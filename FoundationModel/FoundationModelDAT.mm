@@ -28,6 +28,8 @@ using namespace TD;
 // libFMHelper.dylib（Swift）の C API
 extern "C" {
 void* fm_create(const char* instructions);
+bool fm_submit_structured(void* handle, const char* prompt, const char* schema,
+                          double temperature, int32_t maxTokens, bool keepContext);
 bool fm_submit(void* handle, const char* prompt, double temperature, int32_t maxTokens,
                bool keepContext);
 int32_t fm_poll(void* handle, char* buffer, int32_t capacity);
@@ -77,10 +79,19 @@ public:
         if (myWantSubmit && mySession) {
             myWantSubmit = false;
             const char* prompt = inputs->getParString("Prompt");
-            fm_submit(mySession, prompt ? prompt : "",
-                      inputs->getParDouble("Temperature"),
-                      (int32_t)inputs->getParInt("Maxtokens"),
-                      inputs->getParInt("Keepcontext") != 0);
+            const char* schema = inputs->getParString("Schema");
+            if (schema && *schema) {
+                // 構造化出力: "name:type" 改行区切りのスキーマでJSONを生成させる
+                fm_submit_structured(mySession, prompt ? prompt : "", schema,
+                                     inputs->getParDouble("Temperature"),
+                                     (int32_t)inputs->getParInt("Maxtokens"),
+                                     inputs->getParInt("Keepcontext") != 0);
+            } else {
+                fm_submit(mySession, prompt ? prompt : "",
+                          inputs->getParDouble("Temperature"),
+                          (int32_t)inputs->getParInt("Maxtokens"),
+                          inputs->getParInt("Keepcontext") != 0);
+            }
         }
         if (myWantClear && mySession) {
             myWantClear = false;
@@ -96,21 +107,29 @@ public:
             parsePoll(buf.data(), history);
         }
 
-        // テーブル出力
+        // テーブル出力(構造化フィールド行 → 会話履歴の順)
         const int maxRows = std::max(1, (int)inputs->getParInt("Maxrows"));
         const int begin = std::max(0, (int)history.size() - maxRows);
         output->setOutputDataType(DAT_OutDataType::Table);
-        output->setTableSize(1 + (int32_t)(history.size() - begin), 3);
+        output->setTableSize(
+            1 + (int32_t)myStructured.size() + (int32_t)(history.size() - begin), 3);
         output->setCellString(0, 0, "index");
         output->setCellString(0, 1, "role");
         output->setCellString(0, 2, "text");
+        int32_t row = 1;
+        for (auto& kv : myStructured) {
+            output->setCellString(row, 0, kv.first.c_str());
+            output->setCellString(row, 1, "field");
+            output->setCellString(row, 2, kv.second.c_str());
+            row++;
+        }
         for (size_t r = begin; r < history.size(); r++) {
             char idx[16];
             snprintf(idx, sizeof(idx), "%d", (int)r);
-            const int32_t row = (int32_t)(r - begin) + 1;
             output->setCellString(row, 0, idx);
             output->setCellString(row, 1, history[r].role.c_str());
             output->setCellString(row, 2, history[r].text.c_str());
+            row++;
         }
         myTurnCount = (int)history.size();
     }
@@ -155,6 +174,14 @@ public:
             p.page = "Foundation Model";
             p.defaultValues[0] = 1;
             manager->appendToggle(p);
+        }
+        {
+            // 構造化出力スキーマ("name:type" 改行区切り。type: string|number|int|bool)。
+            // 空なら通常のテキスト生成
+            OP_StringParameter p("Schema");
+            p.label = "Output Schema (name:type)";
+            p.page = "Foundation Model";
+            manager->appendString(p);
         }
         {
             OP_NumericParameter p("Maxrows");
@@ -223,6 +250,18 @@ private:
             if ([status isKindOfClass:[NSString class]])
                 myStatus = status.UTF8String;
             myBusy = [dict[@"busy"] boolValue] ? 1 : 0;
+            // 構造化出力(key/value)を取り出してキー順で保持
+            myStructured.clear();
+            NSDictionary* st = dict[@"structured"];
+            if ([st isKindOfClass:[NSDictionary class]]) {
+                NSArray* keys =
+                    [st.allKeys sortedArrayUsingSelector:@selector(compare:)];
+                for (NSString* k in keys) {
+                    NSString* v = [NSString stringWithFormat:@"%@", st[k]];
+                    myStructured.push_back(
+                        {k.UTF8String ?: "", v.UTF8String ?: ""});
+                }
+            }
             NSArray* hist = dict[@"history"];
             if ([hist isKindOfClass:[NSArray class]]) {
                 for (NSDictionary* turn in hist) {
@@ -243,6 +282,7 @@ private:
 
     void* mySession = nullptr;
     std::string myInstructions = "\x01uninit";   // 初回に必ず作り直すための番兵
+    std::vector<std::pair<std::string, std::string>> myStructured;
     std::atomic<bool> myWantSubmit{false};
     std::atomic<bool> myWantClear{false};
     std::string myStatus = "no session";

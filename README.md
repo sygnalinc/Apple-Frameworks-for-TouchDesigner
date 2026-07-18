@@ -38,6 +38,9 @@ Windows+NVIDIA 専用の TD 標準オペレータ（Body Track CHOP 等）の ma
 | [Photogrammetry](Photogrammetry/) | SOP | **写真→3Dメッシュ**（RealityKit Object Capture）。写真フォルダからUSDZ/OBJ生成しSOPジオメトリ出力（templeRing 47枚→1416点/2835三角形・約1分で実証） | ✅ 実装済み |
 | [VisionAesthetics](VisionAesthetics/) | CHOP | **写真の美的スコア**（macOS 15+・-1〜+1とutility判定）。ベストショット自動選択に | ✅ 実装済み |
 | [ImageMetadata](ImageMetadata/) | DAT | **EXIF/GPS/IPTC読み取り**（ImageIO・ファイル直読み）。GPS十進度変換つき。撮影情報を演出パラメータに | ✅ 実装済み |
+| [Shortcuts](Shortcuts/) | DAT | **macOSショートカット実行ブリッジ**（shortcuts CLI）。HomeKit照明・家電・通知をTDイベントから。一覧取得・入出力受け渡し対応 | ✅ 実装済み |
+| [Multipeer](Multipeer/) | DAT | **Mac/iPhone間ローカルP2P**（MultipeerConnectivity）。自動発見・自動接続でテキスト送受信（2ノード相互接続・送受信を実測）。サーバー不要 | ✅ 実装済み |
+| [GameController](GameController/) | CHOP | **ゲームパッド入力**（PS5/Xbox/MFi）。アナログトリガー・モーション・ランブル対応。Joystick CHOPのモダン代替 | ⚠ 実機パッド未検証 |
 | [VisionContours](VisionContours/) | SOP | **画像輪郭を閉じたLine primitiveへ変換**。親子階層属性と点数制御に対応し、Sweep/Extrude/Particleへ直結 | ✅ 実装済み |
 | [VisionAnimalPose](VisionAnimalPose/) | CHOP | **犬・猫の2D姿勢推定**（25関節・複数匹）。bboxとu/v/confidenceを左→右スロット出力 | ✅ 実装済み |
 | [VisionClassify](VisionClassify/) | DAT | **Apple標準モデルによる画像分類**。追加モデル不要でrank/identifier/confidenceを上位100件まで出力 | ✅ 実装済み |

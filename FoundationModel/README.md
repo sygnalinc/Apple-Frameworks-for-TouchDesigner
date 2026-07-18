@@ -36,6 +36,16 @@ Info CHOP: `executes / busy / turns`。Info DAT: `status`
 （ready / generating / unavailable: Apple Intelligence not enabled 等 — 端末側で
 Apple Intelligence を有効にしておく必要がある）。
 
+## 構造化出力
+
+Output Schema に `name:type` を改行区切りで書くと(type: string|number|int|bool)、
+出力が**スキーマ保証のJSON**になり、テーブル先頭に `field` 行として展開される。
+
+実測: Instructions「照明デザイナー」+「真っ赤で激しく点滅する興奮した雰囲気にして」
++ Schema `color:string / intensity:number / strobe:bool`
+→ **color=red / intensity=100 / strobe=1**。
+Select DAT で `field` 行だけ抜けばそのままショー制御に接続できる。
+
 ## 使いどころ（他OPとの生成チェーン）
 
 - **ライブ実況**: SoundClass（歓声）や VisionPose（動き量）の値を CHOP Execute で

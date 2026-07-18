@@ -23,6 +23,7 @@ final class FMSession: @unchecked Sendable {
     private var status = "checking availability"
     private var busy = false
     private var history: [[String: String]] = []   // {role, text}
+    private var structured: [String: Any] = [:]    // 最後の構造化出力
     private var generation = 0
 
     init(instructions: String) {
@@ -119,6 +120,113 @@ final class FMSession: @unchecked Sendable {
         }
     }
 
+    // ------------------------------------------------- 構造化出力
+    // schemaSpec: "color:string" 改行区切り(type ∈ string|number|int|bool)
+    func submitStructured(prompt: String, schemaSpec: String, temperature: Double,
+                          maxTokens: Int, keepContext: Bool) -> Bool
+    {
+        lock.lock()
+        if busy {
+            lock.unlock()
+            return false
+        }
+        busy = true
+        status = "generating"
+        history.append(["role": "user", "text": prompt])
+        history.append(["role": "assistant", "text": ""])
+        let gen = generation + 1
+        generation = gen
+        lock.unlock()
+
+        Task { [weak self] in
+            await self?.runStructured(prompt: prompt, schemaSpec: schemaSpec,
+                                      temperature: temperature, maxTokens: maxTokens,
+                                      keepContext: keepContext, gen: gen)
+        }
+        return true
+    }
+
+    private func runStructured(prompt: String, schemaSpec: String, temperature: Double,
+                               maxTokens: Int, keepContext: Bool, gen: Int) async
+    {
+        do {
+            // "name:type" 行 → DynamicGenerationSchema
+            var fields: [(String, String)] = []
+            var props: [DynamicGenerationSchema.Property] = []
+            for rawLine in schemaSpec.split(whereSeparator: { $0 == "\n" || $0 == "," }) {
+                let parts = rawLine.split(separator: ":", maxSplits: 1)
+                guard let n = parts.first?.trimmingCharacters(in: .whitespaces),
+                      !n.isEmpty else { continue }
+                let t = parts.count > 1
+                    ? parts[1].trimmingCharacters(in: .whitespaces).lowercased() : "string"
+                fields.append((n, t))
+                let s: DynamicGenerationSchema
+                switch t {
+                case "number", "float", "double":
+                    s = DynamicGenerationSchema(type: Double.self)
+                case "int", "integer":
+                    s = DynamicGenerationSchema(type: Int.self)
+                case "bool", "boolean":
+                    s = DynamicGenerationSchema(type: Bool.self)
+                default:
+                    s = DynamicGenerationSchema(type: String.self)
+                }
+                props.append(DynamicGenerationSchema.Property(
+                    name: n, description: nil, schema: s))
+            }
+            let root = DynamicGenerationSchema(name: "Output", description: nil,
+                                               properties: props)
+            let schema = try GenerationSchema(root: root, dependencies: [])
+
+            lock.lock()
+            if !keepContext || session == nil {
+                session = LanguageModelSession(instructions: instructions)
+            }
+            let sess = session!
+            lock.unlock()
+
+            var options = GenerationOptions()
+            options.temperature = temperature
+            options.maximumResponseTokens = maxTokens
+
+            let resp = try await sess.respond(to: prompt, schema: schema,
+                                              options: options)
+            let content = resp.content
+            var dict: [String: Any] = [:]
+            for (n, t) in fields {
+                switch t {
+                case "number", "float", "double":
+                    dict[n] = (try? content.value(Double.self, forProperty: n)) ?? 0
+                case "int", "integer":
+                    dict[n] = (try? content.value(Int.self, forProperty: n)) ?? 0
+                case "bool", "boolean":
+                    dict[n] = (try? content.value(Bool.self, forProperty: n)) ?? false
+                default:
+                    dict[n] = (try? content.value(String.self, forProperty: n)) ?? ""
+                }
+            }
+            let jsonText: String
+            if let d = try? JSONSerialization.data(withJSONObject: dict),
+               let s = String(data: d, encoding: .utf8) { jsonText = s }
+            else { jsonText = "{}" }
+
+            lock.lock()
+            structured = dict
+            if generation == gen, var last = history.last, last["role"] == "assistant" {
+                last["text"] = jsonText
+                history[history.count - 1] = last
+            }
+            busy = false
+            status = "ready"
+            lock.unlock()
+        } catch {
+            lock.lock()
+            busy = false
+            status = "error: \(error.localizedDescription)"
+            lock.unlock()
+        }
+    }
+
     func clear() {
         lock.lock()
         history.removeAll()
@@ -135,6 +243,7 @@ final class FMSession: @unchecked Sendable {
             "status": status,
             "busy": busy,
             "history": history,
+            "structured": structured,
         ]
         lock.unlock()
         guard let data = try? JSONSerialization.data(withJSONObject: dict),
@@ -180,6 +289,23 @@ public func fm_poll(_ handle: UnsafeMutableRawPointer?,
     memcpy(buffer, utf8, utf8.count)
     buffer[utf8.count] = 0
     return Int32(utf8.count)
+}
+
+@_cdecl("fm_submit_structured")
+public func fm_submit_structured(_ handle: UnsafeMutableRawPointer?,
+                                 _ prompt: UnsafePointer<CChar>?,
+                                 _ schema: UnsafePointer<CChar>?,
+                                 _ temperature: Double, _ maxTokens: Int32,
+                                 _ keepContext: Bool) -> Bool
+{
+    guard #available(macOS 26.0, *), let handle, let prompt, let schema else {
+        return false
+    }
+    let session = Unmanaged<FMSession>.fromOpaque(handle).takeUnretainedValue()
+    return session.submitStructured(prompt: String(cString: prompt),
+                                    schemaSpec: String(cString: schema),
+                                    temperature: temperature,
+                                    maxTokens: Int(maxTokens), keepContext: keepContext)
 }
 
 @_cdecl("fm_clear")

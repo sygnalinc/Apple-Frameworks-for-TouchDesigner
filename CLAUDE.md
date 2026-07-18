@@ -765,3 +765,28 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
 - **ヘルパdylibの修正が反映されないときは install name キャッシュ**(ハマりどころ集①の実例)。
   .plugin のパスを変えても dylib の install name が同じだと dyld が旧dylibを使い続ける。
   Photogrammetry/Shazam の build.sh を `lib*_<epoch>.dylib` 方式に修正済み
+
+### 2026-07-19 6件実装(既存強化3+新規3)
+
+ユーザー指示で推奨リスト6件を一括実装。全てM2実測(GameControllerのみ構造検証)。
+
+- **TextAnalyze日本語類似度**: NLContextualEmbedding(BERT系・macOS 14+)を第一候補に。
+  平均プーリング+コサイン類似度。実測: ja文どうしで similarity=0.6433。
+  非対応言語/OSはNLEmbeddingへフォールバック。初回アセットDLは警告表示
+- **FoundationModel構造化出力**: DynamicGenerationSchemaで "name:type" スキーマ→
+  スキーマ保証JSON。DATに Schema パラメータ+field行出力を追加。
+  実測: 「真っ赤で激しく点滅」→ color=red / intensity=100 / strobe=1。
+  helper dylib を epoch 付き名に修正(install nameキャッシュ対策)
+- **VisionFace quality**: VNDetectFaceCaptureQualityRequest を Quality トグルで追加
+  (face{i}/quality・bbox最近傍マッチ)。Offなら従来チャンネル互換。
+  実測: ダンス動画3顔・quality=0.246
+- **Shortcuts DAT**(新規): shortcuts CLI ブリッジ。List/Run・入出力受け渡し。
+  実測: ユーザー実環境の21ショートカット列挙
+- **Multipeer DAT**(新規): MultipeerConnectivity自動メッシュ(表示名辞書順で
+  片方向招待=二重接続防止)。実測: 同一マシン2ノードが相互接続し
+  "hello from A" の送受信を確認。入力DAT変化で自動送信
+- **GameController CHOP**(新規): GCController 19ch+モーション6ch+CoreHapticsランブル。
+  実機パッド未検証(未接続時の警告表示のみ確認)
+- 6件ともビルド・インストール済み(TD再起動で反映)。README更新・ルート一覧に3行追加
+- 次にやること: GameControllerの実機パッド検証、FoundationModelのfield行を使った
+  ショー制御デモ、iPhone側Multipeerサンプルの用意
