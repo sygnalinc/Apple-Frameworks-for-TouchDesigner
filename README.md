@@ -29,7 +29,15 @@ Windows+NVIDIA 専用の TD 標準オペレータ（Body Track CHOP 等）の ma
 | [VisionSubject](VisionSubject/) | TOP | **任意被写体の切り抜き**（Subject Lifting・macOS 14+）。写真アプリ「被写体をコピー」と同じAPI。ソフトマスク/背景透過カットアウト/インスタンス分離。720p 約45ms | ✅ 実装済み |
 | [VisionTrack](VisionTrack/) | CHOP | **任意オブジェクト追跡**（VNTrackObjectRequest）。初期bbox指定→追従、valid/u/v/w/h/confidence出力。3〜5ms/frame。Blob Track TOP 代替に近い | ✅ 実装済み |
 | [FrameInterp](FrameInterp/) | TOP | **MLフレーム補間/モーションブラー**（VTFrameProcessor・macOS 15.4+）。前後フレームの中間生成（Phase指定）とML動きブラー。720p 約15fps | ✅ 実装済み |
-| [Upscale](Upscale/) | TOP | **リアルタイム超解像**。**Nvidia Upscaler TOP 代替**。MetalFX Spatial（任意倍率・2x 16ms）/ VT Super Resolution（macOS 26+・4x固定・1.9s・ML高品質） | ✅ 実装済み |
+| [Upscale](Upscale/) | TOP | **リアルタイム超解像**。**Nvidia Upscaler TOP 代替**。バックエンド3種: MetalFX Spatial（任意倍率・2x 16ms）/ VT Super Resolution（4x固定・1.9s・高品質）/ **VT Low Latency ML（2x・21ms・入力96〜960px）** | ✅ 実装済み |
+| [CoreMLDetect](CoreMLDetect/) | DAT | **汎用物体検出**。YOLOv3等の検出Core MLモデルで「何が・どこに」をテーブル出力（label/confidence/bbox）。M2実測 YOLOv3 38ms≈26fps・banana 0.994 | ✅ 実装済み |
+| [TextAnalyze](TextAnalyze/) | DAT | **テキスト解析**（NaturalLanguage）。感情スコア・言語判定・固有表現（人名/地名/組織）・参照テキストとの意味的類似度。SpeechText直結で「発話の感情/話題でビジュアル制御」 | ✅ 実装済み |
+| [Denoise](Denoise/) | TOP | **MLテンポラルノイズ除去**（VTTemporalNoiseFilter・macOS 26+）。**M2は非対応**（isSupported=false・エラー表示のみ）。対応ハード向け実装 | ⚠ M2非対応 |
+| [SAM2Segment](SAM2Segment/) | TOP | **点指定で任意物体マスク**（SAM 2.1・Apple公式Core ML）。エンコード390ms+デコード40ms — 静止画は点を動かすだけで25fps級のインタラクティブ選択。観客が触れたものを切り抜く演出に | ✅ 実装済み |
+| [Shazam](Shazam/) | DAT | **自作音源のオフライン照合**（ShazamKit カスタムカタログ）。どの曲の何秒目かを判定（実測 offset 29.06s特定）— 会場音源にショー進行を同期 | ✅ 実装済み |
+| [Photogrammetry](Photogrammetry/) | SOP | **写真→3Dメッシュ**（RealityKit Object Capture）。写真フォルダからUSDZ/OBJ生成しSOPジオメトリ出力。分単位のじっくり系 | ⚠ APIパス検証のみ（写真セット待ち） |
+| [VisionAesthetics](VisionAesthetics/) | CHOP | **写真の美的スコア**（macOS 15+・-1〜+1とutility判定）。ベストショット自動選択に | ✅ 実装済み |
+| [ImageMetadata](ImageMetadata/) | DAT | **EXIF/GPS/IPTC読み取り**（ImageIO・ファイル直読み）。GPS十進度変換つき。撮影情報を演出パラメータに | ✅ 実装済み |
 | [VisionContours](VisionContours/) | SOP | **画像輪郭を閉じたLine primitiveへ変換**。親子階層属性と点数制御に対応し、Sweep/Extrude/Particleへ直結 | ✅ 実装済み |
 | [VisionAnimalPose](VisionAnimalPose/) | CHOP | **犬・猫の2D姿勢推定**（25関節・複数匹）。bboxとu/v/confidenceを左→右スロット出力 | ✅ 実装済み |
 | [VisionClassify](VisionClassify/) | DAT | **Apple標準モデルによる画像分類**。追加モデル不要でrank/identifier/confidenceを上位100件まで出力 | ✅ 実装済み |
@@ -37,6 +45,22 @@ Windows+NVIDIA 専用の TD 標準オペレータ（Body Track CHOP 等）の ma
 | [VisionTrajectory](VisionTrajectory/) | CHOP | **放物運動する小物体の軌跡検出**。実測点/投影点、放物線係数、平均半径を出力 | ✅ 実装済み |
 | [CoreMLCHOP](CoreMLCHOP/) | CHOP | **汎用Core MLベクトル推論**。画像入力モデルのMultiArrayを最大65536chへフラット化し、feature/shapeをInfo DAT出力 | ✅ 実装済み |
 | [VisionRect](VisionRect/) | CHOP | **複数矩形検出**。confidence、bbox、投影四隅を最大100スロットへ出力しCorner Pinへ直結 | ✅ 実装済み |
+| [VisionKeystone](VisionKeystone/) | TOP | **矩形の自動透視補正**。VisionRect CHOPの四隅または手動四隅から紙面・スクリーン・投影面を正対化。Core Image使用 | ✅ 実装済み |
+| [SoundFeatures](SoundFeatures/) | CHOP | **音響特徴量解析**。RMS/Peak/FFT帯域/centroid/flux/onset/beat/BPMと16帯域をAccelerate/vDSPで非同期出力 | ✅ 実装済み |
+| [ScreenCapture](ScreenCapture/) | TOP | **macOS画面キャプチャ**。ScreenCaptureKitでディスプレイまたは単一ウインドウを指定解像度・最大120fpsで取得 | ✅ 実装済み |
+| [VisionSimilarity](VisionSimilarity/) | CHOP | **画像類似度**。Vision Feature Printで2つのTOPのdistance/similarity/matchをモデル追加なしで出力 | ✅ 実装済み |
+| [VoiceActivity](VoiceActivity/) | CHOP | **発話区間検出**（SpeechDetector・macOS 26+）。speaking/onset/offsetと区間時刻を完全オンデバイス出力 | ✅ 実装済み |
+| [VisionBokeh](VisionBokeh/) | TOP | **マスク可変ぼかし**。VisionSubject等のマスクから被写体を保持した背景ボケをCore Imageで生成 | ✅ 実装済み |
+| [MPSAnalyze](MPSAnalyze/) | CHOP | **GPU画像統計**。Metal Performance ShadersのRGBAヒストグラムと平均・輝度分布を76chで出力 | ✅ 実装済み |
+| [SystemAudio](SystemAudio/) | CHOP | **macOSシステム音声キャプチャ**。ScreenCaptureKitから48kHz stereoを取得し、ScreenCapture TOPと併用可能 | ✅ 実装済み |
+| [VisionHorizon](VisionHorizon/) | CHOP | **水平線・地平線検出**。angle、補正transform、confidenceを出力。640x360初回約38ms | ✅ 実装済み |
+| [CoreImageCode](CoreImageCode/) | TOP | **QR/Aztec/PDF417/Code 128生成**。Core Image標準generator、外部ライブラリ不要。512x512出力を実機確認 | ✅ 実装済み |
+| [ImageAutoEnhance](ImageAutoEnhance/) | TOP | **画像の自動補正**。Core Imageが露出・彩度・色補正filterを自動選択。640x360約32ms | ✅ 実装済み |
+| [SpeechSynth](SpeechSynth/) | CHOP | **オンデバイス音声合成**。AVSpeechSynthesizerのSystem VoiceをPCM stereo CHOPへ出力 | ✅ 実装済み |
+| [MusicCompose](MusicCompose/) | DAT | **アルゴリズム／Foundation Models作曲**。コード・ベース・メロディ・ドラムを共通MIDI event JSONへ生成 | ✅ 実装済み |
+| [MusicSequence](MusicSequence/) | CHOP | **SoundFont/内蔵シンセ楽曲レンダリング**。4つのApple Samplerへpad/bass/lead/drumsを分離し44.1kHz stereo化 | ✅ 実装済み |
+| [MusicMIDI](MusicMIDI/) | CHOP | **外部DAWリアルタイム再生**。Core MIDI仮想ポートへ4トラックのNote/Clock/Transportを送信 | ✅ 実装済み |
+| [MusicEvents](MusicEvents/) | DAT | **作曲MIDIイベント確認表**。小節・拍・パート・チャンネル・ノート名・長さ・ベロシティを一覧化 | ✅ 実装済み |
 
 ## 必要環境
 

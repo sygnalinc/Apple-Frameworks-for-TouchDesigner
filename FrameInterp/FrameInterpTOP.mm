@@ -67,7 +67,6 @@ public:
     {
         myExecCount++;
         const bool active = inputs->getParInt("Active") != 0;
-        myFlip = inputs->getParInt("Flip") != 0;
         myMode = (strcmp(inputs->getParString("Mode"), "motionblur") == 0) ? 1 : 0;
         myPhase = (float)inputs->getParDouble("Phase");
         myStrength = (int)inputs->getParInt("Strength");
@@ -79,8 +78,10 @@ public:
             std::unique_lock<std::mutex> lock(myMutex, std::try_to_lock);
             if (lock.owns_lock() && !myHasPending && !myBusy) {
                 OP_TOPInputDownloadOptions opts;
+                // 補間/ブラーは向きに依存しないので flip せずそのまま渡し、そのまま返す
+                // (Vision系と違い出力側の再反転が無いため、flip すると上下逆になる)
                 opts.pixelFormat = OP_PixelFormat::RGBA16Float;
-                opts.verticalFlip = myFlip;
+                opts.verticalFlip = false;
                 myPending = top->downloadTexture(opts, nullptr);
                 if (myPending) {
                     myHasPending = true;
@@ -158,13 +159,6 @@ public:
             p.clampMaxes[0] = true;
             manager->appendInt(p);
         }
-        {
-            OP_NumericParameter p("Flip");
-            p.label = "Flip Image Vertically";
-            p.page = "Frame Interp";
-            p.defaultValues[0] = 1;
-            manager->appendToggle(p);
-        }
     }
 
     int32_t getNumInfoCHOPChans(void*) override { return 4; }
@@ -193,7 +187,6 @@ private:
             OP_SmartRef<OP_TOPDownloadResult> download;
             int mode, strength;
             float phase;
-            bool flip;
             {
                 std::unique_lock<std::mutex> lock(myMutex);
                 myCond.wait(lock, [this] { return myQuit || myHasPending; });
@@ -205,7 +198,6 @@ private:
                 mode = myMode;
                 phase = myPhase;
                 strength = myStrength;
-                flip = myFlip;
             }
             FrameResult result;
             std::string error;
@@ -452,7 +444,6 @@ private:
 
     std::atomic<int> myMode{0}, myStrength{50};
     std::atomic<float> myPhase{0.5f};
-    std::atomic<bool> myFlip{true};
 
     std::atomic<int> myExecCount{0}, mySubmitCount{0}, myAnalyzeCount{0};
     std::atomic<float> myProcessMs{0.0f};

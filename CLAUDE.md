@@ -64,10 +64,13 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
    結果は1〜2フレーム遅れで最新値を出力する
 2. TOP入力は `inputs->getParTOP()/getInputTOP()` → `downloadTexture()`。
    `getData()` はブロックするので**ワーカー側で呼ぶ**。busyフラグで多重投入を防ぐ
-3. **TOPダウンロードは BGRA8Fixed + `verticalFlip=true` 必須**
+3. **TOPダウンロードは BGRA8Fixed + `verticalFlip=true` 必須 — ただし Vision/ML 意味処理系のみ**
    (TDのテクスチャはGL系bottom-up。フリップしないとVisionが検出0になる)。
-   `Flip` トグル(既定On)として必ず露出する
+   `Flip` トグル(既定On)として露出する。**向きに依存しない処理(Upscale/FrameInterp の
+   幾何変換・補間系)は flip 自体を持たない**(verticalFlip=false 固定・出力もそのまま。
+   片側だけ flip すると出力が上下逆になる事故の元)
 4. TOP出力(CPUMem)は Vision系出力(top-down)を**行反転してアップロード**
+   (ダウンロード flip と出力再反転は必ず対で行う)
 5. 診断用に Info CHOP チャンネル(`executes / submits / analyzes` 等)を必ず出す。
    `analyzes` が `executes` に追従していればフレーム落ちなし、という読み方
 6. `cookEveryFrameIfAsked = true`。**出力をどこかで使っていないとcookされない**
@@ -276,5 +279,445 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   （削除済みファイル・未追跡ファイルを含む）を1コミットとしてpushする方針
 - `Assets/test_video_2.mp4`（約183MB）はGitHub通常Gitの100MB制限を超えるため、
   ユーザーの「LFSは使わない」指示に従い、ローカルに残して今回のコミット対象から除外
-- `codex/publish-all-changes`でコミット・push完了（commit: `ecd67ac`）。除外動画のみ
+- `codex/publish-all-changes`でコミット・push完了（最終commit: `b811ade`）。除外動画のみ
   未追跡でローカルに残る
+
+### 2026-07-19 次期プラグイン候補の調査
+
+- Core Imageの汎用色補正・ブラー・エッジ処理はTouchDesigner標準TOPと重なりやすいため、
+  Vision出力と組み合わせて自動化できる機能を優先候補とした
+- 最優先は`VisionKeystone TOP`。既存`VisionRect CHOP`の四隅を
+  `CIPerspectiveCorrection`または`CIKeystoneCorrectionCombined`へ渡し、紙面・
+  スクリーン・投影面を自動で正対補正する。`TOP -> VisionRect -> TOP`の一貫した
+  ワークフローになり、既存群との相乗効果が最も大きい
+- 次点は、Vision Feature Printによる`VisionSimilarity CHOP`、水平角検出による
+  `VisionHorizon CHOP`、マスク入力で背景だけを可変ぼかしする`VisionBokeh TOP`、
+  QR/Code128等を生成する`CoreImageCode TOP`。画像美的スコア出力も候補だが、
+  演出用途の汎用性では上記より後順位
+
+### 2026-07-19 音声・サウンド系の次期候補調査
+
+- 既存`SoundClass CHOP`はSoundAnalysis組込み分類（300種類以上）と独自Core ML音響モデルを
+  すでに扱うため、分類器の重複実装は優先しない
+- 最優先候補は`SoundFeatures CHOP`。Audio CHOPからRMS/peak、周波数帯エネルギー、
+  spectral centroid/flux、onset/beat、推定tempoを一貫した低遅延CHOPとして出す
+- 次点は新Speech APIの`SpeechDetector`をSwift helperで包む`VoiceActivity CHOP`。
+  `speaking / onset / offset / confidence`を出し、SpeechTextの文字起こし開始・終了、
+  映像切替、照明制御に直接使える
+- 音源分離・自動ミックスはApple標準のオンデバイスAPIだけでは汎用実装の基盤が弱いため、
+  現時点では優先外。空間音響はAVAudioEngineで可能だが、TouchDesigner標準の音声経路との
+  接続・出力デバイス所有が複雑なため後順位
+
+### 2026-07-19 Appleフレームワーク横断の候補カタログ調査
+
+- macOS版TouchDesignerのネイティブpluginとして有効な範囲を、Vision/Core Image/
+  AVFoundation/ScreenCaptureKit/Metal Performance Shaders/Accelerate/Speech/
+  NaturalLanguage/WeatherKit/MapKit/Core Location/MultipeerConnectivityまで横断調査
+- 最優先候補は`VisionKeystone TOP`、`SoundFeatures CHOP`、`ScreenCapture TOP`。
+  既存pluginと相乗効果があり、TD標準OPとの差別化も明確
+- `ScreenCapture TOP`はScreenCaptureKitでディスプレイ・アプリ・任意ウインドウと同時に
+  システム音声を取得できる。画面収録権限と選択UIを要する
+- `MPSAnalyze TOP/CHOP`（histogram/平均色/統計）、`ImageAutoEnhance TOP`、
+  `VisionSimilarity CHOP`、`VisionHorizon CHOP`、`VisionBokeh TOP`、
+  `CoreImageCode TOP`を映像系の有望候補として整理
+- 文章・データ入力向けには`TextAnalyze DAT`（言語判定・固有表現・品詞・埋め込み）、
+  外部演出データには`Weather CHOP/DAT`、`MapSnapshot TOP`、`Location CHOP`、
+  `Multipeer DAT/CHOP`を候補化。ただしそれぞれ権限・Developer Program・利用規約・
+  ローカルネットワーク設定を伴うため優先度は下げる
+- iOS/visionOS中心でmacOS版TouchDesignerに直接載せにくいARKit、RoomPlan、
+  Nearby Interaction、HealthKit、Core Hapticsは今回の実装候補から除外
+
+### 2026-07-19 VisionKeystone TOP実装
+
+- `CIPerspectiveCorrection`を使う非同期CPUMem TOPを新規実装
+- 既存VisionRect CHOPの`rect{i}/tl:u`等8chを直接参照でき、手動四隅にも対応
+- 自動解像度または固定出力解像度、Flip既定On、Info CHOP診断を実装
+- Core Image / Core Graphicsをリンクし、ad-hoc署名までビルド成功
+
+### 2026-07-19 SoundFeatures CHOP実装
+
+- Accelerate/vDSPのHann窓+FFTをワーカースレッドで実行する非同期CHOPを新規実装
+- RMS/peak/dB/ZCR/centroid/rolloff/spectral flux/onset/beat/BPM、bass/mid/high、
+  対数16帯域を固定29ch・1sampleで出力
+- FFTサイズとonset閾値、Info CHOP診断を実装し、ad-hoc署名までビルド成功
+
+### 2026-07-19 ScreenCapture TOP実装
+
+- ScreenCaptureKitでdisplay/windowを選択してBGRA8 TOPへ非同期出力するpluginを新規実装
+- source index、ネイティブ/固定解像度、1〜120fps、カーソル表示、Restartに対応
+- callback受信フレームを最新値保持し、画面収録権限/APIエラーをWarningへ出力
+- ScreenCaptureKit/CoreMedia/CoreVideoをリンクし、ad-hoc署名までビルド成功
+
+### 2026-07-19 VisionSimilarity CHOP実装
+
+- `VNGenerateImageFeaturePrintRequest`で2つのTOPを非同期比較するCHOPを新規実装
+- `valid / distance / similarity / match`を出力し、distance閾値をパラメータ化
+- similarityは演出制御用に`exp(-distance/10)`へ変換、Vision固有distanceもそのまま保持
+- Vision/CoreVideoをリンクし、ad-hoc署名までビルド成功
+
+### 2026-07-19 VoiceActivity CHOP実装
+
+- macOS 26のSwift専用`SpeechDetector`をhelper dylib+C ABIで包むCHOPを新規実装
+- `speaking / onset / offset / start / end / duration`を出力し、感度3段階に対応
+- Audio CHOPの任意sample rateをSpeechAnalyzer推奨形式へ変換してAsyncStreamへ投入
+- macOS 14 targetの`@available`ガード、Info DAT status、同梱dylibのrpathを実装し、
+  Swift 6のNSLock async-context警告（現言語モードではwarning）を除きビルド・署名成功
+
+### 2026-07-19 VisionBokeh TOP実装
+
+- Core Image `CIMaskedVariableBlur`を使う2入力非同期CPUMem TOPを新規実装
+- 入力0=画像、入力1=マスク。VisionSubject等の白い被写体マスクを想定し、背景ぼかし用の
+  mask反転を既定Onに設定。異解像度マスクの自動スケールにも対応
+- radius 0〜100、Flip既定On、Info CHOP診断を実装し、ビルド・署名成功
+
+### 2026-07-19 Core Image同時実行クラッシュ修正
+
+- TD実測でVisionKeystoneとVisionBokehを別pluginパスから同時初期化した際、
+  `CIFilter setValue:forKey:`内部のKVC競合でEXC_BAD_ACCESSを確認
+- 両pluginのCore Image処理区間を`@synchronized([CIFilter class])`でプロセス横断直列化
+- Core Image出力の行反転を追加し、TD上で正立画像を`get_top_image`相当のsnapshot確認
+- TD再起動後に両TOPを同時40cookし、640x426出力・エラー/警告なし・再クラッシュなしを確認
+
+### 2026-07-19 MPSAnalyze CHOP実装
+
+- `MPSImageHistogram`でRGBA 256binをGPU集計し、16bin×4chへ正規化するCHOPを新規実装
+- RGBA平均、Rec.709輝度の平均/標準偏差/最小/最大、dark/midtone/bright比率を加え、
+  合計76ch・1sampleで出力。GPU完了待ちはワーカースレッドで行いcookは非ブロッキング
+- M2実測で640x426画像からmean_luma=0.4895、std_luma=0.2976、
+  dark/midtone/bright=0.2589/0.5129/0.2282。ビルド・署名成功
+
+### 2026-07-19 新規7プラグイン最終検証
+
+- VisionKeystone / SoundFeatures / ScreenCapture / VisionSimilarity / VoiceActivity /
+  VisionBokeh / MPSAnalyzeを全件再ビルドし、ad-hoc署名と`codesign --verify --deep --strict`成功
+- TD MCP実測: Keystone/Bokehは640x426正立出力、Similarityは同一画像distance=0・
+  similarity=1、MPSAnalyzeはvalid=1・76ch、ScreenCaptureは1710x1112を取得
+- SoundFeaturesは44.1kHz・440Hz正弦波でRMS=0.707、centroid=440.0Hzを確認
+- VoiceActivityは6chロードと非音声入力speaking=0を確認。実発話によるonset/offsetは未検証
+- ScreenCaptureは再起動前にTCC拒否Warning、再起動後は権限が反映され実画面取得成功
+- 静止画の処理パラメータ変更で再投入するsignature検知をKeystone/Bokeh/Similarity/MPSへ追加
+- `git diff --check`、opType規約、英字3文字opIcon、全READMEとルート一覧更新を確認
+- TD `/project1` の`_codex_*`検証ノードを全て削除
+
+### 2026-07-19 新規7プラグインのGit公開
+
+- 今回の7プラグイン、各README、ルートREADME、引き継ぎ記録を
+  `codex/publish-all-changes`へコミットしてoriginへpush
+- LFSは使用せず、183MBの`Assets/test_video_2.mp4`は引き続きローカルのみ
+- TDクラッシュ由来の`CrashAutoSave.sample.toe`と更新された`sample.toe`、既存の
+  `sample.py`削除は混在差分としてコミット対象外に保持
+
+### 2026-07-19 次期プラグイン候補（7件実装後）
+
+- 最優先は`SystemAudio CHOP`。ScreenCaptureKitのaudio streamをAudio CHOPとして出し、
+  新規ScreenCapture TOPと組み合わせてアプリ/画面映像とシステム音を同時利用できるようにする
+- 次点は`VisionHorizon CHOP`、`CoreImageCode TOP`、`ImageAutoEnhance TOP`。
+  小〜中規模でApple標準APIの価値が明確かつ、既存Vision/Core Image群と接続しやすい
+- その後は`SpeechSynth CHOP`、`TextAnalyze DAT`、`VisionAesthetics CHOP`、
+  `ImageMetadata DAT`を推奨。オンデバイス音声合成、NLP、画像選別、EXIF/GPSを補完する
+- 外部入力系の`GameController CHOP`、`CoreMIDI2 CHOP`、外部データ系の
+  `Weather CHOP/DAT`、`MapSnapshot TOP`は有用だが、TD標準OPとの重複や権限・利用条件が
+  増えるため後順位
+
+### 2026-07-19 次期5プラグイン実装
+
+- `SystemAudio CHOP`をScreenCaptureKitのaudio streamで実装。display index、48 kHz stereo、
+  block size、TouchDesigner自身の音声除外、Restart、Info CHOP診断に対応
+- `VisionHorizon CHOP`を`VNDetectHorizonRequest`で実装。valid/angle/angledeg、
+  affine transformのa〜d、confidenceを非同期出力
+- `CoreImageCode TOP`をCore Image generatorで実装。QR/Aztec/PDF417/Code 128、
+  整数拡大、中央配置、quiet zone、QR error correctionに対応
+- `ImageAutoEnhance TOP`を`autoAdjustmentFiltersWithOptions`で実装。red-eye/crop/levelを
+  選択でき、実際に適用したfilter名をInfo DATへ出力
+- `SpeechSynth CHOP`を`AVSpeechSynthesizer.writeUtterance`で実装。Text/Voice/Rate/Pitch/
+  Volume、Speak/Stop、文字変更trigger、PCM stereo出力に対応
+- 5件ともcookをブロックしないcallback/worker構成、Info CHOP診断、個別README、
+  ルートREADME一覧を追加。build bundleのad-hoc署名検証に成功
+- TD実測: 5件すべてロード・パラメータ生成・エラーなし。CoreImageCodeは512x512 QRを視認、
+  ImageAutoEnhanceは640x360正立・2 filters・約32.1ms、VisionHorizonは水平構造のない
+  gradientで解析約37.7ms・valid=0、SpeechSynthは英語1 utteranceを22.05 kHz・181 buffers生成
+- SystemAudioは48 kHz stereo 1024 samplesとstream running=1まで確認。テスト音再生中の
+  callback/peak捕捉は未完了のため、実音声の最終確認が残る
+- TD検証ノード削除時にMCP接続断を確認。SpeechSynthのbuffer callbackがinstance破棄後に
+  ownerへ触れないようshared atomic生存tokenを追加。修正版は再ビルド・署名済みだが、
+  TouchDesigner再起動が必要なため破棄テストの再確認は未実施
+
+### 2026-07-19 次期5プラグインをCustom OPへ登録
+
+- SystemAudioCHOP / VisionHorizonCHOP / CoreImageCodeTOP / ImageAutoEnhanceTOP /
+  SpeechSynthCHOPの完成bundleを`~/Library/Application Support/Derivative/
+  TouchDesigner099/Plugins/`へ配置
+- 配置先に既存の同名bundleがないことを確認して新規登録し、全5件で実行binaryの存在と
+  `codesign --verify --deep --strict`成功を確認
+- TouchDesignerは起動時に常設Custom OPを走査するため、登録反映にはTD再起動が必要
+
+### 2026-07-19 音楽生成ライブラリ調査
+
+- Apple標準Frameworkにはtext-to-music専用の公開生成APIはない。AVAudioEngine /
+  AVAudioSequencer / AVAudioUnitSamplerで合成・MIDI再生はできるが、作曲モデルは別途必要
+- 完成音声生成候補はMeta AudioCraftのMusicGen/JASCO、Stability AIのStable Audio系、
+  ライブ生成候補はMagenta RealTime。MusicGen weightはCC-BY-NC 4.0のため商用配布不可
+- TD向け最優先案は`MusicSequence CHOP/DAT`。Foundation Modelsまたは小型Core MLモデルで
+  note/chord/drumイベントを生成し、AVAudioSequencer/AVAudioUnitSamplerで鳴らす構成
+- 高品質text-to-musicは`MusicGen CHOP`として別Python workerまたは専用helper processを使い、
+  生成済みPCMをCHOPへstreamする案が現実的。巨大weightは従来どおりcommitしない
+
+### 2026-07-19 Apple標準API作曲プラグイン実装
+
+- `MusicCompose DAT`を新規実装。BPM/Bar/Key/Scale/Seed/Complexityからchords/bass/
+  melody/drumsのMIDI event JSONを即時生成するAlgorithmモードを搭載
+- Foundation Modelsモードは既存Swift helper方式を再利用し、厳密な同一JSON schemaを要求。
+  Apple Intelligence利用不可、生成中、不正JSON時はAlgorithm結果を維持する
+- `MusicSequence CHOP`を新規実装。Song JSON DATを読み、worker thread上のAVAudioEngine
+  manual offline rendering + AVAudioUnitSamplerで44.1 kHz stereo PCMへ変換
+- Play/Loop/Volume/Block Samples、SoundFont/DLS path、GM Program、Render/Restartに対応。
+  初版は単一Samplerのため全track共通音色。track別Samplerは次版候補
+- 両pluginともSDKビルドとad-hoc署名成功。TD MCPは直前の検証時に接続断しているため、
+  TouchDesigner再起動後のJSON接続、PCM peak、破棄安全性の実機検証が残る
+- 初回TD検証ではMusicComposeが毎frame cookされ、MusicSequenceがDAT更新と誤認して49回連続
+  render。AVAudioEngine/Audio Unit teardown中にworkerでEXC_BAD_ACCESSとなった
+- MusicComposeの`cookEveryFrameIfAsked`をAI busy中のみOnへ変更し、通常時のJSON totalCooksを
+  安定化。TDをクリーン再起動して再検証し、213 events・16.5秒を約118ms、peak 0.374で出力
+- 安定後はsubmits/renders=2のまま増加せず、検証ノードをinfo→sequence→composeの順で削除後も
+  MCP応答・TDプロセスとも正常。`_codex_*`ノードを全削除済み
+- 最終bundleを再ビルドして`codesign --verify --deep --strict`成功。MusicComposeDAT.pluginと
+  MusicSequenceCHOP.pluginをTouchDesigner099の常設Pluginsディレクトリへ登録済み
+
+### 2026-07-19 MusicCompose利用サンプル配置
+
+- `sample.toe`の`/project1/MusicCompose_sample`へ独立base COMPを追加して保存
+- 内部は`music_compose DAT -> music_sequence CHOP -> music_out -> audio_device_out`。
+  README Text DATと両pluginのInfo CHOPも配置
+- 既定例はuplifting electronic、120 BPM、8 bars、C minor、seed 7、complexity 0.6。
+  206 events・16.5秒を約65.9msでrenderし、music_outの非ゼロPCMを確認
+- Audio Device Outは不意な発音防止のためActive Off、Volume 0.35。ユーザーがActiveをOnにして試す
+- サンプル配置中、AVAudioPCMBufferのconst pointer workaroundとして追加していたObjC categoryが
+  Audio Device Out起動時のruntime method-cache競合を起こしEXC_BAD_ACCESS。categoryを完全撤去し、
+  C++ `auto`でApple APIの戻り型を保持するよう修正。再ビルド・署名・常設bundle更新済み
+- 修正版をクリーン再起動したTDで再検証し、Audio Device Out配置後もMCP応答、network map、
+  全ノードerrors/warningsなしを確認
+
+### 2026-07-19 MusicSequence音質修正
+
+- ユーザー実聴で既定AVAudioUnitSampler出力が音楽ではなくノイズ状と判明。General MIDI bankを
+  loadしていない単一Samplerへ全track/channelを密集させていたことが原因
+- 既定rendererを追加音源不要のtrack別native synthへ置換。chords=soft pad、bass=低域倍音、
+  melody=pluck、drums=kick/snare/hat専用合成、stereo pan、envelope、soft clipを実装
+- AVAudioPCMBufferの型cast用ObjC categoryはAudio Device Out起動中にruntime method-cache競合を
+  起こすことも再確認。旧AVAudioEngine rendererとcategoryを完全撤去
+- TDを再起動して常設bundleからサンプルを再ロード。212 events・約19秒を約51ms、renders=1、
+  errors/warningsなし。Audio Device OutをActive On・Volume 0.25にして`sample.toe`へ保存
+- Audio Device Out稼働後もMCP network map取得成功、TDクラッシュなし。Soundbank/Programは
+  将来backend互換の予約parameterとして残す
+
+### 2026-07-19 MusicComposeサンプル再構築
+
+- `sample.toe`の`/project1/MusicCompose_sample`を一度削除し、修正版track synth前提で再構築
+- 左から`music_compose -> music_sequence -> music_out -> audio_device_out`の直線構成、上段に
+  `00_README`、下段にcompose/sequenceのInfo CHOPを配置。色とnode commentも設定
+- 既定値をAlgorithm、warm synthwave、112 BPM、8 bars、A minor、seed 42、complexity 0.48へ
+  reset。以前のAI/rock band/ランダムseed状態は除去
+- Audio Device OutはActive On、Volume 0.22。212 events・約17.5秒、render約99.4ms、
+  PCM peak 0.161、全7node errors/warningsなしを確認して`sample.toe`へ保存
+- network map再取得時もsubmits/renders=2のまま安定し、Audio Device Out動作中のMCP応答正常
+
+### 2026-07-19 GeneralUser GS SoundFont適用
+
+- ローカルにsf2/dlsがなかったため、公式GeneralUser-GS GitHubからv2.0.3の
+  `GeneralUser-GS.sf2`（約31MB、SHA-256 `9575028c7a1f589f5770fccc8cff2734566af40cd26ed836944e9a5152688cfe`）を取得
+- `models/GeneralUser-GS.sf2`へ配置。models/はgitignore対象で、LFSも使用せずcommitしない
+- MusicSequenceへSoundFont backendを実装。AVAudioEngine manual offline renderingで4つの
+  AVAudioUnitSamplerを使用し、chords=program 88、bass=38、melody=80、drums=percussion kit 0
+- Soundbank空欄時は既存native track synthへfallback。SoundFont pathまたは各program変更を
+  signature検知して自動再renderする
+- TDを保存終了・再起動して常設bundleをreload。サンプルへSoundFont pathを設定し、
+  212 events・約17.7秒を約1.86秒、peak 0.128、errors/warningsなしでrender
+- `/project1/MusicCompose_sample/audiodevout1`をActive On・Volume 0.30、READMEをSoundFont割当に
+  更新して`sample.toe`へ保存
+
+### 2026-07-19 SoundFont版サンプル再構築
+
+- `/project1/MusicCompose_sample`を再度削除し、GeneralUser GS backend専用サンプルとして再構築
+- 直線配置は`music_compose -> music_sequence -> music_out -> audio_device_out`、READMEと
+  compose/sequence Info CHOPを上下に配置。各nodeへSTEP commentと色を設定
+- 既定曲はbright synthwave、110 BPM、8 bars、A minor、seed 42、complexity 0.5
+- Soundbank=`models/GeneralUser-GS.sf2`、chords=88、bass=38、melody=80、drums=0を初期設定
+- 212 events・約18.0秒、SoundFont render約874ms、非ゼロPCM、全7node errors/warningsなし
+- render完了後にAudio Device OutをActive On・Volume 0.30として`sample.toe`へ保存
+
+### 2026-07-19 CoreML TOP(汎用Core ML推論)実装
+
+- 任意の`.mlpackage`/`.mlmodel`/`.mlmodelc`をロードし入力TOPに推論する汎用TOPを新規実装。
+  SoundClassの独自Core MLモデル対応の設計思想を映像側へ拡張
+- 出力を自動判別: Image(グレー/BGRA)→テクスチャ、MLMultiArray`[..,H,W]`/`[..,3,H,W]`→
+  Mono32Float/RGBA32Float、分類→Info DAT上位10クラス。深度の生値対策にOutput Range
+  (auto min-max/raw/manual)とInvert(Depth Anythingは近=大のdisparity系)を用意
+- mlpackageのコンパイル結果を`~/Library/Caches/TDAppleML/`にキャッシュ(2回目以降高速)
+- **実測(M2)**: Apple公式Depth Anything V2 Small F16(48MB・`models/`に配置・gitignore)、
+  518x392、推論約33ms→約20fps。TD本体60fps維持。深度マップ・Invertを視認確認
+- モデル入手先: https://huggingface.co/apple/coreml-depth-anything-v2-small
+- 次にやること: YOLO等の物体検出(VNRecognizedObjectObservation→bbox)は現状未対応。
+  SAM2は複数入力+プロンプトのため専用plugin化が要る
+
+### 2026-07-19 Nvidia専用OP代替5プラグイン実装
+
+指定された5件を新規実装。全て非同期worker+cook非ブロックの家族の型。
+
+- **VisionFlow TOP**(`VNGenerateOpticalFlowRequest`): Optical Flow TOP(Nvidia)代替。
+  RG32Floatで動きベクトル場。UV(既定・+v上向きに符号反転済み)/Pixels切替。
+  720p Medium 約64ms→約15fps。実測フロー値が理論値と一致
+- **VisionSubject TOP**(`VNGenerateForegroundInstanceMaskRequest`・macOS 14+):
+  VisionSegment(人物限定)の汎用版。ソフトマスク/背景透過カットアウト/インスタンス分離。
+  720p 約45ms。カットアウトを視認確認
+- **VisionTrack CHOP**(`VNTrackObjectRequest`+`VNSequenceRequestHandler`): 任意物体追跡。
+  Blob Track TOP代替に近い。valid/u/v/w/h/confidence。3〜5ms/frame。実写テクスチャで追従確認
+- **FrameInterp TOP**(`VTFrameProcessor`・macOS 15.4+): MLフレーム補間/モーションブラー。
+  720p 約67ms→約15fps。補間フレームを視認確認
+- **Upscale TOP**(MetalFX Spatial / `VTSuperResolutionScaler`): Nvidia Upscaler TOP代替。
+  MetalFX 2x=約16ms(リアルタイム)、VT SuperRes 4x(720p→5120x2880)約1.9s。両方動作確認
+- 踏んだ地雷はハマりどころ集に反映済み: VNTrackObjectはRevision1明示必須(Revision2は
+  macOS 26でbboxサイズエラー)、カットアウトはIOSurfaceバッファ必須、VTは64RGBAHalf専用、
+  静止画入力はパラメータ変更検知で再投入。各README+ルート一覧+CLAUDE.md更新済み
+- 5件とも`~/Library/.../Plugins/`へインストール済み(TD再起動で登録)
+
+### 2026-07-19 Upscale TOP の Flip 既定をOffへ修正
+
+- ユーザー指摘で再検証: Upscaleは**Flip=Onで出力が上下逆**、Off=ソースと同じ正立(実機視認)。
+  Vision系はダウンロードflip+出力再反転で相殺するが、Upscale/FrameInterp/CoreMLは
+  ダウンロードflipのみで出力を戻さないため、幾何変換のUpscaleではflip=1が余計な1回反転になる
+- `Flip`の既定値を`1`→`0`に変更(理由コメント付き)。リビルド・インストール・
+  新規ノードで既定0かつ正立出力を確認。READMEも「既定Off=正立」に修正
+- 未対応(要相談): FrameInterp・CoreMLも同構造でflip時に上下逆になる(既定Onのまま)。
+  揃えるなら両者もOffにする
+  → 補足訂正: CoreMLは出力側で再反転する対称構造なので問題なし(Flip必要・既定Onが正しい)。
+  FrameInterpのみUpscaleと同じ非対称構造だった(次エントリで解決)
+
+### 2026-07-19 Upscale/FrameInterp から Flip パラメータを削除
+
+- ユーザー指示「flip機能は必要なもの以外は削除して」を受け整理:
+  **Flipが必要** = Vision/ML意味処理系(Vision全部・CoreML。正立画像でないと検出/推論が
+  劣化し、出力側の再反転と対になっている) / **不要** = 向き非依存の Upscale・FrameInterp
+- Upscale・FrameInterp から `Flip` パラメータと関連コードを削除。ダウンロードは
+  `verticalFlip=false` 固定にし、入力の向きのまま処理して返す(理由コメント付き)
+- リビルド・`~/Library/.../Plugins/` へインストール済み。TD実測: 両ノードとも
+  Flipパラメータが消え、Upscale(2560x1440)・FrameInterp(1280x720)ともソースと同じ
+  正立出力を視認確認。検証用一時コンテナは削除済み
+- 実装の型3項を「Flipは Vision/ML意味処理系のみ・向き非依存系は持たない」に改訂
+- 注意: 既にプロジェクトに置かれている Upscale ノード(例 `/project1/Upscale1`)は
+  TD再起動で新バイナリに切り替わり、Flip par は自動的に消える
+
+### 2026-07-19 CoreMLDetect DAT / TextAnalyze DAT / Denoise TOP / Upscale LLSRバックエンド実装
+
+推奨候補1〜3をまとめて実装(ユーザー指示)。
+
+- **CoreMLDetect DAT**: 検出系Core MLモデル(VNRecognizedObjectObservation)の汎用DAT。
+  rank/label/confidence/u/v/w/h(bbox中心+サイズ・uv)をテーブル出力。
+  コンパイルキャッシュはCoreML TOPと共有。実測(M2): YOLOv3Int8LUT(62MB・
+  https://huggingface.co/apple/coreml-YOLOv3 → models/)で banana 0.994、
+  単独38ms≈26fps。NMS込みエクスポートが対象(生テンソルYOLOは警告)
+- **TextAnalyze DAT**: NaturalLanguageで感情(-1〜+1)・言語・固有表現(人名/地名/組織)・
+  Reference Textとの文埋め込み類似度をkey/valueテーブル+Info CHOP出力。
+  実測: 英文で sentiment+1.0、Tim Cook/Tokyo/Sonyを正抽出、similarity 0.33。
+  感情スコアは日本語未対応(常に0)→Translate経由の英訳ワークアラウンドをREADMEに記載。
+  実装時バグ: NLTagger は init 時に使う全スキームを渡す必要がある
+  (TokenTypeを渡し忘れて語数が0になった)
+- **Denoise TOP**(VTTemporalNoiseFilter・macOS 26+): **M2では isSupported=false で
+  動作しない**(実測・maximumDimensions=0x0)。エラー表示のみのクリーンな非対応パスを確認。
+  対応ハードでは動く実装だが実データ検証は未実施(ルートREADMEに「⚠ M2非対応」)
+- **Upscale に VT Low Latency ML バックエンド追加**(VTLowLatencySuperResolutionScaler・
+  macOS 26+): 2x固定・入力96〜960px。実測 640x360→1280x720 が定常21ms(単独時)で
+  リアルタイム。**対応ピクセル形式は420v(YCbCr)のみ**で、当初64RGBAHalf前提で書いて
+  出力がノイズになった → vImageでBGRA↔420v変換して解決
+- 4件ともビルド・インストール済み。検証用一時コンテナは削除済み
+- 次にやること: Denoiseの対応ハード実機検証、YOLOv8系NMS込みモデルの動作確認
+
+### 新規ハマりどころ(上記実装で発見)
+
+- **VTLowLatencySuperResolutionScaler の対応形式は 420v のみ**(他のVT系の64RGBAHalfと
+  違う)。frameSupportedPixelFormats を必ず確認し、vImage(ITU-R 601 videoRange)で変換する
+- **VTTemporalNoiseFilter は M2 非対応**(isSupported=false)。VT系は必ず isSupported と
+  supportedScaleFactors/maximumDimensions をプローブしてから設計する
+- **ANE系プラグインの同時実行は競合で数倍遅くなる**(実測: YOLO 38ms→262ms、
+  LLSR 4ms→324ms)。重いML系を複数常時走らせる設計は避け、READMEに明記する
+- **NLTagger は initWithTagSchemes に使う全スキームを列挙する**。列挙外のスキームで
+  enumerate してもエラーにならず単に結果0件になる(気づきにくい)
+
+### 2026-07-19 MusicCompose サンプルのノイズ感を再診断
+
+- SoundFont出力をTDのAudio File Out CHOPで24-bit/44.1kHz WAVへ実録し解析。
+  peak -5.22dB、RMS -20.98dBでクリップやサンプルレート不一致はなかった
+- 原因はサンプル指定のGM Program 88/80（効果音寄りPad/鋭いLead）で、高域倍音が
+  20kHz付近まで強く広がり「ノイズ」に聞こえやすい音色構成だった
+- 既定とサンプルを Acoustic Grand Piano(0) / Acoustic Bass(32) / Flute(73) /
+  Standard Drum Kit(0)へ変更。SoundFont使用時はまず明確な生楽器音で検証する
+
+### 2026-07-19 MusicMIDI CHOP（外部DAW再生）実装
+
+- MusicComposeのevent JSONをCore MIDI仮想ソース`TDAppleML Music`へリアルタイム送信
+- chords/bass/melody/drumsを既定Channel 1/2/3/10へ分離。Note On/Off、MIDI Start/Stop、
+  24 PPQN Clock、Loop、Restart、All Notes Off（Panic）を実装
+- MIDI送信と再生スケジューリングは専用worker thread（1ms周期）。cookはJSON受け渡しと
+  状態更新のみでブロックしない
+- Info CHOPはexecutes/loads/events/playing/beat/bpm/midi_ready。Logic ProなどDAW側の
+  Software Instrumentで音色・エフェクト・ミックスを担当する
+- `./build.sh`成功、ad-hoc署名済み。仮想MIDI sourceはOP生成時にCoreMIDIへ登録される
+
+### 2026-07-19 MusicMIDI 毎フレームcook確認
+
+- TDタイムライン再生中、2秒間で`executes`/`total_cooks`が52455→52573（+118）へ増加。
+  約59 cook/secで毎フレームcookされていることを実測確認
+- `Play=True`、出力`playing=1`、`root.time.play=True`。LogicへのMIDI送信中もcook停止なし
+
+### 2026-07-19 MusicEvents DAT実装（生成MIDIの可視化）
+
+- MusicCompose JSONを演奏時刻順の表へ変換する`MusicEvents DAT`を追加
+- 列はindex/bar/beat/position/track/channel/note/note_name/duration/velocity。
+  MIDI番号だけでなくC4/A2等のノート名と小節位置を確認できる
+- `sample.toe`へ`midi_events`を配置し、`music_compose`をSongに指定。実測208イベント、
+  210行×10列、chords=1/bass=2/melody=3/drums=10を確認。エラー・警告なし
+- ビルド・ad-hoc署名・Custom OPディレクトリへの登録済み
+
+### 2026-07-19 MusicCompose パラメータ更新・AI競合修正
+
+- Seed変更でJSON hashが`29c1d0212071`→`a2c015f74834`へ変わること自体は確認したが、
+  Foundation Models生成中に設定を変えると古いAI応答が新しいAlgorithm fallbackを後から
+  上書きする競合を発見
+- 変更signatureへPromptとComposerを追加。全パラメータ変更で確実に自動再生成する
+- AI生成中の変更は最新設定をpending保持し、旧応答はsignature不一致なら破棄。完了後に
+  最新設定だけを再submitする。AI historyの同一結果を毎cook再適用する挙動も防止
+- Algorithm生成時もInfo CHOPの`notes`を更新
+- 新バイナリでPrompt変更、Seed変更のJSON hashがそれぞれ異なることを確認。
+  ビルド・Custom OP登録済み。既存TDプロセスはplugin cacheのため再起動後に切替
+
+### 2026-07-19 SAM2Segment / Shazam / Photogrammetry / VisionAesthetics / ImageMetadata 実装
+
+推奨候補4件(小物2つ含む計5プラグイン)をまとめて実装(ユーザー指示)。
+
+- **SAM2Segment TOP**: Apple公式 `coreml-sam2.1-tiny`(3モデル・計80MB・models/にDL済み)で
+  点指定の任意物体マスク。実測(M2): エンコード390ms(フレーム変化時のみ)+デコード40ms
+  (プロンプト変化時のみ)→静止画は点移動だけで25fps級。左端/中央のドラム缶を
+  個別選択できることを視認(score 0.99/0.74)。出力はsigmoidソフトマスク Mono32Float 256x256
+- **Shazam DAT**(Swiftヘルパ sh_): SHCustomCatalogによる完全オフライン照合。
+  Reference Folderの音源からカタログ構築→Audio CHOPを照合し title/offset/skew を出力。
+  実測: TD同梱mp3で matched=1・offset=29.06秒(曲内位置特定)
+- **Photogrammetry SOP**(Swiftヘルパ ph_): PhotogrammetrySessionで写真→3Dメッシュ。
+  OBJパース→SOP点+三角形出力。セッション起動・進捗・エラー報告・USDZ出力は検証済み。
+  **実写真セットでのフルメッシュ検証は未実施**(撮影セットが無い)
+- **VisionAesthetics CHOP**(macOS 15+): 美的スコア。実測 OilDrums score=0.381 utility=1
+- **ImageMetadata DAT**(ImageIO): EXIF/GPS/IPTC key/valueテーブル。ファイルmtimeで自動再読込。
+  TDサンプル画像はEXIFストリップ済みのため基本情報のみで検証(GPS十進変換は未実測)
+- 5件ともビルド・`~/Library/.../Plugins/`インストール済み(TD再起動で登録)。
+  検証用一時コンテナは削除済み
+- 次にやること: Photogrammetryの実写真セット検証、SAM2+VisionTrackの連携デモ、
+  ImageMetadataのEXIF/GPS付き実写真での確認
+
+### 新規ハマりどころ(上記実装で発見)
+
+- **SAM2(Apple Core ML版)のプロンプト座標は1024x1024ピクセル空間**。正規化0〜1を渡すと
+  常に左上(壁など)が選択される。TD uv→ `x=u*1024, y=(1-v)*1024` に変換する
+- **PhotogrammetrySession の modelFile 出力は USDZ のみ**(.obj指定は invalidOutput)。
+  OBJが欲しい場合は一時USDZ→ModelIO(MDLAsset.export)で変換する
+- **SOPプラグインは executeVBO() も実装必須**(純粋仮想。空実装でよい。忘れると
+  abstract class エラー)
+- ShazamKitのカスタムカタログ照合はエンタイトルメント不要・完全ローカル。
+  Shazam公式カタログ照合はエンタイトルメントが要るため手を出さない
