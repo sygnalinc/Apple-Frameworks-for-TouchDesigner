@@ -790,3 +790,15 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
 - 6件ともビルド・インストール済み(TD再起動で反映)。README更新・ルート一覧に3行追加
 - 次にやること: GameControllerの実機パッド検証、FoundationModelのfield行を使った
   ショー制御デモ、iPhone側Multipeerサンプルの用意
+
+### 2026-07-19 FoundationModel構造化出力デモを sample.toe に追加
+
+- `/project1/fm_structured_demo`: 雰囲気の言葉 → 構造化出力(r,g,b,intensity,strobe)→
+  照明色として画面に出る完全チェーン。色は**数値RGBスキーマで受ける**のが配線を
+  頑丈にするコツ(色名文字列だとマッピングが要る)
+- field行の参照は **1列目がrow nameになる**ことを利用して
+  `float(op('fm')['r',2] or 0)` の式で直接引ける(or 0 は生成前のNone対策)
+- strobe は Level TOP opacity の式で LFO(square 8Hz)と合成:
+  `intensity * (lfo if strobe else 1)`
+- 実測: 「夕暮れの海のような…」→ r0.95/g0.9/b0.9/int0.7/strobe0、
+  「真っ赤で激しく点滅する警報…」→ **r1/g0/b0/int1/strobe1** に切替を視認
