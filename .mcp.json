@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "touchdesigner": {
+      "type": "http",
+      "url": "http://localhost:9988/mcp"
+    }
+  }
+}

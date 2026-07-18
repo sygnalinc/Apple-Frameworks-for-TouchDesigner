@@ -24,6 +24,19 @@ Windows+NVIDIA 専用の TD 標準オペレータ（Body Track CHOP 等）の ma
 | [VisionFace](VisionFace/) | CHOP | **顔検出+ランドマーク**（最大100顔）。bbox・roll/yaw/pitch・目/鼻/口、オプションで全76点。Face Track CHOP 代替 | ✅ 実装済み |
 | [VisionText](VisionText/) | DAT | **OCR / テキスト認識**（日英ほか多言語・Accurate/Fast切替）。テキスト領域ごとに text/confidence/bbox をテーブル出力（読み順ソート） | ✅ 実装済み |
 | [VisionSaliency](VisionSaliency/) | TOP | **顕著性マップ+オートフレーミング**（Attention/Objectness 切替）。ヒートマップに加え、注目領域bbox・視線重心・スムージング済みクロップ矩形をチャンネル出力 — Crop TOP 直結でカメラワーク自動化 | ✅ 実装済み |
+| [CoreML](CoreML/) | TOP | **汎用 Core ML 推論**。任意の .mlpackage/.mlmodel を差し替えて深度推定・スタイル変換・分類等（Depth Anything V2 で実証: 518x392 約20fps・推論33ms）。出力は自動判別（Image/MultiArray→テクスチャ、分類→Info DAT） | ✅ 実装済み |
+| [VisionFlow](VisionFlow/) | TOP | **オプティカルフロー**（VNGenerateOpticalFlowRequest）。**Optical Flow TOP（Nvidia専用）代替**。RG32Floatで動きベクトル場を出力（UV/Pixels切替）。720p 約15fps | ✅ 実装済み |
+| [VisionSubject](VisionSubject/) | TOP | **任意被写体の切り抜き**（Subject Lifting・macOS 14+）。写真アプリ「被写体をコピー」と同じAPI。ソフトマスク/背景透過カットアウト/インスタンス分離。720p 約45ms | ✅ 実装済み |
+| [VisionTrack](VisionTrack/) | CHOP | **任意オブジェクト追跡**（VNTrackObjectRequest）。初期bbox指定→追従、valid/u/v/w/h/confidence出力。3〜5ms/frame。Blob Track TOP 代替に近い | ✅ 実装済み |
+| [FrameInterp](FrameInterp/) | TOP | **MLフレーム補間/モーションブラー**（VTFrameProcessor・macOS 15.4+）。前後フレームの中間生成（Phase指定）とML動きブラー。720p 約15fps | ✅ 実装済み |
+| [Upscale](Upscale/) | TOP | **リアルタイム超解像**。**Nvidia Upscaler TOP 代替**。MetalFX Spatial（任意倍率・2x 16ms）/ VT Super Resolution（macOS 26+・4x固定・1.9s・ML高品質） | ✅ 実装済み |
+| [VisionContours](VisionContours/) | SOP | **画像輪郭を閉じたLine primitiveへ変換**。親子階層属性と点数制御に対応し、Sweep/Extrude/Particleへ直結 | ✅ 実装済み |
+| [VisionAnimalPose](VisionAnimalPose/) | CHOP | **犬・猫の2D姿勢推定**（25関節・複数匹）。bboxとu/v/confidenceを左→右スロット出力 | ✅ 実装済み |
+| [VisionClassify](VisionClassify/) | DAT | **Apple標準モデルによる画像分類**。追加モデル不要でrank/identifier/confidenceを上位100件まで出力 | ✅ 実装済み |
+| [VisionBarcode](VisionBarcode/) | DAT | **QR・各種バーコード検出**。payload、symbology、bbox、投影四隅をテーブル出力 | ✅ 実装済み |
+| [VisionTrajectory](VisionTrajectory/) | CHOP | **放物運動する小物体の軌跡検出**。実測点/投影点、放物線係数、平均半径を出力 | ✅ 実装済み |
+| [CoreMLCHOP](CoreMLCHOP/) | CHOP | **汎用Core MLベクトル推論**。画像入力モデルのMultiArrayを最大65536chへフラット化し、feature/shapeをInfo DAT出力 | ✅ 実装済み |
+| [VisionRect](VisionRect/) | CHOP | **複数矩形検出**。confidence、bbox、投影四隅を最大100スロットへ出力しCorner Pinへ直結 | ✅ 実装済み |
 
 ## 必要環境
 
