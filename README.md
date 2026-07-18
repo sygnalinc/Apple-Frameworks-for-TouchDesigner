@@ -17,10 +17,10 @@ Windows+NVIDIA 専用の TD 標準オペレータ（Body Track CHOP 等）の ma
 | [VisionPose3D](VisionPose3D/) | CHOP | **単一人物の3Dポーズ推定**（VNDetectHumanBodyPose3D・macOS 14+）。17関節をメートル単位の3D座標+2D投影で出力、身長推定つき。約2fps（じっくり系） | ✅ 実装済み |
 | [SoundClass](SoundClass/) | CHOP | **音の分類**（SNClassifySoundRequest・300種類以上: 拍手/歓声/笑い声/警報音等）。選択クラスの信頼度をチャンネル出力、ランキングは Info DAT。**独自 Core ML 音響モデル対応** | ✅ 実装済み |
 | [SpeechText](SpeechText/) | DAT | **ライブ文字起こし**（新 SpeechAnalyzer/SpeechTranscriber・macOS 26+・完全オンデバイス・TCC不要）。確定/途中テキストをテーブル出力。Swift ヘルパ dylib 同梱 | ✅ 実装済み |
-| VisionHand | CHOP | 手指21点（VNDetectHumanHandPoseRequest） | 構想 |
-| VisionFace | CHOP | 顔ランドマーク（VNDetectFaceLandmarksRequest）。Face Track CHOP 代替 | 構想 |
+| [VisionHand](VisionHand/) | CHOP | **手指トラッキング**（21関節×最大100手・左右判定つき）。u,v,confidence をチャンネル出力 | ✅ 実装済み |
+| [VisionFace](VisionFace/) | CHOP | **顔検出+ランドマーク**（最大100顔）。bbox・roll/yaw/pitch・目/鼻/口、オプションで全76点。Face Track CHOP 代替 | ✅ 実装済み |
+| [VisionSaliency](VisionSaliency/) | TOP | **顕著性マップ+オートフレーミング**（Attention/Objectness 切替）。ヒートマップに加え、注目領域bbox・視線重心・スムージング済みクロップ矩形をチャンネル出力 — Crop TOP 直結でカメラワーク自動化 | ✅ 実装済み |
 | VisionText | DAT | OCR（VNRecognizeTextRequest） | 構想 |
-| VisionSaliency | TOP | 顕著性マップ（VNGenerateAttentionBasedSaliencyImageRequest） | 構想 |
 
 ## 必要環境
 

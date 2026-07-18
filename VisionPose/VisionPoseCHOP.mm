@@ -40,7 +40,7 @@ using namespace TD;
 
 namespace {
 
-constexpr int kMaxBodies = 8;
+constexpr int kMaxBodies = 100;
 constexpr int kNumKP = 34;
 
 // Body Track CHOP（NVIDIA Maxine）の34キーポイント。名前・順序とも実機出力に一致させている
@@ -256,7 +256,7 @@ public:
             p.page = "Vision Pose";
             p.defaultValues[0] = 8;
             p.minSliders[0] = 1;
-            p.maxSliders[0] = kMaxBodies;
+            p.maxSliders[0] = 10;
             p.minValues[0] = 1;
             p.maxValues[0] = kMaxBodies;
             p.clampMins[0] = true;

@@ -30,7 +30,7 @@ cp -R build/VisionPoseCHOP.plugin ~/Library/Application\ Support/Derivative/Touc
 |---|---|---|
 | TOP | — | 解析する映像の TOP パス |
 | Active | On | 解析の有効/無効 |
-| Max Bodies | 8 | 出力する body 枠数（1〜8。チャンネル数が変わる） |
+| Max Bodies | 8 | 出力する body 枠数（**1〜100**・スライダー表示は10まで。チャンネル数が変わる） |
 | Rotations (layout only) | Off | Body Track の Rotations と同じ rx/ry/rz チャンネルを出す（**値は常に0**・レイアウト互換用） |
 | Flip Image Vertically | **On** | TD の TOP ダウンロードは上下逆（bottom-up）なので既定 On。通常触らない |
 
