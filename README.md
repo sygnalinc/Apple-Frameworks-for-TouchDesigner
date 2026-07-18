@@ -13,6 +13,8 @@ Windows+NVIDIA 専用の TD 標準オペレータ（Body Track CHOP 等）の ma
 | プラグイン | 種類 | 内容 | 状態 |
 |---|---|---|---|
 | [VisionPose](VisionPose/) | CHOP | 多人数ボディポーズ推定（34kp）。**Body Track CHOP（2D複数人）と完全互換のチャンネル形式**（body{i}:valid / bbox / trackingid / {kp}:u,v,confidence）。M2 実測 5人 60fps | ✅ 実装済み |
+| [VisionSegment](VisionSegment/) | TOP | 人物セグメンテーション。**Nvidia Background TOP 代替**。統合マスク（VNGeneratePersonSegmentation）と人物別マスク R/G/B/A 分離（VNGeneratePersonInstanceMask・最大4人）| ✅ 実装済み |
+| [VisionPose3D](VisionPose3D/) | CHOP | **単一人物の3Dポーズ推定**（VNDetectHumanBodyPose3D・macOS 14+）。17関節をメートル単位の3D座標+2D投影で出力、身長推定つき。約2fps（じっくり系） | ✅ 実装済み |
 | VisionHand | CHOP | 手指21点（VNDetectHumanHandPoseRequest） | 構想 |
 | VisionFace | CHOP | 顔ランドマーク（VNDetectFaceLandmarksRequest）。Face Track CHOP 代替 | 構想 |
 | VisionText | DAT | OCR（VNRecognizeTextRequest） | 構想 |
