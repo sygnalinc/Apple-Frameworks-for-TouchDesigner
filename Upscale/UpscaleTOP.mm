@@ -11,6 +11,7 @@
 //
 // 実装: 処理はワーカースレッドで非同期(cook 非ブロック・結果は1〜2フレーム遅れ)。
 
+#import <Accelerate/Accelerate.h>
 #import <Foundation/Foundation.h>
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
@@ -72,14 +73,14 @@ public:
     {
         myExecCount++;
         const bool active = inputs->getParInt("Active") != 0;
-        myFlip = inputs->getParInt("Flip") != 0;
-        myVT = strcmp(inputs->getParString("Backend"), "vtsuper") == 0;
+        const char* be = inputs->getParString("Backend");
+        myBackend = (strcmp(be, "vtsuper") == 0) ? 1 : (strcmp(be, "vtlow") == 0) ? 2 : 0;
         myScale = (float)inputs->getParDouble("Scale");
-        inputs->enablePar("Scale", !myVT);
-        inputs->enablePar("Downloadmodel", myVT);
+        inputs->enablePar("Scale", myBackend == 0);
+        inputs->enablePar("Downloadmodel", myBackend == 1);
 
         // 静止画入力でもバックエンド/倍率変更で再処理させる
-        const int settings = (myVT ? 1000 : 0) + (int)(myScale * 100.0f);
+        const int settings = myBackend * 10000 + (int)(myScale * 100.0f);
         if (settings != myLastSettingsSeen) {
             myLastSettingsSeen = settings;
             myLastCookSeen = -1;
@@ -90,10 +91,11 @@ public:
             std::unique_lock<std::mutex> lock(myMutex, std::try_to_lock);
             if (lock.owns_lock() && !myHasPending && !myBusy) {
                 OP_TOPInputDownloadOptions opts;
-                // MetalFX は BGRA8、VT SuperRes は RGBA16F(64RGBAHalf)で受ける
-                opts.pixelFormat = myVT ? OP_PixelFormat::RGBA16Float
-                                        : OP_PixelFormat::BGRA8Fixed;
-                opts.verticalFlip = myFlip;
+                // VT SuperRes は RGBA16F(64RGBAHalf)、MetalFX と VT LowLatency(420v)は
+                // BGRA8 で受ける。拡大処理は向きに依存しないので flip せずそのまま渡す
+                opts.pixelFormat = (myBackend == 1) ? OP_PixelFormat::RGBA16Float
+                                                    : OP_PixelFormat::BGRA8Fixed;
+                opts.verticalFlip = false;
                 myPending = top->downloadTexture(opts, nullptr);
                 if (myPending) {
                     myHasPending = true;
@@ -141,9 +143,10 @@ public:
             p.label = "Backend";
             p.page = "Upscale";
             p.defaultValue = "metalfx";
-            const char* names[] = {"metalfx", "vtsuper"};
-            const char* labels[] = {"MetalFX Spatial (Fast)", "VT Super Resolution (ML, 4x)"};
-            manager->appendMenu(p, 2, names, labels);
+            const char* names[] = {"metalfx", "vtsuper", "vtlow"};
+            const char* labels[] = {"MetalFX Spatial (Fast)", "VT Super Resolution (ML, 4x)",
+                                    "VT Low Latency ML (2x, Max 960px)"};
+            manager->appendMenu(p, 3, names, labels);
         }
         {
             OP_NumericParameter p("Scale");
@@ -163,16 +166,6 @@ public:
             p.label = "Download Model";
             p.page = "Upscale";
             manager->appendPulse(p);
-        }
-        {
-            // Upscale は幾何変換なので入出力の向きを変えない = flip 不要。
-            // ダウンロード時のみ flip し出力側で戻していないため、On にすると出力が上下逆になる。
-            // 既定 Off = ソースと同じ正立。逆さ素材を受けたときだけ On にする
-            OP_NumericParameter p("Flip");
-            p.label = "Flip Image Vertically";
-            p.page = "Upscale";
-            p.defaultValues[0] = 0;
-            manager->appendToggle(p);
         }
     }
 
@@ -219,7 +212,8 @@ private:
     {
         while (true) {
             OP_SmartRef<OP_TOPDownloadResult> download;
-            bool vt, wantDownload;
+            bool wantDownload;
+            int backend;
             float scale;
             {
                 std::unique_lock<std::mutex> lock(myMutex);
@@ -229,7 +223,7 @@ private:
                 download = std::move(myPending);
                 myHasPending = false;
                 myBusy = true;
-                vt = myVT;
+                backend = myBackend;
                 scale = myScale;
                 wantDownload = myDownloadRequested;
                 myDownloadRequested = false;
@@ -237,11 +231,16 @@ private:
             FrameResult result;
             std::string error, warning;
             const auto t0 = std::chrono::steady_clock::now();
-            if (vt) {
+            if (backend == 1) {
                 if (@available(macOS 26.0, *))
                     processVT(download, wantDownload, result, error, warning);
                 else
                     error = "VT Super Resolution requires macOS 26+";
+            } else if (backend == 2) {
+                if (@available(macOS 26.0, *))
+                    processLL(download, result, error);
+                else
+                    error = "VT Low Latency scaler requires macOS 26+";
             } else {
                 processMetalFX(download, scale, result, error);
             }
@@ -259,8 +258,188 @@ private:
                 myBusy = false;
             }
         }
-        if (@available(macOS 26.0, *))
+        if (@available(macOS 26.0, *)) {
             teardownVT();
+            teardownLL();
+        }
+    }
+
+    // ---------------------------------------------------------- VT Low Latency backend
+
+    API_AVAILABLE(macos(26.0))
+    void teardownLL()
+    {
+        if (myLLProcessor)
+            [myLLProcessor endSession];
+        myLLProcessor = nil;
+        myLLSrcPool = nil;
+        myLLDstPool = nil;
+        myLLW = 0;
+        myLLH = 0;
+    }
+
+    API_AVAILABLE(macos(26.0))
+    void processLL(OP_SmartRef<OP_TOPDownloadResult>& download, FrameResult& out,
+                   std::string& error)
+    {
+        if (!download)
+            return;
+        void* data = download->getData();
+        const uint32_t w = download->textureDesc.width;
+        const uint32_t h = download->textureDesc.height;
+        if (!data || w == 0 || h == 0)
+            return;
+
+        @autoreleasepool {
+            if (!VTLowLatencySuperResolutionScalerConfiguration.isSupported) {
+                error = "VT Low Latency scaler not supported on this hardware";
+                return;
+            }
+
+            if (!myLLProcessor || myLLW != w || myLLH != h) {
+                teardownLL();
+                NSArray<NSNumber*>* factors =
+                    [VTLowLatencySuperResolutionScalerConfiguration
+                        supportedScaleFactorsForFrameWidth:w frameHeight:h];
+                if (factors.count == 0) {
+                    error = "Input size unsupported (max 960x960, min 96x96)";
+                    return;
+                }
+                VTLowLatencySuperResolutionScalerConfiguration* cfg =
+                    [[VTLowLatencySuperResolutionScalerConfiguration alloc]
+                        initWithFrameWidth:w frameHeight:h
+                               scaleFactor:factors.firstObject.integerValue];
+                if (!cfg) {
+                    error = "Low latency scaler configuration failed";
+                    return;
+                }
+                CVPixelBufferPoolRef sp = nullptr, dp = nullptr;
+                CVPixelBufferPoolCreate(nullptr, nullptr,
+                    (__bridge CFDictionaryRef)cfg.sourcePixelBufferAttributes, &sp);
+                CVPixelBufferPoolCreate(nullptr, nullptr,
+                    (__bridge CFDictionaryRef)cfg.destinationPixelBufferAttributes, &dp);
+                myLLSrcPool = (__bridge_transfer id)sp;
+                myLLDstPool = (__bridge_transfer id)dp;
+                VTFrameProcessor* proc = [[VTFrameProcessor alloc] init];
+                NSError* err = nil;
+                if (![proc startSessionWithConfiguration:cfg error:&err]) {
+                    error = "startSession failed: " +
+                            std::string(err ? err.localizedDescription.UTF8String
+                                            : "unknown");
+                    return;
+                }
+                myLLProcessor = proc;
+                myLLW = w;
+                myLLH = h;
+                myLLFrameIndex = 0;
+            }
+
+            CVPixelBufferRef curPB = nullptr, dstPB = nullptr;
+            CVPixelBufferPoolCreatePixelBuffer(
+                nullptr, (__bridge CVPixelBufferPoolRef)myLLSrcPool, &curPB);
+            CVPixelBufferPoolCreatePixelBuffer(
+                nullptr, (__bridge CVPixelBufferPoolRef)myLLDstPool, &dstPB);
+            if (!curPB || !dstPB) {
+                if (curPB) CVPixelBufferRelease(curPB);
+                if (dstPB) CVPixelBufferRelease(dstPB);
+                error = "pixel buffer allocation failed";
+                return;
+            }
+            id curObj = (__bridge_transfer id)curPB;
+            id dstObj = (__bridge_transfer id)dstPB;
+            (void)curObj;
+            (void)dstObj;
+
+            // LLSR の対応形式は 420v のみ(実測)。BGRA8 入力を vImage で変換して渡す
+            if (!bgraTo420v((const uint8_t*)data, w, h, curPB)) {
+                error = "BGRA -> 420v conversion failed";
+                return;
+            }
+
+            const int64_t n = ++myLLFrameIndex;
+            VTFrameProcessorFrame* curF = [[VTFrameProcessorFrame alloc]
+                initWithBuffer:curPB presentationTimeStamp:CMTimeMake(n, 60)];
+            VTFrameProcessorFrame* dstF = [[VTFrameProcessorFrame alloc]
+                initWithBuffer:dstPB presentationTimeStamp:CMTimeMake(n, 60)];
+            VTLowLatencySuperResolutionScalerParameters* params =
+                [[VTLowLatencySuperResolutionScalerParameters alloc]
+                    initWithSourceFrame:curF destinationFrame:dstF];
+            NSError* err = nil;
+            if (!params || ![myLLProcessor processWithParameters:params error:&err]) {
+                error = "process failed: " +
+                        std::string(err ? err.localizedDescription.UTF8String : "unknown");
+                return;
+            }
+            if (!copy420vToBGRA(dstPB, out))
+                error = "420v -> BGRA conversion failed";
+        }
+    }
+
+    // BGRA8888 → 420v(biplanar YCbCr・video range)。vImage で変換して CVPixelBuffer の
+    // 2プレーンへ書き込む
+    static bool bgraTo420v(const uint8_t* bgra, uint32_t w, uint32_t h, CVPixelBufferRef pb)
+    {
+        static vImage_ARGBToYpCbCr sToYpCbCr;
+        static dispatch_once_t once;
+        static bool ok = false;
+        dispatch_once(&once, ^{
+            vImage_YpCbCrPixelRange range = {16, 128, 235, 240, 235, 16, 240, 16};
+            ok = vImageConvert_ARGBToYpCbCr_GenerateConversion(
+                     kvImage_ARGBToYpCbCrMatrix_ITU_R_601_4, &range, &sToYpCbCr,
+                     kvImageARGB8888, kvImage420Yp8_CbCr8, 0) == kvImageNoError;
+        });
+        if (!ok)
+            return false;
+
+        CVPixelBufferLockBaseAddress(pb, 0);
+        vImage_Buffer src = {(void*)bgra, h, w, (size_t)w * 4};
+        vImage_Buffer yp = {CVPixelBufferGetBaseAddressOfPlane(pb, 0), h, w,
+                            CVPixelBufferGetBytesPerRowOfPlane(pb, 0)};
+        vImage_Buffer cbcr = {CVPixelBufferGetBaseAddressOfPlane(pb, 1), h / 2, w / 2,
+                              CVPixelBufferGetBytesPerRowOfPlane(pb, 1)};
+        // メモリ順 B,G,R,A → ARGB へ並べ替え(A=idx3, R=idx2, G=idx1, B=idx0)
+        const uint8_t permute[4] = {3, 2, 1, 0};
+        const vImage_Error e = vImageConvert_ARGB8888To420Yp8_CbCr8(
+            &src, &yp, &cbcr, &sToYpCbCr, permute, kvImageDoNotTile);
+        CVPixelBufferUnlockBaseAddress(pb, 0);
+        return e == kvImageNoError;
+    }
+
+    // 420v → BGRA8888 で FrameResult へ
+    static bool copy420vToBGRA(CVPixelBufferRef pb, FrameResult& out)
+    {
+        static vImage_YpCbCrToARGB sToARGB;
+        static dispatch_once_t once;
+        static bool ok = false;
+        dispatch_once(&once, ^{
+            vImage_YpCbCrPixelRange range = {16, 128, 235, 240, 235, 16, 240, 16};
+            ok = vImageConvert_YpCbCrToARGB_GenerateConversion(
+                     kvImage_YpCbCrToARGBMatrix_ITU_R_601_4, &range, &sToARGB,
+                     kvImage420Yp8_CbCr8, kvImageARGB8888, 0) == kvImageNoError;
+        });
+        if (!ok)
+            return false;
+
+        CVPixelBufferLockBaseAddress(pb, kCVPixelBufferLock_ReadOnly);
+        const uint32_t w = (uint32_t)CVPixelBufferGetWidth(pb);
+        const uint32_t h = (uint32_t)CVPixelBufferGetHeight(pb);
+        out.width = w;
+        out.height = h;
+        out.format = OP_PixelFormat::BGRA8Fixed;
+        out.data.resize((size_t)w * h * 4);
+        vImage_Buffer yp = {CVPixelBufferGetBaseAddressOfPlane(pb, 0), h, w,
+                            CVPixelBufferGetBytesPerRowOfPlane(pb, 0)};
+        vImage_Buffer cbcr = {CVPixelBufferGetBaseAddressOfPlane(pb, 1), h / 2, w / 2,
+                              CVPixelBufferGetBytesPerRowOfPlane(pb, 1)};
+        vImage_Buffer dst = {out.data.data(), h, w, (size_t)w * 4};
+        // ARGB の並びを B,G,R,A のメモリ順で書かせる
+        const uint8_t permute[4] = {3, 2, 1, 0};
+        const vImage_Error e = vImageConvert_420Yp8_CbCr8ToARGB8888(
+            &yp, &cbcr, &dst, &sToARGB, permute, 255, kvImageDoNotTile);
+        CVPixelBufferUnlockBaseAddress(pb, kCVPixelBufferLock_ReadOnly);
+        if (e != kvImageNoError)
+            out.data.clear();
+        return e == kvImageNoError;
     }
 
     // ---------------------------------------------------------- MetalFX backend
@@ -575,7 +754,13 @@ private:
     uint32_t myVTW = 0, myVTH = 0, myVTFactor = 4;
     int64_t myVTFrameIndex = 0;
 
-    std::atomic<bool> myFlip{true}, myVT{false};
+    // ワーカー専用(VT Low Latency)
+    VTFrameProcessor* myLLProcessor API_AVAILABLE(macos(15.4)) = nil;
+    id myLLSrcPool = nil, myLLDstPool = nil;
+    uint32_t myLLW = 0, myLLH = 0;
+    int64_t myLLFrameIndex = 0;
+
+    std::atomic<int> myBackend{0};
     std::atomic<float> myScale{2.0f};
     std::atomic<int> myModelStatus{-1};
 

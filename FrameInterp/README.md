@@ -23,7 +23,8 @@ Apple の動画ML処理 **VTFrameProcessor**(VideoToolbox・macOS 15.4+)によ�
 | Mode | Interpolate / Motion Blur |
 | Interpolation Phase | 補間位置 0〜1(Interpolate 時) |
 | Blur Strength | ブラー強度 1〜100(Motion Blur 時) |
-| Flip Image Vertically | 入力の上下反転(既定On) |
+
+Flip パラメータは無い(補間/ブラーは向きに依存しないため、入力をそのままの向きで処理して返す)。
 
 ## Info CHOP
 
