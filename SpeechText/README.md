@@ -44,6 +44,23 @@ listening / error...）。
   流れない（DAT Execute で監視する等）
 - ロード直後にカスタムパラメータが見えないことがある → `Re-Init Plugin` をパルス
 
+
+## Whisper バックエンド(macOS 14+)
+
+Backend メニューで **WhisperKit(Core ML版Whisper)** に切替できる:
+
+| | Apple SpeechAnalyzer(既定) | WhisperKit |
+|---|---|---|
+| 対応OS | macOS 26+ | **macOS 14+** |
+| 方式 | 真のストリーミング(低遅延) | チャンク再認識(volatileを定期更新・無音/30秒で確定) |
+| 言語 | ロケールの言語モデル | 多言語(Localeの先頭2文字を言語ヒントに) |
+| 英訳 | なし(Translate DATを併用) | **Whisper Task=Translate To English で直接英訳** |
+| モデル | OS同梱(初回DL) | Tiny 75MB / Base 150MB / Small 500MB / Large v3 3GB(初回にHugging FaceからDL・`~/Documents/huggingface/`) |
+
+- 初回は status が "loading model..." のままモデルDLが走る(Base 約150MB)
+- Whisper はストリーミング非対応のため確定までのテンポは Apple 側より遅い。
+  低遅延が必要なら macOS 26 + Apple バックエンドを推奨
+
 ## ビルド
 
 ```

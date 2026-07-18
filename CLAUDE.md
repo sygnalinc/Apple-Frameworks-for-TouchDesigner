@@ -802,3 +802,23 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   `intensity * (lfo if strobe else 1)`
 - 実測: 「夕暮れの海のような…」→ r0.95/g0.9/b0.9/int0.7/strobe0、
   「真っ赤で激しく点滅する警報…」→ **r1/g0/b0/int1/strobe1** に切替を視認
+
+### 2026-07-19 SpeechText に WhisperKit バックエンド追加
+
+- Backend メニュー(apple/whisper)を追加。whisper は WhisperKit(Core ML版Whisper・
+  SPMパッケージ・macOS 14+)を helper dylib(wk_・sp_ と同形の poll JSON)で統合。
+  Whisper Model(tiny/base/small/large-v3)と Whisper Task(transcribe/**translate=英訳**)
+- Whisper はストリーミング非対応のため「溜めたバッファを0.7秒毎に再認識して volatile 更新、
+  無音(末尾0.8s RMS<0.005)or 30秒で確定行に落とす」チャンク方式
+- 実測(M2・base・sayのTTS音声): 英語・日本語とも認識成功
+  (ja: 「こんにちは、これはウィスパーホン性認識のテストです。部隊証明を真っ赤に…」—
+  同音異義の誤りはbase相応。実マイク/大モデルで改善)。モデルは初回にHFから自動DL
+- 次にやること: 実マイク音声での精度確認、large-v3系での品質比較
+
+### 新規ハマりどころ(上記で発見)
+
+- **Whisperは無音バッファに「[音楽]」等を幻覚する**。①ほぼ無音のバッファは認識せず捨てる
+  (RMS<0.004)②括弧タグだけの確定行は破棄、の2段ガードが必須。
+  ガード無しだと音声終了後に幻覚行が延々と積まれる
+- WhisperKit は SPM 依存(ImageGenと同じ helper を Swift Package にする型)。
+  swift build -c release 初回は依存込みで数分。dylib は install_name_tool で epoch 名に

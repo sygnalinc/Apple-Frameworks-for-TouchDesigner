@@ -29,6 +29,12 @@ void sp_feed(void* handle, const float* samples, int32_t count, double rate);
 int32_t sp_poll(void* handle, char* buffer, int32_t capacity);
 void sp_clear(void* handle);
 void sp_destroy(void* handle);
+// libWhisperHelper.dylib(WhisperKit・macOS 14+)の C API(同形のJSONを返す)
+void* wk_create(const char* model, const char* task, const char* lang);
+void wk_feed(void* handle, const float* samples, int32_t count, double rate);
+int32_t wk_poll(void* handle, char* buffer, int32_t capacity);
+void wk_clear(void* handle);
+void wk_destroy(void* handle);
 }
 
 namespace {
@@ -38,10 +44,17 @@ class SpeechTextDAT : public DAT_CPlusPlusBase
 public:
     explicit SpeechTextDAT(const OP_NodeInfo*) {}
 
-    ~SpeechTextDAT() override
+    ~SpeechTextDAT() override { destroySession(); }
+
+    void destroySession()
     {
-        if (mySession)
-            sp_destroy(mySession);
+        if (mySession) {
+            if (myIsWhisper)
+                wk_destroy(mySession);
+            else
+                sp_destroy(mySession);
+        }
+        mySession = nullptr;
     }
 
     void getGeneralInfo(DAT_GeneralInfo* ginfo, const OP_Inputs*, void*) override
@@ -56,20 +69,39 @@ public:
         const char* localePar = inputs->getParString("Locale");
         const std::string locale = localePar ? localePar : "ja-JP";
         const int maxRows = std::max(1, (int)inputs->getParInt("Maxrows"));
+        const bool whisper = strcmp(inputs->getParString("Backend"), "whisper") == 0;
+        const char* modelPar = inputs->getParString("Whispermodel");
+        const std::string model = modelPar ? modelPar : "base";
+        const char* taskPar = inputs->getParString("Whispertask");
+        const std::string task = taskPar ? taskPar : "transcribe";
+        inputs->enablePar("Whispermodel", whisper);
+        inputs->enablePar("Whispertask", whisper);
 
-        // ロケール変更（または初回）でセッションを作り直す
-        if (active && (!mySession || locale != myLocale)) {
-            if (mySession)
-                sp_destroy(mySession);
-            mySession = sp_create(locale.c_str());
-            myLocale = locale;
+        // バックエンド/ロケール/モデル変更(または初回)でセッションを作り直す
+        const std::string sig =
+            (whisper ? "w:" : "a:") + locale + ":" + model + ":" + task;
+        if (active && (!mySession || sig != mySignature)) {
+            destroySession();
+            if (whisper) {
+                // Whisper の言語ヒントはロケール先頭2文字("ja-JP"→"ja")
+                const std::string lang = locale.size() >= 2 ? locale.substr(0, 2) : "";
+                mySession = wk_create(model.c_str(), task.c_str(), lang.c_str());
+            } else {
+                mySession = sp_create(locale.c_str());
+            }
+            myIsWhisper = whisper;
+            mySignature = sig;
         }
 
         // 入力オーディオ（ch0）を流し込む
         const OP_CHOPInput* audio = inputs->getParCHOP("Audio");
         if (active && mySession && audio && audio->numChannels > 0 && audio->numSamples > 0) {
-            sp_feed(mySession, audio->getChannelData(0), audio->numSamples,
-                    audio->sampleRate);
+            if (myIsWhisper)
+                wk_feed(mySession, audio->getChannelData(0), audio->numSamples,
+                        audio->sampleRate);
+            else
+                sp_feed(mySession, audio->getChannelData(0), audio->numSamples,
+                        audio->sampleRate);
         }
 
         // 最新の認識結果を取得
@@ -78,7 +110,10 @@ public:
         std::string volatileText;
         if (mySession) {
             char buf[65536];
-            sp_poll(mySession, buf, sizeof(buf));
+            if (myIsWhisper)
+                wk_poll(mySession, buf, sizeof(buf));
+            else
+                sp_poll(mySession, buf, sizeof(buf));
             parsePoll(buf, finalized, volatileText);
         }
 
@@ -132,6 +167,37 @@ public:
             manager->appendString(p);
         }
         {
+            // apple: SpeechAnalyzer(macOS 26+・低遅延ストリーミング)
+            // whisper: WhisperKit(macOS 14+・多言語・英訳対応。初回モデルDL)
+            OP_StringParameter p("Backend");
+            p.label = "Backend";
+            p.page = "Speech";
+            p.defaultValue = "apple";
+            const char* names[] = {"apple", "whisper"};
+            const char* labels[] = {"Apple SpeechAnalyzer (macOS 26+)",
+                                    "WhisperKit (macOS 14+)"};
+            manager->appendMenu(p, 2, names, labels);
+        }
+        {
+            OP_StringParameter p("Whispermodel");
+            p.label = "Whisper Model";
+            p.page = "Speech";
+            p.defaultValue = "base";
+            const char* names[] = {"tiny", "base", "small", "large-v3"};
+            const char* labels[] = {"Tiny (75MB, Fast)", "Base (150MB)",
+                                    "Small (500MB)", "Large v3 (3GB, Best)"};
+            manager->appendMenu(p, 4, names, labels);
+        }
+        {
+            OP_StringParameter p("Whispertask");
+            p.label = "Whisper Task";
+            p.page = "Speech";
+            p.defaultValue = "transcribe";
+            const char* names[] = {"transcribe", "translate"};
+            const char* labels[] = {"Transcribe", "Translate To English"};
+            manager->appendMenu(p, 2, names, labels);
+        }
+        {
             OP_NumericParameter p("Maxrows");
             p.label = "Max Rows";
             p.page = "Speech";
@@ -150,8 +216,12 @@ public:
 
     void pulsePressed(const char* name, void*) override
     {
-        if (strcmp(name, "Clear") == 0 && mySession)
-            sp_clear(mySession);
+        if (strcmp(name, "Clear") == 0 && mySession) {
+            if (myIsWhisper)
+                wk_clear(mySession);
+            else
+                sp_clear(mySession);
+        }
     }
 
     int32_t getNumInfoCHOPChans(void*) override { return 2; }
@@ -205,7 +275,8 @@ private:
     }
 
     void* mySession = nullptr;
-    std::string myLocale;
+    bool myIsWhisper = false;
+    std::string mySignature;
     std::string myStatus = "inactive";
     std::atomic<int> myExecCount{0};
     int myFinalCount = 0;
