@@ -744,3 +744,24 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   ルートREADMEを「✅ 実装済み」へ更新
 - 未コミット: この整備分(README更新・CLAUDE.md・SAM2のMaskselect・sample.toe)は
   次回コミットにまとめる
+
+### 2026-07-19 Photogrammetry にテクスチャ対応を追加
+
+- **ヘルパ**: 再構成完了時に usdz(実体はzip)から焼き込みテクスチャを `/usr/bin/unzip` で
+  抽出し `<出力名>_tex0.png` に改名、`.mtl` の `map_Kd`(usdz内部参照)も書き換え。
+  テクスチャパスは poll JSON の `texture` フィールドで返す
+- **SOP**: OBJ の vt をパースし **UV付きで出力**(v/vt 分離は (v,vt) の組で点を分割して解決。
+  templeRing 実測 1416点→1865点)。テクスチャパスは Info DAT `texture` 行で公開
+- **実測**: templeRing 再構成→テクスチャ抽出(370KB png)→ Phong MAT Color Map で
+  **テクスチャ付きメッシュのレンダリングを視認**。デモ(/project1/photogrammetry_demo)に
+  tex(moviefilein)+phong(MAT) を追加して保存済み
+- 使い方: Movie File In に `_tex0.png` → Phong MAT Color Map → Geo の Material
+
+### 新規ハマりどころ(上記で発見)
+
+- **SOP の一括 `setTexCoords()` は先頭UVが全点に入る**(実測・TD 2023系)。
+  TD付属サンプルと同じ **per-point の `setTexCoord()`** を使うこと
+- **PhotogrammetrySession は出力先に既存ファイルがあると invalidOutput**。開始前に削除する
+- **ヘルパdylibの修正が反映されないときは install name キャッシュ**(ハマりどころ集①の実例)。
+  .plugin のパスを変えても dylib の install name が同じだと dyld が旧dylibを使い続ける。
+  Photogrammetry/Shazam の build.sh を `lib*_<epoch>.dylib` 方式に修正済み

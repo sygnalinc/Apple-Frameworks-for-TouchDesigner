@@ -1,11 +1,13 @@
 #!/bin/zsh
 # Photogrammetry SOP のビルド → build/PhotogrammetrySOP.plugin
+# dylib はビルド毎に名前を変える(TD/dyld が install name でキャッシュするため)
 set -e
 cd "$(dirname "$0")"
 
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/SimpleShapesSOP"
 NAME=PhotogrammetrySOP
 OUT="build/$NAME.plugin/Contents"
+DYLIB="libPhotogrammetryHelper_$(date +%s).dylib"
 rm -rf build
 mkdir -p "$OUT/MacOS" "$OUT/Frameworks"
 
@@ -13,14 +15,14 @@ swiftc -O -emit-library -module-name PhotogrammetryHelper \
   -target arm64-apple-macos12.0 \
   PhotogrammetryHelper.swift \
   -framework RealityKit \
-  -Xlinker -install_name -Xlinker @rpath/libPhotogrammetryHelper.dylib \
-  -o "$OUT/Frameworks/libPhotogrammetryHelper.dylib"
+  -Xlinker -install_name -Xlinker "@rpath/$DYLIB" \
+  -o "$OUT/Frameworks/$DYLIB"
 
 clang++ -std=c++17 -fobjc-arc -O2 -bundle \
   -I "$SDK" \
   PhotogrammetrySOP.mm \
   -framework Foundation \
-  -L "$OUT/Frameworks" -lPhotogrammetryHelper \
+  "$OUT/Frameworks/$DYLIB" \
   -Xlinker -rpath -Xlinker @loader_path/../Frameworks \
   -o "$OUT/MacOS/$NAME"
 
@@ -39,4 +41,4 @@ cat > "$OUT/Info.plist" <<'PLIST'
 PLIST
 
 codesign --force --deep -s - "build/$NAME.plugin"
-echo "built: $(pwd)/build/$NAME.plugin"
+echo "built: $(pwd)/build/$NAME.plugin ($DYLIB)"

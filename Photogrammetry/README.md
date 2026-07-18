@@ -13,6 +13,15 @@ Start をパルス → 数分の処理後、メッシュを**SOPジオメトリ�
   sample.toe の `/project1/photogrammetry_demo` にデモネットワークあり
 - 雑多な画像セット(重なりのない写真)では正しく processError を返すことも確認済み
 
+## テクスチャ
+
+- 再構成完了時、**usdz内の焼き込みテクスチャを `<出力名>_tex0.png` として自動抽出**し、
+  `.mtl` の `map_Kd` も書き換える(TD・他ツールから直接読める)
+- SOP は **UV(テクスチャ座標)付き**で出力する(OBJのv/vt分離はUVシームで点を分割して解決)
+- **TDでの貼り方**: Movie File In TOP に `_tex0.png` → Phong MAT の Color Map に指定 →
+  Geometry COMP の Material へ。テクスチャパスは **Info DAT の `texture` 行**から
+  式で参照できる(`op('photo_info')[1,1]` 等)
+
 ## パラメータ
 
 | 名前 | 内容 |
@@ -22,15 +31,15 @@ Start をパルス → 数分の処理後、メッシュを**SOPジオメトリ�
 | Detail | Preview / Reduced / Medium(既定)/ Full |
 | Start / Cancel | 再構成の開始・中断(パルス) |
 
-Info CHOP: `executes / progress(0〜1)/ points`。進捗と状態は警告文にJSONで出る。
+Info CHOP: `executes / progress(0〜1)/ points`。
+Info DAT: `texture`(抽出テクスチャのパス)/ `status`(JSON)。進捗は警告文にも出る。
 
 ## 注意
 
 - **PhotogrammetrySession の直接出力は USDZ のみ**(`.obj` 指定は invalidOutput・実測)。
   `.obj` 指定時はプラグインが一時USDZ→ModelIOでOBJ変換する(同名の .usdz も残る)
 - 処理は分単位のじっくり系。TD本体はブロックしない
-- SOP出力は頂点+三角形のみ(テクスチャはOBJ/USDZファイル側にある。
-  絵付きで使う場合は生成された USDZ/OBJ を通常のジオメトリ読込で)
+- SOP出力は頂点+三角形+UV(法線は含まない。必要なら Facet SOP / Attribute Create SOP で)
 
 ## ビルド
 

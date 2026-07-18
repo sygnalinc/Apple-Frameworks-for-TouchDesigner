@@ -20,6 +20,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include "SOP_CPlusPlusBase.h"
@@ -40,6 +41,7 @@ namespace {
 struct Mesh
 {
     std::vector<Position> points;
+    std::vector<TexCoord> uvs;        // points と同数(vt が無ければ空)
     std::vector<int32_t> triangles;   // 3 indices per tri
     uint64_t serial = 0;
 };
@@ -105,6 +107,7 @@ public:
             ph_poll(mySession, buf, sizeof(buf));
         myStatusJson = buf;
         myProgress = (float)extractNum(buf, "progress");
+        myTexturePath = extractStr(buf, "texture");
         const bool done = strstr(buf, "\"done\":true") != nullptr;
         if (done && !myLoadedObj && !outfile.empty() &&
             outfile.size() > 4 && outfile.substr(outfile.size() - 4) == ".obj") {
@@ -123,6 +126,11 @@ public:
         }
         if (!mesh.points.empty()) {
             output->addPoints(mesh.points.data(), (int32_t)mesh.points.size());
+            // 一括の setTexCoords は先頭UVが全点に入る不具合があるため(実測)、
+            // TD付属サンプルと同じ per-point の setTexCoord を使う
+            if (mesh.uvs.size() == mesh.points.size())
+                for (int32_t i = 0; i < (int32_t)mesh.uvs.size(); i++)
+                    output->setTexCoord(&mesh.uvs[i], 1, i);
             if (!mesh.triangles.empty())
                 output->addTriangles(mesh.triangles.data(),
                                      (int32_t)(mesh.triangles.size() / 3));
@@ -185,6 +193,25 @@ public:
         chan->value = values[index];
     }
 
+    bool getInfoDATSize(OP_InfoDATSize* infoSize, void*) override
+    {
+        infoSize->rows = 2;
+        infoSize->cols = 2;
+        infoSize->byColumn = false;
+        return true;
+    }
+
+    void getInfoDATEntries(int32_t index, int32_t, OP_InfoDATEntries* entries, void*) override
+    {
+        if (index == 0) {
+            entries->values[0]->setString("texture");
+            entries->values[1]->setString(myTexturePath.c_str());
+        } else {
+            entries->values[0]->setString("status");
+            entries->values[1]->setString(myStatusJson.c_str());
+        }
+    }
+
     void getWarningString(OP_String* warning, void*) override
     {
         if (!mySession) {
@@ -203,6 +230,29 @@ private:
         std::string pat = std::string("\"") + key + "\":";
         const char* p = strstr(json, pat.c_str());
         return p ? atof(p + pat.size()) : 0.0;
+    }
+
+    // JSONSerialization は "/" を "\/" にエスケープするので戻す
+    static std::string extractStr(const char* json, const char* key)
+    {
+        std::string pat = std::string("\"") + key + "\":\"";
+        const char* p = strstr(json, pat.c_str());
+        if (!p)
+            return "";
+        p += pat.size();
+        const char* e = strchr(p, '"');
+        std::string s = e ? std::string(p, e - p) : "";
+        std::string out;
+        out.reserve(s.size());
+        for (size_t i = 0; i < s.size(); i++) {
+            if (s[i] == '\\' && i + 1 < s.size() && s[i + 1] == '/') {
+                out += '/';
+                i++;
+            } else {
+                out += s[i];
+            }
+        }
+        return out;
     }
 
     void workerLoop()
@@ -227,32 +277,76 @@ private:
         }
     }
 
-    // 最小限の OBJ パーサ(v と f のみ。f の多角形は扇状に三角形分割)
+    // OBJ パーサ(v / vt / f。f の多角形は扇状に三角形分割)。
+    // OBJ は位置とUVが別インデックスなので、(v,vt) の組ごとに TD の点を分割して
+    // 各点に1つのUVが付くようにする(UVシーム対応)
     static void parseObj(const std::string& path, Mesh& mesh)
     {
         FILE* fp = fopen(path.c_str(), "r");
         if (!fp)
             return;
-        char line[512];
+        char line[1024];
+        std::vector<float> rawV;    // x,y,z の連続
+        std::vector<float> rawVT;   // u,v の連続
+        std::unordered_map<uint64_t, int32_t> vertMap;   // (v<<32|vt) → 点番号
         std::vector<int32_t> faceIdx;
+        bool hasVT = false;
+
         while (fgets(line, sizeof(line), fp)) {
             if (line[0] == 'v' && line[1] == ' ') {
                 float x, y, z;
-                if (sscanf(line + 2, "%f %f %f", &x, &y, &z) == 3)
-                    mesh.points.emplace_back(x, y, z);
+                if (sscanf(line + 2, "%f %f %f", &x, &y, &z) == 3) {
+                    rawV.push_back(x);
+                    rawV.push_back(y);
+                    rawV.push_back(z);
+                }
+            } else if (line[0] == 'v' && line[1] == 't') {
+                float u, v;
+                if (sscanf(line + 2, "%f %f", &u, &v) == 2) {
+                    rawVT.push_back(u);
+                    rawVT.push_back(v);
+                    hasVT = true;
+                }
             } else if (line[0] == 'f' && line[1] == ' ') {
                 faceIdx.clear();
                 const char* p = line + 2;
+                const long nv = (long)(rawV.size() / 3);
+                const long nt = (long)(rawVT.size() / 2);
                 while (*p) {
                     while (*p == ' ')
                         p++;
                     if (!*p || *p == '\n' || *p == '\r')
                         break;
-                    const long v = strtol(p, nullptr, 10);
-                    if (v != 0)
-                        faceIdx.push_back(
-                            v > 0 ? (int32_t)(v - 1)
-                                  : (int32_t)((long)mesh.points.size() + v));
+                    char* end = nullptr;
+                    long v = strtol(p, &end, 10);
+                    long t = 0;
+                    if (end && *end == '/') {
+                        const char* q = end + 1;
+                        if (*q != '/')
+                            t = strtol(q, nullptr, 10);
+                    }
+                    if (v != 0) {
+                        const long vi = v > 0 ? v - 1 : nv + v;
+                        const long ti = t > 0 ? t - 1 : (t < 0 ? nt + t : -1);
+                        const uint64_t key =
+                            ((uint64_t)(uint32_t)vi << 32) | (uint32_t)(ti + 1);
+                        auto it = vertMap.find(key);
+                        int32_t idx;
+                        if (it != vertMap.end()) {
+                            idx = it->second;
+                        } else {
+                            idx = (int32_t)mesh.points.size();
+                            mesh.points.emplace_back(rawV[vi * 3], rawV[vi * 3 + 1],
+                                                     rawV[vi * 3 + 2]);
+                            TexCoord tc;
+                            tc.u = (ti >= 0) ? rawVT[ti * 2] : 0.0f;
+                            tc.v = (ti >= 0) ? rawVT[ti * 2 + 1] : 0.0f;
+                            tc.w = 0.0f;
+                            mesh.uvs.push_back(tc);
+                            vertMap.emplace(key, idx);
+                        }
+                        faceIdx.push_back(idx);
+                    }
                     while (*p && *p != ' ' && *p != '\n')
                         p++;
                 }
@@ -264,6 +358,8 @@ private:
             }
         }
         fclose(fp);
+        if (!hasVT)
+            mesh.uvs.clear();
     }
 
     void* mySession = nullptr;
@@ -275,7 +371,7 @@ private:
     bool myStartRequested = false;
     bool myCancelRequested = false;
     bool myLoadedObj = false;
-    std::string myPendingObj, myStatusJson;
+    std::string myPendingObj, myStatusJson, myTexturePath;
     Mesh myMesh;
     uint64_t mySerial = 0;
 

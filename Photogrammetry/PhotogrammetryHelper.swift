@@ -21,7 +21,59 @@ final class PhotoSession {
     private var progress = 0.0
     private var done = false
     private var errorMsg = ""
+    private var texture = ""
     private var convertTo: URL?
+
+    // usdz(実体はzip)から焼き込みテクスチャを取り出し、
+    // <出力名>_tex0.png 等に改名して並べる。mtl の usdz 内部参照も書き換える。
+    // 戻り値は最初のテクスチャのパス(無ければ空)
+    private func extractTextures(usdz: URL, obj: URL?) -> String {
+        let fm = FileManager.default
+        let tmp = fm.temporaryDirectory.appendingPathComponent(
+            "tdappleml_tex_\(ProcessInfo.processInfo.globallyUniqueString)")
+        defer { try? fm.removeItem(at: tmp) }
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        proc.arguments = ["-o", "-j", usdz.path, "-d", tmp.path]
+        proc.standardOutput = FileHandle.nullDevice
+        proc.standardError = FileHandle.nullDevice
+        do {
+            try proc.run()
+            proc.waitUntilExit()
+        } catch {
+            return ""
+        }
+        let base = (obj ?? usdz).deletingPathExtension()
+        let exts = ["png", "jpg", "jpeg", "heic"]
+        let images = ((try? fm.contentsOfDirectory(atPath: tmp.path)) ?? [])
+            .filter { exts.contains(($0 as NSString).pathExtension.lowercased()) }
+            .sorted()
+        var first = ""
+        for (i, name) in images.enumerated() {
+            let ext = (name as NSString).pathExtension.lowercased()
+            let dst = URL(fileURLWithPath:
+                "\(base.path)_tex\(i).\(ext)")
+            try? fm.removeItem(at: dst)
+            try? fm.copyItem(at: tmp.appendingPathComponent(name), to: dst)
+            if i == 0 { first = dst.path }
+        }
+        // mtl の map_Kd を抽出したテクスチャへ書き換え(TDや他ツールで直接読めるように)
+        if let obj, !first.isEmpty {
+            let mtlURL = obj.deletingPathExtension().appendingPathExtension("mtl")
+            if var mtl = try? String(contentsOf: mtlURL, encoding: .utf8) {
+                let texName = URL(fileURLWithPath: first).lastPathComponent
+                var lines = mtl.components(separatedBy: "\n")
+                for i in lines.indices {
+                    if lines[i].trimmingCharacters(in: .whitespaces).hasPrefix("map_Kd") {
+                        lines[i] = "\tmap_Kd \(texName)"
+                    }
+                }
+                mtl = lines.joined(separator: "\n")
+                try? mtl.write(to: mtlURL, atomically: true, encoding: .utf8)
+            }
+        }
+        return first
+    }
 
     func start(imageFolder: String, outputPath: String, detail: Int) {
         cancel()
@@ -38,6 +90,9 @@ final class PhotoSession {
             ? finalURL.deletingPathExtension().appendingPathExtension("usdz")
             : finalURL
         self.convertTo = wantsOBJ ? finalURL : nil
+        // 既存の出力があると invalidOutput になる(実測)ので先に消す
+        try? FileManager.default.removeItem(at: outputURL)
+        try? FileManager.default.removeItem(at: finalURL)
         let detailLevel: PhotogrammetrySession.Request.Detail =
             detail == 0 ? .preview : detail == 1 ? .reduced : detail == 3 ? .full : .medium
 
@@ -58,13 +113,20 @@ final class PhotoSession {
                             self.lock.unlock()
                         case .requestComplete(_, let result):
                             var convertError = ""
-                            if case .modelFile(let usdzURL) = result,
-                               let objURL = self.convertTo {
-                                do {
-                                    let asset = MDLAsset(url: usdzURL)
-                                    try asset.export(to: objURL)
-                                } catch {
-                                    convertError = "OBJ convert failed: \(error)"
+                            var texPath = ""
+                            if case .modelFile(let usdzURL) = result {
+                                if let objURL = self.convertTo {
+                                    do {
+                                        let asset = MDLAsset(url: usdzURL)
+                                        try asset.export(to: objURL)
+                                        texPath = self.extractTextures(usdz: usdzURL,
+                                                                       obj: objURL)
+                                    } catch {
+                                        convertError = "OBJ convert failed: \(error)"
+                                    }
+                                } else {
+                                    // USDZ 直指定でもテクスチャは取り出しておく
+                                    texPath = self.extractTextures(usdz: usdzURL, obj: nil)
                                 }
                             }
                             self.lock.lock()
@@ -72,6 +134,7 @@ final class PhotoSession {
                             self.done = convertError.isEmpty
                             self.status = convertError.isEmpty ? "complete" : "error"
                             self.errorMsg = convertError
+                            self.texture = texPath
                             self.lock.unlock()
                         case .requestError(_, let error):
                             self.lock.lock()
@@ -125,7 +188,8 @@ final class PhotoSession {
     func poll() -> String {
         lock.lock(); defer { lock.unlock() }
         let dict: [String: Any] = ["status": status, "progress": progress,
-                                   "done": done, "error": errorMsg]
+                                   "done": done, "error": errorMsg,
+                                   "texture": texture]
         if let data = try? JSONSerialization.data(withJSONObject: dict),
            let s = String(data: data, encoding: .utf8) { return s }
         return "{}"
