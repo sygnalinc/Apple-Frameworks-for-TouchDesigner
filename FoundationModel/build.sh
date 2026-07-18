@@ -6,6 +6,7 @@ cd "$(dirname "$0")"
 
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
 NAME=FoundationModelDAT
+DYLIB="libFMHelper_$(date +%s).dylib"
 OUT="build/$NAME.plugin/Contents"
 rm -rf build
 mkdir -p "$OUT/MacOS" "$OUT/Frameworks"
@@ -15,15 +16,15 @@ swiftc -O -emit-library -module-name FMHelper \
   -target arm64-apple-macos14.0 \
   helper/FMHelper.swift \
   -framework FoundationModels \
-  -Xlinker -install_name -Xlinker @rpath/libFMHelper.dylib \
-  -o "$OUT/Frameworks/libFMHelper.dylib"
+  -Xlinker -install_name -Xlinker "@rpath/$DYLIB" \
+  -o "$OUT/Frameworks/$DYLIB"
 
 # ② プラグイン本体
 clang++ -std=c++17 -fobjc-arc -O2 -bundle \
   -I "$SDK" \
   FoundationModelDAT.mm \
   -framework Foundation \
-  -L "$OUT/Frameworks" -lFMHelper \
+  "$OUT/Frameworks/$DYLIB" \
   -Xlinker -rpath -Xlinker @loader_path/../Frameworks \
   -o "$OUT/MacOS/$NAME"
 

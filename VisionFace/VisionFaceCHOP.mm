@@ -51,6 +51,7 @@ struct Face
     bool valid = false;
     float bbox[4] = {};                       // 中心u, 中心v, width, height
     float rot[3] = {};                        // roll, yaw, pitch
+    float quality = 0;                        // 顔写りスコア 0〜1(Quality有効時)
     float centroid[kNumCentroids][2] = {};
     float points[kNumLandmarks][2] = {};
 };
@@ -84,6 +85,7 @@ public:
     {
         myMaxFaces = std::max(1, std::min(kMaxFaces, (int)inputs->getParInt("Maxfaces")));
         myLandmarks = inputs->getParInt("Landmarks") != 0;
+        myQuality = inputs->getParInt("Quality") != 0;
         info->numChannels = myMaxFaces * perFace();
         info->numSamples = 1;
         info->startIndex = 0;
@@ -115,6 +117,14 @@ public:
             return;
         }
         local -= 3;
+        if (myQuality) {
+            if (local == 0) {
+                snprintf(buf, sizeof(buf), "face%d/quality", face);
+                name->setString(buf);
+                return;
+            }
+            local -= 1;
+        }
         if (local < kNumCentroids * 2) {
             const char* f[2] = {"u", "v"};
             snprintf(buf, sizeof(buf), "face%d/%s:%s", face,
@@ -166,6 +176,8 @@ public:
                 output->channels[ch++][0] = on ? face.bbox[c] : 0.0f;
             for (int c = 0; c < 3; c++)
                 output->channels[ch++][0] = on ? face.rot[c] : 0.0f;
+            if (myQuality)
+                output->channels[ch++][0] = on ? face.quality : 0.0f;
             for (int c = 0; c < kNumCentroids; c++) {
                 output->channels[ch++][0] = on ? face.centroid[c][0] : 0.0f;
                 output->channels[ch++][0] = on ? face.centroid[c][1] : 0.0f;
@@ -215,6 +227,14 @@ public:
             manager->appendToggle(p);
         }
         {
+            // VNDetectFaceCaptureQualityRequest による顔写りスコア(ベストショット選択用)
+            OP_NumericParameter p("Quality");
+            p.label = "Face Capture Quality";
+            p.page = "Vision Face";
+            p.defaultValues[0] = 0;
+            manager->appendToggle(p);
+        }
+        {
             // TD の TOP ダウンロードは GL 系の上下逆（bottom-up）なので既定でフリップする
             OP_NumericParameter p("Flip");
             p.label = "Flip Image Vertically";
@@ -236,7 +256,8 @@ public:
 private:
     int perFace() const
     {
-        return 1 + 4 + 3 + kNumCentroids * 2 + (myLandmarks ? kNumLandmarks * 2 : 0);
+        return 1 + 4 + 3 + (myQuality ? 1 : 0) + kNumCentroids * 2 +
+               (myLandmarks ? kNumLandmarks * 2 : 0);
     }
 
     // ---------------------------------------------------------- worker
@@ -309,6 +330,15 @@ private:
                 [[VNImageRequestHandler alloc] initWithCVPixelBuffer:buffer options:@{}];
             [handler performRequests:@[request] error:nil];
 
+            // 顔写りスコア(有効時のみ・別リクエスト)。bbox中心の最近傍で対応付ける
+            NSArray<VNFaceObservation*>* qualityObs = nil;
+            if (myQuality) {
+                VNDetectFaceCaptureQualityRequest* qreq =
+                    [[VNDetectFaceCaptureQualityRequest alloc] init];
+                if ([handler performRequests:@[qreq] error:nil])
+                    qualityObs = qreq.results;
+            }
+
             for (VNFaceObservation* obs in request.results) {
                 Face face;
                 face.valid = true;
@@ -320,6 +350,20 @@ private:
                 face.rot[0] = obs.roll ? obs.roll.floatValue : 0.0f;
                 face.rot[1] = obs.yaw ? obs.yaw.floatValue : 0.0f;
                 face.rot[2] = obs.pitch ? obs.pitch.floatValue : 0.0f;
+
+                if (qualityObs) {
+                    double bestD = 1e9;
+                    for (VNFaceObservation* q in qualityObs) {
+                        const CGRect qb = q.boundingBox;
+                        const double du = (qb.origin.x + qb.size.width * 0.5) - face.bbox[0];
+                        const double dv = (qb.origin.y + qb.size.height * 0.5) - face.bbox[1];
+                        const double d = du * du + dv * dv;
+                        if (d < bestD && q.faceCaptureQuality) {
+                            bestD = d;
+                            face.quality = q.faceCaptureQuality.floatValue;
+                        }
+                    }
+                }
 
                 VNFaceLandmarks2D* lm = obs.landmarks;
                 if (lm) {
@@ -359,6 +403,7 @@ private:
     int64_t myLastCookSeen = -1;
     int myMaxFaces = 5;
     bool myLandmarks = false;
+    std::atomic<bool> myQuality{false};
     std::atomic<bool> myFlip{true};
 
     std::atomic<int> myExecCount{0}, mySubmitCount{0}, myAnalyzeCount{0};

@@ -7,6 +7,7 @@ cd "$(dirname "$0")"
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
 NAME=ShazamDAT
 OUT="build/$NAME.plugin/Contents"
+DYLIB="libShazamHelper_$(date +%s).dylib"
 rm -rf build
 mkdir -p "$OUT/MacOS" "$OUT/Frameworks"
 
@@ -14,14 +15,14 @@ swiftc -O -emit-library -module-name ShazamHelper \
   -target arm64-apple-macos12.0 \
   ShazamHelper.swift \
   -framework ShazamKit -framework AVFAudio \
-  -Xlinker -install_name -Xlinker @rpath/libShazamHelper.dylib \
-  -o "$OUT/Frameworks/libShazamHelper.dylib"
+  -Xlinker -install_name -Xlinker "@rpath/$DYLIB" \
+  -o "$OUT/Frameworks/$DYLIB"
 
 clang++ -std=c++17 -fobjc-arc -O2 -bundle \
   -I "$SDK" \
   ShazamDAT.mm \
   -framework Foundation \
-  -L "$OUT/Frameworks" -lShazamHelper \
+  "$OUT/Frameworks/$DYLIB" \
   -Xlinker -rpath -Xlinker @loader_path/../Frameworks \
   -o "$OUT/MacOS/$NAME"
 

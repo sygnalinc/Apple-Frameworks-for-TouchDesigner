@@ -28,6 +28,10 @@ face の並びは bbox 中心の x で左→右にソート。
 
 ## 注意
 
+- **Face Capture Quality**(トグル・既定Off): Onで `face{i}/quality`(0〜1の顔写り
+  スコア・VNDetectFaceCaptureQualityRequest)が roll/yaw/pitch の後に追加される。
+  フォトブースの「ベスト表情自動選択」に。Offなら従来とチャンネル互換
+
 - 顔が小さい（引きの全身ショット等）と検出が不安定。バストアップ程度の画角が確実
 - **絵に描かれた顔（Tシャツのプリント等）も顔として検出しうる**（Vision の仕様）
 - 実測: 顔写真で bbox・目/鼻/口の位置関係が正しく出力されることを確認

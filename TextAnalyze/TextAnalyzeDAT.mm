@@ -261,20 +261,39 @@ private:
             snprintf(buf, sizeof(buf), "%.4f", res.sentiment);
             res.rows.push_back({"sentiment", buf});
 
-            // 参照テキストとの意味的類似度(文埋め込み・コサイン距離 0〜2 → 類似度 0〜1)
+            // 参照テキストとの意味的類似度。
+            // 第一候補: NLContextualEmbedding(BERT系・macOS 14+・日本語対応)。
+            // 使えない言語/OSでは NLEmbedding の文埋め込み(英語等)へフォールバック
             if (!ref.empty()) {
                 NSString* nsref = [NSString stringWithUTF8String:ref.c_str()];
-                NLEmbedding* emb = embeddingForLanguage(lang);
-                if (emb && nsref) {
-                    const double dist = [emb distanceBetweenString:nstext
-                                                         andString:nsref
-                                                      distanceType:NLDistanceTypeCosine];
-                    res.similarity = (float)(1.0 - dist / 2.0);
-                    snprintf(buf, sizeof(buf), "%.4f", res.similarity);
-                    res.rows.push_back({"similarity", buf});
-                } else {
-                    warning = "Sentence embedding unavailable for language: " +
-                              (lang ? nsstr(lang) : "unknown");
+                bool done = false;
+                if (@available(macOS 14.0, *)) {
+                    double sim = 0;
+                    std::string ctxWarn;
+                    if (nsref && contextualSimilarity(nstext, nsref, lang, sim, ctxWarn)) {
+                        res.similarity = (float)sim;
+                        snprintf(buf, sizeof(buf), "%.4f", res.similarity);
+                        res.rows.push_back({"similarity", buf});
+                        done = true;
+                    } else if (!ctxWarn.empty()) {
+                        warning = ctxWarn;   // アセットDL中など。次回以降に成立する
+                        done = true;
+                    }
+                }
+                if (!done) {
+                    NLEmbedding* emb = embeddingForLanguage(lang);
+                    if (emb && nsref) {
+                        const double dist =
+                            [emb distanceBetweenString:nstext
+                                             andString:nsref
+                                          distanceType:NLDistanceTypeCosine];
+                        res.similarity = (float)(1.0 - dist / 2.0);
+                        snprintf(buf, sizeof(buf), "%.4f", res.similarity);
+                        res.rows.push_back({"similarity", buf});
+                    } else {
+                        warning = "Embedding unavailable for language: " +
+                                  (lang ? nsstr(lang) : "unknown");
+                    }
                 }
             }
 
@@ -317,6 +336,71 @@ private:
         }
     }
 
+    // NLContextualEmbedding(BERT系)で平均プーリング→コサイン類似度。
+    // 戻り値 true=計算成功。アセット未取得時は warning を入れて true(DL開始済み)
+    API_AVAILABLE(macos(14.0))
+    bool contextualSimilarity(NSString* a, NSString* b, NLLanguage lang, double& simOut,
+                              std::string& warn)
+    {
+        NLLanguage use = lang ?: NLLanguageEnglish;
+        if (!myCtxEmb || ![myCtxLang isEqualToString:use]) {
+            NLContextualEmbedding* e =
+                [NLContextualEmbedding contextualEmbeddingWithLanguage:use];
+            if (!e)
+                return false;   // 言語非対応 → フォールバックへ
+            if (!e.hasAvailableAssets) {
+                [e requestEmbeddingAssetsWithCompletionHandler:^(
+                     NLContextualEmbeddingAssetsResult, NSError*) {}];
+                warn = "Downloading embedding assets for " + nsstr(use) + "...";
+                return true;    // DL開始。次回以降のテキスト変化で成立する
+            }
+            if (![e loadWithError:nil])
+                return false;
+            myCtxEmb = e;
+            myCtxLang = use;
+        }
+        std::vector<double> va, vb;
+        if (!meanVector(a, va) || !meanVector(b, vb) || va.size() != vb.size() ||
+            va.empty())
+            return false;
+        double dot = 0, na = 0, nb = 0;
+        for (size_t i = 0; i < va.size(); i++) {
+            dot += va[i] * vb[i];
+            na += va[i] * va[i];
+            nb += vb[i] * vb[i];
+        }
+        if (na <= 0 || nb <= 0)
+            return false;
+        simOut = dot / (sqrt(na) * sqrt(nb));   // コサイン類似度 -1〜1
+        return true;
+    }
+
+    API_AVAILABLE(macos(14.0))
+    bool meanVector(NSString* text, std::vector<double>& out)
+    {
+        NSError* err = nil;
+        NLContextualEmbeddingResult* r =
+            [myCtxEmb embeddingResultForString:text language:myCtxLang error:&err];
+        if (!r)
+            return false;
+        out.assign((size_t)myCtxEmb.dimension, 0.0);
+        __block int count = 0;
+        std::vector<double>* acc = &out;
+        [r enumerateTokenVectorsInRange:NSMakeRange(0, text.length)
+                             usingBlock:^(NSArray<NSNumber*>* vec, NSRange, BOOL*) {
+                                 const size_t n =
+                                     std::min((size_t)vec.count, acc->size());
+                                 for (size_t i = 0; i < n; i++)
+                                     (*acc)[i] += vec[i].doubleValue;
+                                 count++;
+                             }];
+        if (count == 0)
+            return false;
+        for (auto& v : out)
+            v /= count;
+        return true;
+    }
+
     // 言語ごとの文埋め込みをキャッシュ(初回ロードが重い)
     NLEmbedding* embeddingForLanguage(NLLanguage lang)
     {
@@ -348,6 +432,8 @@ private:
     // ワーカー専用
     NLEmbedding* myEmbedding = nil;
     NLLanguage myEmbeddingLang = nil;
+    NLContextualEmbedding* myCtxEmb API_AVAILABLE(macos(14.0)) = nil;
+    NLLanguage myCtxLang = nil;
 
     std::atomic<int> myExecCount{0}, mySubmitCount{0}, myAnalyzeCount{0};
     std::atomic<int> myEntities{0}, myValid{0};

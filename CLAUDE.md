@@ -721,3 +721,84 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   abstract class エラー)
 - ShazamKitのカスタムカタログ照合はエンタイトルメント不要・完全ローカル。
   Shazam公式カタログ照合はエンタイトルメントが要るため手を出さない
+
+### 2026-07-19 整備3件(git公開・SAM2連携デモ・Photogrammetry実証)
+
+- **git commit/push**: Claude Codeセッション分の8プラグイン+Upscale/FrameInterp改修+
+  CLAUDE.mdを `codex/publish-all-changes` へコミット(e41cd76)・push完了。
+  Codex作業中の Music* 系・巨大動画・CrashAutoSave は対象外のまま
+- **SAM2+VisionTrack連携デモ**(`/project1/sam2_track_demo`・sample.toe保存済み):
+  test_video_1(5人ダンス)で VisionTrack の u/v を式で SAM2 の Prompt Point に接続 →
+  中央人物のフルカラー切り抜きを視認。組み立ての要点:
+  ① マスクは正方形256x256なので Fit TOP は **fit=fill(stretch)** で入力アスペクトへ
+  ② sigmoidソフトマスクは背景に中間値が残るので **Threshold TOP(0.5)** を挟む
+  ③ Composite(multiply)は**出力formatをrgba8fixedに固定**(Mono32Float入力に
+  引っ張られてモノクロ化する)
+- **SAM2SegmentにMask Selectパラメータ追加**(largest=物体全体・既定 / score=部位)。
+  スコア最高候補は「服だけ」等の部位を選びがちなため、面積最大候補で人物全体を選択。
+  リビルド・インストール済み(**開いているTDセッションはパスキャッシュのため旧コード。
+  TD再起動で有効化**)
+- **Photogrammetry実写真検証完了**: Middlebury templeRing(47枚・640x480)で
+  約1分(Preview)→ USDZ 450KB → OBJ変換 → SOP 1416点/2835三角形をレンダリング視認。
+  データセットとメッシュを Assets/ に同梱、デモは `/project1/photogrammetry_demo`。
+  ルートREADMEを「✅ 実装済み」へ更新
+- 未コミット: この整備分(README更新・CLAUDE.md・SAM2のMaskselect・sample.toe)は
+  次回コミットにまとめる
+
+### 2026-07-19 Photogrammetry にテクスチャ対応を追加
+
+- **ヘルパ**: 再構成完了時に usdz(実体はzip)から焼き込みテクスチャを `/usr/bin/unzip` で
+  抽出し `<出力名>_tex0.png` に改名、`.mtl` の `map_Kd`(usdz内部参照)も書き換え。
+  テクスチャパスは poll JSON の `texture` フィールドで返す
+- **SOP**: OBJ の vt をパースし **UV付きで出力**(v/vt 分離は (v,vt) の組で点を分割して解決。
+  templeRing 実測 1416点→1865点)。テクスチャパスは Info DAT `texture` 行で公開
+- **実測**: templeRing 再構成→テクスチャ抽出(370KB png)→ Phong MAT Color Map で
+  **テクスチャ付きメッシュのレンダリングを視認**。デモ(/project1/photogrammetry_demo)に
+  tex(moviefilein)+phong(MAT) を追加して保存済み
+- 使い方: Movie File In に `_tex0.png` → Phong MAT Color Map → Geo の Material
+
+### 新規ハマりどころ(上記で発見)
+
+- **SOP の一括 `setTexCoords()` は先頭UVが全点に入る**(実測・TD 2023系)。
+  TD付属サンプルと同じ **per-point の `setTexCoord()`** を使うこと
+- **PhotogrammetrySession は出力先に既存ファイルがあると invalidOutput**。開始前に削除する
+- **ヘルパdylibの修正が反映されないときは install name キャッシュ**(ハマりどころ集①の実例)。
+  .plugin のパスを変えても dylib の install name が同じだと dyld が旧dylibを使い続ける。
+  Photogrammetry/Shazam の build.sh を `lib*_<epoch>.dylib` 方式に修正済み
+
+### 2026-07-19 6件実装(既存強化3+新規3)
+
+ユーザー指示で推奨リスト6件を一括実装。全てM2実測(GameControllerのみ構造検証)。
+
+- **TextAnalyze日本語類似度**: NLContextualEmbedding(BERT系・macOS 14+)を第一候補に。
+  平均プーリング+コサイン類似度。実測: ja文どうしで similarity=0.6433。
+  非対応言語/OSはNLEmbeddingへフォールバック。初回アセットDLは警告表示
+- **FoundationModel構造化出力**: DynamicGenerationSchemaで "name:type" スキーマ→
+  スキーマ保証JSON。DATに Schema パラメータ+field行出力を追加。
+  実測: 「真っ赤で激しく点滅」→ color=red / intensity=100 / strobe=1。
+  helper dylib を epoch 付き名に修正(install nameキャッシュ対策)
+- **VisionFace quality**: VNDetectFaceCaptureQualityRequest を Quality トグルで追加
+  (face{i}/quality・bbox最近傍マッチ)。Offなら従来チャンネル互換。
+  実測: ダンス動画3顔・quality=0.246
+- **Shortcuts DAT**(新規): shortcuts CLI ブリッジ。List/Run・入出力受け渡し。
+  実測: ユーザー実環境の21ショートカット列挙
+- **Multipeer DAT**(新規): MultipeerConnectivity自動メッシュ(表示名辞書順で
+  片方向招待=二重接続防止)。実測: 同一マシン2ノードが相互接続し
+  "hello from A" の送受信を確認。入力DAT変化で自動送信
+- **GameController CHOP**(新規): GCController 19ch+モーション6ch+CoreHapticsランブル。
+  実機パッド未検証(未接続時の警告表示のみ確認)
+- 6件ともビルド・インストール済み(TD再起動で反映)。README更新・ルート一覧に3行追加
+- 次にやること: GameControllerの実機パッド検証、FoundationModelのfield行を使った
+  ショー制御デモ、iPhone側Multipeerサンプルの用意
+
+### 2026-07-19 FoundationModel構造化出力デモを sample.toe に追加
+
+- `/project1/fm_structured_demo`: 雰囲気の言葉 → 構造化出力(r,g,b,intensity,strobe)→
+  照明色として画面に出る完全チェーン。色は**数値RGBスキーマで受ける**のが配線を
+  頑丈にするコツ(色名文字列だとマッピングが要る)
+- field行の参照は **1列目がrow nameになる**ことを利用して
+  `float(op('fm')['r',2] or 0)` の式で直接引ける(or 0 は生成前のNone対策)
+- strobe は Level TOP opacity の式で LFO(square 8Hz)と合成:
+  `intensity * (lfo if strobe else 1)`
+- 実測: 「夕暮れの海のような…」→ r0.95/g0.9/b0.9/int0.7/strobe0、
+  「真っ赤で激しく点滅する警報…」→ **r1/g0/b0/int1/strobe1** に切替を視認
