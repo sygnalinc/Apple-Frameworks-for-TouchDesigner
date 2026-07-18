@@ -721,3 +721,26 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   abstract class エラー)
 - ShazamKitのカスタムカタログ照合はエンタイトルメント不要・完全ローカル。
   Shazam公式カタログ照合はエンタイトルメントが要るため手を出さない
+
+### 2026-07-19 整備3件(git公開・SAM2連携デモ・Photogrammetry実証)
+
+- **git commit/push**: Claude Codeセッション分の8プラグイン+Upscale/FrameInterp改修+
+  CLAUDE.mdを `codex/publish-all-changes` へコミット(e41cd76)・push完了。
+  Codex作業中の Music* 系・巨大動画・CrashAutoSave は対象外のまま
+- **SAM2+VisionTrack連携デモ**(`/project1/sam2_track_demo`・sample.toe保存済み):
+  test_video_1(5人ダンス)で VisionTrack の u/v を式で SAM2 の Prompt Point に接続 →
+  中央人物のフルカラー切り抜きを視認。組み立ての要点:
+  ① マスクは正方形256x256なので Fit TOP は **fit=fill(stretch)** で入力アスペクトへ
+  ② sigmoidソフトマスクは背景に中間値が残るので **Threshold TOP(0.5)** を挟む
+  ③ Composite(multiply)は**出力formatをrgba8fixedに固定**(Mono32Float入力に
+  引っ張られてモノクロ化する)
+- **SAM2SegmentにMask Selectパラメータ追加**(largest=物体全体・既定 / score=部位)。
+  スコア最高候補は「服だけ」等の部位を選びがちなため、面積最大候補で人物全体を選択。
+  リビルド・インストール済み(**開いているTDセッションはパスキャッシュのため旧コード。
+  TD再起動で有効化**)
+- **Photogrammetry実写真検証完了**: Middlebury templeRing(47枚・640x480)で
+  約1分(Preview)→ USDZ 450KB → OBJ変換 → SOP 1416点/2835三角形をレンダリング視認。
+  データセットとメッシュを Assets/ に同梱、デモは `/project1/photogrammetry_demo`。
+  ルートREADMEを「✅ 実装済み」へ更新
+- 未コミット: この整備分(README更新・CLAUDE.md・SAM2のMaskselect・sample.toe)は
+  次回コミットにまとめる

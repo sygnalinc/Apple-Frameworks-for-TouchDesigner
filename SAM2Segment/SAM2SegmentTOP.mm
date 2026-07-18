@@ -99,6 +99,10 @@ public:
         prompt.bv = (float)inputs->getParDouble("Bgpoint", 1);
         prompt.useBg = inputs->getParInt("Usebgpoint") != 0;
         inputs->enablePar("Bgpoint", prompt.useBg);
+        const bool largest = strcmp(inputs->getParString("Maskselect"), "largest") == 0;
+        const bool selectChanged = (largest != myLastLargestSeen);
+        myLastLargestSeen = largest;
+        myLargest = largest;
 
         const bool cpuGPU = strcmp(inputs->getParString("Computeunits"), "cpugpu") == 0;
         std::string folder;
@@ -119,7 +123,7 @@ public:
 
         const OP_TOPInput* top = inputs->getInputTOP(0);
         const bool newFrame = top && top->totalCooks != myLastCookSeen;
-        const bool newPrompt = prompt != myLastPrompt;
+        const bool newPrompt = (prompt != myLastPrompt) || selectChanged;
         if (active && myModelsLoaded && (newFrame || newPrompt)) {
             std::unique_lock<std::mutex> lock(myMutex, std::try_to_lock);
             if (lock.owns_lock() && !myHasPending && !myBusy) {
@@ -212,6 +216,15 @@ public:
                 p.maxSliders[i] = 1.0;
             }
             manager->appendXY(p);
+        }
+        {
+            OP_StringParameter p("Maskselect");
+            p.label = "Mask Select";
+            p.page = "SAM2";
+            p.defaultValue = "largest";
+            const char* names[] = {"largest", "score"};
+            const char* labels[] = {"Largest (Whole Object)", "Best Score (Part)"};
+            manager->appendMenu(p, 2, names, labels);
         }
         {
             OP_NumericParameter p("Usebgpoint");
@@ -546,9 +559,32 @@ private:
             return;
         }
 
-        // 最高スコアの候補を選ぶ
+        // 候補選択: Best Score(最高信頼度・部位が選ばれがち)/ Largest(最大面積・
+        // 物体全体が選ばれがち)。SAMの3候補は部位→全体の粒度違いを表す
+        const uint32_t cn = masks.shape[1].unsignedIntValue;
         int best = 0;
-        if (scores) {
+        if (myLargest && cn > 1) {
+            const uint32_t wq = masks.shape[3].unsignedIntValue;
+            const uint32_t hq = masks.shape[2].unsignedIntValue;
+            const NSInteger cS = masks.strides[1].integerValue;
+            const NSInteger hS = masks.strides[2].integerValue;
+            const NSInteger wS = masks.strides[3].integerValue;
+            const __fp16* mb = (const __fp16*)masks.dataPointer;
+            long bestArea = -1;
+            for (uint32_t ci = 0; ci < cn; ci++) {
+                long area = 0;
+                for (uint32_t y = 0; y < hq; y += 2)          // 1/4サンプリングで十分
+                    for (uint32_t x = 0; x < wq; x += 2)
+                        if ((float)mb[ci * cS + (NSInteger)y * hS + (NSInteger)x * wS] > 0)
+                            area++;
+                if (area > bestArea) {
+                    bestArea = area;
+                    best = (int)ci;
+                }
+            }
+            if (scores && best < (int)scores.count)
+                myScore = [scores objectAtIndexedSubscript:best].floatValue;
+        } else if (scores) {
             float bestScore = -1e9f;
             const NSInteger sc = scores.count;
             for (NSInteger i = 0; i < sc; i++) {
@@ -612,6 +648,8 @@ private:
     MLMultiArray* myFeatsS0 = nil;
     MLMultiArray* myFeatsS1 = nil;
     std::atomic<bool> myHasEmbedding{false};
+    std::atomic<bool> myLargest{true};
+    bool myLastLargestSeen = true;
 
     std::atomic<int> myExecCount{0}, mySubmitCount{0}, myAnalyzeCount{0};
     std::atomic<float> myEncodeMs{0.0f}, myDecodeMs{0.0f}, myScore{0.0f};

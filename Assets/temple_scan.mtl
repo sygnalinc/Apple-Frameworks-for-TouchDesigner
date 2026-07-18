@@ -1,0 +1,18 @@
+# Apple ModelI/O MTL File: temple_scan.mtl
+
+newmtl Texture
+	map_Kd temple_scan.usdz[0/baked_mesh_f50e9403_tex0.png]
+	Kd 0.18 0.18 0.18
+	Ka 0 0 0
+	Ks 0
+	ao 0
+	subsurface 0
+	metallic 0
+	specularTint 0
+	roughness 0.9
+	anisotropicRotation 0
+	sheen 0.05
+	sheenTint 0
+	clearCoat 0
+	clearCoatGloss 0.99
+
