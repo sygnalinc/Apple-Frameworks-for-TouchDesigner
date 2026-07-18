@@ -85,6 +85,17 @@ public:
         }
         void* active_session = playground ? myPGSession : mySession;
 
+        // バックエンドで使わないパラメータをグレーアウト
+        inputs->enablePar("Style", playground);
+        inputs->enablePar("Model", !playground);
+        inputs->enablePar("Compute", !playground);
+        inputs->enablePar("Negativeprompt", !playground);
+        inputs->enablePar("Steps", !playground);
+        inputs->enablePar("Guidance", !playground);
+        inputs->enablePar("Seed", !playground);
+        inputs->enablePar("Img2img", !playground);
+        inputs->enablePar("Strength", !playground && inputs->getParInt("Img2img") != 0);
+
         // 状態ポーリング（トリガ判定に使うので先に行う）
         myStatus = "no model";
         int imageSerial = 0, imgW = 0, imgH = 0;

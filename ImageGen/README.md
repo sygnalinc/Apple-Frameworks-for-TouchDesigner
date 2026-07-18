@@ -16,6 +16,9 @@ Core ML の画像生成モデルで **TD 内から text2img / img2img** する �
 | **Stable Diffusion (Core ML)** | ml-stable-diffusion。SD 2.x / SDXL / SD Turbo を Model Folder で指定(自動判定) | Turbo 1step **0.8秒** / SD2.1 15steps 7.6秒 |
 | **Image Playground** | Apple の ImageCreator API(macOS 15.4+・Apple Intelligence必須)。**モデルフォルダ不要**。Style: Animation / Illustration / Sketch | 1536x1536 **2.7秒** |
 
+パラメータは選択中のバックエンドで使えるものだけ有効になる(使えないものはグレーアウト。
+Strength は Image to Image オン時のみ有効)。
+
 Image Playground の注意:
 - **人物はテキストのみから生成できない**(「顔のソース画像が必要」とエラーになる安全設計)。
   モノ・風景・動物などのプロンプト向き
