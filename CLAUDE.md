@@ -395,3 +395,11 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
 - 静止画の処理パラメータ変更で再投入するsignature検知をKeystone/Bokeh/Similarity/MPSへ追加
 - `git diff --check`、opType規約、英字3文字opIcon、全READMEとルート一覧更新を確認
 - TD `/project1` の`_codex_*`検証ノードを全て削除
+
+### 2026-07-19 新規7プラグインのGit公開
+
+- 今回の7プラグイン、各README、ルートREADME、引き継ぎ記録を
+  `codex/publish-all-changes`へコミットしてoriginへpush
+- LFSは使用せず、183MBの`Assets/test_video_2.mp4`は引き続きローカルのみ
+- TDクラッシュ由来の`CrashAutoSave.sample.toe`と更新された`sample.toe`、既存の
+  `sample.py`削除は混在差分としてコミット対象外に保持
