@@ -276,5 +276,122 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   （削除済みファイル・未追跡ファイルを含む）を1コミットとしてpushする方針
 - `Assets/test_video_2.mp4`（約183MB）はGitHub通常Gitの100MB制限を超えるため、
   ユーザーの「LFSは使わない」指示に従い、ローカルに残して今回のコミット対象から除外
-- `codex/publish-all-changes`でコミット・push完了（commit: `ecd67ac`）。除外動画のみ
+- `codex/publish-all-changes`でコミット・push完了（最終commit: `b811ade`）。除外動画のみ
   未追跡でローカルに残る
+
+### 2026-07-19 次期プラグイン候補の調査
+
+- Core Imageの汎用色補正・ブラー・エッジ処理はTouchDesigner標準TOPと重なりやすいため、
+  Vision出力と組み合わせて自動化できる機能を優先候補とした
+- 最優先は`VisionKeystone TOP`。既存`VisionRect CHOP`の四隅を
+  `CIPerspectiveCorrection`または`CIKeystoneCorrectionCombined`へ渡し、紙面・
+  スクリーン・投影面を自動で正対補正する。`TOP -> VisionRect -> TOP`の一貫した
+  ワークフローになり、既存群との相乗効果が最も大きい
+- 次点は、Vision Feature Printによる`VisionSimilarity CHOP`、水平角検出による
+  `VisionHorizon CHOP`、マスク入力で背景だけを可変ぼかしする`VisionBokeh TOP`、
+  QR/Code128等を生成する`CoreImageCode TOP`。画像美的スコア出力も候補だが、
+  演出用途の汎用性では上記より後順位
+
+### 2026-07-19 音声・サウンド系の次期候補調査
+
+- 既存`SoundClass CHOP`はSoundAnalysis組込み分類（300種類以上）と独自Core ML音響モデルを
+  すでに扱うため、分類器の重複実装は優先しない
+- 最優先候補は`SoundFeatures CHOP`。Audio CHOPからRMS/peak、周波数帯エネルギー、
+  spectral centroid/flux、onset/beat、推定tempoを一貫した低遅延CHOPとして出す
+- 次点は新Speech APIの`SpeechDetector`をSwift helperで包む`VoiceActivity CHOP`。
+  `speaking / onset / offset / confidence`を出し、SpeechTextの文字起こし開始・終了、
+  映像切替、照明制御に直接使える
+- 音源分離・自動ミックスはApple標準のオンデバイスAPIだけでは汎用実装の基盤が弱いため、
+  現時点では優先外。空間音響はAVAudioEngineで可能だが、TouchDesigner標準の音声経路との
+  接続・出力デバイス所有が複雑なため後順位
+
+### 2026-07-19 Appleフレームワーク横断の候補カタログ調査
+
+- macOS版TouchDesignerのネイティブpluginとして有効な範囲を、Vision/Core Image/
+  AVFoundation/ScreenCaptureKit/Metal Performance Shaders/Accelerate/Speech/
+  NaturalLanguage/WeatherKit/MapKit/Core Location/MultipeerConnectivityまで横断調査
+- 最優先候補は`VisionKeystone TOP`、`SoundFeatures CHOP`、`ScreenCapture TOP`。
+  既存pluginと相乗効果があり、TD標準OPとの差別化も明確
+- `ScreenCapture TOP`はScreenCaptureKitでディスプレイ・アプリ・任意ウインドウと同時に
+  システム音声を取得できる。画面収録権限と選択UIを要する
+- `MPSAnalyze TOP/CHOP`（histogram/平均色/統計）、`ImageAutoEnhance TOP`、
+  `VisionSimilarity CHOP`、`VisionHorizon CHOP`、`VisionBokeh TOP`、
+  `CoreImageCode TOP`を映像系の有望候補として整理
+- 文章・データ入力向けには`TextAnalyze DAT`（言語判定・固有表現・品詞・埋め込み）、
+  外部演出データには`Weather CHOP/DAT`、`MapSnapshot TOP`、`Location CHOP`、
+  `Multipeer DAT/CHOP`を候補化。ただしそれぞれ権限・Developer Program・利用規約・
+  ローカルネットワーク設定を伴うため優先度は下げる
+- iOS/visionOS中心でmacOS版TouchDesignerに直接載せにくいARKit、RoomPlan、
+  Nearby Interaction、HealthKit、Core Hapticsは今回の実装候補から除外
+
+### 2026-07-19 VisionKeystone TOP実装
+
+- `CIPerspectiveCorrection`を使う非同期CPUMem TOPを新規実装
+- 既存VisionRect CHOPの`rect{i}/tl:u`等8chを直接参照でき、手動四隅にも対応
+- 自動解像度または固定出力解像度、Flip既定On、Info CHOP診断を実装
+- Core Image / Core Graphicsをリンクし、ad-hoc署名までビルド成功
+
+### 2026-07-19 SoundFeatures CHOP実装
+
+- Accelerate/vDSPのHann窓+FFTをワーカースレッドで実行する非同期CHOPを新規実装
+- RMS/peak/dB/ZCR/centroid/rolloff/spectral flux/onset/beat/BPM、bass/mid/high、
+  対数16帯域を固定29ch・1sampleで出力
+- FFTサイズとonset閾値、Info CHOP診断を実装し、ad-hoc署名までビルド成功
+
+### 2026-07-19 ScreenCapture TOP実装
+
+- ScreenCaptureKitでdisplay/windowを選択してBGRA8 TOPへ非同期出力するpluginを新規実装
+- source index、ネイティブ/固定解像度、1〜120fps、カーソル表示、Restartに対応
+- callback受信フレームを最新値保持し、画面収録権限/APIエラーをWarningへ出力
+- ScreenCaptureKit/CoreMedia/CoreVideoをリンクし、ad-hoc署名までビルド成功
+
+### 2026-07-19 VisionSimilarity CHOP実装
+
+- `VNGenerateImageFeaturePrintRequest`で2つのTOPを非同期比較するCHOPを新規実装
+- `valid / distance / similarity / match`を出力し、distance閾値をパラメータ化
+- similarityは演出制御用に`exp(-distance/10)`へ変換、Vision固有distanceもそのまま保持
+- Vision/CoreVideoをリンクし、ad-hoc署名までビルド成功
+
+### 2026-07-19 VoiceActivity CHOP実装
+
+- macOS 26のSwift専用`SpeechDetector`をhelper dylib+C ABIで包むCHOPを新規実装
+- `speaking / onset / offset / start / end / duration`を出力し、感度3段階に対応
+- Audio CHOPの任意sample rateをSpeechAnalyzer推奨形式へ変換してAsyncStreamへ投入
+- macOS 14 targetの`@available`ガード、Info DAT status、同梱dylibのrpathを実装し、
+  Swift 6のNSLock async-context警告（現言語モードではwarning）を除きビルド・署名成功
+
+### 2026-07-19 VisionBokeh TOP実装
+
+- Core Image `CIMaskedVariableBlur`を使う2入力非同期CPUMem TOPを新規実装
+- 入力0=画像、入力1=マスク。VisionSubject等の白い被写体マスクを想定し、背景ぼかし用の
+  mask反転を既定Onに設定。異解像度マスクの自動スケールにも対応
+- radius 0〜100、Flip既定On、Info CHOP診断を実装し、ビルド・署名成功
+
+### 2026-07-19 Core Image同時実行クラッシュ修正
+
+- TD実測でVisionKeystoneとVisionBokehを別pluginパスから同時初期化した際、
+  `CIFilter setValue:forKey:`内部のKVC競合でEXC_BAD_ACCESSを確認
+- 両pluginのCore Image処理区間を`@synchronized([CIFilter class])`でプロセス横断直列化
+- Core Image出力の行反転を追加し、TD上で正立画像を`get_top_image`相当のsnapshot確認
+- TD再起動後に両TOPを同時40cookし、640x426出力・エラー/警告なし・再クラッシュなしを確認
+
+### 2026-07-19 MPSAnalyze CHOP実装
+
+- `MPSImageHistogram`でRGBA 256binをGPU集計し、16bin×4chへ正規化するCHOPを新規実装
+- RGBA平均、Rec.709輝度の平均/標準偏差/最小/最大、dark/midtone/bright比率を加え、
+  合計76ch・1sampleで出力。GPU完了待ちはワーカースレッドで行いcookは非ブロッキング
+- M2実測で640x426画像からmean_luma=0.4895、std_luma=0.2976、
+  dark/midtone/bright=0.2589/0.5129/0.2282。ビルド・署名成功
+
+### 2026-07-19 新規7プラグイン最終検証
+
+- VisionKeystone / SoundFeatures / ScreenCapture / VisionSimilarity / VoiceActivity /
+  VisionBokeh / MPSAnalyzeを全件再ビルドし、ad-hoc署名と`codesign --verify --deep --strict`成功
+- TD MCP実測: Keystone/Bokehは640x426正立出力、Similarityは同一画像distance=0・
+  similarity=1、MPSAnalyzeはvalid=1・76ch、ScreenCaptureは1710x1112を取得
+- SoundFeaturesは44.1kHz・440Hz正弦波でRMS=0.707、centroid=440.0Hzを確認
+- VoiceActivityは6chロードと非音声入力speaking=0を確認。実発話によるonset/offsetは未検証
+- ScreenCaptureは再起動前にTCC拒否Warning、再起動後は権限が反映され実画面取得成功
+- 静止画の処理パラメータ変更で再投入するsignature検知をKeystone/Bokeh/Similarity/MPSへ追加
+- `git diff --check`、opType規約、英字3文字opIcon、全READMEとルート一覧更新を確認
+- TD `/project1` の`_codex_*`検証ノードを全て削除

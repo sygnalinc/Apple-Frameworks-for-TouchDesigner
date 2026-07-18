@@ -37,6 +37,13 @@ Windows+NVIDIA 専用の TD 標準オペレータ（Body Track CHOP 等）の ma
 | [VisionTrajectory](VisionTrajectory/) | CHOP | **放物運動する小物体の軌跡検出**。実測点/投影点、放物線係数、平均半径を出力 | ✅ 実装済み |
 | [CoreMLCHOP](CoreMLCHOP/) | CHOP | **汎用Core MLベクトル推論**。画像入力モデルのMultiArrayを最大65536chへフラット化し、feature/shapeをInfo DAT出力 | ✅ 実装済み |
 | [VisionRect](VisionRect/) | CHOP | **複数矩形検出**。confidence、bbox、投影四隅を最大100スロットへ出力しCorner Pinへ直結 | ✅ 実装済み |
+| [VisionKeystone](VisionKeystone/) | TOP | **矩形の自動透視補正**。VisionRect CHOPの四隅または手動四隅から紙面・スクリーン・投影面を正対化。Core Image使用 | ✅ 実装済み |
+| [SoundFeatures](SoundFeatures/) | CHOP | **音響特徴量解析**。RMS/Peak/FFT帯域/centroid/flux/onset/beat/BPMと16帯域をAccelerate/vDSPで非同期出力 | ✅ 実装済み |
+| [ScreenCapture](ScreenCapture/) | TOP | **macOS画面キャプチャ**。ScreenCaptureKitでディスプレイまたは単一ウインドウを指定解像度・最大120fpsで取得 | ✅ 実装済み |
+| [VisionSimilarity](VisionSimilarity/) | CHOP | **画像類似度**。Vision Feature Printで2つのTOPのdistance/similarity/matchをモデル追加なしで出力 | ✅ 実装済み |
+| [VoiceActivity](VoiceActivity/) | CHOP | **発話区間検出**（SpeechDetector・macOS 26+）。speaking/onset/offsetと区間時刻を完全オンデバイス出力 | ✅ 実装済み |
+| [VisionBokeh](VisionBokeh/) | TOP | **マスク可変ぼかし**。VisionSubject等のマスクから被写体を保持した背景ボケをCore Imageで生成 | ✅ 実装済み |
+| [MPSAnalyze](MPSAnalyze/) | CHOP | **GPU画像統計**。Metal Performance ShadersのRGBAヒストグラムと平均・輝度分布を76chで出力 | ✅ 実装済み |
 
 ## 必要環境
 
