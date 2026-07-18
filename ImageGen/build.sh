@@ -11,16 +11,18 @@ OUT="build/$NAME.plugin/Contents"
 # ① Swift ヘルパ
 (cd helper && swift build -c release)
 
+DYLIB="libImageGenHelper_$(date +%s).dylib"
 rm -rf build
 mkdir -p "$OUT/MacOS" "$OUT/Frameworks"
-cp helper/.build/release/libImageGenHelper.dylib "$OUT/Frameworks/"
+cp helper/.build/release/libImageGenHelper.dylib "$OUT/Frameworks/$DYLIB"
+install_name_tool -id "@rpath/$DYLIB" "$OUT/Frameworks/$DYLIB"
 
-# ② プラグイン本体
+# ② プラグイン本体（依存dylibはビルド毎に名前を変える=TDのプロセス内キャッシュ対策）
 clang++ -std=c++17 -fobjc-arc -O2 -bundle \
   -I "$SDK" \
   ImageGenTOP.mm \
   -framework Foundation \
-  -L "$OUT/Frameworks" -lImageGenHelper \
+  "$OUT/Frameworks/$DYLIB" \
   -Xlinker -rpath -Xlinker @loader_path/../Frameworks \
   -o "$OUT/MacOS/$NAME"
 

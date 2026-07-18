@@ -9,6 +9,19 @@ Core ML の画像生成モデルで **TD 内から text2img / img2img** する �
 実測（M2 / SD 2.1 base split_einsum / 15 steps / CPU+ANE）:
 **text2img 7.6秒・img2img 4.5秒**。モデルロード（初回のANEコンパイル）は約2分。
 
+## バックエンド
+
+| Backend | 内容 | 実測(M2) |
+|---|---|---|
+| **Stable Diffusion (Core ML)** | ml-stable-diffusion。SD 2.x / SDXL / SD Turbo を Model Folder で指定(自動判定) | Turbo 1step **0.8秒** / SD2.1 15steps 7.6秒 |
+| **Image Playground** | Apple の ImageCreator API(macOS 15.4+・Apple Intelligence必須)。**モデルフォルダ不要**。Style: Animation / Illustration / Sketch | 1536x1536 **2.7秒** |
+
+Image Playground の注意:
+- **人物はテキストのみから生成できない**(「顔のソース画像が必要」とエラーになる安全設計)。
+  モノ・風景・動物などのプロンプト向き
+- Steps / Guidance / Seed / img2img は Playground では無効(API仕様)
+- 出力は安全フィルタ済み・スタイルは3種のみ
+
 ## 使い方
 
 1. `Model Folder` に Core ML SD モデルのフォルダを指定
@@ -40,7 +53,9 @@ Seed は固定値にすると連続フレームの見た目が安定し、-1（�
 
 | パラメータ | 既定 | 内容 |
 |---|---|---|
-| Model Folder | — | Core ML 画像生成モデルのフォルダ |
+| Backend | Stable Diffusion | 生成バックエンド(上表) |
+| Style (Playground) | Animation | Image Playground のスタイル |
+| Model Folder | — | Core ML 画像生成モデルのフォルダ(SD バックエンドのみ) |
 | Compute Units | CPU + Neural Engine | split_einsum は ANE 推奨。ORIGINAL 変換版は CPU+GPU |
 | Prompt / Negative Prompt | — | プロンプト |
 | Steps | 15 | サンプリングステップ（スケジューラは DPM-Solver++） |

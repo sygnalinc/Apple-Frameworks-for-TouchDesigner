@@ -16,7 +16,7 @@ Windows+NVIDIA 専用の TD 標準オペレータ（Body Track CHOP 等）の ma
 | [VisionSegment](VisionSegment/) | TOP | 人物セグメンテーション。**Nvidia Background TOP 代替**。統合マスク（VNGeneratePersonSegmentation）と人物別マスク R/G/B/A 分離（VNGeneratePersonInstanceMask・最大4人）| ✅ 実装済み |
 | [VisionPose3D](VisionPose3D/) | CHOP | **単一人物の3Dポーズ推定**（VNDetectHumanBodyPose3D・macOS 14+）。17関節をメートル単位の3D座標+2D投影で出力、身長推定つき。約2fps（じっくり系） | ✅ 実装済み |
 | [SoundClass](SoundClass/) | CHOP | **音の分類**（SNClassifySoundRequest・300種類以上: 拍手/歓声/笑い声/警報音等）。選択クラスの信頼度をチャンネル出力、ランキングは Info DAT。**独自 Core ML 音響モデル対応** | ✅ 実装済み |
-| [ImageGen](ImageGen/) | TOP | **text2img / img2img**（Core ML 画像生成。現行バックエンドは ml-stable-diffusion・SD2.x/SDXL自動判定、他モデルのバックエンド追加前提の設計）。M2実測 7.6s/512px・15steps | ✅ 実装済み |
+| [ImageGen](ImageGen/) | TOP | **text2img / img2img**。バックエンド2種: Core ML Stable Diffusion（SD2.x/SDXL/Turbo・Turbo 1step 0.8秒でリアルタイム変換）/ **Image Playground**（ImageCreator API・モデル不要・2.7秒） | ✅ 実装済み |
 | [FoundationModel](FoundationModel/) | DAT | **Apple Intelligence オンデバイスLLM**（FoundationModels・macOS 26+）。Instructions+Promptでテキスト生成、ストリーミング・マルチターン対応。API課金なし | ✅ 実装済み |
 | [Translate](Translate/) | DAT | **オンデバイス翻訳**（Translation framework・macOS 15+）。DATのtext列を同形で翻訳出力。SpeechText直結でリアルタイム字幕翻訳 | ✅ 実装済み |
 | [SpeechText](SpeechText/) | DAT | **ライブ文字起こし**（新 SpeechAnalyzer/SpeechTranscriber・macOS 26+・完全オンデバイス・TCC不要）。確定/途中テキストをテーブル出力。Swift ヘルパ dylib 同梱 | ✅ 実装済み |
