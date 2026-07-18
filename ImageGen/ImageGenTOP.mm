@@ -1,8 +1,9 @@
-// StableDiffusion TOP — text2img / img2img（macOS / Core ML Stable Diffusion）
+// ImageGen TOP — text2img / img2img（macOS / Core ML 画像生成）
 //
-// Apple の ml-stable-diffusion（Core ML 変換済みモデル）で画像生成する TD カスタム TOP。
-// SD 2.x 系と SDXL 系のモデルフォルダを自動判定してロードする（実装は同梱の
-// libSDHelper.dylib（Swift）が担う）。
+// Core ML の画像生成モデルで text2img / img2img を行う TD カスタム TOP。
+// 現行バックエンドは Apple の ml-stable-diffusion（SD 2.x / SDXL をフォルダ内容で自動判定）。
+// Stable Diffusion 以外の Core ML 生成モデルにも対応できるよう、推論は同梱の
+// ヘルパ dylib（Swift）に分離してある。
 //
 // 使い方:
 //   Model Folder に Core ML SD モデルのフォルダ（*.mlmodelc 群が入った階層）を指定 →
@@ -38,12 +39,12 @@ void sd_destroy(void* handle);
 
 namespace {
 
-class StableDiffusionTOP : public TOP_CPlusPlusBase
+class ImageGenTOP : public TOP_CPlusPlusBase
 {
 public:
-    StableDiffusionTOP(const OP_NodeInfo*, TOP_Context* context) : myContext(context) {}
+    ImageGenTOP(const OP_NodeInfo*, TOP_Context* context) : myContext(context) {}
 
-    ~StableDiffusionTOP() override
+    ~ImageGenTOP() override
     {
         if (mySession)
             sd_destroy(mySession);
@@ -70,8 +71,21 @@ public:
             myCompute = compute;
         }
 
-        // Generate パルス処理（img2img 時は入力 TOP をダウンロードして渡す）
-        if (myWantGenerate && mySession) {
+        // 状態ポーリング（トリガ判定に使うので先に行う）
+        myStatus = "no model";
+        int imageSerial = 0, imgW = 0, imgH = 0;
+        bool loaded = false;
+        if (mySession) {
+            char pbuf[1024];
+            sd_poll(mySession, pbuf, sizeof(pbuf));
+            loaded = parsePoll(pbuf, imageSerial, imgW, imgH);
+        }
+
+        // 生成トリガ: Generate パルス、または Continuous（前の生成が終わり次第
+        // 最新の入力フレーム/パラメータで自動再生成 = リアルタイム変換モード）
+        const bool continuous = inputs->getParInt("Continuous") != 0;
+        const bool trigger = myWantGenerate || (continuous && loaded && !myBusy);
+        if (trigger && mySession) {
             myWantGenerate = false;
             const bool img2img = inputs->getParInt("Img2img") != 0;
             const OP_TOPInput* top = inputs->getInputTOP(0);
@@ -111,15 +125,6 @@ public:
             }
         }
 
-        // 状態ポーリング
-        myStatus = "no model";
-        int imageSerial = 0, imgW = 0, imgH = 0;
-        if (mySession) {
-            char buf[1024];
-            sd_poll(mySession, buf, sizeof(buf));
-            parsePoll(buf, imageSerial, imgW, imgH);
-        }
-
         // 新しい画像ができていたらアップロード（行反転で TD の bottom-up へ）
         if (imageSerial != myUploadedSerial && imgW > 0 && imgH > 0) {
             const uint64_t bytes = (uint64_t)imgW * imgH * 4;
@@ -152,13 +157,13 @@ public:
         {
             OP_StringParameter p("Model");
             p.label = "Model Folder";
-            p.page = "Stable Diffusion";
+            p.page = "Image Gen";
             manager->appendFolder(p);
         }
         {
             OP_StringParameter p("Compute");
             p.label = "Compute Units";
-            p.page = "Stable Diffusion";
+            p.page = "Image Gen";
             p.defaultValue = "0";
             const char* names[] = {"0", "1", "2"};
             const char* labels[] = {"CPU + Neural Engine", "CPU + GPU", "All"};
@@ -167,19 +172,19 @@ public:
         {
             OP_StringParameter p("Prompt");
             p.label = "Prompt";
-            p.page = "Stable Diffusion";
+            p.page = "Image Gen";
             manager->appendString(p);
         }
         {
             OP_StringParameter p("Negativeprompt");
             p.label = "Negative Prompt";
-            p.page = "Stable Diffusion";
+            p.page = "Image Gen";
             manager->appendString(p);
         }
         {
             OP_NumericParameter p("Steps");
             p.label = "Steps";
-            p.page = "Stable Diffusion";
+            p.page = "Image Gen";
             p.defaultValues[0] = 15;
             p.minSliders[0] = 1;
             p.maxSliders[0] = 50;
@@ -191,7 +196,7 @@ public:
         {
             OP_NumericParameter p("Guidance");
             p.label = "Guidance Scale";
-            p.page = "Stable Diffusion";
+            p.page = "Image Gen";
             p.defaultValues[0] = 7.5;
             p.minSliders[0] = 0;
             p.maxSliders[0] = 20;
@@ -200,7 +205,7 @@ public:
         {
             OP_NumericParameter p("Seed");
             p.label = "Seed (-1 = Random)";
-            p.page = "Stable Diffusion";
+            p.page = "Image Gen";
             p.defaultValues[0] = -1;
             p.minSliders[0] = -1;
             p.maxSliders[0] = 10000;
@@ -209,14 +214,14 @@ public:
         {
             OP_NumericParameter p("Img2img");
             p.label = "Image to Image (Input 0)";
-            p.page = "Stable Diffusion";
+            p.page = "Image Gen";
             p.defaultValues[0] = 0;
             manager->appendToggle(p);
         }
         {
             OP_NumericParameter p("Strength");
             p.label = "Img2img Strength";
-            p.page = "Stable Diffusion";
+            p.page = "Image Gen";
             p.defaultValues[0] = 0.6;
             p.minSliders[0] = 0.0;
             p.maxSliders[0] = 1.0;
@@ -225,13 +230,21 @@ public:
         {
             OP_NumericParameter p("Generate");
             p.label = "Generate";
-            p.page = "Stable Diffusion";
+            p.page = "Image Gen";
             manager->appendPulse(p);
+        }
+        {
+            // 前の生成が終わり次第、自動で次を生成（SD Turbo でのリアルタイム変換用）
+            OP_NumericParameter p("Continuous");
+            p.label = "Continuous Generate";
+            p.page = "Image Gen";
+            p.defaultValues[0] = 0;
+            manager->appendToggle(p);
         }
         {
             OP_NumericParameter p("Flip");
             p.label = "Flip Output Vertically";
-            p.page = "Stable Diffusion";
+            p.page = "Image Gen";
             p.defaultValues[0] = 1;
             manager->appendToggle(p);
         }
@@ -280,14 +293,15 @@ private:
         float strength = 0.6f;
     };
 
-    void parsePoll(const char* json, int& imageSerial, int& imgW, int& imgH)
+    bool parsePoll(const char* json, int& imageSerial, int& imgW, int& imgH)
     {
+        bool loaded = false;
         @autoreleasepool {
             NSData* data = [NSData dataWithBytes:json length:strlen(json)];
             NSDictionary* dict = [NSJSONSerialization JSONObjectWithData:data
                                                                  options:0 error:nil];
             if (![dict isKindOfClass:[NSDictionary class]])
-                return;
+                return false;
             NSString* status = dict[@"status"];
             if ([status isKindOfClass:[NSString class]])
                 myStatus = status.UTF8String;
@@ -298,7 +312,9 @@ private:
             imageSerial = [dict[@"imageSerial"] intValue];
             imgW = [dict[@"width"] intValue];
             imgH = [dict[@"height"] intValue];
+            loaded = [dict[@"loaded"] boolValue];
         }
+        return loaded;
     }
 
     TOP_Context* myContext;
@@ -325,10 +341,10 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     if (!info->setAPIVersion(TOPCPlusPlusAPIVersion))
         return;
     info->executeMode = TOP_ExecuteMode::CPUMem;
-    info->customOPInfo.opType->setString("Stablediffusion");
-    info->customOPInfo.opLabel->setString("Stable Diffusion");
+    info->customOPInfo.opType->setString("Imagegen");
+    info->customOPInfo.opLabel->setString("Image Gen");
     info->customOPInfo.authorName->setString("sygnal");
-    info->customOPInfo.opIcon->setString("SDF");
+    info->customOPInfo.opIcon->setString("IMG");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 1;
 }
@@ -336,13 +352,13 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
 DLLEXPORT TOP_CPlusPlusBase*
 CreateTOPInstance(const OP_NodeInfo* info, TOP_Context* context)
 {
-    return new StableDiffusionTOP(info, context);
+    return new ImageGenTOP(info, context);
 }
 
 DLLEXPORT void
 DestroyTOPInstance(TOP_CPlusPlusBase* instance, TOP_Context*)
 {
-    delete (StableDiffusionTOP*)instance;
+    delete (ImageGenTOP*)instance;
 }
 
 }   // extern "C"

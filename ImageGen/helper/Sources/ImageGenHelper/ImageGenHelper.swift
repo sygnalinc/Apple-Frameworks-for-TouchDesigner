@@ -1,4 +1,4 @@
-// StableDiffusion TOP の Swift ヘルパ（libSDHelper.dylib）。
+// ImageGen TOP の Swift ヘルパ（libImageGenHelper.dylib）。
 //
 // Apple 公式 ml-stable-diffusion の StableDiffusionPipeline / StableDiffusionXLPipeline を
 // C ABI（sd_*）で ObjC++ プラグインへ提供する。モデルフォルダに TextEncoder2.mlmodelc が
@@ -236,6 +236,7 @@ final class SDSession: @unchecked Sendable {
         let dict: [String: Any] = [
             "status": status,
             "busy": busy,
+            "loaded": pipe != nil,
             "step": step,
             "steps": steps,
             "imageSerial": imageSerial,

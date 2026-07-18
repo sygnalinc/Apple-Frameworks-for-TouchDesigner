@@ -2,17 +2,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "SDHelper",
+    name: "ImageGenHelper",
     platforms: [.macOS(.v14)],
     products: [
-        .library(name: "SDHelper", type: .dynamic, targets: ["SDHelper"]),
+        .library(name: "ImageGenHelper", type: .dynamic, targets: ["ImageGenHelper"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/ml-stable-diffusion.git", from: "1.1.0"),
     ],
     targets: [
         .target(
-            name: "SDHelper",
+            name: "ImageGenHelper",
             dependencies: [
                 .product(name: "StableDiffusion", package: "ml-stable-diffusion"),
             ]),
