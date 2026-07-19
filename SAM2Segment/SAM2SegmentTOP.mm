@@ -668,7 +668,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
         return;
     info->executeMode = TOP_ExecuteMode::CPUMem;
     info->customOPInfo.opType->setString("Sam2segment");
-    info->customOPInfo.opLabel->setString("SAM2 Segment");
+    info->customOPInfo.opLabel->setString("Apple SAM2 Segment");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("SAM");
     info->customOPInfo.minInputs = 1;

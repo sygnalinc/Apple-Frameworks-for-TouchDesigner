@@ -303,7 +303,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Foundationmodel");
-    info->customOPInfo.opLabel->setString("Foundation Model");
+    info->customOPInfo.opLabel->setString("Apple Foundation Model");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("AFM");
     info->customOPInfo.minInputs = 0;

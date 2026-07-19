@@ -278,7 +278,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Imagemetadata");
-    info->customOPInfo.opLabel->setString("Image Metadata");
+    info->customOPInfo.opLabel->setString("Apple Image Metadata");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("IMD");
     info->customOPInfo.minInputs = 0;

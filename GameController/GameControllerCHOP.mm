@@ -240,7 +240,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     if (!info->setAPIVersion(CHOPCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Gamecontroller");
-    info->customOPInfo.opLabel->setString("Game Controller");
+    info->customOPInfo.opLabel->setString("Apple Game Controller");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("GCT");
     info->customOPInfo.minInputs = 0;

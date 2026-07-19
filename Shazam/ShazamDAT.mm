@@ -206,7 +206,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Shazam");
-    info->customOPInfo.opLabel->setString("Shazam");
+    info->customOPInfo.opLabel->setString("Apple Shazam");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("SHZ");
     info->customOPInfo.minInputs = 0;

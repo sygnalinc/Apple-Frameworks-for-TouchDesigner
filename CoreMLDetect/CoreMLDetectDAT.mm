@@ -500,7 +500,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Coremldetect");
-    info->customOPInfo.opLabel->setString("CoreML Detect");
+    info->customOPInfo.opLabel->setString("Apple CoreML Detect");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("CMD");
     info->customOPInfo.minInputs = 0;

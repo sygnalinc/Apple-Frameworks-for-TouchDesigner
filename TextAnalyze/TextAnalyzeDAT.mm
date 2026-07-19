@@ -452,7 +452,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Textanalyze");
-    info->customOPInfo.opLabel->setString("Text Analyze");
+    info->customOPInfo.opLabel->setString("Apple Text Analyze");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("TXA");
     info->customOPInfo.minInputs = 0;

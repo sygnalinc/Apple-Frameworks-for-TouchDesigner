@@ -339,7 +339,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     if (!info->setAPIVersion(CHOPCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Visionhand");
-    info->customOPInfo.opLabel->setString("Vision Hand");
+    info->customOPInfo.opLabel->setString("Apple Vision Hand");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("VHD");
     info->customOPInfo.minInputs = 0;

@@ -172,7 +172,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Multipeerin");
-    info->customOPInfo.opLabel->setString("Multipeer In");
+    info->customOPInfo.opLabel->setString("Apple Multipeer In");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("MPI");
     info->customOPInfo.minInputs = 0;

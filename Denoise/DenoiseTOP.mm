@@ -403,7 +403,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
         return;
     info->executeMode = TOP_ExecuteMode::CPUMem;
     info->customOPInfo.opType->setString("Denoise");
-    info->customOPInfo.opLabel->setString("Denoise");
+    info->customOPInfo.opLabel->setString("Apple Denoise");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("DNZ");
     info->customOPInfo.minInputs = 1;

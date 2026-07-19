@@ -389,7 +389,7 @@ FillSOPPluginInfo(SOP_PluginInfo* info)
     if (!info->setAPIVersion(SOPCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Photogrammetry");
-    info->customOPInfo.opLabel->setString("Photogrammetry");
+    info->customOPInfo.opLabel->setString("Apple Photogrammetry");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("PHG");
     info->customOPInfo.minInputs = 0;

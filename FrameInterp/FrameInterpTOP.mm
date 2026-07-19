@@ -462,7 +462,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
         return;
     info->executeMode = TOP_ExecuteMode::CPUMem;
     info->customOPInfo.opType->setString("Frameinterp");
-    info->customOPInfo.opLabel->setString("Frame Interp");
+    info->customOPInfo.opLabel->setString("Apple Frame Interp");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("FIN");
     info->customOPInfo.minInputs = 1;

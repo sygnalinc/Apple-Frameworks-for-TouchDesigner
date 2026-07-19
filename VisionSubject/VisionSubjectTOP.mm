@@ -381,7 +381,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
         return;
     info->executeMode = TOP_ExecuteMode::CPUMem;
     info->customOPInfo.opType->setString("Visionsubject");
-    info->customOPInfo.opLabel->setString("Vision Subject");
+    info->customOPInfo.opLabel->setString("Apple Vision Subject");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("VSU");
     info->customOPInfo.minInputs = 1;

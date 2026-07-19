@@ -221,7 +221,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     if (!info->setAPIVersion(CHOPCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Visionaesthetics");
-    info->customOPInfo.opLabel->setString("Vision Aesthetics");
+    info->customOPInfo.opLabel->setString("Apple Vision Aesthetics");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("VAE");
     info->customOPInfo.minInputs = 0;

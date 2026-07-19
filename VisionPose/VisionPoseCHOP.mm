@@ -490,7 +490,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     if (!info->setAPIVersion(CHOPCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Visionpose");
-    info->customOPInfo.opLabel->setString("Vision Pose");
+    info->customOPInfo.opLabel->setString("Apple Vision Pose");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("VPS");
     info->customOPInfo.minInputs = 0;
