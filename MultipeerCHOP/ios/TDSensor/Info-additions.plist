@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- これらのキーを Xcode プロジェクトの Info.plist(または Target > Info)に追加する。
+     ローカルネットワーク許可・Bonjourサービス・モーション使用目的が必須。 -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Sends motion sensor data to TouchDesigner on your Mac over the local network.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_td-sensor._tcp</string>
+        <string>_td-sensor._udp</string>
+    </array>
+    <key>NSMotionUsageDescription</key>
+    <string>Uses the device motion sensors (gyroscope / accelerometer) as controller input.</string>
+</dict>
+</plist>

@@ -822,3 +822,25 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   ガード無しだと音声終了後に幻覚行が延々と積まれる
 - WhisperKit は SPM 依存(ImageGenと同じ helper を Swift Package にする型)。
   swift build -c release 初回は依存込みで数分。dylib は install_name_tool で epoch 名に
+
+### 2026-07-19 Multipeer CHOP + iPhoneセンサーアプリ実装
+
+- **Multipeer CHOP**(新規): iPhone等から名前付きfloatチャンネルのバイナリを低遅延
+  (unreliable)で毎フレーム受信し、CHOPが**チャンネルを動的生成**する。テキストの
+  Multipeer DATの数値版。Service Type一致で自動接続、Prefix Peer Nameで複数台分離
+- **ワイヤープロトコル TDMP**(LE): `"TDMP"|uint16 count|count×{uint8 nameLen, name, float32}`。
+  CHOPとiOSアプリで共通。入力CHOP接続時は逆に全ピアへ送信も可
+- **iOSサンプルアプリ**(`MultipeerCHOP/ios/TDSensor/`・SwiftUI): CoreMotionの
+  gyro/accel/gravity/attitude/heading + タッチパッド(touch/touch_x/touch_y)を送信。
+  iphonesimulator SDKで型チェック通過。Info.plistに要3キー(ローカルネットワーク/
+  Bonjour `_td-sensor._tcp`/モーション)。README にXcodeビルド手順
+- **実測**: 擬似送信ピア(macOSのMultipeerで同じTDMPを送るテストバイナリ)から4ch送り、
+  CHOPが gyro_x/gyro_y/accel_z/touch を動的生成し値受信を確認(accel_z=0.98/touch=1.0一致)
+- CHOP本体ビルド・インストール済み。実機iPhoneでの接続は端末があれば要確認
+- 次にやること: 実機iPhoneでの接続・遅延測定、iOS側の受信(TD→iPhone表示/ハプティクス)
+
+### 新規ハマりどころ
+
+- **CHOPは0ch出力を嫌う**。受信前(チャンネル未確定)は1ch(connected)のダミーを出す。
+  getOutputInfoでチャンネル名スナップショットを固定し、getChannelName/executeで整合させる
+- opTypeはファミリー間で重複可(Multipeer DAT と Multipeer CHOP が同名"Multipeer"で共存)
