@@ -1147,3 +1147,19 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
 - 途中TDが落ちたがクリーン再ロードで再現せず(プラグイン起因でないと確認済み)
 - 両プラグイン最終ビルド・署名・常設インストール済み。README/skill/この記録を「検証完了」に更新。
   テスト動画(IMG_2531/2532フォルダ)は巨大なのでgitignore
+
+### 2026-07-20 CreateML Image DAT 実装(オンデバイス画像分類学習)
+
+- CreateML `MLImageClassifier` でラベル付きフォルダ(サブフォルダ=クラス)から画像分類を
+  オンデバイス学習し `.mlmodel` を書き出す DAT を新規実装。**出力モデルは既存 CoreML TOP が
+  推論できる**ので「TD内で撮る→ラベル付け→学習→推論」を閉じられる
+- Swiftヘルパ `CreateMLImageHelper`(cm_)。非同期 `train()→MLJob`、`job.result` を Combine `.sink` で
+  購読し完了で `write(to:)`。進捗は `job.progress.fractionCompleted` を poll。cook 非ブロック
+- **検証(M2)**: 合成データ(horizontal/vertical/checker 縞・各15枚)を自作。ヘッドレスで学習
+  → **val_acc 1.0**、.mlmodel 出力。出力モデルを Vision/CoreML で推論し3クラス全て正解(信頼度1.000)。
+  TDでも Train パルス→done・val_acc 1.0・モデル書き出しを確認
+- **踏んだ罠(skill反映)**: `MLJob` と `AnyCancellable` を state に保持しないと購読が即解放。
+  pulse は `pulsePressed(name)`(OP_Inputs無し)→フラグ→execute で処理。CreateMLはSwift/Combine専用
+- README+ルート一覧(英日)更新、常設インストール済み(TD再起動で `CreateML Image` 登録)
+- 次にやること: CreateML HandPose(ジェスチャ学習・VisionHandと連携)、TOP画像からの直接学習
+  (キャプチャ→一時ラベルフォルダ)、CoreML TOPでのTD内推論デモ

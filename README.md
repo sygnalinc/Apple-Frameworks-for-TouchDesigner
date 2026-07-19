@@ -106,6 +106,7 @@ grouped by category.
 | [CoreML CHOP](CoreMLCHOP/) | CHOP | **Vector output** of any Core ML model into channels (embeddings, keypoints…) |
 | [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img** (Core ML Stable Diffusion / Image Playground) |
 | [CoreImage Code](CoreImageCode/) | TOP | **Generate** QR / Aztec / PDF417 / Code128 (no external library) |
+| [CreateML Image](CreateMLImage/) | DAT | **Train** an image classifier on-device from a labeled folder → `.mlmodel` (usable by CoreML TOP). Capture→label→train→infer loop entirely in TD |
 
 ### Audio & sound
 

@@ -175,6 +175,21 @@
   Mac側フォルダの「IMG_E」無しMOV)すれば iPhone 13〜17 いずれも Cinematic framework で読める想定
   ※ この点は当初「iPhone 17の新形式は読めない」と誤結論した。実際は転送で深度が剥がれていただけ
 
+## CreateML(オンデバイス学習)
+
+- **CreateML は Swift/Combine専用** → helper dylib 経由(ObjC++不可)。学習は非同期
+  `train()→MLJob<T>`。`job.result`(Combine `AnyPublisher`)を `.sink` で購読し、完了で
+  `model.write(to:)`。**`AnyCancellable` と `MLJob` を state に保持**しないと購読が即解放される
+- 進捗は `job.progress.fractionCompleted`(Foundation `Progress`)を poll、精度は
+  `model.trainingMetrics/validationMetrics.classificationError`(accuracy = 1 - error)
+- 画像分類: `MLImageClassifier.DataSource.labeledDirectories(at:)`(サブフォルダ名=クラス)、
+  `ModelParameters(validation:.split(strategy:.automatic), maxIterations:, augmentation:)`。
+  `ImageAugmentationOptions` は OptionSet(flip/crop/rotation/blur/exposure/noise)
+- **出力 .mlmodel は既存 CoreML TOP/DAT がそのまま推論**(推論側の追加実装ゼロ)。
+  「TD内で撮る→学習→推論」を1つのネットワークで閉じられる
+- pulse パラメータは `pulsePressed(name)` で検出(OP_Inputs無し)→ フラグを立てて
+  execute でパラメータを読んで処理する
+
 ## SOP(VisionContours / RealityKit Capture / ImageIO PointCloud)
 
 - **SOPプラグインは `executeVBO()` も実装必須**(純粋仮想。空実装でよい。忘れると abstract class エラー)
