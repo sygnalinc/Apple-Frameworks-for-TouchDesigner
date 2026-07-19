@@ -844,3 +844,21 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
 - **CHOPは0ch出力を嫌う**。受信前(チャンネル未確定)は1ch(connected)のダミーを出す。
   getOutputInfoでチャンネル名スナップショットを固定し、getChannelName/executeで整合させる
 - opTypeはファミリー間で重複可(Multipeer DAT と Multipeer CHOP が同名"Multipeer"で共存)
+
+### 2026-07-19 Multipeer を In/Out に分割(名前で送受信の役割を明示)
+
+- ユーザー指示「multipeer opは in か out か名前で役割がわかるように」を受け、
+  双方向1オペレータだった Multipeer DAT / CHOP を**方向別の2オペレータ**に分割:
+  - **Multipeer In**(opType `Multipeerin`・icon MPI): 受信専用。CHOP=ピア→TD(動的ch生成・
+    入力なし)、DAT=受信→`type/peer/message`テーブル
+  - **Multipeer Out**(opType `Multipeerout`・icon MPO): 送信専用。CHOP=入力CHOP→ピア
+    (出力`connected`)、DAT=入力DAT→ピア(出力`status/peers/sends`診断・入力必須)
+- ObjCブリッジを共有ヘッダに切り出し(`MultipeerChopBridge.h`/`MultipeerDatBridge.h`)。
+  In/Outは別バンドルなのでヘッダに`@implementation`を置いても重複シンボルにならない
+- 1フォルダから2バンドルを作るため build.sh は共通ヘルパを使わず手動(build_one を2回)。
+  共通ヘルパは`rm -rf build`を毎回するため2回呼べない
+- iOSアプリのserviceTypeは`td-sensor`のままでIn CHOPの既定と一致(変更不要)
+- 旧 MultipeerDAT.mm / MultipeerCHOP.mm は削除。旧インストール済みバンドルも削除し
+  新4バンドルを配置。**TD再接続後にロード検証**(MCP切断中のためビルド・署名まで確認済み)
+- 注意: In と Out を同一Macに置くとピアから2ピアに見える(別セッション)。センサー受信のみ
+  なら In だけの最小構成を推奨

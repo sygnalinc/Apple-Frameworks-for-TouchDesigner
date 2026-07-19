@@ -39,8 +39,8 @@ Windows+NVIDIA 専用の TD 標準オペレータ（Body Track CHOP 等）の ma
 | [VisionAesthetics](VisionAesthetics/) | CHOP | **写真の美的スコア**（macOS 15+・-1〜+1とutility判定）。ベストショット自動選択に | ✅ 実装済み |
 | [ImageMetadata](ImageMetadata/) | DAT | **EXIF/GPS/IPTC読み取り**（ImageIO・ファイル直読み）。GPS十進度変換つき。撮影情報を演出パラメータに | ✅ 実装済み |
 | [Shortcuts](Shortcuts/) | DAT | **macOSショートカット実行ブリッジ**（shortcuts CLI）。HomeKit照明・家電・通知をTDイベントから。一覧取得・入出力受け渡し対応 | ✅ 実装済み |
-| [Multipeer](Multipeer/) | DAT | **Mac/iPhone間ローカルP2P**（MultipeerConnectivity）。自動発見・自動接続でテキスト送受信（2ノード相互接続・送受信を実測）。サーバー不要 | ✅ 実装済み |
-| [MultipeerCHOP](MultipeerCHOP/) | CHOP | **iPhoneをワイヤレスセンサーに**（Multipeer・低遅延バイナリ）。iOS端末のジャイロ/加速度/姿勢/タッチを名前付きchで受信。**iOSサンプルアプリ同梱**（ios/TDSensor）。擬似ピアで動的ch生成・値受信を実測 | ✅ 実装済み |
+| [Multipeer In / Out](Multipeer/) | DAT | **ローカルP2Pテキスト**（MultipeerConnectivity）。**In=受信→テーブル / Out=入力DAT送信**の2オペレータに分割し名前で役割が分かる。自動発見・自動接続・サーバー不要 | ✅ 実装済み |
+| [Multipeer In / Out](MultipeerCHOP/) | CHOP | **iPhoneをワイヤレスセンサーに**（低遅延バイナリ）。**In=ピア→TD受信（動的ch生成）/ Out=TD→ピア送信**。**iOSサンプルアプリ同梱**（ios/TDSensor）。擬似ピアで受信を実測 | ✅ 実装済み |
 | [GameController](GameController/) | CHOP | **ゲームパッド入力**（PS5/Xbox/MFi）。アナログトリガー・モーション・ランブル対応。Joystick CHOPのモダン代替 | ⚠ 実機パッド未検証 |
 | [VisionContours](VisionContours/) | SOP | **画像輪郭を閉じたLine primitiveへ変換**。親子階層属性と点数制御に対応し、Sweep/Extrude/Particleへ直結 | ✅ 実装済み |
 | [VisionAnimalPose](VisionAnimalPose/) | CHOP | **犬・猫の2D姿勢推定**（25関節・複数匹）。bboxとu/v/confidenceを左→右スロット出力 | ✅ 実装済み |
