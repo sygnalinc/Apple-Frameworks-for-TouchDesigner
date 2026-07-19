@@ -430,7 +430,7 @@ DLLEXPORT void FillSOPPluginInfo(SOP_PluginInfo* info)
     if (!info->setAPIVersion(SOPCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Visioncontours");
-    info->customOPInfo.opLabel->setString("Apple Vision Contours");
+    info->customOPInfo.opLabel->setString("Vision Contours");
     info->customOPInfo.opIcon->setString("VCS");
     info->customOPInfo.authorName->setString("TDAppleML");
     info->customOPInfo.minInputs = 0;

@@ -321,7 +321,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     if (!info->setAPIVersion(CHOPCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Visionpose3d");
-    info->customOPInfo.opLabel->setString("Apple Vision Pose 3D");
+    info->customOPInfo.opLabel->setString("Vision Pose 3D");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("VPD");   // アイコンは英字のみ(数字はTD起動時の検証で弾かれる)
     info->customOPInfo.minInputs = 0;

@@ -322,7 +322,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Visiontext");
-    info->customOPInfo.opLabel->setString("Apple Vision Text");
+    info->customOPInfo.opLabel->setString("Vision Text");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("VTX");
     info->customOPInfo.minInputs = 0;

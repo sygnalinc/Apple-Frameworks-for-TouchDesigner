@@ -294,7 +294,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Speechtext");
-    info->customOPInfo.opLabel->setString("Apple Speech Text");
+    info->customOPInfo.opLabel->setString("Speech Text");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("SPT");
     info->customOPInfo.minInputs = 0;

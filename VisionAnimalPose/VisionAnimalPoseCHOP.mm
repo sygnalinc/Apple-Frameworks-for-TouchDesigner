@@ -306,7 +306,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* info)
 {
     if (!info->setAPIVersion(CHOPCPlusPlusAPIVersion)) return;
     info->customOPInfo.opType->setString("Visionanimalpose");
-    info->customOPInfo.opLabel->setString("Apple Vision Animal Pose");
+    info->customOPInfo.opLabel->setString("Vision Animal Pose");
     info->customOPInfo.opIcon->setString("VAP");
     info->customOPInfo.authorName->setString("TDAppleML");
     info->customOPInfo.minInputs = 0; info->customOPInfo.maxInputs = 0;

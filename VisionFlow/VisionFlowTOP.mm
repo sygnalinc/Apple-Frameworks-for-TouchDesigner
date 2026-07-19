@@ -319,7 +319,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
         return;
     info->executeMode = TOP_ExecuteMode::CPUMem;
     info->customOPInfo.opType->setString("Visionflow");
-    info->customOPInfo.opLabel->setString("Apple Vision Flow");
+    info->customOPInfo.opLabel->setString("Vision Flow");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("VFL");
     info->customOPInfo.minInputs = 1;

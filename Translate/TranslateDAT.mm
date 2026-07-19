@@ -227,7 +227,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Translate");
-    info->customOPInfo.opLabel->setString("Apple Translate");
+    info->customOPInfo.opLabel->setString("Translate");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("TRN");
     info->customOPInfo.minInputs = 0;

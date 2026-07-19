@@ -433,7 +433,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
         return;
     info->executeMode = TOP_ExecuteMode::CPUMem;
     info->customOPInfo.opType->setString("Visionsaliency");
-    info->customOPInfo.opLabel->setString("Apple Vision Saliency");
+    info->customOPInfo.opLabel->setString("Vision Saliency");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("VSL");
     info->customOPInfo.minInputs = 1;

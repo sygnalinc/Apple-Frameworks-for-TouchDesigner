@@ -421,7 +421,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     if (!info->setAPIVersion(CHOPCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Visionface");
-    info->customOPInfo.opLabel->setString("Apple Vision Face");
+    info->customOPInfo.opLabel->setString("Vision Face");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("VFC");
     info->customOPInfo.minInputs = 0;

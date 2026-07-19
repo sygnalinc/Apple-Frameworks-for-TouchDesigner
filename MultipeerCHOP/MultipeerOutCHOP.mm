@@ -180,7 +180,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     if (!info->setAPIVersion(CHOPCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Multipeerout");
-    info->customOPInfo.opLabel->setString("Apple Multipeer Out");
+    info->customOPInfo.opLabel->setString("Multipeer Out");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("MPO");
     info->customOPInfo.minInputs = 1;

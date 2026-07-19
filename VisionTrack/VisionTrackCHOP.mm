@@ -382,7 +382,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     if (!info->setAPIVersion(CHOPCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Visiontrack");
-    info->customOPInfo.opLabel->setString("Apple Vision Track");
+    info->customOPInfo.opLabel->setString("Vision Track");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("VTR");
     info->customOPInfo.minInputs = 0;

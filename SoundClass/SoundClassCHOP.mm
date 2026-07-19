@@ -396,7 +396,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     if (!info->setAPIVersion(CHOPCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Soundclass");
-    info->customOPInfo.opLabel->setString("Apple Sound Class");
+    info->customOPInfo.opLabel->setString("Sound Class");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("SND");
     info->customOPInfo.minInputs = 1;

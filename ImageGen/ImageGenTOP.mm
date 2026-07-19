@@ -398,7 +398,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
         return;
     info->executeMode = TOP_ExecuteMode::CPUMem;
     info->customOPInfo.opType->setString("Imagegen");
-    info->customOPInfo.opLabel->setString("Apple Image Gen");
+    info->customOPInfo.opLabel->setString("CoreML ImageGen");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("IMG");
     info->customOPInfo.minInputs = 0;
