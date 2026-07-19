@@ -27,6 +27,7 @@ grouped by category.
 - [Getting started](#getting-started)
 - [Requirements](#requirements)
 - [Writing your own plugin](#writing-your-own-plugin)
+- [License](#license)
 
 ## As a macOS alternative to NVIDIA-only OPs
 
@@ -167,3 +168,15 @@ diagnostics, …) and every pitfall actually hit during development are collecte
 [`CLAUDE.md`](CLAUDE.md), with a distilled agent skill under
 [`.claude/skills/td-apple-plugin/`](.claude/skills/td-apple-plugin/).
 `common/build_plugin.sh` factors out bundle assembly and signing.
+
+## License
+
+This project's own code is released under the **[MIT License](LICENSE)** — use it freely,
+including commercially.
+
+It contains **only original code**: no Apple source, no TouchDesigner SDK, and no model
+weights are redistributed here. Apple frameworks are used through their public APIs (governed
+by Apple's SDK agreement, which does not restrict your code), the TouchDesigner C++ SDK is
+supplied by your own install, and models are downloaded separately under their own licenses.
+Build-time dependencies (`apple/ml-stable-diffusion`, `argmaxinc/WhisperKit`) are MIT and
+fetched via SPM, not vendored. Details in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

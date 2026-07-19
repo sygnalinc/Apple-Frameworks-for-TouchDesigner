@@ -25,6 +25,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 - [使い方](#使い方)
 - [必要環境](#必要環境)
 - [プラグインを自作する人へ](#プラグインを自作する人へ)
+- [ライセンス](#ライセンス)
 
 ## Nvidia専用OPの macOS 代替として
 
@@ -163,3 +164,14 @@ Apple公式の Core ML モデルを `models/`(gitignore)へ置いてください
 実際に踏んだハマりどころは [`CLAUDE.md`](CLAUDE.md) にまとめてあります。エージェント向けに蒸留した
 スキルが [`.claude/skills/td-apple-plugin/`](.claude/skills/td-apple-plugin/) にあります。
 `common/build_plugin.sh` が bundle 組み立て・署名を共通化しています。
+
+## ライセンス
+
+本プロジェクトの自作コードは **[MIT ライセンス](LICENSE)** です。商用を含め自由に利用できます。
+
+このリポジトリには**自作コードのみ**が含まれ、Apple のソース・TouchDesigner SDK・モデルの
+重みは同梱・再配布していません。Apple フレームワークは公開API経由で利用し(Apple の SDK
+使用許諾に従いますが、あなたのコードのライセンスは制約されません)、TouchDesigner の C++ SDK は
+各自のインストールから供給され、モデルは各自が固有ライセンスの下でダウンロードします。ビルド時
+依存(`apple/ml-stable-diffusion` / `argmaxinc/WhisperKit`)はいずれも MIT で、SPM が取得する
+だけで同梱していません。詳細は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) を参照。
