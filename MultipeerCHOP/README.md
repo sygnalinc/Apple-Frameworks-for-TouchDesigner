@@ -40,14 +40,32 @@ CHOP と iOS アプリで共通。In が受信・Out が送信する。
 - **In**: Active / Peer Name / Service Type(既定 `td-sensor`)/ Prefix Peer Name
 - **Out**: Active / Peer Name / Service Type(既定 `td-sensor`)
 
-## iOS サンプルアプリ(ios/TDSensor)
+## iOS サンプルアプリ(ios/)
 
 CoreMotion の gyro/accel/gravity/attitude/heading + タッチパッドを送信する SwiftUI アプリ。
-Service Type は `td-sensor`(In CHOP の既定と一致)。ビルド手順は下記。
+Service Type は `td-sensor`(In CHOP の既定と一致)。**Xcode プロジェクト同梱**。
 
-- Xcode で `ios/TDSensor` を開き、実機ターゲットで Run(モーションは実機のみ)
-- Info.plist に3キーが必要: ローカルネットワーク使用許可 /
-  Bonjour services(`_td-sensor._tcp`)/ モーション使用許可
+### すぐ実機ビルドする
+
+1. `ios/TDSensor.xcodeproj` を Xcode で開く(シミュレータビルドは検証済み・BUILD SUCCEEDED)
+2. TDSensor ターゲット → Signing & Capabilities で自分の **Team** を選ぶ(自動署名)
+3. iPhone/iPad 実機を選んで **Run**(モーションセンサーは実機のみ動作)
+4. アプリで「送信 On」→ Mac 側で **Multipeer In CHOP** の Service Type を `td-sensor` にすれば自動接続
+
+- Bundle ID: `tokyo.sygnal.tdsensor`(必要に応じて変更可)/ iOS 16+ / iPhone・iPad
+- Info.plist に必要3キー(ローカルネットワーク許可 / Bonjour `_td-sensor._tcp`・`_td-sensor._udp` /
+  モーション許可)は設定済み
+
+### プロジェクトの再生成(任意)
+
+ソース構成は `ios/project.yml`(XcodeGen)で管理。`.xcodeproj` を作り直す場合:
+
+```
+brew install xcodegen        # 未導入なら
+cd MultipeerCHOP/ios && xcodegen generate
+```
+
+生成済み `.xcodeproj` は Xcode で直接開けるので、通常 xcodegen は不要。
 
 ## 注意
 

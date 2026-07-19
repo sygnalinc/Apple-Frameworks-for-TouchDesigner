@@ -1,0 +1,6 @@
+# Xcode ユーザー固有・ビルド生成物(プロジェクトは xcodegen で再生成可)
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+.DS_Store
