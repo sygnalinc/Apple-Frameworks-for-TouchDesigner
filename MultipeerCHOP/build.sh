@@ -1,9 +1,10 @@
 #!/bin/zsh
-# Multipeer In / Out DAT のビルド → build/MultipeerInDAT.plugin, build/MultipeerOutDAT.plugin
+# Multipeer In / Out CHOP のビルド → build/MultipeerInCHOP.plugin, build/MultipeerOutCHOP.plugin
+# 1フォルダから2バンドルを作るため共通ヘルパは使わず手動でビルドする。
 set -e
 cd "$(dirname "$0")"
 
-SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
+SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
 rm -rf build
 
 build_one() {
@@ -32,5 +33,5 @@ PLIST
     echo "built: $(pwd)/build/$name.plugin"
 }
 
-build_one MultipeerInDAT  MultipeerInDAT.mm  multipeerin-dat
-build_one MultipeerOutDAT MultipeerOutDAT.mm multipeerout-dat
+build_one MultipeerInCHOP  MultipeerInCHOP.mm  multipeerin-chop
+build_one MultipeerOutCHOP MultipeerOutCHOP.mm multipeerout-chop

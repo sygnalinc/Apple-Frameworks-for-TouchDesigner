@@ -802,3 +802,63 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   `intensity * (lfo if strobe else 1)`
 - 実測: 「夕暮れの海のような…」→ r0.95/g0.9/b0.9/int0.7/strobe0、
   「真っ赤で激しく点滅する警報…」→ **r1/g0/b0/int1/strobe1** に切替を視認
+
+### 2026-07-19 SpeechText に WhisperKit バックエンド追加
+
+- Backend メニュー(apple/whisper)を追加。whisper は WhisperKit(Core ML版Whisper・
+  SPMパッケージ・macOS 14+)を helper dylib(wk_・sp_ と同形の poll JSON)で統合。
+  Whisper Model(tiny/base/small/large-v3)と Whisper Task(transcribe/**translate=英訳**)
+- Whisper はストリーミング非対応のため「溜めたバッファを0.7秒毎に再認識して volatile 更新、
+  無音(末尾0.8s RMS<0.005)or 30秒で確定行に落とす」チャンク方式
+- 実測(M2・base・sayのTTS音声): 英語・日本語とも認識成功
+  (ja: 「こんにちは、これはウィスパーホン性認識のテストです。部隊証明を真っ赤に…」—
+  同音異義の誤りはbase相応。実マイク/大モデルで改善)。モデルは初回にHFから自動DL
+- 次にやること: 実マイク音声での精度確認、large-v3系での品質比較
+
+### 新規ハマりどころ(上記で発見)
+
+- **Whisperは無音バッファに「[音楽]」等を幻覚する**。①ほぼ無音のバッファは認識せず捨てる
+  (RMS<0.004)②括弧タグだけの確定行は破棄、の2段ガードが必須。
+  ガード無しだと音声終了後に幻覚行が延々と積まれる
+- WhisperKit は SPM 依存(ImageGenと同じ helper を Swift Package にする型)。
+  swift build -c release 初回は依存込みで数分。dylib は install_name_tool で epoch 名に
+
+### 2026-07-19 Multipeer CHOP + iPhoneセンサーアプリ実装
+
+- **Multipeer CHOP**(新規): iPhone等から名前付きfloatチャンネルのバイナリを低遅延
+  (unreliable)で毎フレーム受信し、CHOPが**チャンネルを動的生成**する。テキストの
+  Multipeer DATの数値版。Service Type一致で自動接続、Prefix Peer Nameで複数台分離
+- **ワイヤープロトコル TDMP**(LE): `"TDMP"|uint16 count|count×{uint8 nameLen, name, float32}`。
+  CHOPとiOSアプリで共通。入力CHOP接続時は逆に全ピアへ送信も可
+- **iOSサンプルアプリ**(`MultipeerCHOP/ios/TDSensor/`・SwiftUI): CoreMotionの
+  gyro/accel/gravity/attitude/heading + タッチパッド(touch/touch_x/touch_y)を送信。
+  iphonesimulator SDKで型チェック通過。Info.plistに要3キー(ローカルネットワーク/
+  Bonjour `_td-sensor._tcp`/モーション)。README にXcodeビルド手順
+- **実測**: 擬似送信ピア(macOSのMultipeerで同じTDMPを送るテストバイナリ)から4ch送り、
+  CHOPが gyro_x/gyro_y/accel_z/touch を動的生成し値受信を確認(accel_z=0.98/touch=1.0一致)
+- CHOP本体ビルド・インストール済み。実機iPhoneでの接続は端末があれば要確認
+- 次にやること: 実機iPhoneでの接続・遅延測定、iOS側の受信(TD→iPhone表示/ハプティクス)
+
+### 新規ハマりどころ
+
+- **CHOPは0ch出力を嫌う**。受信前(チャンネル未確定)は1ch(connected)のダミーを出す。
+  getOutputInfoでチャンネル名スナップショットを固定し、getChannelName/executeで整合させる
+- opTypeはファミリー間で重複可(Multipeer DAT と Multipeer CHOP が同名"Multipeer"で共存)
+
+### 2026-07-19 Multipeer を In/Out に分割(名前で送受信の役割を明示)
+
+- ユーザー指示「multipeer opは in か out か名前で役割がわかるように」を受け、
+  双方向1オペレータだった Multipeer DAT / CHOP を**方向別の2オペレータ**に分割:
+  - **Multipeer In**(opType `Multipeerin`・icon MPI): 受信専用。CHOP=ピア→TD(動的ch生成・
+    入力なし)、DAT=受信→`type/peer/message`テーブル
+  - **Multipeer Out**(opType `Multipeerout`・icon MPO): 送信専用。CHOP=入力CHOP→ピア
+    (出力`connected`)、DAT=入力DAT→ピア(出力`status/peers/sends`診断・入力必須)
+- ObjCブリッジを共有ヘッダに切り出し(`MultipeerChopBridge.h`/`MultipeerDatBridge.h`)。
+  In/Outは別バンドルなのでヘッダに`@implementation`を置いても重複シンボルにならない
+- 1フォルダから2バンドルを作るため build.sh は共通ヘルパを使わず手動(build_one を2回)。
+  共通ヘルパは`rm -rf build`を毎回するため2回呼べない
+- iOSアプリのserviceTypeは`td-sensor`のままでIn CHOPの既定と一致(変更不要)
+- 旧 MultipeerDAT.mm / MultipeerCHOP.mm は削除。旧インストール済みバンドルも削除し
+  新4バンドルを配置。**TD再接続後にロード検証**(MCP切断中のためビルド・署名まで確認済み)
+- 注意: In と Out を同一Macに置くとピアから2ピアに見える(別セッション)。センサー受信のみ
+  なら In だけの最小構成を推奨

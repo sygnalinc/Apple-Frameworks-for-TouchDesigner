@@ -19,7 +19,7 @@ Windows+NVIDIA 専用の TD 標準オペレータ（Body Track CHOP 等）の ma
 | [ImageGen](ImageGen/) | TOP | **text2img / img2img**。バックエンド2種: Core ML Stable Diffusion（SD2.x/SDXL/Turbo・Turbo 1step 0.8秒でリアルタイム変換）/ **Image Playground**（ImageCreator API・モデル不要・2.7秒） | ✅ 実装済み |
 | [FoundationModel](FoundationModel/) | DAT | **Apple Intelligence オンデバイスLLM**（FoundationModels・macOS 26+）。Instructions+Promptでテキスト生成、ストリーミング・マルチターン対応。API課金なし | ✅ 実装済み |
 | [Translate](Translate/) | DAT | **オンデバイス翻訳**（Translation framework・macOS 15+）。DATのtext列を同形で翻訳出力。SpeechText直結でリアルタイム字幕翻訳 | ✅ 実装済み |
-| [SpeechText](SpeechText/) | DAT | **ライブ文字起こし**（新 SpeechAnalyzer/SpeechTranscriber・macOS 26+・完全オンデバイス・TCC不要）。確定/途中テキストをテーブル出力。Swift ヘルパ dylib 同梱 | ✅ 実装済み |
+| [SpeechText](SpeechText/) | DAT | **ライブ文字起こし**。バックエンド2種: SpeechAnalyzer（macOS 26+・低遅延ストリーミング）/ **WhisperKit（macOS 14+・多言語・英訳対応**・tiny〜large-v3、日英で実測）。TCC不要 | ✅ 実装済み |
 | [VisionHand](VisionHand/) | CHOP | **手指トラッキング**（21関節×最大100手・左右判定つき）。u,v,confidence をチャンネル出力 | ✅ 実装済み |
 | [VisionFace](VisionFace/) | CHOP | **顔検出+ランドマーク**（最大100顔）。bbox・roll/yaw/pitch・目/鼻/口、オプションで全76点。Face Track CHOP 代替 | ✅ 実装済み |
 | [VisionText](VisionText/) | DAT | **OCR / テキスト認識**（日英ほか多言語・Accurate/Fast切替）。テキスト領域ごとに text/confidence/bbox をテーブル出力（読み順ソート） | ✅ 実装済み |
@@ -39,7 +39,8 @@ Windows+NVIDIA 専用の TD 標準オペレータ（Body Track CHOP 等）の ma
 | [VisionAesthetics](VisionAesthetics/) | CHOP | **写真の美的スコア**（macOS 15+・-1〜+1とutility判定）。ベストショット自動選択に | ✅ 実装済み |
 | [ImageMetadata](ImageMetadata/) | DAT | **EXIF/GPS/IPTC読み取り**（ImageIO・ファイル直読み）。GPS十進度変換つき。撮影情報を演出パラメータに | ✅ 実装済み |
 | [Shortcuts](Shortcuts/) | DAT | **macOSショートカット実行ブリッジ**（shortcuts CLI）。HomeKit照明・家電・通知をTDイベントから。一覧取得・入出力受け渡し対応 | ✅ 実装済み |
-| [Multipeer](Multipeer/) | DAT | **Mac/iPhone間ローカルP2P**（MultipeerConnectivity）。自動発見・自動接続でテキスト送受信（2ノード相互接続・送受信を実測）。サーバー不要 | ✅ 実装済み |
+| [Multipeer In / Out](Multipeer/) | DAT | **ローカルP2Pテキスト**（MultipeerConnectivity）。**In=受信→テーブル / Out=入力DAT送信**の2オペレータに分割し名前で役割が分かる。自動発見・自動接続・サーバー不要 | ✅ 実装済み |
+| [Multipeer In / Out](MultipeerCHOP/) | CHOP | **iPhoneをワイヤレスセンサーに**（低遅延バイナリ）。**In=ピア→TD受信（動的ch生成）/ Out=TD→ピア送信**。**iOSサンプルアプリ同梱**（ios/TDSensor）。擬似ピアで受信を実測 | ✅ 実装済み |
 | [GameController](GameController/) | CHOP | **ゲームパッド入力**（PS5/Xbox/MFi）。アナログトリガー・モーション・ランブル対応。Joystick CHOPのモダン代替 | ⚠ 実機パッド未検証 |
 | [VisionContours](VisionContours/) | SOP | **画像輪郭を閉じたLine primitiveへ変換**。親子階層属性と点数制御に対応し、Sweep/Extrude/Particleへ直結 | ✅ 実装済み |
 | [VisionAnimalPose](VisionAnimalPose/) | CHOP | **犬・猫の2D姿勢推定**（25関節・複数匹）。bboxとu/v/confidenceを左→右スロット出力 | ✅ 実装済み |
