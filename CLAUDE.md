@@ -1087,3 +1087,18 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
 - プラグインは**旧形式向けに正しく実装済み・ロード検証済み**。iPhone 13〜16の動画があれば動く想定。
   新形式対応はAppleの読み取りAPI提供待ち(足場として残す)。pitfalls.md / README に明記
 - 深度が今すぐ要る用途は ImageIO Depth / ImageIO PointCloud(iPhone写真)を案内
+
+### 2026-07-20 Cinematic 結論の訂正: 「新形式で読めない」は誤り→転送で深度が剥がれていた
+
+- 前エントリで「iPhone 17の新Cinematic形式は読めるAPIが無い」と結論したが**誤り**。裏取りで訂正。
+- Apple公式([support.apple.com/en-us/101995](https://support.apple.com/en-us/101995) 他)によると、
+  Cinematic動画をAirDropする際に**共有→オプション→「すべての写真データ(All Photos Data)」をオンに
+  しないと、通常動画に平坦化され深度・フォーカスを編集できなくなる**。Cinematic frameworkが読めるのは
+  深度データ付きのファイルのみ
+- 手元の2ファイル(iPhone 17 Pro)が「単層hvc1・視差トラック無し・CNAssetInfo Incomplete」だったのは、
+  まさに**平坦化された(All Photos Data無しで転送された/IMG_E焼き込み版)通常動画**の状態。形式やAPIの
+  問題ではなく**転送方法の問題**だった
+- 正しい取り出し: 写真アプリ→クリップ選択→共有→オプション→「すべての写真データ」ON→AirDrop→
+  Mac側フォルダの**「IMG_E」接頭辞が無い .MOV** を使う。機種(13〜17)問わず正しく転送すれば読める想定
+- README/skill/この記録を訂正。プラグイン実装自体は変更なし(Apple サンプルAPI準拠で正しい)。
+  深度保持ファイルが入手でき次第、視覚検証する

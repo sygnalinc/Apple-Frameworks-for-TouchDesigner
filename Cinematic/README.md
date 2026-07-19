@@ -39,24 +39,26 @@ iPhone(13以降)の**Cinematicモード動画**に埋め込まれた深度・被
 - **両プラグインのロード・パラメータ生成・チャンネル構造・File未指定の安全動作を確認**
   (CHOP=83ch、TOP=Depth/Rendered各パラメータ、クラッシュ・エラーなし)
 - **実Cinematic動画での深度・再レンダ・被写体メタデータの視覚検証は未実施**。
-  iPhone 17 Pro の実動画2本で試したが、いずれも**新形式**で `CNAssetInfo` が読めず(下記「対応形式」)、
-  検証には旧形式(iPhone 13〜16)の動画が必要。実装は Apple サンプル
-  "Playing and editing Cinematic mode video" の API に準拠
+  iPhone 17 Pro の動画2本で試したが、いずれも**視差データを含まない状態**(=通常動画として転送された)で
+  `CNAssetInfo` が Incomplete。**深度を保持した転送**(下記)ができ次第、視覚検証する。
+  実装は Apple サンプル "Playing and editing Cinematic mode video" の API に準拠
 
-## 対応形式(重要)
+## 重要: Cinematic動画は「深度を保持して転送」する
 
-- **対応するのは「旧Cinematicモード」形式(iPhone 13〜16)**。この形式は分離した**視差トラック**
-  (`cinematicDisparityTrack`)とメタデータトラックを持ち、`CNAssetInfo` で読める
-- **iPhone 17以降の「新Cinematic video」形式は現状読めない**(実機で確認)。新形式は単層HEVC
-  (hvc1)で分離視差トラックが無く、macOS 26.4 SDK の `Cinematic` framework(`CNAssetInfo`)は
-  `Incomplete` を返す。**新形式から深度を取り出す公開macOS APIが現状存在しない**ため、対応は
-  Apple が読み取りAPIを出すまで保留(このプラグインは旧形式向けの足場として残す)
-- 深度が今すぐ要るなら、ポートレート写真の深度は [ImageIO Depth](../ImageIODepth/) /
-  [ImageIO PointCloud](../ImageIOPointCloud/) が iPhone 写真で動作する
+Cinematic動画は転送方法を誤ると**通常動画に平坦化され、深度・フォーカスを編集できなくなる**
+(Apple公式)。Cinematic frameworkが読めるのは深度データ付きのファイルのみ。
+
+**iPhone → Mac(AirDrop)の正しい手順**:
+1. 写真アプリでCinematicクリップを選択 → **共有**
+2. 上部 **「オプション」** → **「すべての写真データ(All Photos Data)」をオン** → 完了
+3. AirDrop → Mac側にできる**フォルダ内の「IMG_E」接頭辞が無い .MOV** を使う(Eは焼き込み版)
+
+「すべての写真データ」をオフで転送すると深度が失われる(= `CNAssetInfo` が Incomplete になる)。
+機種(iPhone 13〜17)を問わず、正しく転送すれば Cinematic framework で読める想定。
 
 ## 注意
 
-- **合成不可**。旧Cinematicモードの実動画が必要
+- **合成不可**。Cinematicモードで撮影した実動画が必要
 - **macOS 26+ 必須**(Cinematic framework)
 - 視差トラックは映像より低解像度。深度TOPもその解像度
 - 時刻指定デコードは AVAssetReader。スクラブ多用時は負荷が上がる(将来 AVSampleBufferGenerator 化候補)

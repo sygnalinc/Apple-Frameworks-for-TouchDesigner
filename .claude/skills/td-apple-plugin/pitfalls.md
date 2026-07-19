@@ -150,11 +150,14 @@
   abstract class エラー)。`CHOP_GeneralInfo` のフィールドは `timeslice`(小文字s)
 - 1フォルダから2バンドル(CHOP+TOP)を共有Swiftヘルパで作る場合、build.sh は共通ヘルパを使わず
   `build_one` を2回(Multipeer In/Out と同型)
-- **iPhone 17以降の「新Cinematic video」形式は `CNAssetInfo` で読めない**(macOS 26.4 SDK・実機確認)。
-  新形式は単層HEVC(hvc1)で分離視差トラックが無く `CNCinematicErrorCodeIncomplete`(=3)を返す。
-  旧Cinematicモード(iPhone 13〜16)は分離視差トラックを持ち読める。**新形式の深度を取り出す公開API
-  が現状無い**。`cinematic-video` メタフラグは新形式、`cinematic`(古い)は旧形式の目安。判定は
-  `AVAsset` のトラック構成(video/disparity/metadata の3〜4本 vs video/audio/metaの3本)で先に切り分ける
+- **転送方法で深度が失われる(最重要・実機で踏んだ)**: Cinematic動画をAirDropする際に
+  共有→オプション→**「すべての写真データ(All Photos Data)」をオンにしないと、通常動画に平坦化**され
+  視差トラックが消える(Apple公式)。その状態のファイルは `CNAssetInfo` が
+  `CNCinematicErrorCodeIncomplete`(=3)を返す。**「読めない=形式が新しい」と早合点しない**。まず
+  `AVAsset` のトラック構成を見る: 正常なCinematicは video + **disparity** + metadata を持つ。
+  平坦化版は video(単層hvc1)+audio+meta のみで disparity が無い。正しく転送(All Photos Data ON、
+  Mac側フォルダの「IMG_E」無しMOV)すれば iPhone 13〜17 いずれも Cinematic framework で読める想定
+  ※ この点は当初「iPhone 17の新形式は読めない」と誤結論した。実際は転送で深度が剥がれていただけ
 
 ## SOP(VisionContours / RealityKit Capture / ImageIO PointCloud)
 
