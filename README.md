@@ -1,4 +1,4 @@
-# TDAppleML — Apple のオンデバイスML を TouchDesigner のネイティブOP に
+# TDAppleOps — Apple のオンデバイス框架を TouchDesigner のネイティブOP に
 
 macOS / Apple Silicon の**オンデバイスML(Vision / Core ML / Speech / Sound Analysis /
 Natural Language / ScreenCaptureKit ほか)を、TouchDesigner のカスタムオペレータ**として
