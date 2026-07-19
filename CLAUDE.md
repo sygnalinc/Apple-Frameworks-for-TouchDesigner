@@ -901,3 +901,28 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   カスタムOPは、削除済みバンドルのため TD再起動後にロードエラー(赤)になる。
   次に sample.toe を編集する際に該当4コンテナを手動削除すること
 - 過去ログ(GeneralUser GS適用・MusicComposeサンプル等)は履歴として残置
+
+### 2026-07-20 プラグインフォルダ名をフレームワーク接頭辞ラベルに統一
+
+- opLabel/opType のフレームワーク接頭辞化に合わせ、フォルダ名・ソース.mm・build.sh・
+  各READMEを12件リネーム(git mvで履歴保持):
+  VisionBokeh→CoreImageBokeh / VisionKeystone→CoreImageKeystone /
+  ImageAutoEnhance→CoreImageEnhance / SAM2Segment→CoreMLSAM2 / ImageGen→CoreMLImageGen /
+  Upscale→MetalUpscale / Denoise→MetalDenoise / FrameInterp→MetalFrameInterp /
+  MPSAnalyze→MetalMPSAnalyze / ImageMetadata→ImageIOMetadata /
+  VoiceActivity→SpeechActivity / Photogrammetry→RealityKitCapture
+- **Swiftヘルパのモジュール/dylib名は内部保持**(VoiceActivityHelper・PhotogrammetryHelper・
+  libImageGenHelper)。build.shは`s/<旧NAME+family>/<新NAME+family>/g`でNAME・ソース.mm・
+  plistのみ置換し、Helperを含む行は別substringなので巻き込まない設計にした
+- **ImageGen(SPM)はフォルダ移動でModuleCacheパスが変わり再ビルド失敗**するため、
+  移動後に`rm -rf helper/.build`してから`swift build`(既知のハマりどころ再現)
+- ルートREADMEのリンク先hrefと表示名を全プラグインの新ラベル(Vision Pose /
+  CoreImage Bokeh / Metal Upscale / RealityKit Capture 等)へ更新。表示名は実バイナリの
+  opLabelと突き合わせて確定(Foundation Model / Translate / Text Analyze は据え置きが正)
+- 12件を再ビルド・ad-hoc署名し、常設Pluginsへ再インストール。**旧名インストール済み
+  バンドルは先に削除**(旧バンドルは既に新opTypeを内包しており、残すとopType重複衝突)
+- `git add -A`が100MB超のローカル専用テスト動画(test_animal.mp4 366MB /
+  test_video_2.mp4 175MB)を巻き込みpush却下(GH001)。動画2本・TDImportCache/・
+  CrashAutoSave.*を.gitignoreへ追加し、リネームに絞って再コミット→push成功(a38e61b)
+- 次にやること: sample.toe内のデモは変更opType(12種)で参照切れ。ユーザーは.toe破損許容
+  済みだが、再構築するなら新opType(coreimagebokeh等)で貼り直しが必要
