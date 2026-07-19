@@ -866,3 +866,20 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   DAT: "hello from out DAT" が In 側テーブルに到達**(Out診断 status=ok/peers=1/sends=1)
 - 注意: In と Out を同一Macに置くとピアから2ピアに見える(別セッション)。センサー受信のみ
   なら In だけの最小構成を推奨
+
+### 2026-07-20 sample.toe に全カスタムOPの利用例を追加(/project1/examples)
+
+- ユーザー指示「全てのopのコンテナを作って利用例を組む」を受け、`/project1/examples` 配下に
+  **1オペレータ=1コンテナ**の最小利用例を51個構築。各コンテナは
+  共有ソース参照(Select TOP→media_video / audiofilein→media_audio)→OP→out+説明textDAT
+- バッチ順に保存・main直コミット(4コミット)。全OPエラーなしを確認、主要OPは実データ検証:
+  VisionPose=5人検出、Segment 512x384、CoreML(Depth)518x392、YOLOv3 5検出、
+  SAM2 256x256マスク、SoundFeatures 29ch、MusicEvents 214イベント、Upscale 640→1280x720
+- Barcodeは動画にQRが無いのでCoreImageCode TOPでQR生成して入力(payload検出を確認)
+- Shazam参照フォルダは著作物mp3の同梱を避けTD Samples/Audioを参照。SpeechText用に
+  say生成の `Assets/sample_speech.aiff`(小・非著作物)のみ同梱
+- **VisionSimilarity/VoiceActivity は未インストールだったので本セッションでインストール済み。
+  TD再起動後に td.VisionsimilarityCHOP/VoiceactivityCHOP が現れるので、その2つの
+  利用例コンテナを追加すれば全53OP網羅**(次セッションのTODO)
+- 開いていた sample.toe は以前のデモ(sam2_track_demo等)を含まない2ノード状態だった。
+  git HEADの旧版(28578B)はバックアップ済み。新しい examples 集約版で置き換えた
