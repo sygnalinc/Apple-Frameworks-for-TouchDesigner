@@ -954,3 +954,24 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
 - **splat 実アセット未検証**(手元に splat USDZ が無い)。ロード経路は USDZメッシュで検証済みで、
   splat も同じ `Entity(contentsOf:)` 経路。splatの実描画確認が次の課題。README に明記
 - 次にやること: 実 Gaussian Splat USDZ での描画確認、sample.toe への利用例追加
+
+### 2026-07-20 Plugins整理 + sample.toe利用例の作り直し(opType改称対応)
+
+- **重複の実体**: フォルダのバンドルファイル自体はクリーンだったが、①`Plugins.json`(TD承認リスト)に
+  旧名の残骸19件(StableDiffusion/ImageGen/Upscale/Music系/VoiceActivity等)、②**実行中TDプロセスの
+  メモリに旧opType登録が残存**(今セッションで旧→新バンドル差し替え時の名残)。②は
+  **TD再起動でクリーンなフォルダ再スキャンにより解消**(ファイル操作では消せない)
+- Plugins.jsonのゴースト19件をバックアップ付きで削除
+- **sample.toe `/project1/examples` を改称に追従して作り直し**(KeyframeEditorは未変更):
+  - 旧opType参照の11例を新opに置換+コンテナ名を新ラベルへ(VisionBokeh→CoreImageBokeh、
+    Upscale→MetalUpscale、SAM2Segment→CoreMLSAM2、Photogrammetry→RealityKitCapture等)。
+    配線(inputs/outputs)とカスタムパラメータ値を維持したまま差し替え
+  - 削除済みMusic系4例を除去
+  - 欠落していた VisionSimilarity / SpeechActivity / RealityKitSplat の3例を追加
+  - **全custom opのnode名を "op1" → 手動設置時の既定名 `<OpType>1`**(例 Coreimagebokeh1)に統一
+  - 計50例、全てエラー無しを確認して保存。RealityKitSplatはデフォルト箱シーンの描画も視認
+- **踏んだ罠**: ①TDのcustom op生成は `create('CoreimagebokehTOP')`(先頭大文字opType+FAMILY大文字)。
+  小文字や'TOP'サフィックス無しは "Unknown operator type"。②新規追加opは**TD再起動まで未登録**で
+  create不可(RealityKitSplatは再起動後に追加)。③VisionBarcode等の複数custom op containerは
+  主opの取り違えに注意(先頭isCustomが補助opのことがある)
+- 次にやること: 実Gaussian Splat USDZでのRealityKitSplat描画確認
