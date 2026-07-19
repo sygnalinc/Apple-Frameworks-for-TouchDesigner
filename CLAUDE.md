@@ -859,6 +859,10 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   共通ヘルパは`rm -rf build`を毎回するため2回呼べない
 - iOSアプリのserviceTypeは`td-sensor`のままでIn CHOPの既定と一致(変更不要)
 - 旧 MultipeerDAT.mm / MultipeerCHOP.mm は削除。旧インストール済みバンドルも削除し
-  新4バンドルを配置。**TD再接続後にロード検証**(MCP切断中のためビルド・署名まで確認済み)
+  新4バンドルを配置。**TD再起動後にロード検証完了**(2026-07-19):
+  MultipeerinCHOP/MultipeeroutCHOP/MultipeerinDAT/MultipeeroutDAT の4型が登録され、
+  パラメータ生成・エラーなしを確認。同一マシンで Out→In を別Peer名・同Service Typeで接続し、
+  **CHOP: gyro_x=0.42/accel_z=0.98/touch=1.0 が動的ch生成され値一致、
+  DAT: "hello from out DAT" が In 側テーブルに到達**(Out診断 status=ok/peers=1/sends=1)
 - 注意: In と Out を同一Macに置くとピアから2ピアに見える(別セッション)。センサー受信のみ
   なら In だけの最小構成を推奨
