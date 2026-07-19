@@ -1,4 +1,4 @@
-# ImageAutoEnhance TOP
+# CoreImage Enhance TOP
 
 Core Imageの`autoAdjustmentFilters`が画像内容に応じて露出、彩度、コントラスト、色かぶり等の補正filterを自動選択するTOP。追加モデル不要。
 
@@ -12,4 +12,4 @@ Core Imageの`autoAdjustmentFilters`が画像内容に応じて露出、彩度�
 
 ## ビルド
 
-`./build.sh` → `build/ImageAutoEnhanceTOP.plugin`
+`./build.sh` → `build/CoreImageEnhanceTOP.plugin`

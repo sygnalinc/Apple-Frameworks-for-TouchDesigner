@@ -1,11 +1,11 @@
 #!/bin/zsh
-# Image Gen TOP のビルド → build/ImageGenTOP.plugin
+# Image Gen TOP のビルド → build/CoreMLImageGenTOP.plugin
 # 2段構成: helper(Swiftパッケージ・ml-stable-diffusion) → libImageGenHelper.dylib、.mm → plugin本体
 set -e
 cd "$(dirname "$0")"
 
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP"
-NAME=ImageGenTOP
+NAME=CoreMLImageGenTOP
 OUT="build/$NAME.plugin/Contents"
 
 # ① Swift ヘルパ
@@ -20,7 +20,7 @@ install_name_tool -id "@rpath/$DYLIB" "$OUT/Frameworks/$DYLIB"
 # ② プラグイン本体（依存dylibはビルド毎に名前を変える=TDのプロセス内キャッシュ対策）
 clang++ -std=c++17 -fobjc-arc -O2 -bundle \
   -I "$SDK" \
-  ImageGenTOP.mm \
+  CoreMLImageGenTOP.mm \
   -framework Foundation \
   "$OUT/Frameworks/$DYLIB" \
   -Xlinker -rpath -Xlinker @loader_path/../Frameworks \
@@ -31,9 +31,9 @@ cat > "$OUT/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleExecutable</key><string>ImageGenTOP</string>
-    <key>CFBundleIdentifier</key><string>tokyo.sygnal.imagegen-top</string>
-    <key>CFBundleName</key><string>ImageGenTOP</string>
+    <key>CFBundleExecutable</key><string>CoreMLImageGenTOP</string>
+    <key>CFBundleIdentifier</key><string>tokyo.sygnal.coremlimagegen-top</string>
+    <key>CFBundleName</key><string>CoreMLImageGenTOP</string>
     <key>CFBundlePackageType</key><string>BNDL</string>
     <key>CFBundleVersion</key><string>0.1.0</string>
 </dict>

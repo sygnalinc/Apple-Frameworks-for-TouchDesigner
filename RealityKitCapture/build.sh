@@ -1,11 +1,11 @@
 #!/bin/zsh
-# Photogrammetry SOP のビルド → build/PhotogrammetrySOP.plugin
+# Photogrammetry SOP のビルド → build/RealityKitCaptureSOP.plugin
 # dylib はビルド毎に名前を変える(TD/dyld が install name でキャッシュするため)
 set -e
 cd "$(dirname "$0")"
 
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/SimpleShapesSOP"
-NAME=PhotogrammetrySOP
+NAME=RealityKitCaptureSOP
 OUT="build/$NAME.plugin/Contents"
 DYLIB="libPhotogrammetryHelper_$(date +%s).dylib"
 rm -rf build
@@ -20,7 +20,7 @@ swiftc -O -emit-library -module-name PhotogrammetryHelper \
 
 clang++ -std=c++17 -fobjc-arc -O2 -bundle \
   -I "$SDK" \
-  PhotogrammetrySOP.mm \
+  RealityKitCaptureSOP.mm \
   -framework Foundation \
   "$OUT/Frameworks/$DYLIB" \
   -Xlinker -rpath -Xlinker @loader_path/../Frameworks \
@@ -31,9 +31,9 @@ cat > "$OUT/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleExecutable</key><string>PhotogrammetrySOP</string>
-    <key>CFBundleIdentifier</key><string>tokyo.sygnal.photogrammetry-sop</string>
-    <key>CFBundleName</key><string>PhotogrammetrySOP</string>
+    <key>CFBundleExecutable</key><string>RealityKitCaptureSOP</string>
+    <key>CFBundleIdentifier</key><string>tokyo.sygnal.realitykitcapture-sop</string>
+    <key>CFBundleName</key><string>RealityKitCaptureSOP</string>
     <key>CFBundlePackageType</key><string>BNDL</string>
     <key>CFBundleVersion</key><string>0.1.0</string>
 </dict>

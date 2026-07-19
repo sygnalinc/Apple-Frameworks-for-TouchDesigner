@@ -17,11 +17,11 @@ Natural Language / ScreenCaptureKit ほか)を、TouchDesigner のカスタム�
 
 | やりたいこと | TD標準(Win+NVIDIA) | このリポジトリ |
 |---|---|---|
-| 人物ポーズ推定 | Body Track CHOP | [VisionPose](VisionPose/) |
-| 背景除去・人物マスク | Nvidia Background TOP | [VisionSegment](VisionSegment/) |
-| 超解像アップスケール | Nvidia Upscaler TOP | [Upscale](Upscale/) |
-| オプティカルフロー | Optical Flow TOP | [VisionFlow](VisionFlow/) |
-| 顔トラッキング | Face Track CHOP | [VisionFace](VisionFace/) |
+| 人物ポーズ推定 | Body Track CHOP | [Vision Pose](VisionPose/) |
+| 背景除去・人物マスク | Nvidia Background TOP | [Vision Segment](VisionSegment/) |
+| 超解像アップスケール | Nvidia Upscaler TOP | [Metal Upscale](MetalUpscale/) |
+| オプティカルフロー | Optical Flow TOP | [Vision Flow](VisionFlow/) |
+| 顔トラッキング | Face Track CHOP | [Vision Face](VisionFace/) |
 
 ---
 
@@ -29,94 +29,94 @@ Natural Language / ScreenCaptureKit ほか)を、TouchDesigner のカスタム�
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
-| [VisionPose](VisionPose/) | CHOP | 多人数の2Dボディポーズ(34キーポイント)。**Body Track CHOP と互換のチャンネル形式**。5人60fps |
-| [VisionPose3D](VisionPose3D/) | CHOP | 単一人物の**3Dポーズ**(17関節・メートル単位+2D投影・身長推定)。約2fpsのじっくり系 |
-| [VisionHand](VisionHand/) | CHOP | 手指トラッキング(21関節×最大100手・左右判定) |
-| [VisionFace](VisionFace/) | CHOP | 顔検出+bbox・roll/yaw/pitch・ランドマーク(最大76点)・顔写りスコア。**Face Track CHOP 代替** |
-| [VisionSegment](VisionSegment/) | TOP | 人物セグメンテーション。**Nvidia Background TOP 代替**(統合マスク/人物別R/G/B/A分離) |
+| [Vision Pose](VisionPose/) | CHOP | 多人数の2Dボディポーズ(34キーポイント)。**Body Track CHOP と互換のチャンネル形式**。5人60fps |
+| [Vision Pose3D](VisionPose3D/) | CHOP | 単一人物の**3Dポーズ**(17関節・メートル単位+2D投影・身長推定)。約2fpsのじっくり系 |
+| [Vision Hand](VisionHand/) | CHOP | 手指トラッキング(21関節×最大100手・左右判定) |
+| [Vision Face](VisionFace/) | CHOP | 顔検出+bbox・roll/yaw/pitch・ランドマーク(最大76点)・顔写りスコア。**Face Track CHOP 代替** |
+| [Vision Segment](VisionSegment/) | TOP | 人物セグメンテーション。**Nvidia Background TOP 代替**(統合マスク/人物別R/G/B/A分離) |
 
 ## 物体・シーンの認識・読み取り
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
-| [CoreMLDetect](CoreMLDetect/) | DAT | **物体検出**。YOLO等のCore MLモデルで「何が・どこに」を label/confidence/bbox で出力 |
-| [VisionClassify](VisionClassify/) | DAT | **画像分類**(追加モデル不要)。上位N件の identifier/confidence |
-| [VisionAnimalPose](VisionAnimalPose/) | CHOP | 犬・猫の2D姿勢推定(25関節・複数匹) |
-| [VisionRect](VisionRect/) | CHOP | 矩形検出→bbox/投影四隅(Corner Pin 直結) |
-| [VisionBarcode](VisionBarcode/) | DAT | QR・各種バーコード検出→payload / symbology / bbox / 四隅 |
-| [VisionText](VisionText/) | DAT | **OCR / テキスト認識**(多言語・読み順ソート・Accurate/Fast) |
-| [VisionTrajectory](VisionTrajectory/) | CHOP | 放物運動する小物体の軌跡検出(実測点/投影点/放物線係数) |
-| [VisionHorizon](VisionHorizon/) | CHOP | 水平線・地平線の角度と補正transform |
-| [VisionAesthetics](VisionAesthetics/) | CHOP | 写真の**美的スコア**(-1〜+1)。ベストショット自動選択に |
-| [ImageMetadata](ImageMetadata/) | DAT | 画像ファイルの EXIF/GPS/IPTC 読み取り(GPS十進度変換つき) |
+| [CoreML Detect](CoreMLDetect/) | DAT | **物体検出**。YOLO等のCore MLモデルで「何が・どこに」を label/confidence/bbox で出力 |
+| [Vision Classify](VisionClassify/) | DAT | **画像分類**(追加モデル不要)。上位N件の identifier/confidence |
+| [Vision AnimalPose](VisionAnimalPose/) | CHOP | 犬・猫の2D姿勢推定(25関節・複数匹) |
+| [Vision Rect](VisionRect/) | CHOP | 矩形検出→bbox/投影四隅(Corner Pin 直結) |
+| [Vision Barcode](VisionBarcode/) | DAT | QR・各種バーコード検出→payload / symbology / bbox / 四隅 |
+| [Vision Text](VisionText/) | DAT | **OCR / テキスト認識**(多言語・読み順ソート・Accurate/Fast) |
+| [Vision Trajectory](VisionTrajectory/) | CHOP | 放物運動する小物体の軌跡検出(実測点/投影点/放物線係数) |
+| [Vision Horizon](VisionHorizon/) | CHOP | 水平線・地平線の角度と補正transform |
+| [Vision Aesthetics](VisionAesthetics/) | CHOP | 写真の**美的スコア**(-1〜+1)。ベストショット自動選択に |
+| [ImageIO Metadata](ImageIOMetadata/) | DAT | 画像ファイルの EXIF/GPS/IPTC 読み取り(GPS十進度変換つき) |
 
 ## 切り抜き・マスク
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
-| [VisionSubject](VisionSubject/) | TOP | **任意被写体の切り抜き**(写真アプリ「被写体をコピー」と同じAPI)。ソフトマスク/背景透過 |
-| [SAM2Segment](SAM2Segment/) | TOP | **点を指定して任意物体をマスク**(SAM 2.1)。観客が触れたものを切り抜く演出に |
-| [VisionBokeh](VisionBokeh/) | TOP | マスクで被写体を保持したまま**背景を可変ぼかし** |
+| [Vision Subject](VisionSubject/) | TOP | **任意被写体の切り抜き**(写真アプリ「被写体をコピー」と同じAPI)。ソフトマスク/背景透過 |
+| [CoreML SAM2](CoreMLSAM2/) | TOP | **点を指定して任意物体をマスク**(SAM 2.1)。観客が触れたものを切り抜く演出に |
+| [CoreImage Bokeh](CoreImageBokeh/) | TOP | マスクで被写体を保持したまま**背景を可変ぼかし** |
 
 ## 追跡・モーション・カメラワーク
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
-| [VisionTrack](VisionTrack/) | CHOP | **任意オブジェクトの追跡**(初期bbox→追従)。Blob Track TOP 代替に近い |
-| [VisionFlow](VisionFlow/) | TOP | **オプティカルフロー**(動きベクトル場)。**Optical Flow TOP 代替**(UV/Pixels) |
-| [VisionSaliency](VisionSaliency/) | TOP | 顕著性マップ+**オートフレーミング**(注目領域のクロップ矩形を Crop TOP 直結でカメラワーク自動化) |
-| [VisionSimilarity](VisionSimilarity/) | CHOP | 2つの画像の**類似度**(Feature Print)。「参照画像に似たら発火」トリガー |
+| [Vision Track](VisionTrack/) | CHOP | **任意オブジェクトの追跡**(初期bbox→追従)。Blob Track TOP 代替に近い |
+| [Vision Flow](VisionFlow/) | TOP | **オプティカルフロー**(動きベクトル場)。**Optical Flow TOP 代替**(UV/Pixels) |
+| [Vision Saliency](VisionSaliency/) | TOP | 顕著性マップ+**オートフレーミング**(注目領域のクロップ矩形を Crop TOP 直結でカメラワーク自動化) |
+| [Vision Similarity](VisionSimilarity/) | CHOP | 2つの画像の**類似度**(Feature Print)。「参照画像に似たら発火」トリガー |
 
 ## 映像加工・超解像
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
-| [Upscale](Upscale/) | TOP | **リアルタイム超解像**。**Nvidia Upscaler TOP 代替**(MetalFX 2x / VT SuperRes 4x / VT LowLatency) |
-| [FrameInterp](FrameInterp/) | TOP | ML **フレーム補間 / モーションブラー**(中間フレーム生成) |
-| [Denoise](Denoise/) | TOP | ML テンポラルノイズ除去(対応ハードのみ。M2非対応) |
-| [VisionKeystone](VisionKeystone/) | TOP | 矩形の**自動透視補正**(紙面・スクリーン・投影面を正対化) |
-| [ImageAutoEnhance](ImageAutoEnhance/) | TOP | 露出・彩度・色を自動補正(Core Image) |
-| [MPSAnalyze](MPSAnalyze/) | CHOP | GPU画像統計(RGBAヒストグラム・平均色・輝度分布 76ch) |
+| [Metal Upscale](MetalUpscale/) | TOP | **リアルタイム超解像**。**Nvidia Upscaler TOP 代替**(MetalFX 2x / VT SuperRes 4x / VT LowLatency) |
+| [Metal FrameInterp](MetalFrameInterp/) | TOP | ML **フレーム補間 / モーションブラー**(中間フレーム生成) |
+| [Metal Denoise](MetalDenoise/) | TOP | ML テンポラルノイズ除去(対応ハードのみ。M2非対応) |
+| [CoreImage Keystone](CoreImageKeystone/) | TOP | 矩形の**自動透視補正**(紙面・スクリーン・投影面を正対化) |
+| [CoreImage Enhance](CoreImageEnhance/) | TOP | 露出・彩度・色を自動補正(Core Image) |
+| [Metal MPSAnalyze](MetalMPSAnalyze/) | CHOP | GPU画像統計(RGBAヒストグラム・平均色・輝度分布 76ch) |
 
 ## 汎用ML推論・画像生成
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
 | [CoreML](CoreML/) | TOP | **任意の Core ML モデル**を差し替えて推論(深度推定・スタイル変換・分類等)。画像/配列出力を自動判別 |
-| [CoreMLCHOP](CoreMLCHOP/) | CHOP | 任意の Core ML モデルの**ベクトル出力**をCHへ(埋め込み・キーポイント等) |
-| [ImageGen](ImageGen/) | TOP | **text2img / img2img**(Core ML Stable Diffusion / Image Playground) |
-| [CoreImageCode](CoreImageCode/) | TOP | QR / Aztec / PDF417 / Code128 の**生成**(外部ライブラリ不要) |
+| [CoreML CHOP](CoreMLCHOP/) | CHOP | 任意の Core ML モデルの**ベクトル出力**をCHへ(埋め込み・キーポイント等) |
+| [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img**(Core ML Stable Diffusion / Image Playground) |
+| [CoreImage Code](CoreImageCode/) | TOP | QR / Aztec / PDF417 / Code128 の**生成**(外部ライブラリ不要) |
 
 ## 音声・音響
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
-| [SoundClass](SoundClass/) | CHOP | **音の分類**(拍手/歓声/警報音等 300種類+)。独自 Core ML 音響モデルも可 |
-| [SoundFeatures](SoundFeatures/) | CHOP | 音響特徴(RMS/peak/centroid/onset/beat/BPM/16帯域) |
-| [SpeechText](SpeechText/) | DAT | **ライブ文字起こし**。Apple SpeechAnalyzer(macOS26+)/ WhisperKit(macOS14+・多言語・英訳) |
-| [SpeechSynth](SpeechSynth/) | CHOP | オンデバイス**音声合成**→ PCM stereo |
-| [VoiceActivity](VoiceActivity/) | CHOP | **発話区間検出**(speaking/onset/offset)。文字起こしの開始・終了トリガーに |
+| [Sound Class](SoundClass/) | CHOP | **音の分類**(拍手/歓声/警報音等 300種類+)。独自 Core ML 音響モデルも可 |
+| [Sound Features](SoundFeatures/) | CHOP | 音響特徴(RMS/peak/centroid/onset/beat/BPM/16帯域) |
+| [Speech Text](SpeechText/) | DAT | **ライブ文字起こし**。Apple SpeechAnalyzer(macOS26+)/ WhisperKit(macOS14+・多言語・英訳) |
+| [Speech Synth](SpeechSynth/) | CHOP | オンデバイス**音声合成**→ PCM stereo |
+| [Speech Activity](SpeechActivity/) | CHOP | **発話区間検出**(speaking/onset/offset)。文字起こしの開始・終了トリガーに |
 | [Shazam](Shazam/) | DAT | **自作音源のオフライン照合**(ShazamKit)。会場音源にショー進行を同期 |
-| [SystemAudio](SystemAudio/) | CHOP | macOS の**システム音声**を取得(ScreenCaptureKit・48kHz stereo) |
+| [System Audio](SystemAudio/) | CHOP | macOS の**システム音声**を取得(ScreenCaptureKit・48kHz stereo) |
 
 ## 言語・テキスト
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
-| [FoundationModel](FoundationModel/) | DAT | **Apple Intelligence オンデバイスLLM**(macOS26+)。**構造化出力(JSONスキーマ)**でショー制御へ直結 |
-| [Translate](Translate/) | DAT | **オンデバイス翻訳**。SpeechText 直結でリアルタイム字幕翻訳 |
-| [TextAnalyze](TextAnalyze/) | DAT | 感情スコア・言語判定・固有表現・意味的類似度(日本語対応)。「発話の感情/話題でビジュアル制御」 |
+| [Foundation Model](FoundationModel/) | DAT | **Apple Intelligence オンデバイスLLM**(macOS26+)。**構造化出力(JSONスキーマ)**でショー制御へ直結 |
+| [Translate](Translate/) | DAT | **オンデバイス翻訳**。Speech Text 直結でリアルタイム字幕翻訳 |
+| [Text Analyze](TextAnalyze/) | DAT | 感情スコア・言語判定・固有表現・意味的類似度(日本語対応)。「発話の感情/話題でビジュアル制御」 |
 
 ## 3D・画面・入力デバイス・外部連携
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
-| [Photogrammetry](Photogrammetry/) | SOP | **写真フォルダ→3Dメッシュ**(RealityKit Object Capture)。テクスチャ付きOBJ出力 |
-| [VisionContours](VisionContours/) | SOP | 画像の輪郭を**閉じたLineジオメトリ**へ(Sweep/Extrude/Particle 直結) |
-| [ScreenCapture](ScreenCapture/) | TOP | ディスプレイ/単一ウインドウの**画面収録**(最大120fps) |
+| [RealityKit Capture](RealityKitCapture/) | SOP | **写真フォルダ→3Dメッシュ**(RealityKit Object Capture)。テクスチャ付きOBJ出力 |
+| [Vision Contours](VisionContours/) | SOP | 画像の輪郭を**閉じたLineジオメトリ**へ(Sweep/Extrude/Particle 直結) |
+| [Screen Capture](ScreenCapture/) | TOP | ディスプレイ/単一ウインドウの**画面収録**(最大120fps) |
 | [Multipeer In / Out](MultipeerCHOP/) | CHOP | **iPhone/iPad をワイヤレスセンサーに**(ジャイロ/加速度/タッチを低遅延受信)。**iOSアプリ同梱** |
 | [Multipeer In / Out](Multipeer/) | DAT | Mac/iPhone 間の**ローカルP2Pテキスト**(自動接続・サーバー不要) |
-| [GameController](GameController/) | CHOP | PS5/Xbox/MFi **ゲームパッド入力**(スティック/トリガー+モーション+ランブル) |
+| [Game Controller](GameController/) | CHOP | PS5/Xbox/MFi **ゲームパッド入力**(スティック/トリガー+モーション+ランブル) |
 | [Shortcuts](Shortcuts/) | DAT | **macOSショートカット実行**(HomeKit照明・家電・通知を TD イベントから) |
 
 ---
@@ -138,7 +138,7 @@ cd VisionPose && ./build.sh      # → VisionPose/build/VisionPoseCHOP.plugin
   `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/` に `.plugin` をコピー
   → TD 再起動で OP Create Dialog に現れる
 
-モデルを使うプラグイン(CoreML / SAM2 / ImageGen 等)は、各 README のリンク先から
+モデルを使うプラグイン(CoreML / CoreML SAM2 / CoreML ImageGen 等)は、各 README のリンク先から
 Apple公式の Core ML モデルを `models/`(gitignore)へ置いてください。
 
 ## 必要環境

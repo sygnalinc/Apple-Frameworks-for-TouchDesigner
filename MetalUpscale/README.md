@@ -1,4 +1,4 @@
-# Upscale TOP
+# Metal Upscale TOP
 
 リアルタイム超解像。**Windows+NVIDIA 専用の Nvidia Upscaler TOP の macOS 代替**。
 バックエンド2種を Backend メニューで切替。
@@ -44,5 +44,5 @@ Flip パラメータは無い(拡大処理は向きに依存しないため、�
 ## ビルド
 
 ```
-cd Upscale && ./build.sh   # → build/UpscaleTOP.plugin
+cd MetalUpscale && ./build.sh   # → build/MetalUpscaleTOP.plugin
 ```

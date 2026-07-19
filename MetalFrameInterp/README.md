@@ -1,4 +1,4 @@
-# FrameInterp TOP
+# Metal FrameInterp TOP
 
 Apple の動画ML処理 **VTFrameProcessor**(VideoToolbox・macOS 15.4+)による
 フレーム補間とモーションブラー。
@@ -43,5 +43,5 @@ Flip パラメータは無い(補間/ブラーは向きに依存しないため�
 ## ビルド
 
 ```
-cd FrameInterp && ./build.sh   # → build/FrameInterpTOP.plugin
+cd MetalFrameInterp && ./build.sh   # → build/MetalFrameInterpTOP.plugin
 ```

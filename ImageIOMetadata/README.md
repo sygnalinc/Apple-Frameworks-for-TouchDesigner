@@ -1,4 +1,4 @@
-# ImageMetadata DAT
+# ImageIO Metadata DAT
 
 画像ファイルの**メタデータ(EXIF・GPS・TIFF・IPTC・PNG)**を key/value テーブルで出力
 (ImageIO)。撮影日時・GPS座標・カメラ機種・露出などを演出パラメータとして使える。
@@ -28,5 +28,5 @@ Info CHOP: `executes / reads / keys`
 ## ビルド
 
 ```
-cd ImageMetadata && ./build.sh   # → build/ImageMetadataDAT.plugin
+cd ImageIOMetadata && ./build.sh   # → build/ImageIOMetadataDAT.plugin
 ```

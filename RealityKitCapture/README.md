@@ -1,4 +1,4 @@
-# Photogrammetry SOP
+# RealityKit Capture SOP
 
 **写真フォルダから3Dメッシュを再構成**(RealityKit Object Capture・macOS 12+)。
 物体を一周撮った写真(20枚以上推奨・オーバーラップ必須)を Image Folder に置き、
@@ -44,5 +44,5 @@ Info DAT: `texture`(抽出テクスチャのパス)/ `status`(JSON)。進捗は�
 ## ビルド
 
 ```
-cd Photogrammetry && ./build.sh   # → build/PhotogrammetrySOP.plugin(Swiftヘルパ同梱)
+cd RealityKitCapture && ./build.sh   # → build/RealityKitCaptureSOP.plugin(Swiftヘルパ同梱)
 ```

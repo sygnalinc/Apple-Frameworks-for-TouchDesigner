@@ -6,3 +6,9 @@ Backup/
 *.toe.*
 models/
 .build/
+# 100MB超のテスト動画はローカルのみ(LFS不使用)
+Assets/test_animal.mp4
+Assets/test_video_2.mp4
+# TDインポートキャッシュ・クラッシュ自動保存(再生成物)
+TDImportCache/
+CrashAutoSave.*

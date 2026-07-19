@@ -1,4 +1,4 @@
-# Denoise TOP
+# Metal Denoise TOP
 
 Apple の **ML テンポラルノイズフィルタ**(VTTemporalNoiseFilter・macOS 26+)で
 映像の時間方向ノイズを除去する。暗所カメラのざらつき低減など。
@@ -27,10 +27,10 @@ Flip パラメータは無い(ノイズ除去は向きに依存しないため�
 
 - 入出力 64RGBAHalf(TD の RGBA16Float 直結)。config の
   `previousFrameCount` ぶん前フレームを保持して渡す(初回は hasDiscontinuity=true)
-- FrameInterp と同じ VTFrameProcessor パイプライン(セッション・CVPixelBufferPool)
+- Metal FrameInterp と同じ VTFrameProcessor パイプライン(セッション・CVPixelBufferPool)
 
 ## ビルド
 
 ```
-cd Denoise && ./build.sh   # → build/DenoiseTOP.plugin
+cd MetalDenoise && ./build.sh   # → build/MetalDenoiseTOP.plugin
 ```

@@ -1,4 +1,4 @@
-# SAM2Segment TOP
+# CoreML SAM2 TOP
 
 Apple公式変換の **SAM 2.1(Segment Anything Model 2)** で、**指定した点にある任意の
 オブジェクトのマスク**を生成する。VisionSubject(全被写体自動)と違い「どれを抜くか」を
@@ -49,5 +49,5 @@ Info CHOP: `executes / submits / analyzes / encode_ms / decode_ms / score / load
 ## ビルド
 
 ```
-cd SAM2Segment && ./build.sh   # → build/SAM2SegmentTOP.plugin
+cd CoreMLSAM2 && ./build.sh   # → build/CoreMLSAM2TOP.plugin
 ```
