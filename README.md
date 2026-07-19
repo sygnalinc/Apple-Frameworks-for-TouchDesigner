@@ -61,6 +61,7 @@ grouped by category.
 | [Vision Rect](VisionRect/) | CHOP | Rectangle detection → bbox / projected corners (wire straight into Corner Pin) |
 | [Vision Barcode](VisionBarcode/) | DAT | QR / various barcodes → payload / symbology / bbox / corners |
 | [Vision Text](VisionText/) | DAT | **OCR / text recognition** (multilingual, reading-order sort, Accurate/Fast) |
+| [Vision Document](VisionDocument/) | DAT | **Document structure** (macOS 26+): paragraphs / tables / rows / cells / lists, not just OCR |
 | [Vision Trajectory](VisionTrajectory/) | CHOP | Trajectory of small projectile objects (measured / projected points, parabola coefficients) |
 | [Vision Horizon](VisionHorizon/) | CHOP | Horizon angle + correction transform |
 | [Vision Aesthetics](VisionAesthetics/) | CHOP | Photo **aesthetic score** (−1..+1). Auto best-shot selection |
@@ -93,6 +94,9 @@ grouped by category.
 | [CoreImage Keystone](CoreImageKeystone/) | TOP | **Automatic perspective correction** of a rectangle (square up paper / screen / projection) |
 | [CoreImage Enhance](CoreImageEnhance/) | TOP | Auto exposure / saturation / color correction (Core Image) |
 | [Metal MPSAnalyze](MetalMPSAnalyze/) | CHOP | GPU image statistics (RGBA histogram, average color, luminance distribution — 76ch) |
+| [CoreImage RAW](CoreImageRAW/) | TOP | **Develop DNG / ProRAW** in real time (exposure / WB / noise / sharpness) via CIRAWFilter |
+| [CoreImage HDR](CoreImageHDR/) | TOP | **HDR gain map** extraction + SDR/HDR (EDR) conversion from HEIC |
+| [ImageIO Depth](ImageIODepth/) | TOP | **Depth / disparity / Portrait Matte / semantic mattes** embedded in iPhone photos → Mono32Float |
 
 ### General ML inference & image generation
 
@@ -129,6 +133,7 @@ grouped by category.
 |---|---|---|
 | [RealityKit Capture](RealityKitCapture/) | SOP | **Photo folder → 3D mesh** (RealityKit Object Capture). Textured OBJ output |
 | [RealityKit Splat](RealityKitSplat/) | TOP | **Render a USD/USDZ scene (incl. 3D Gaussian Splats, macOS 26+) to a TOP** via RealityRenderer. Orbit camera, auto-framing |
+| [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **Photo depth → 3D point cloud** (unproject via camera calibration / FOV). Colors sampled from RGB |
 | [Vision Contours](VisionContours/) | SOP | Image contours → **closed Line geometry** (wire into Sweep / Extrude / Particle) |
 | [Screen Capture](ScreenCapture/) | TOP | **Screen recording** of a display / single window (up to 120fps) |
 | [Multipeer In / Out](MultipeerCHOP/) | CHOP | **Turn an iPhone/iPad into a wireless sensor** (low-latency gyro / accel / touch). **iOS app included** |

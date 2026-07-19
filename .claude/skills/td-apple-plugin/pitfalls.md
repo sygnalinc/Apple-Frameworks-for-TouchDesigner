@@ -110,9 +110,33 @@
 - ModelIO(`MDLAsset.export`)は **`.usdz` 拡張子を書き出せない**("Unknown extension")。
   `.usdc`/`.usd` を使う。RealityKit はどれも読める
 
-## SOP(VisionContours / RealityKit Capture)
+## 深度 / 画像補助データ / RAW / HDR(ImageIO・AVFoundation・Core Image)
+
+- **iPhone写真の深度/視差/マットは ImageIO の補助データ**: `CGImageSourceCopyAuxiliaryDataInfoAtIndex`
+  (type = `kCGImageAuxiliaryDataTypeDisparity/Depth/PortraitEffectsMatte/SemanticSegmentation*Matte`)。
+  `kCGImageAuxiliaryDataInfoData`(CFData)+`...DataDescription`(Width/Height/BytesPerRow/PixelFormat)
+- **深度の画素形式は DisparityFloat16/32・DepthFloat16/32・8bitマット**。float16→float32は Accelerate の
+  `vImageConvert_Planar16FtoPlanarF`。BytesPerRow ≠ Width×bytes のことがあるので行ごとに処理
+- **カメラ内部パラメータは AVDepthData**: `[AVDepthData depthDataFromDictionaryRepresentation:auxDict]`
+  → `.cameraCalibrationData.intrinsicMatrix`(+`intrinsicMatrixReferenceDimensions` で解像度スケール)。
+  ポートレート写真以外は nil なので FOV フォールバックを用意
+- **HDRゲインマップ**: `CIImage(contentsOf:options:[kCIImageAuxiliaryHDRGainMap:@YES])` でゲインマップ、
+  `[kCIImageExpandToHDR:@YES]` でHDR拡張(EDR・1.0超の値)。拡張の効きは画像のheadroomメタ依存
+- **CIRAWFilter は JPEG/TIFFも開ける**が非RAWはセンサーデータ前提の現像とズレる(白飛び)。
+  ノイズ除去/シャープは `*Supported` を確認してから適用
+- **テスト素材の合成**: 深度HEICは `CGImageDestinationAddAuxiliaryDataInfo` に手組み辞書(CFData+
+  DataDescription)で埋め込める。HDRゲインマップHEICは `CIContext.writeHEIFRepresentation` の
+  option `.hdrGainMapImage`。文書画像はCoreTextで描画(`kCTFontAttributeName` 等のCFStringキー)。
+  **ModelIO/ImageIO は DNG・USDZ を書き出せない**(DNGはCGImageDestination非対応、USDZは`.usdc`で代替)
+
+## SOP(VisionContours / RealityKit Capture / ImageIO PointCloud)
 
 - **SOPプラグインは `executeVBO()` も実装必須**(純粋仮想。空実装でよい。忘れると abstract class エラー)
+- **SOP_PluginInfo は `setAPIVersion()` で設定**(`apiVersion=` 直接代入は private でエラー)
+- **`cplusplusSOP`(汎用C++ SOP)にプラグインパスを与えて試すとき、`.plugin` バンドルフォルダ名 =
+  実行バイナリ名でないと dlopen 失敗**(TDはフォルダ basename でバイナリを探す)。/tmp へ別名コピーは
+  実行名と同じフォルダ名で(例 `ImageIOPointCloudSOP.plugin`)。TOP/DATでは Info.plist が使われ緩いが SOP は厳しめ
+- 点群は `addPoints` → `setColors(..., startIdx)` → `addParticleSystem(n, 0)` で描画可能な点群になる
 - **一括 `setTexCoords()` は先頭UVが全点に入る**(TD 2023系)。per-point の `setTexCoord()` を使う
 - **PhotogrammetrySession の modelFile出力は USDZ のみ**(.obj指定は invalidOutput)。
   一時USDZ → ModelIO(MDLAsset.export)でOBJ変換。出力先に既存ファイルがあると invalidOutput なので

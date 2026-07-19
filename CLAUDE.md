@@ -975,3 +975,32 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   create不可(RealityKitSplatは再起動後に追加)。③VisionBarcode等の複数custom op containerは
   主opの取り違えに注意(先頭isCustomが補助opのことがある)
 - 次にやること: 実Gaussian Splat USDZでのRealityKitSplat描画確認
+
+### 2026-07-20 深度/RAW/HDR/文書/点群 5プラグイン実装(堅実な画像系)
+
+ユーザー提案15件をSDK実機で実現可能性トリアージし(#1,6,11,12,13,15はmacOS公開API無しで除外)、
+堅実な5件を実装。全てM2実測・TD MCP検証。
+
+- **ImageIO Depth TOP**: iPhone写真の深度/視差/Portrait Matte/セマンティックマット(skin/hair/sky/
+  teeth/glasses)を ImageIO 補助データから抽出→Mono32Float。合成視差HEIC(自作)で range 0.02〜0.5
+  round-trip一致・Autoモード・深度なし警告を確認
+- **CoreImage RAW TOP**: CIRAWFilterでDNG/ProRAW現像(露出/WB/ノイズ/シャープ)→RGBA16Float。
+  パイプライン動作・パラメータ反映を確認。**実RAW視覚検証はサンプル未入手で未実施**(JPEGは開けるが
+  非RAWは現像がズレる)
+- **CoreImage HDR TOP**: HEICのHDRゲインマップ抽出/SDR/HDR(EDR)変換。自作ゲインマップHEIC
+  (`writeHEIFRepresentation` option `.hdrGainMapImage`)で Gain Map/SDR を視認、HDR拡張は動作
+  (>1は実HDR写真のheadroom必要)
+- **Vision Document DAT**(Swiftヘルパ): 新Vision `RecognizeDocumentsRequest`(macOS 26+)で
+  段落/表/セル/リスト構造を認識。自作文書画像で **table 4×3・12セル全てを正しいrow/col+テキスト**で
+  抽出(Region/Q1/Q2, North/120/145…)を確認。高精度
+- **ImageIO PointCloud SOP**: 写真深度を内部パラメータ(AVDepthData较正 or FOV)で逆投影→点群+色。
+  合成深度HEICで **16384点(128×128)・Z範囲 −1.0〜−0.04 が視差×scaleと厳密一致**を確認。
+  较正付き実写真の内部パラメータ経路は実写真未入手で未検証
+
+- **踏んだ地雷(pitfalls.md反映)**: ImageIO補助データのfloat16変換(vImage)、AVDepthData较正の
+  取り出し、HDRゲインマップのCIImageオプション、CIRAWFilterは非RAWも開く、**ModelIO/ImageIOは
+  DNG/USDZを書き出せない**(テスト素材合成の壁)、**SOP_PluginInfoは`setAPIVersion()`**、
+  **cplusplusSOPの試用時は.pluginフォルダ名=実行バイナリ名でないとdlopen失敗**
+- 5件ともビルド・署名・`~/Library/.../Plugins/`インストール済み(TD再起動で登録)。README+ルート一覧(英日)更新
+- 次にやること: 実深度写真(ポートレート)/実DNG での検証、複雑枠(CinematicDepth/SpatialAudio/
+  GeneratedCaption)の実装可否判断
