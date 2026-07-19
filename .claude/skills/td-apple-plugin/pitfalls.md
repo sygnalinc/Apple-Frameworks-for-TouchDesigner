@@ -150,6 +150,11 @@
   abstract class エラー)。`CHOP_GeneralInfo` のフィールドは `timeslice`(小文字s)
 - 1フォルダから2バンドル(CHOP+TOP)を共有Swiftヘルパで作る場合、build.sh は共通ヘルパを使わず
   `build_one` を2回(Multipeer In/Out と同型)
+- **iPhone 17以降の「新Cinematic video」形式は `CNAssetInfo` で読めない**(macOS 26.4 SDK・実機確認)。
+  新形式は単層HEVC(hvc1)で分離視差トラックが無く `CNCinematicErrorCodeIncomplete`(=3)を返す。
+  旧Cinematicモード(iPhone 13〜16)は分離視差トラックを持ち読める。**新形式の深度を取り出す公開API
+  が現状無い**。`cinematic-video` メタフラグは新形式、`cinematic`(古い)は旧形式の目安。判定は
+  `AVAsset` のトラック構成(video/disparity/metadata の3〜4本 vs video/audio/metaの3本)で先に切り分ける
 
 ## SOP(VisionContours / RealityKit Capture / ImageIO PointCloud)
 

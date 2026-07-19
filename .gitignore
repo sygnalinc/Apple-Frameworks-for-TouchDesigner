@@ -12,3 +12,5 @@ Assets/test_video_2.mp4
 # TDインポートキャッシュ・クラッシュ自動保存(再生成物)
 TDImportCache/
 CrashAutoSave.*
+Assets/cinematic_footage.mov
+Assets/cinematic_footage2.mov

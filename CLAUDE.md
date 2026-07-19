@@ -1070,3 +1070,20 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
   TD/MCPの一時的不安定**と確認。ロード安全確認後に常設インストール
 - 次にやること: 実Cinematic動画(iPhone 13以降・AirDrop)での深度・再レンダ・被写体の視覚検証、
   スクラブ高速化(AVSampleBufferGenerator)
+
+### 2026-07-20 Cinematic 実動画検証 → iPhone 17新形式は現状読めないと判明
+
+- ユーザーが実Cinematic動画を2本追加(`Assets/cinematic_footage.mov` 37MB / `cinematic_footage2.mov` 15MB)。
+  gitignoreへ追加(検証に使えず巨大なため)
+- 両方 **iPhone 17 Pro / iOS 26.5.2 の新Cinematic video形式**。`CNAssetInfo` が
+  `CNCinematicErrorCodeIncomplete`(=3)で失敗。原因を実機解析:
+  - トラック = 映像1(**hvc1 単層HEVC** 3840×2160)+音声aac+メタmebx の3本のみ
+  - **旧Cinematicモード(iPhone 13〜16)の分離した視差トラックが無い**
+  - MV-HEVC第2レイヤーも無し(subtype hvc1)、mebxは5サンプル8バイト(フラグのみ)、映像に深度aux無し
+  - `com.apple.quicktime.cinematic-video` フラグは有り(=Cinematic撮影はされている)
+- **結論: iPhone 17の新Cinematic形式から深度を取り出す公開macOS APIが現状(26.4 SDK)存在しない**。
+  `Cinematic` framework(CNAssetInfo/CNScript)は旧形式専用。WWDC25の新Cinematicは撮影側API
+  (AVCaptureDeviceInput.cinematicVideoCaptureEnabled 等)で、読み取り/編集側の新形式対応は未提供
+- プラグインは**旧形式向けに正しく実装済み・ロード検証済み**。iPhone 13〜16の動画があれば動く想定。
+  新形式対応はAppleの読み取りAPI提供待ち(足場として残す)。pitfalls.md / README に明記
+- 深度が今すぐ要る用途は ImageIO Depth / ImageIO PointCloud(iPhone写真)を案内
