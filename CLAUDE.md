@@ -883,3 +883,17 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   利用例コンテナを追加すれば全53OP網羅**(次セッションのTODO)
 - 開いていた sample.toe は以前のデモ(sam2_track_demo等)を含まない2ノード状態だった。
   git HEADの旧版(28578B)はバックアップ済み。新しい examples 集約版で置き換えた
+
+### 2026-07-20 Music系OPを全削除(期待動作せず)
+
+- ユーザー判断により Music 系4オペレータ(MusicCompose DAT / MusicEvents DAT /
+  MusicMIDI CHOP / MusicSequence CHOP)を**リポジトリ・インストール済みプラグイン・
+  music専用モデルから全削除**。期待した音楽的出力が得られなかったため
+- 削除対象: リポジトリの `MusicCompose/` `MusicEvents/` `MusicMIDI/` `MusicSequence/`
+  (このブランチには未コミットの未追跡フォルダだった)、`~/Library/.../Plugins/` の
+  4バンドル、`models/GeneralUser-GS.sf2`(32MB・MusicSequence専用・gitignore対象)、
+  ルートREADMEのMusic 4行
+- sample.toe には触れていない(ユーザー指示)。開いているTDに残る Music 例コンテナと
+  カスタムOPは、削除済みバンドルのため TD再起動後にロードエラー(赤)になる。
+  次に sample.toe を編集する際に該当4コンテナを手動削除すること
+- 過去ログ(GeneralUser GS適用・MusicComposeサンプル等)は履歴として残置

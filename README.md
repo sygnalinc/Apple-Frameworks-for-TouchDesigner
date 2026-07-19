@@ -61,10 +61,6 @@ Windows+NVIDIA 専用の TD 標準オペレータ（Body Track CHOP 等）の ma
 | [CoreImageCode](CoreImageCode/) | TOP | **QR/Aztec/PDF417/Code 128生成**。Core Image標準generator、外部ライブラリ不要。512x512出力を実機確認 | ✅ 実装済み |
 | [ImageAutoEnhance](ImageAutoEnhance/) | TOP | **画像の自動補正**。Core Imageが露出・彩度・色補正filterを自動選択。640x360約32ms | ✅ 実装済み |
 | [SpeechSynth](SpeechSynth/) | CHOP | **オンデバイス音声合成**。AVSpeechSynthesizerのSystem VoiceをPCM stereo CHOPへ出力 | ✅ 実装済み |
-| [MusicCompose](MusicCompose/) | DAT | **アルゴリズム／Foundation Models作曲**。コード・ベース・メロディ・ドラムを共通MIDI event JSONへ生成 | ✅ 実装済み |
-| [MusicSequence](MusicSequence/) | CHOP | **SoundFont/内蔵シンセ楽曲レンダリング**。4つのApple Samplerへpad/bass/lead/drumsを分離し44.1kHz stereo化 | ✅ 実装済み |
-| [MusicMIDI](MusicMIDI/) | CHOP | **外部DAWリアルタイム再生**。Core MIDI仮想ポートへ4トラックのNote/Clock/Transportを送信 | ✅ 実装済み |
-| [MusicEvents](MusicEvents/) | DAT | **作曲MIDIイベント確認表**。小節・拍・パート・チャンネル・ノート名・長さ・ベロシティを一覧化 | ✅ 実装済み |
 
 ## 必要環境
 
