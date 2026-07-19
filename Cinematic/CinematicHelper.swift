@@ -132,38 +132,42 @@ public func cn_meta(_ h: UnsafeMutableRawPointer?, _ timeSec: Double) -> UnsafeP
 // ---- 時刻指定デコード(depth / render 用) ----
 
 @available(macOS 26.0, *)
+// reader と CMSampleBuffer を返す(呼び出し側が保持している間だけ CVImageBuffer が有効。
+// reader を cancel/破棄すると読み出しデータが無効化されるため、変換完了まで reader を生かす)
 private func readFrames(_ s: CNState, timeSec: Double, wantRender: Bool)
-    -> (image: CVPixelBuffer?, disparity: CVPixelBuffer?, meta: CMSampleBuffer?)? {
+    -> (reader: AVAssetReader, image: CMSampleBuffer?, disparity: CMSampleBuffer?, meta: AVTimedMetadataGroup?)? {
     s.lock.lock(); let asset = s.asset; let info = s.info; let ts = s.timeScale; let fps = s.fps; s.lock.unlock()
     guard let asset = asset, let info = info else { return nil }
     guard let reader = try? AVAssetReader(asset: asset) else { return nil }
     let dur = CMTime(seconds: 1.0 / max(fps, 1) * 1.5, preferredTimescale: ts)
     reader.timeRange = CMTimeRange(start: CMTime(seconds: max(0, timeSec), preferredTimescale: ts), duration: dur)
 
-    // disparity(常に)
-    let disOut = AVAssetReaderTrackOutput(track: info.cinematicDisparityTrack,
-        outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_DisparityFloat16,
-                         kCVPixelBufferIOSurfacePropertiesKey as String: [:]])
-    disOut.alwaysCopiesSampleData = false
+    // disparity(常に)。depth抽出(CPU読み)は IOSurface無し=タイトなbytesPerRowでクリーン。
+    // render(Metal)時のみ IOSurface backed が要る
+    var disSettings: [String: Any] = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_DisparityFloat16]
+    if wantRender { disSettings[kCVPixelBufferIOSurfacePropertiesKey as String] = [:] }
+    let disOut = AVAssetReaderTrackOutput(track: info.cinematicDisparityTrack, outputSettings: disSettings)
+    disOut.alwaysCopiesSampleData = true
     if reader.canAdd(disOut) { reader.add(disOut) }
 
     var vidOut: AVAssetReaderTrackOutput? = nil
-    var metaOut: AVAssetReaderTrackOutput? = nil
+    var metaAdaptor: AVAssetReaderOutputMetadataAdaptor? = nil
     if wantRender {
         let v = AVAssetReaderTrackOutput(track: info.cinematicVideoTrack,
             outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_64RGBAHalf,
                              kCVPixelBufferIOSurfacePropertiesKey as String: [:]])
-        v.alwaysCopiesSampleData = false
+        v.alwaysCopiesSampleData = true
         if reader.canAdd(v) { reader.add(v); vidOut = v }
+        // メタデータは Adaptor 経由で AVTimedMetadataGroup に変換(生サンプルは FrameAttributes が解釈できない)
         let m = AVAssetReaderTrackOutput(track: info.cinematicMetadataTrack, outputSettings: nil)
-        if reader.canAdd(m) { reader.add(m); metaOut = m }
+        if reader.canAdd(m) { reader.add(m); metaAdaptor = AVAssetReaderOutputMetadataAdaptor(assetReaderTrackOutput: m) }
     }
     guard reader.startReading() else { return nil }
-    let dis = disOut.copyNextSampleBuffer().flatMap { CMSampleBufferGetImageBuffer($0) }
-    let img = vidOut?.copyNextSampleBuffer().flatMap { CMSampleBufferGetImageBuffer($0) }
-    let meta = metaOut?.copyNextSampleBuffer()
-    reader.cancelReading()
-    return (img, dis, meta)
+    let disSB = disOut.copyNextSampleBuffer()
+    let imgSB = vidOut?.copyNextSampleBuffer()
+    let metaSB = metaAdaptor?.nextTimedMetadataGroup()
+    // cancelReading しない: reader/バッファは呼び出し側が保持し、使用後にARCで解放させる
+    return (reader, imgSB, disSB, metaSB)
 }
 
 // float16 disparity CVPixelBuffer → Float 配列(上下反転してTD正立)
@@ -188,13 +192,23 @@ private func disparityToFloat(_ pb: CVPixelBuffer, flip: Bool, normalize: Bool, 
         let p = base.assumingMemoryBound(to: UInt8.self)
         for y in 0..<H { for x in 0..<W { tmp[y * W + x] = Float(p[y * bpr + x]) / 255 } }
     }
+    // 無効画素を0に。Cinematicの視差は小さい実値(〜数十)で、無効画素は巨大なsentinel
+    // (実測 1.566e38)や非正になる。NaN/Inf/非正/巨大値を無効として除外
+    for i in 0..<tmp.count { let v = tmp[i]; if !v.isFinite || v <= 0 || v > 1.0e4 { tmp[i] = 0 } }
     if normalize {
-        var lo = tmp[0], hi = tmp[0]; for v in tmp { if v < lo { lo = v }; if v > hi { hi = v } }
-        if hi > lo { let inv = 1 / (hi - lo); for i in 0..<tmp.count { tmp[i] = (tmp[i] - lo) * inv } }
+        var lo = Float.greatestFiniteMagnitude, hi: Float = 0
+        for v in tmp { if v > 0 { if v < lo { lo = v }; if v > hi { hi = v } } }
+        if hi > lo { let inv = 1 / (hi - lo); for i in 0..<tmp.count { tmp[i] = tmp[i] > 0 ? (tmp[i] - lo) * inv : 0 } }
     }
-    out = [Float](repeating: 0, count: W * H)
-    if flip { for y in 0..<H { memcpy(&out[(H - 1 - y) * W], &tmp[y * W], W * 4) } }
-    else { out = tmp }
+    // 安全なポインタベースで上下反転コピー(Swiftの &array[i] を memcpy に渡すのは不安定)
+    var result = [Float](repeating: 0, count: W * H)
+    result.withUnsafeMutableBufferPointer { o in
+        tmp.withUnsafeBufferPointer { t in
+            if flip { for y in 0..<H { memcpy(o.baseAddress! + (H - 1 - y) * W, t.baseAddress! + y * W, W * 4) } }
+            else { memcpy(o.baseAddress!, t.baseAddress!, W * H * 4) }
+        }
+    }
+    out = result
     outW = W; outH = H
 }
 
@@ -204,9 +218,11 @@ public func cn_depth(_ h: UnsafeMutableRawPointer?, _ timeSec: Double, _ flip: I
     guard let h = h else { return 0 }
     let s = Unmanaged<CNState>.fromOpaque(h).takeUnretainedValue()
     guard #available(macOS 26.0, *) else { return 0 }
-    guard let frames = readFrames(s, timeSec: timeSec, wantRender: false), let dis = frames.disparity else { return 0 }
+    guard let frames = readFrames(s, timeSec: timeSec, wantRender: false),
+          let disSB = frames.disparity, let dis = CMSampleBufferGetImageBuffer(disSB) else { return 0 }
     var buf: [Float] = []; var W = 0, H = 0
     disparityToFloat(dis, flip: flip != 0, normalize: normalize != 0, out: &buf, outW: &W, outH: &H)
+    _ = disSB  // 変換中はsample bufferを生存させる
     if buf.isEmpty { return 0 }
     s.lock.lock(); s.depthBuf = buf; s.depthW = W; s.depthH = H; s.serialCtr += 1; s.depthSerial = s.serialCtr; s.lock.unlock()
     return 1
@@ -237,9 +253,10 @@ public func cn_render(_ h: UnsafeMutableRawPointer?, _ timeSec: Double, _ fNumbe
     guard #available(macOS 26.0, *) else { return 0 }
     s.lock.lock(); let session = s.session; let script = s.script; let dev = s.device; let q = s.queue; let ts = s.timeScale; let fps = s.fps; s.lock.unlock()
     guard let session = session, let script = script, let dev = dev, let q = q else { return 0 }
-    guard let frames = readFrames(s, timeSec: timeSec, wantRender: true),
-          let img = frames.image, let dis = frames.disparity, let meta = frames.meta else { return 0 }
-    guard var fa = CNRenderingSession.FrameAttributes(sampleBuffer: meta, sessionAttributes: session.sessionAttributes) else { return 0 }
+    guard let frames = readFrames(s, timeSec: timeSec, wantRender: true) else { return 0 }
+    guard let imgSB = frames.image, let disSB = frames.disparity, let metaGroup = frames.meta,
+          let img = CMSampleBufferGetImageBuffer(imgSB), let dis = CMSampleBufferGetImageBuffer(disSB) else { return 0 }
+    guard var fa = CNRenderingSession.FrameAttributes(timedMetadataGroup: metaGroup, sessionAttributes: session.sessionAttributes) else { return 0 }
     fa.fNumber = fNumber
     let t = CMTime(seconds: timeSec, preferredTimescale: ts)
     let tol = CMTime(seconds: 1.0 / max(fps, 1), preferredTimescale: ts)

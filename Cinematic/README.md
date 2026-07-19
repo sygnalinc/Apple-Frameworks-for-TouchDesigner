@@ -34,14 +34,15 @@ iPhone(13以降)の**Cinematicモード動画**に埋め込まれた深度・被
 **CHOP**: `Max Subjects`
 **TOP**: `Mode` / `Aperture (f-number)` / `Focus Disparity Override`(0=script準拠)/ `Normalize Depth` / `Flip`
 
-## 検証状況(M2)
+## 検証状況(M2・実Cinematic動画で全機能確認済み)
 
-- **両プラグインのロード・パラメータ生成・チャンネル構造・File未指定の安全動作を確認**
-  (CHOP=83ch、TOP=Depth/Rendered各パラメータ、クラッシュ・エラーなし)
-- **実Cinematic動画での深度・再レンダ・被写体メタデータの視覚検証は未実施**。
-  iPhone 17 Pro の動画2本で試したが、いずれも**視差データを含まない状態**(=通常動画として転送された)で
-  `CNAssetInfo` が Incomplete。**深度を保持した転送**(下記)ができ次第、視覚検証する。
-  実装は Apple サンプル "Playing and editing Cinematic mode video" の API に準拠
+iPhone 17 Pro のCinematic動画(3840×2160・視差512×288)で **全機能を実データ視認**:
+
+- ✅ **Cinematic Data(CHOP)**: focus_disparity=0.75、被写体4個(猫=pet depth 2.0、物体 depth 0.18)を取得
+- ✅ **Cinematic Video / Depth**: 手前=近い の視差深度マップを正しく出力
+- ✅ **Cinematic Video / Rendered**: f値でボケが変化(f/2.0=背景大ボケ ↔ f/16=背景くっきり)を視認。
+  3840×2160の再レンダをGPUで実行
+- 実装は Apple サンプル "Playing and editing Cinematic mode video" の API に準拠
 
 ## 重要: Cinematic動画は「深度を保持して転送」する
 

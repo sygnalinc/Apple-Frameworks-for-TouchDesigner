@@ -1047,6 +1047,30 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
 - 学習前にDataset検証を必須にする: パス/拡張子、クラス数、サンプル数、欠損値、列型、ラベル不均衡、
   Train/Validationのクラス一致を検査し、Create MLへ投入する前にInfo DATへ明確なエラーを返す。
 
+### 2026-07-20 Cinematic Audio Mix CHOP設計方針(未実装)
+
+- Logic ProのStem Splitterは外部公開API無し。一方、macOS 26のCinematic / AudioToolboxにある
+  **AUAudioMixは公開Audio Unit**なのでTD Plugin化可能。ただし通常楽曲のVocal/Drums/Bass分離ではなく、
+  **対応Spatial Audio素材のForeground(主にspeech) / Background(ambience)分離・再ミックス**である。
+- 新規Pluginは既存`Cinematic/`(深度・フォーカス・映像再レンダ)へ混ぜず、別フォルダ
+  `CinematicAudioMix/`、表示名 `Cinematic Audio Mix`、opType `Cinematicaudiomix`、CHOP、icon `CAM`。
+- 入力はファイル指定を基本とする。対象はiPhone 16以降等のSpatial Audio動画、FOA/APACトラック、
+  必要なSpatial Audio Mix metadataを持つMOV/QTA。一般的なMP3/WAVでは意味のある分離はできない。
+  `CNAssetSpatialAudioInfo`で対応可否を事前検査し、非対応理由をInfo DATへ出す。
+- Rendering Style: Standard / Cinematic / Studio / In-Frame。Stem用に各スタイルの
+  Foreground Stem / Background Stemがある。出力Mode:
+  - Mixed: `left/right`
+  - Stems: `foreground_l/r`, `background_l/r`(2つのAUAudioMixを同期、またはofflineで2回render)
+  - All Stylesは12ch出せるが6回render相当で重いため初版対象外
+- 主パラメータ: File / Mode / Style / Intensity(0..1) / Position / Play / Loop / Speed /
+  Sample Rate / Render / Reset。Info CHOPは executes/renders/busy/valid/duration/samplerate/
+  channels/position、Info DATは status/has_spatial_audio/content_type/rendering_style/error。
+- 実装順: ①`CNAssetSpatialAudioInfo`素材検証 ②Mixed stereo ③Foreground ④Background
+  ⑤4ch同期Stem ⑥Position/Play/Loop ⑦cook中のIntensity変更 ⑧offline WAV書き出し。
+- リアルタイム版はAudio Unit pull model→Float32リングバッファ→CHOP sample block。cook内ファイルI/O禁止、
+  parameter変更ごとのAU再生成禁止、seek時Flush、2 Stemのsample同期、sample-rate変換、underrunは0出力。
+  初期検証はAppleの`SpatialAudioCLI`と同じAVAssetWriter/offline render経路から始めてもよい。
+
 ### 2026-07-20 Cinematic 2プラグイン実装(iPhone Cinematicモード動画)
 
 iPhone Cinematicモード動画から深度・被写体・フォーカスを扱う2プラグインを実装(Apple `Cinematic`
@@ -1102,3 +1126,24 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
   Mac側フォルダの**「IMG_E」接頭辞が無い .MOV** を使う。機種(13〜17)問わず正しく転送すれば読める想定
 - README/skill/この記録を訂正。プラグイン実装自体は変更なし(Apple サンプルAPI準拠で正しい)。
   深度保持ファイルが入手でき次第、視覚検証する
+
+### 2026-07-20 Cinematic 実素材で全機能検証完了(深度・被写体・f値再レンダ)
+
+- ユーザーが「すべての写真データ」付きの正しいCinematic原本(iPhone 17 Pro・`IMG_2531/IMG_2531.MOV`
+  等・視差track id2 あり)を提供。`CNAssetInfo OK`(前回の平坦化ファイルと違い視差トラックを持つ)
+- **実データで全機能を視認確認**:
+  - Cinematic CHOP: focus_disparity=0.75、被写体4個(猫=pet depth2.0、物体 depth0.18)
+  - Cinematic TOP Depth: 手前=近い の視差深度マップ
+  - Cinematic TOP Rendered: 3840×2160再レンダ、f/2.0(背景大ボケ)↔f/16(背景くっきり)を視認
+- **デバッグで潰した実バグ(pitfalls.md反映)**:
+  1. **Swiftの `memcpy(&array[i], ...)` が不安定** → 行反転コピーで出力破壊(縦縞)。
+     `withUnsafeMutableBufferPointer` のベースポインタ+offsetに修正
+  2. **AVAssetReaderのCVPixelBufferはreader破棄で無効化** → cancel後の変換で解放済みメモリ読み
+     (実行毎に変わるガベージ)。reader/CMSampleBufferを変換完了まで保持
+  3. **再レンダのメタは `AVAssetReaderOutputMetadataAdaptor`→`nextTimedMetadataGroup()`→
+     `FrameAttributes(timedMetadataGroup:)`**。生サンプルは FrameAttributes/AVTimedMetadataGroup とも nil
+  4. **視差の無効画素は巨大sentinel(1.566e38、isFinite通過)** → `>1e4`も無効除外して正規化
+  5. depth抽出はIOSurface無し(タイトbytesPerRow)、renderはIOSurface付き、と用途で分ける
+- 途中TDが落ちたがクリーン再ロードで再現せず(プラグイン起因でないと確認済み)
+- 両プラグイン最終ビルド・署名・常設インストール済み。README/skill/この記録を「検証完了」に更新。
+  テスト動画(IMG_2531/2532フォルダ)は巨大なのでgitignore

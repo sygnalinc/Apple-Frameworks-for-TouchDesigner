@@ -150,6 +150,22 @@
   abstract class エラー)。`CHOP_GeneralInfo` のフィールドは `timeslice`(小文字s)
 - 1フォルダから2バンドル(CHOP+TOP)を共有Swiftヘルパで作る場合、build.sh は共通ヘルパを使わず
   `build_one` を2回(Multipeer In/Out と同型)
+- **再レンダのメタデータは `AVAssetReaderOutputMetadataAdaptor` 経由(実機で踏んだ)**:
+  メタデータtrackを生の `copyNextSampleBuffer` で読むと `CNRenderingSession.FrameAttributes(sampleBuffer:)`
+  も `AVTimedMetadataGroup(sampleBuffer:)` も nil を返す。`AVAssetReaderOutputMetadataAdaptor` で
+  `nextTimedMetadataGroup()` を得て `FrameAttributes(timedMetadataGroup:)` に渡すと通る。
+  再レンダは video(64RGBAHalf)+ disparity(IOSurface付き)+ metadata(adaptor)を同時刻デコード →
+  `session.encodeRender(sourceImage:sourceDisparity:destinationImage:)`(Metal)
+- **AVAssetReader の CVPixelBuffer は reader を破棄すると無効化**(実機で踏んだ)。`cancelReading()` や
+  reader の deinit 後に変換すると解放済みメモリを読む(実行毎に値が変わるガベージ)。**reader と
+  CMSampleBuffer を変換完了まで保持**する(`alwaysCopiesSampleData=true` だけでは不十分、reader自体を生かす)
+- **Swiftの `memcpy(&array[i], &array[j], n)` は不安定**(実機で踏んだ)。`&array[要素]` は一時コピーを
+  作りうるので行反転コピー等で出力が壊れる。`withUnsafeMutableBufferPointer`/`withUnsafeBufferPointer`
+  でベースポインタを取り `base + offset` で memcpy する
+- **Cinematic視差の無効画素は巨大なsentinel値(実測 1.566e38)**。`isFinite` は通過するので
+  正規化が壊れる。`v <= 0 || v > 1e4` も無効として除外してから min-max 正規化する
+- **深度抽出(CPU読み)は IOSurface無しでタイトなbytesPerRow**、再レンダ(Metal)は IOSurface付き、と
+  用途で `outputSettings` を分ける
 - **転送方法で深度が失われる(最重要・実機で踏んだ)**: Cinematic動画をAirDropする際に
   共有→オプション→**「すべての写真データ(All Photos Data)」をオンにしないと、通常動画に平坦化**され
   視差トラックが消える(Apple公式)。その状態のファイルは `CNAssetInfo` が
