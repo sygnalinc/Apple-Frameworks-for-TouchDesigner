@@ -85,6 +85,31 @@
 - ShazamKitのカスタムカタログ照合はエンタイトルメント不要・完全ローカル。
   公式カタログ照合はエンタイトルメントが要るので手を出さない
 
+## RealityKit / RealityRenderer(RealityKit Splat 等のオフスクリーン描画)
+
+- **`RealityRenderer` は `@MainActor` 拘束**(init / entities / updateAndRender すべて)。だが
+  **TDの custom TOP の execute() はメインスレッドではない**(TDのcookスレッド)。
+  `MainActor.assumeIsolated` を execute から呼ぶと trap する。解決策: **`DispatchQueue.main.async`
+  で本物のメインスレッドへ描画を回す**。TDはメインランループをpumpするので実行される。cookは
+  スケジュールするだけ(非ブロック)、GPU完了(`updateAndRender` の onComplete)で
+  shared MTLTexture を CPU へ readback して latest バッファへ。cookは latest をTOPへupload
+- **オフスクリーン描画はヘッドレス(ウィンドウ無し)で動く**。`RealityRenderer.CameraOutput`
+  の `.singleProjection(colorTexture:)` に自前の MTLTexture(`.bgra8Unorm` / `.shared` /
+  usage=[.renderTarget,.shaderRead])を渡し、`getBytes` で読み戻す
+- **Gaussian Splat 専用のロードAPIは存在しない**(SDKに "splat"/"gaussian" シンボル無し)。
+  splat は USD/USDZ に含めて `Entity(contentsOf:)` で読み込み、RealityKit が内部描画する。
+  つまり「splat専用TOP」ではなく「RealityKitが読めるUSDシーンを描くTOP」になる(macOS 26+ で splat 対応)
+- **`Entity.visualBounds` はシーンへ追加した後に取得する**。ロード直後は不定。さらに
+  **`entity.scale = ...` でロード物を正規化しようとすると内部トランスフォームと複合して破綻**
+  (16単位のモデルが 0.09 掛けで 150単位に肥大した実例)。**エンティティは変形せず、カメラ側で
+  フレーミング**する(target=bounds中心、distance=bounds半径×倍率)。これなら被写体の絶対サイズに
+  依存しない
+- **PBRメッシュは IBL/ライトが無いと真っ黒**(Unlit材質は自己発光で見える)。`RealityRenderer`
+  に簡易 IBL(`EnvironmentResource(equirectangular: CGImage)`・macOS 15+)+ `DirectionalLight`
+  を常設する。splat/自発光系はライト非依存
+- ModelIO(`MDLAsset.export`)は **`.usdz` 拡張子を書き出せない**("Unknown extension")。
+  `.usdc`/`.usd` を使う。RealityKit はどれも読める
+
 ## SOP(VisionContours / RealityKit Capture)
 
 - **SOPプラグインは `executeVBO()` も実装必須**(純粋仮想。空実装でよい。忘れると abstract class エラー)

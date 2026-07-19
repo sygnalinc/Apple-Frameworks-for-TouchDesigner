@@ -126,6 +126,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | プラグイン | 種類 | 内容 |
 |---|---|---|
 | [RealityKit Capture](RealityKitCapture/) | SOP | **写真フォルダ→3Dメッシュ**(RealityKit Object Capture)。テクスチャ付きOBJ出力 |
+| [RealityKit Splat](RealityKitSplat/) | TOP | **USD/USDZシーン(3D Gaussian Splat含む・macOS 26+)をTOPへ描画**(RealityRenderer)。オービットカメラ・自動フレーミング |
 | [Vision Contours](VisionContours/) | SOP | 画像の輪郭を**閉じたLineジオメトリ**へ(Sweep/Extrude/Particle 直結) |
 | [Screen Capture](ScreenCapture/) | TOP | ディスプレイ/単一ウインドウの**画面収録**(最大120fps) |
 | [Multipeer In / Out](MultipeerCHOP/) | CHOP | **iPhone/iPad をワイヤレスセンサーに**(ジャイロ/加速度/タッチを低遅延受信)。**iOSアプリ同梱** |

@@ -926,3 +926,31 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   CrashAutoSave.*を.gitignoreへ追加し、リネームに絞って再コミット→push成功(a38e61b)
 - 次にやること: sample.toe内のデモは変更opType(12種)で参照切れ。ユーザーは.toe破損許容
   済みだが、再構築するなら新opType(coreimagebokeh等)で貼り直しが必要
+
+### 2026-07-20 RealityKit Splat TOP 実装(RealityRendererオフスクリーン描画)
+
+- `RealityRenderer`(macOS 15+)で **USD/USDZ/Reality シーンをオフスクリーン描画**して TOP に出す
+  新規プラグインを実装。**macOS 26 の RealityKit は 3D Gaussian Splat を描画**できるため、splat を
+  含む USD をTDに取り込める(通常のPBRメッシュUSDZも可)。カメラはTDパラメータからオービット駆動
+- **踏んだ地雷(スキルの pitfalls.md にも反映)**:
+  - **RealityRenderer は `@MainActor` 拘束だが TDの TOP cook はメインスレッドではない**。
+    execute から `MainActor.assumeIsolated` は trap する → **`DispatchQueue.main.async` で本物の
+    メインスレッドへ描画を回す**(TDがメインランループをpump)。GPU完了(onComplete)で shared
+    MTLTexture を CPU readback → latest。cookは非ブロックで latest をupload
+  - **Gaussian Splat 専用ロードAPIは無い**(SDKに splat/gaussian シンボル無し)。USD経由で
+    `Entity(contentsOf:)`。= splat専用ではなく「RealityKitが読めるUSDシーンを描くTOP」
+  - **`entity.scale` でロード物を正規化すると内部トランスフォームと複合して破綻**(16単位が
+    150単位に肥大)→ **エンティティは無変形、カメラ側でフレーミング**(target=bounds中心・
+    distance=半径×倍率)。被写体サイズ非依存
+  - **PBRメッシュはIBL/ライト無しで真っ黒**(Unlitは自己発光で出る)→ 簡易IBL
+    (`EnvironmentResource(equirectangular:)`)+ DirectionalLight を常設
+  - ModelIO の `MDLAsset.export` は `.usdz` 拡張子不可 → `.usdc`
+- **検証(M2・TD MCP)**: ヘッドレスCLIでオフスクリーン描画を先に確認(箱・pencil.usdz)後、
+  TDに C++ TOP でロード。デフォルトの箱シーン(自動フレーミング)と Apple サンプル pencil.usdz を
+  **視認**。640×480で **約58fps**(frames が executes に追従・フレーム落ちなし)、loaded=1、
+  errors/warnings なし。検証ノード削除済み
+- 実装は Swiftヘルパ(`RealityKitSplatHelper`・C ABI `rk_`)+ CPUMem TOP。build.sh は epoch dylib。
+  `~/Library/.../Plugins/` へインストール済み(TD再起動で `td.RealitykitsplatTOP` が出る)
+- **splat 実アセット未検証**(手元に splat USDZ が無い)。ロード経路は USDZメッシュで検証済みで、
+  splat も同じ `Entity(contentsOf:)` 経路。splatの実描画確認が次の課題。README に明記
+- 次にやること: 実 Gaussian Splat USDZ での描画確認、sample.toe への利用例追加
