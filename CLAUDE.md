@@ -1004,3 +1004,69 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
 - 5件ともビルド・署名・`~/Library/.../Plugins/`インストール済み(TD再起動で登録)。README+ルート一覧(英日)更新
 - 次にやること: 実深度写真(ポートレート)/実DNG での検証、複雑枠(CinematicDepth/SpatialAudio/
   GeneratedCaption)の実装可否判断
+
+### 2026-07-20 Create ML 汎用Training OPの設計方針(未実装)
+
+- ジェスチャー専用の `GestureTrain DAT` ではなく、Create ML本来のワークフロー
+  **Task選択 → Dataset指定 → Train → Evaluate → Core MLモデル出力**をTD内から扱う
+  汎用 **Create ML DAT** として実装する。表示名 `Create ML`、opType `Createml`、icon `CML`。
+- Create ML DATは**学習・評価・モデル出力だけ**を担当する。推論は既存の CoreML TOP / CoreML CHOP、
+  将来追加する CoreML DATへ渡す。モデル出力はユーザー指定先の `.mlmodel` / `.mlpackage`、必要なら
+  `.mlmodelc`。生成モデルはリポジトリへコミットせず、LFSも使わない。
+- DatasetはCreate MLアプリに近いファイル/フォルダ入力を基本とし、TD向けに入力DATも許可する:
+  - Tabular Classification / Regression: CSVまたはTable DAT。Target columnとFeature columnsを指定
+  - Image / Sound Classification: `<dataset>/<label>/<sample>` のラベル別フォルダ
+  - Time Series Classification: sequence/frame/features/labelを持つCSVまたはDAT
+  - Action / Hand Action: ラベル別動画フォルダ
+  - 後続でObject Detection、Text Classification、Word Tagging、Recommender、Style Transfer
+- **段階実装**:
+  1. v1: Tabular Classification、Tabular Regression、Image Classification、Dataset検証、
+     学習/評価、Metrics、Core ML書き出し
+  2. v2: Time Series Classification、Sound Classification、Action Classification、Checkpoint/Resume
+  3. v3: Object Detection、Hand Pose/Action、Text、Recommender、Style Transfer
+- VisionPoseジェスチャー認識は専用OPにせず、汎用の **Time Series Classification** または
+  **Action Classification** の利用例として提供する。前者はVisionPose CHOPの時系列を直接Dataset化、
+  後者はラベル別動画を`MLActionClassifier`へ渡してCreate ML側でVision関節抽出を行う。
+- 主パラメータ: Task / Training Path / Validation Path / Testing Path / Output Model / Model Name /
+  Train / Pause / Resume / Cancel / Evaluate / Export。DataページにData Mode / Target Column /
+  Feature Columns / Validation Split / Test Split / Shuffle / Seed / Cache Features。Trainingページに
+  Iterations / Batch Size / Learning Rate(対応Taskのみ) / Maximum Time / Augmentation / Compute /
+  Checkpoint Folder。Taskごとに関連パラメータだけenableする。
+- DAT出力はModeで Summary / Metrics / Confusion Matrix / Classes / Model Description / Log を切替。
+  共通キーは status / phase / progress / iteration / training_accuracy / validation_accuracy /
+  training_loss / validation_loss / samples / elapsed_seconds / remaining_seconds / model_path。
+  Info CHOPにもbusy/progress/iteration/accuracy/loss/elapsed/remainingを出す。
+- **学習をTDプロセス/cook内で実行しない**。Swiftのhelper executable `CreateMLTrainer`を
+  `.plugin/Contents/Helpers/`へ同梱し、設定JSONで起動、progress JSONをpollする別プロセス方式にする。
+  TDをブロックせず、学習クラッシュの隔離、Cancel、Checkpoint、終了後のメモリ解放を可能にする。
+  推奨構成:
+  `CreateML/CreateMLDAT.mm` + `helper/Package.swift` +
+  `Sources/CreateMLTrainer/{main,TaskFactory,DatasetLoader,MetricsWriter}.swift`。
+- Create ML APIはTaskごとに非同期`MLJob`対応範囲やパラメータが異なる。共通設定を無理に全Taskへ
+  適用せず、未対応値はhelperへ送らずApple既定値を使う。Pause/Resume/Checkpointも対応Taskのみ有効化。
+- 学習前にDataset検証を必須にする: パス/拡張子、クラス数、サンプル数、欠損値、列型、ラベル不均衡、
+  Train/Validationのクラス一致を検査し、Create MLへ投入する前にInfo DATへ明確なエラーを返す。
+
+### 2026-07-20 Cinematic 2プラグイン実装(iPhone Cinematicモード動画)
+
+iPhone Cinematicモード動画から深度・被写体・フォーカスを扱う2プラグインを実装(Apple `Cinematic`
+framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic mode video" のAPIに準拠。
+
+- **Cinematic Data(CHOP)**: `CNScript.frame(at:)` からフォーカス深度・被写体スロット
+  (type/bbox/depth/trackID)を毎フレーム出力。ピクセルデコード不要。83ch(focus/strong/subjects+10×8)
+- **Cinematic Video(TOP)**: Depth mode=視差マップ(Mono32Float)、Rendered mode=`CNRenderingSession`
+  でf値/ピント差し替え再レンダ(RGBA16Float)。ワーカースレッドでデコード/レンダしcook非ブロック
+- 共有Swiftヘルパ `CinematicHelper`(cn_)で時刻指定デコード(AVAssetReader)。1フォルダから
+  2バンドル生成(Multipeer In/Out と同型のbuild_one×2)
+
+- **検証(M2・TD MCP)**: **両プラグインのロード・パラメータ生成・チャンネル構造・File未指定の
+  安全動作を確認**(クラッシュ・エラーなし)。**実Cinematic動画での深度/再レンダ/被写体の視覚検証は
+  実素材未入手のため未実施**。Apple公式サンプルはコードのみで動画非同梱、ネット上に検証可能な
+  Cinematic動画が無いことを確認(実機撮影→AirDropが必要とREADMEに明記)
+- **踏んだ罠(pitfalls.md反映)**: CHOPの`execute(CHOP_Output*`は非const・`CHOP_GeneralInfo.timeslice`
+  は小文字s、Cinematicのメタデータは`CNScript`でデコード不要、再レンダは3トラック(video/disparity/
+  metadata)を同時刻デコード→`encodeRender`、Cinematic動画は合成不可で実機撮影必須
+- 途中でTDがクラッシュ(→再起動)したが、クリーン再ロードで再現せず**プラグイン起因ではなく
+  TD/MCPの一時的不安定**と確認。ロード安全確認後に常設インストール
+- 次にやること: 実Cinematic動画(iPhone 13以降・AirDrop)での深度・再レンダ・被写体の視覚検証、
+  スクラブ高速化(AVSampleBufferGenerator)

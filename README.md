@@ -134,6 +134,8 @@ grouped by category.
 | [RealityKit Capture](RealityKitCapture/) | SOP | **Photo folder → 3D mesh** (RealityKit Object Capture). Textured OBJ output |
 | [RealityKit Splat](RealityKitSplat/) | TOP | **Render a USD/USDZ scene (incl. 3D Gaussian Splats, macOS 26+) to a TOP** via RealityRenderer. Orbit camera, auto-framing |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **Photo depth → 3D point cloud** (unproject via camera calibration / FOV). Colors sampled from RGB |
+| [Cinematic Data](Cinematic/) | CHOP | **iPhone Cinematic video metadata** (macOS 26+): focus depth, detected subjects (type/bbox/depth/trackID) |
+| [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic video**: depth (disparity) map, or **re-render with adjustable focus / aperture** |
 | [Vision Contours](VisionContours/) | SOP | Image contours → **closed Line geometry** (wire into Sweep / Extrude / Particle) |
 | [Screen Capture](ScreenCapture/) | TOP | **Screen recording** of a display / single window (up to 120fps) |
 | [Multipeer In / Out](MultipeerCHOP/) | CHOP | **Turn an iPhone/iPad into a wireless sensor** (low-latency gyro / accel / touch). **iOS app included** |

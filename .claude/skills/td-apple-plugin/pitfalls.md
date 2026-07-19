@@ -129,6 +129,28 @@
   option `.hdrGainMapImage`。文書画像はCoreTextで描画(`kCTFontAttributeName` 等のCFStringキー)。
   **ModelIO/ImageIO は DNG・USDZ を書き出せない**(DNGはCGImageDestination非対応、USDZは`.usdc`で代替)
 
+## Cinematic(iPhone Cinematicモード動画)
+
+- **実素材が必須で合成不可**: Cinematic動画は iPhone 13以降で撮影した実ファイルにのみ
+  視差トラック(`cinematicDisparityTrack`)とメタデータトラックがある。**Apple公式サンプル
+  "Playing and editing Cinematic mode video" はコードのみで動画非同梱**(自分の動画を開く前提)。
+  ネットの拾い物.movは特殊トラックが無く検証に使えない → 実機撮影→AirDropが唯一確実
+- セットアップ: `CNAssetInfo(asset:)` / `CNRenderingSession.Attributes(asset:)` /
+  `CNRenderingSession(commandQueue:sessionAttributes:preferredTransform:quality:)` / `CNScript(asset:)`
+- **メタデータはピクセルデコード不要**: `CNScript.frame(at:tolerance:)` → `.focusDisparity` /
+  `.allDetections`(`CNDetection`: `.detectionType` / `.normalizedRect` / `.focusDisparity` /
+  `.detectionID`)。`CNDetection.accessibilityLabel(for:)` で種別文字列。CHOPはこれだけで作れる
+- **再レンダ**: 時刻tで video/disparity/metadata の3バッファをデコード →
+  `CNRenderingSession.FrameAttributes(sampleBuffer: metaBuffer, sessionAttributes:)` に `.fNumber` /
+  `.focusDisparity` を設定 → `session.encodeRender(to:cb, frameAttributes:, sourceImage:, sourceDisparity:, destinationImage:)`(Metal)
+- **時刻指定デコード**: `AVAssetReader` に `timeRange` を1フレーム分だけ設定し3トラックの
+  `AVAssetReaderTrackOutput` を追加(disparityは `outputSettings` で `kCVPixelFormatType_DisparityFloat16`、
+  videoは `kCVPixelFormatType_64RGBAHalf`、metadataは `outputSettings: nil`)。3つを同時刻で引く
+- **CHOP のシグネチャ罠**: `execute(CHOP_Output*` は**非const**(`const` を付けると override されず
+  abstract class エラー)。`CHOP_GeneralInfo` のフィールドは `timeslice`(小文字s)
+- 1フォルダから2バンドル(CHOP+TOP)を共有Swiftヘルパで作る場合、build.sh は共通ヘルパを使わず
+  `build_one` を2回(Multipeer In/Out と同型)
+
 ## SOP(VisionContours / RealityKit Capture / ImageIO PointCloud)
 
 - **SOPプラグインは `executeVBO()` も実装必須**(純粋仮想。空実装でよい。忘れると abstract class エラー)
