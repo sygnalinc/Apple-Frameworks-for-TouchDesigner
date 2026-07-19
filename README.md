@@ -1,153 +1,169 @@
-# TDAppleOps — Apple のオンデバイスフレームワークを TouchDesigner のネイティブOP に
+# TDAppleOps
 
-macOS / Apple Silicon の**オンデバイスML(Vision / Core ML / Speech / Sound Analysis /
-Natural Language / ScreenCaptureKit ほか)を、TouchDesigner のカスタムオペレータ**として
-使えるようにするプラグイン集です。
+> Apple's on-device frameworks as native TouchDesigner operators.
 
-- **macOS 専用**。Neural Engine / GPU をそのまま使うので、外部ランタイム・Python 環境・
-  クラウドAPI は不要(モデル同梱のものは追加ダウンロードも不要)
-- 推論はワーカースレッドで非同期に走り、**cook をブロックしない**(TD 本体のfpsを保つ)
-- **Windows+NVIDIA 専用の TD 標準OP の macOS 代替**を主眼にしたものは、チャンネル/
-  テクスチャ形式を既存OPに極力合わせています
+**English** | [日本語](README.ja.md)
 
-各プラグインの詳細(パラメータ・出力仕様・実測値・注意)は**サブフォルダの README** を参照。
-`sample.toe` の `/project1/examples` に**全OPの最小利用例**をカテゴリ別に配置しています。
+A collection of TouchDesigner custom operators (`.plugin`) that expose macOS /
+Apple Silicon **on-device ML and media frameworks** — Vision, Core ML, Core Image,
+VideoToolbox / MetalFX, SpeechAnalyzer, Sound Analysis, Natural Language,
+FoundationModels, ScreenCaptureKit, RealityKit and more — directly inside TouchDesigner.
 
-## Nvidia専用OPの macOS 代替として
+- **macOS only.** Runs on the Neural Engine / GPU as-is — no external runtime, no Python
+  environment, no cloud API (bundled-model ops need no extra download either).
+- **Never blocks cook.** Inference runs asynchronously on worker threads, so TouchDesigner
+  keeps its frame rate.
+- **A macOS alternative to Windows+NVIDIA-only stock OPs.** Where a plugin replaces a stock
+  OP, its channel / texture format matches the original as closely as possible.
 
-| やりたいこと | TD標準(Win+NVIDIA) | このリポジトリ |
+Each plugin has its own `README` with parameters, output specs, measured performance and
+caveats. `sample.toe` (`/project1/examples`) contains a **minimal usage example for every OP**,
+grouped by category.
+
+## Table of contents
+
+- [As a macOS alternative to NVIDIA-only OPs](#as-a-macos-alternative-to-nvidia-only-ops)
+- [Plugin catalog](#plugin-catalog)
+- [Getting started](#getting-started)
+- [Requirements](#requirements)
+- [Writing your own plugin](#writing-your-own-plugin)
+
+## As a macOS alternative to NVIDIA-only OPs
+
+| Goal | Stock OP (Win+NVIDIA) | This repo |
 |---|---|---|
-| 人物ポーズ推定 | Body Track CHOP | [Vision Pose](VisionPose/) |
-| 背景除去・人物マスク | Nvidia Background TOP | [Vision Segment](VisionSegment/) |
-| 超解像アップスケール | Nvidia Upscaler TOP | [Metal Upscale](MetalUpscale/) |
-| オプティカルフロー | Optical Flow TOP | [Vision Flow](VisionFlow/) |
-| 顔トラッキング | Face Track CHOP | [Vision Face](VisionFace/) |
+| Body pose estimation | Body Track CHOP | [Vision Pose](VisionPose/) |
+| Background removal / person mask | Nvidia Background TOP | [Vision Segment](VisionSegment/) |
+| Super-resolution upscaling | Nvidia Upscaler TOP | [Metal Upscale](MetalUpscale/) |
+| Optical flow | Optical Flow TOP | [Vision Flow](VisionFlow/) |
+| Face tracking | Face Track CHOP | [Vision Face](VisionFace/) |
 
----
+## Plugin catalog
 
-## 人物・顔・手のトラッキング
+### People, face & hand tracking
 
-| プラグイン | 種類 | 内容 |
+| Plugin | Family | What it does |
 |---|---|---|
-| [Vision Pose](VisionPose/) | CHOP | 多人数の2Dボディポーズ(34キーポイント)。**Body Track CHOP と互換のチャンネル形式**。5人60fps |
-| [Vision Pose3D](VisionPose3D/) | CHOP | 単一人物の**3Dポーズ**(17関節・メートル単位+2D投影・身長推定)。約2fpsのじっくり系 |
-| [Vision Hand](VisionHand/) | CHOP | 手指トラッキング(21関節×最大100手・左右判定) |
-| [Vision Face](VisionFace/) | CHOP | 顔検出+bbox・roll/yaw/pitch・ランドマーク(最大76点)・顔写りスコア。**Face Track CHOP 代替** |
-| [Vision Segment](VisionSegment/) | TOP | 人物セグメンテーション。**Nvidia Background TOP 代替**(統合マスク/人物別R/G/B/A分離) |
+| [Vision Pose](VisionPose/) | CHOP | Multi-person 2D body pose (34 keypoints). **Channel format compatible with Body Track CHOP.** 5 people @ 60fps |
+| [Vision Pose3D](VisionPose3D/) | CHOP | Single-person **3D pose** (17 joints in meters + 2D projection + height estimate). ~2fps, slow/deliberate |
+| [Vision Hand](VisionHand/) | CHOP | Hand tracking (21 joints × up to 100 hands, left/right) |
+| [Vision Face](VisionFace/) | CHOP | Face detection + bbox, roll/yaw/pitch, landmarks (up to 76), capture-quality score. **Face Track CHOP alternative** |
+| [Vision Segment](VisionSegment/) | TOP | Person segmentation. **Nvidia Background TOP alternative** (combined mask / per-person R/G/B/A split) |
 
-## 物体・シーンの認識・読み取り
+### Object & scene recognition
 
-| プラグイン | 種類 | 内容 |
+| Plugin | Family | What it does |
 |---|---|---|
-| [CoreML Detect](CoreMLDetect/) | DAT | **物体検出**。YOLO等のCore MLモデルで「何が・どこに」を label/confidence/bbox で出力 |
-| [Vision Classify](VisionClassify/) | DAT | **画像分類**(追加モデル不要)。上位N件の identifier/confidence |
-| [Vision AnimalPose](VisionAnimalPose/) | CHOP | 犬・猫の2D姿勢推定(25関節・複数匹) |
-| [Vision Rect](VisionRect/) | CHOP | 矩形検出→bbox/投影四隅(Corner Pin 直結) |
-| [Vision Barcode](VisionBarcode/) | DAT | QR・各種バーコード検出→payload / symbology / bbox / 四隅 |
-| [Vision Text](VisionText/) | DAT | **OCR / テキスト認識**(多言語・読み順ソート・Accurate/Fast) |
-| [Vision Trajectory](VisionTrajectory/) | CHOP | 放物運動する小物体の軌跡検出(実測点/投影点/放物線係数) |
-| [Vision Horizon](VisionHorizon/) | CHOP | 水平線・地平線の角度と補正transform |
-| [Vision Aesthetics](VisionAesthetics/) | CHOP | 写真の**美的スコア**(-1〜+1)。ベストショット自動選択に |
-| [ImageIO Metadata](ImageIOMetadata/) | DAT | 画像ファイルの EXIF/GPS/IPTC 読み取り(GPS十進度変換つき) |
+| [CoreML Detect](CoreMLDetect/) | DAT | **Object detection.** YOLO-style Core ML models → label / confidence / bbox ("what & where") |
+| [Vision Classify](VisionClassify/) | DAT | **Image classification** (no extra model). Top-N identifier / confidence |
+| [Vision AnimalPose](VisionAnimalPose/) | CHOP | Dog / cat 2D pose (25 joints, multiple animals) |
+| [Vision Rect](VisionRect/) | CHOP | Rectangle detection → bbox / projected corners (wire straight into Corner Pin) |
+| [Vision Barcode](VisionBarcode/) | DAT | QR / various barcodes → payload / symbology / bbox / corners |
+| [Vision Text](VisionText/) | DAT | **OCR / text recognition** (multilingual, reading-order sort, Accurate/Fast) |
+| [Vision Trajectory](VisionTrajectory/) | CHOP | Trajectory of small projectile objects (measured / projected points, parabola coefficients) |
+| [Vision Horizon](VisionHorizon/) | CHOP | Horizon angle + correction transform |
+| [Vision Aesthetics](VisionAesthetics/) | CHOP | Photo **aesthetic score** (−1..+1). Auto best-shot selection |
+| [ImageIO Metadata](ImageIOMetadata/) | DAT | Read EXIF / GPS / IPTC from image files (GPS decimal-degree conversion) |
 
-## 切り抜き・マスク
+### Cutout & masking
 
-| プラグイン | 種類 | 内容 |
+| Plugin | Family | What it does |
 |---|---|---|
-| [Vision Subject](VisionSubject/) | TOP | **任意被写体の切り抜き**(写真アプリ「被写体をコピー」と同じAPI)。ソフトマスク/背景透過 |
-| [CoreML SAM2](CoreMLSAM2/) | TOP | **点を指定して任意物体をマスク**(SAM 2.1)。観客が触れたものを切り抜く演出に |
-| [CoreImage Bokeh](CoreImageBokeh/) | TOP | マスクで被写体を保持したまま**背景を可変ぼかし** |
+| [Vision Subject](VisionSubject/) | TOP | **Cut out any subject** (same API as Photos' "Copy Subject"). Soft mask / transparent background |
+| [CoreML SAM2](CoreMLSAM2/) | TOP | **Point-prompted segmentation of any object** (SAM 2.1). Cut out whatever the audience touches |
+| [CoreImage Bokeh](CoreImageBokeh/) | TOP | Keep the subject sharp via a mask and **variably blur the background** |
 
-## 追跡・モーション・カメラワーク
+### Tracking, motion & camera work
 
-| プラグイン | 種類 | 内容 |
+| Plugin | Family | What it does |
 |---|---|---|
-| [Vision Track](VisionTrack/) | CHOP | **任意オブジェクトの追跡**(初期bbox→追従)。Blob Track TOP 代替に近い |
-| [Vision Flow](VisionFlow/) | TOP | **オプティカルフロー**(動きベクトル場)。**Optical Flow TOP 代替**(UV/Pixels) |
-| [Vision Saliency](VisionSaliency/) | TOP | 顕著性マップ+**オートフレーミング**(注目領域のクロップ矩形を Crop TOP 直結でカメラワーク自動化) |
-| [Vision Similarity](VisionSimilarity/) | CHOP | 2つの画像の**類似度**(Feature Print)。「参照画像に似たら発火」トリガー |
+| [Vision Track](VisionTrack/) | CHOP | **Track any object** (initial bbox → follow). Close to a Blob Track TOP alternative |
+| [Vision Flow](VisionFlow/) | TOP | **Optical flow** (motion vector field). **Optical Flow TOP alternative** (UV/Pixels) |
+| [Vision Saliency](VisionSaliency/) | TOP | Saliency map + **auto-framing** (crop rect of the region of interest → Crop TOP for automatic camera work) |
+| [Vision Similarity](VisionSimilarity/) | CHOP | **Similarity** of two images (Feature Print). "Fire when it looks like the reference" trigger |
 
-## 映像加工・超解像
+### Image processing & super-resolution
 
-| プラグイン | 種類 | 内容 |
+| Plugin | Family | What it does |
 |---|---|---|
-| [Metal Upscale](MetalUpscale/) | TOP | **リアルタイム超解像**。**Nvidia Upscaler TOP 代替**(MetalFX 2x / VT SuperRes 4x / VT LowLatency) |
-| [Metal FrameInterp](MetalFrameInterp/) | TOP | ML **フレーム補間 / モーションブラー**(中間フレーム生成) |
-| [Metal Denoise](MetalDenoise/) | TOP | ML テンポラルノイズ除去(対応ハードのみ。M2非対応) |
-| [CoreImage Keystone](CoreImageKeystone/) | TOP | 矩形の**自動透視補正**(紙面・スクリーン・投影面を正対化) |
-| [CoreImage Enhance](CoreImageEnhance/) | TOP | 露出・彩度・色を自動補正(Core Image) |
-| [Metal MPSAnalyze](MetalMPSAnalyze/) | CHOP | GPU画像統計(RGBAヒストグラム・平均色・輝度分布 76ch) |
+| [Metal Upscale](MetalUpscale/) | TOP | **Real-time super-resolution.** **Nvidia Upscaler TOP alternative** (MetalFX 2x / VT SuperRes 4x / VT LowLatency) |
+| [Metal FrameInterp](MetalFrameInterp/) | TOP | ML **frame interpolation / motion blur** (in-between frame generation) |
+| [Metal Denoise](MetalDenoise/) | TOP | ML temporal noise reduction (supported hardware only; not on M2) |
+| [CoreImage Keystone](CoreImageKeystone/) | TOP | **Automatic perspective correction** of a rectangle (square up paper / screen / projection) |
+| [CoreImage Enhance](CoreImageEnhance/) | TOP | Auto exposure / saturation / color correction (Core Image) |
+| [Metal MPSAnalyze](MetalMPSAnalyze/) | CHOP | GPU image statistics (RGBA histogram, average color, luminance distribution — 76ch) |
 
-## 汎用ML推論・画像生成
+### General ML inference & image generation
 
-| プラグイン | 種類 | 内容 |
+| Plugin | Family | What it does |
 |---|---|---|
-| [CoreML](CoreML/) | TOP | **任意の Core ML モデル**を差し替えて推論(深度推定・スタイル変換・分類等)。画像/配列出力を自動判別 |
-| [CoreML CHOP](CoreMLCHOP/) | CHOP | 任意の Core ML モデルの**ベクトル出力**をCHへ(埋め込み・キーポイント等) |
-| [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img**(Core ML Stable Diffusion / Image Playground) |
-| [CoreImage Code](CoreImageCode/) | TOP | QR / Aztec / PDF417 / Code128 の**生成**(外部ライブラリ不要) |
+| [CoreML](CoreML/) | TOP | Run **any Core ML model** by swapping it in (depth, style transfer, classification…). Auto-detects image / array output |
+| [CoreML CHOP](CoreMLCHOP/) | CHOP | **Vector output** of any Core ML model into channels (embeddings, keypoints…) |
+| [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img** (Core ML Stable Diffusion / Image Playground) |
+| [CoreImage Code](CoreImageCode/) | TOP | **Generate** QR / Aztec / PDF417 / Code128 (no external library) |
 
-## 音声・音響
+### Audio & sound
 
-| プラグイン | 種類 | 内容 |
+| Plugin | Family | What it does |
 |---|---|---|
-| [Sound Class](SoundClass/) | CHOP | **音の分類**(拍手/歓声/警報音等 300種類+)。独自 Core ML 音響モデルも可 |
-| [Sound Features](SoundFeatures/) | CHOP | 音響特徴(RMS/peak/centroid/onset/beat/BPM/16帯域) |
-| [Speech Text](SpeechText/) | DAT | **ライブ文字起こし**。Apple SpeechAnalyzer(macOS26+)/ WhisperKit(macOS14+・多言語・英訳) |
-| [Speech Synth](SpeechSynth/) | CHOP | オンデバイス**音声合成**→ PCM stereo |
-| [Speech Activity](SpeechActivity/) | CHOP | **発話区間検出**(speaking/onset/offset)。文字起こしの開始・終了トリガーに |
-| [Shazam](Shazam/) | DAT | **自作音源のオフライン照合**(ShazamKit)。会場音源にショー進行を同期 |
-| [System Audio](SystemAudio/) | CHOP | macOS の**システム音声**を取得(ScreenCaptureKit・48kHz stereo) |
+| [Sound Class](SoundClass/) | CHOP | **Sound classification** (applause / cheering / alarms… 300+ classes). Custom Core ML acoustic models too |
+| [Sound Features](SoundFeatures/) | CHOP | Audio features (RMS / peak / centroid / onset / beat / BPM / 16 bands) |
+| [Speech Text](SpeechText/) | DAT | **Live transcription.** Apple SpeechAnalyzer (macOS 26+) / WhisperKit (macOS 14+, multilingual, translate) |
+| [Speech Synth](SpeechSynth/) | CHOP | On-device **speech synthesis** → PCM stereo |
+| [Speech Activity](SpeechActivity/) | CHOP | **Voice activity detection** (speaking / onset / offset). Start/stop trigger for transcription |
+| [Shazam](Shazam/) | DAT | **Offline matching of your own audio** (ShazamKit). Sync a show to venue audio |
+| [System Audio](SystemAudio/) | CHOP | Capture macOS **system audio** (ScreenCaptureKit, 48kHz stereo) |
 
-## 言語・テキスト
+### Language & text
 
-| プラグイン | 種類 | 内容 |
+| Plugin | Family | What it does |
 |---|---|---|
-| [Foundation Model](FoundationModel/) | DAT | **Apple Intelligence オンデバイスLLM**(macOS26+)。**構造化出力(JSONスキーマ)**でショー制御へ直結 |
-| [Translate](Translate/) | DAT | **オンデバイス翻訳**。Speech Text 直結でリアルタイム字幕翻訳 |
-| [Text Analyze](TextAnalyze/) | DAT | 感情スコア・言語判定・固有表現・意味的類似度(日本語対応)。「発話の感情/話題でビジュアル制御」 |
+| [Foundation Model](FoundationModel/) | DAT | **Apple Intelligence on-device LLM** (macOS 26+). **Structured output (JSON schema)** straight into show control |
+| [Translate](Translate/) | DAT | **On-device translation.** Wire to Speech Text for real-time subtitle translation |
+| [Text Analyze](TextAnalyze/) | DAT | Sentiment / language ID / named entities / semantic similarity (JA supported). "Drive visuals from speech mood/topic" |
 
-## 3D・画面・入力デバイス・外部連携
+### 3D, screen, input devices & connectivity
 
-| プラグイン | 種類 | 内容 |
+| Plugin | Family | What it does |
 |---|---|---|
-| [RealityKit Capture](RealityKitCapture/) | SOP | **写真フォルダ→3Dメッシュ**(RealityKit Object Capture)。テクスチャ付きOBJ出力 |
-| [Vision Contours](VisionContours/) | SOP | 画像の輪郭を**閉じたLineジオメトリ**へ(Sweep/Extrude/Particle 直結) |
-| [Screen Capture](ScreenCapture/) | TOP | ディスプレイ/単一ウインドウの**画面収録**(最大120fps) |
-| [Multipeer In / Out](MultipeerCHOP/) | CHOP | **iPhone/iPad をワイヤレスセンサーに**(ジャイロ/加速度/タッチを低遅延受信)。**iOSアプリ同梱** |
-| [Multipeer In / Out](Multipeer/) | DAT | Mac/iPhone 間の**ローカルP2Pテキスト**(自動接続・サーバー不要) |
-| [Game Controller](GameController/) | CHOP | PS5/Xbox/MFi **ゲームパッド入力**(スティック/トリガー+モーション+ランブル) |
-| [Shortcuts](Shortcuts/) | DAT | **macOSショートカット実行**(HomeKit照明・家電・通知を TD イベントから) |
+| [RealityKit Capture](RealityKitCapture/) | SOP | **Photo folder → 3D mesh** (RealityKit Object Capture). Textured OBJ output |
+| [Vision Contours](VisionContours/) | SOP | Image contours → **closed Line geometry** (wire into Sweep / Extrude / Particle) |
+| [Screen Capture](ScreenCapture/) | TOP | **Screen recording** of a display / single window (up to 120fps) |
+| [Multipeer In / Out](MultipeerCHOP/) | CHOP | **Turn an iPhone/iPad into a wireless sensor** (low-latency gyro / accel / touch). **iOS app included** |
+| [Multipeer In / Out](Multipeer/) | DAT | **Local P2P text** between Mac / iPhone (auto-connect, no server) |
+| [Game Controller](GameController/) | CHOP | PS5 / Xbox / MFi **gamepad input** (sticks / triggers + motion + rumble) |
+| [Shortcuts](Shortcuts/) | DAT | **Run macOS Shortcuts** (HomeKit lights / appliances / notifications from TD events) |
 
----
+## Getting started
 
-## 使い方
+### 1. Build a plugin
 
-### 1. プラグインをビルド
-
-```
+```sh
 cd VisionPose && ./build.sh      # → VisionPose/build/VisionPoseCHOP.plugin
 ```
 
-前提: Xcode(`clang++`)と TouchDesigner.app(C++ SDK ヘッダを流用)。実行は TD 2023 系以降。
+Requires Xcode (`clang++`) and TouchDesigner.app (its C++ SDK headers are reused). Runs on
+TouchDesigner 2023 or later.
 
-### 2. TouchDesigner で使う
+### 2. Use it in TouchDesigner
 
-- **お試し**: `C++ CHOP/TOP/DAT/SOP` を置き、Plugin Path に `.plugin` を指定(再起動不要)
-- **常設のカスタムOPとして**:
-  `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/` に `.plugin` をコピー
-  → TD 再起動で OP Create Dialog に現れる
+- **Quick try:** drop a `C++ CHOP/TOP/DAT/SOP` and point Plugin Path at the `.plugin` (no restart).
+- **As a permanent custom OP:** copy the `.plugin` into
+  `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/`
+  → it appears in the OP Create Dialog after a TouchDesigner restart.
 
-モデルを使うプラグイン(CoreML / CoreML SAM2 / CoreML ImageGen 等)は、各 README のリンク先から
-Apple公式の Core ML モデルを `models/`(gitignore)へ置いてください。
+Model-based plugins (CoreML / CoreML SAM2 / CoreML ImageGen…) need an Apple Core ML model
+placed in `models/` (gitignored) — see each plugin's README for the download link.
 
-## 必要環境
+## Requirements
 
-- macOS 12+(Apple Silicon 推奨)。一部の機能はより新しい macOS を要求(各 README に明記)
-- ビルドに Xcode と TouchDesigner.app
+- macOS 12+ (Apple Silicon recommended). Some features need a newer macOS — noted in each README.
+- Xcode and TouchDesigner.app to build.
 
-## プラグインを自作する人へ
+## Writing your own plugin
 
-共通のビルド・実装パターン(非同期ワーカー、TOP のダウンロード flip、Info CHOP 診断 など)と
-実際に踏んだハマりどころは [`CLAUDE.md`](CLAUDE.md) にまとめてあります。
-`common/build_plugin.sh` が bundle 組み立て・署名を共通化しています。
+The shared build / implementation patterns (async worker, TOP download flip, Info CHOP
+diagnostics, …) and every pitfall actually hit during development are collected in
+[`CLAUDE.md`](CLAUDE.md), with a distilled agent skill under
+[`.claude/skills/td-apple-plugin/`](.claude/skills/td-apple-plugin/).
+`common/build_plugin.sh` factors out bundle assembly and signing.
