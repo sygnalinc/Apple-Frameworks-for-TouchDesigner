@@ -305,7 +305,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     info->customOPInfo.opType->setString("Foundationmodel");
     info->customOPInfo.opLabel->setString("Foundation Model");
     info->customOPInfo.authorName->setString("sygnal");
-    info->customOPInfo.opIcon->setString("AFM");
+    info->customOPInfo.opIcon->setString("FDM");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
 }

@@ -388,10 +388,10 @@ FillSOPPluginInfo(SOP_PluginInfo* info)
 {
     if (!info->setAPIVersion(SOPCPlusPlusAPIVersion))
         return;
-    info->customOPInfo.opType->setString("Photogrammetry");
+    info->customOPInfo.opType->setString("Realitykitcapture");
     info->customOPInfo.opLabel->setString("RealityKit Capture");
     info->customOPInfo.authorName->setString("sygnal");
-    info->customOPInfo.opIcon->setString("PHG");
+    info->customOPInfo.opIcon->setString("RKC");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
 }

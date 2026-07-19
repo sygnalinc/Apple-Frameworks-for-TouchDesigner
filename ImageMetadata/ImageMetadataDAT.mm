@@ -277,7 +277,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
 {
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
-    info->customOPInfo.opType->setString("Imagemetadata");
+    info->customOPInfo.opType->setString("Imageiometadata");
     info->customOPInfo.opLabel->setString("ImageIO Metadata");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("IMD");

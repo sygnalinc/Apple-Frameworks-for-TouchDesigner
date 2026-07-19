@@ -402,10 +402,10 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     if (!info->setAPIVersion(TOPCPlusPlusAPIVersion))
         return;
     info->executeMode = TOP_ExecuteMode::CPUMem;
-    info->customOPInfo.opType->setString("Denoise");
+    info->customOPInfo.opType->setString("Metaldenoise");
     info->customOPInfo.opLabel->setString("Metal Denoise");
     info->customOPInfo.authorName->setString("sygnal");
-    info->customOPInfo.opIcon->setString("DNZ");
+    info->customOPInfo.opIcon->setString("MDN");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;
 }

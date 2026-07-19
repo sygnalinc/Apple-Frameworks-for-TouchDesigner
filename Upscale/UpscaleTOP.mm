@@ -780,10 +780,10 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     if (!info->setAPIVersion(TOPCPlusPlusAPIVersion))
         return;
     info->executeMode = TOP_ExecuteMode::CPUMem;
-    info->customOPInfo.opType->setString("Upscale");
+    info->customOPInfo.opType->setString("Metalupscale");
     info->customOPInfo.opLabel->setString("Metal Upscale");
     info->customOPInfo.authorName->setString("sygnal");
-    info->customOPInfo.opIcon->setString("UPS");
+    info->customOPInfo.opIcon->setString("MUP");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;
 }

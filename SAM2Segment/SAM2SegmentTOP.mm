@@ -667,7 +667,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     if (!info->setAPIVersion(TOPCPlusPlusAPIVersion))
         return;
     info->executeMode = TOP_ExecuteMode::CPUMem;
-    info->customOPInfo.opType->setString("Sam2segment");
+    info->customOPInfo.opType->setString("Coremlsam2");
     info->customOPInfo.opLabel->setString("CoreML SAM2");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("SAM");

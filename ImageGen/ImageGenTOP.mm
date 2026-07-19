@@ -397,7 +397,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     if (!info->setAPIVersion(TOPCPlusPlusAPIVersion))
         return;
     info->executeMode = TOP_ExecuteMode::CPUMem;
-    info->customOPInfo.opType->setString("Imagegen");
+    info->customOPInfo.opType->setString("Coremlimagegen");
     info->customOPInfo.opLabel->setString("CoreML ImageGen");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("IMG");
