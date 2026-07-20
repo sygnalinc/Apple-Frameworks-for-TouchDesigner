@@ -1503,3 +1503,22 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
   要実素材(image+video)。CoreMediaリンク必須
 - 5件ビルド・署名・インストール・TD再起動後にロード/エラーなし確認(自分で再起動)。全12件完了
 - **これで指定12プラグイン全て完了**。README(各+ルート英日)更新。commit/push
+
+### 2026-07-20 最近16件をApple標準フレームワーク名へリネーム(ユーザー指示)
+
+- ユーザー「Pluginの名前はなるべくApple標準のフレームワーク名になぞって」を受け、既存の
+  「Framework Feature」規約に合わせて**11件をリネーム**(opLabel/opType/opIcon/フォルダ/ソース.mm/
+  build.sh/README/ルート一覧/バンドル名):
+  Process Audio→**CoreAudio Tap**、Gameplay Agents→**GameplayKit Agents**、Gameplay Path→
+  **GameplayKit Path**、WiFi Monitor→**CoreWLAN**、PDF Document→**PDFKit**、Beacon→
+  **CoreLocation Beacon**、HID→**IOHID**、Semantic Index→**Spotlight**、Audio Mix→
+  **AudioToolbox Mix**、Spatial Audio→**AVAudio Spatial**、Spatial Mixer→**AVAudio Mixer**
+- **維持**(既にApple標準名): PHASE / ColorSync / Quick Look / Image Capture / Live Photo
+- git mv でフォルダ・ソースを改名、sed で opType/opLabel/クラス名を一括置換。12バンドル再ビルド・
+  常設Pluginsの旧12バンドル削除+新12設置。TD再起動後に全12型が新opTypeで生成できることを確認
+- **踏んだ罠**: ①**opType==opLabel が同一文字列(Beacon)だと sed が opLabel も巻き込む**→手動修正。
+  ②**opIcon の sed で "HID"→"IOHID"(5文字)になり3文字ルール違反でTDがロード拒否**(IOHIDが未登録に)
+  →"IOH"へ修正。opIconは英字3文字厳守。③12バンドル入れ替え直後の初回起動はプラグイン再検証で
+  ロードが数分かかる(2回目はキャッシュで通常速度。固まったら強制終了→再起動でよい)
+- sample.toe の examples は旧opType参照だった16件を含まない(利用例未追加)ため参照切れ無し
+- 次にやること: リネーム16件の sample.toe 利用例追加(任意)

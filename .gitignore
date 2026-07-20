@@ -18,3 +18,9 @@ Assets/IMG_25*
 
 # examples用の学習済みモデル(再生成可能・下記README参照)
 Assets/ml_examples/*.mlmodel
+
+# 大きなローカルテスト素材(スプラット/空間動画/Live Photo・コミットしない)
+Assets/gs_sample
+Assets/gs_sample.ply
+Assets/spatial_video_sample.MOV
+Assets/LIVE_Photo_sample/

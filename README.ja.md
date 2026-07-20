@@ -118,10 +118,10 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Speech Activity](SpeechActivity/) | CHOP | **発話区間検出**(speaking/onset/offset)。文字起こしの開始・終了トリガーに |
 | [Shazam](Shazam/) | DAT | **自作音源のオフライン照合**(ShazamKit)。会場音源にショー進行を同期 |
 | [System Audio](SystemAudio/) | CHOP | macOS の**システム音声**を取得(ScreenCaptureKit・48kHz stereo) |
-| [Spatial Audio](SpatialAudio/) | CHOP | モノ音源の**3D配置**→HRTFバイノーラル(AVAudioEnvironmentNode)。音声はTDに戻る |
-| [Spatial Mixer](SpatialMixer/) | CHOP | **多chサラウンド→バイノーラル**(5.1/7.1/Quad をHRTFで空間ダウンミックス)。音声はTDに戻る |
+| [AVAudio Spatial](AVAudioSpatial/) | CHOP | モノ音源の**3D配置**→HRTFバイノーラル(AVAudioEnvironmentNode)。音声はTDに戻る |
+| [AVAudio Mixer](AVAudioMixer/) | CHOP | **多chサラウンド→バイノーラル**(5.1/7.1/Quad をHRTFで空間ダウンミックス)。音声はTDに戻る |
 | [PHASE](Phase/) | CHOP | **物理ベース空間化**(Apple PHASE)をデバイス出力へ再生。TDにはドライをパススルー、空間版はヘッドホン |
-| [Audio Mix](AudioMix/) | CHOP | **前景(speech)/背景(ambience)分離・再ミックス**(AUAudioMix・macOS 26)。4ch First-Order Ambisonics入力が必要 |
+| [AudioToolbox Mix](AudioToolboxMix/) | CHOP | **前景(speech)/背景(ambience)分離・再ミックス**(AUAudioMix・macOS 26)。4ch First-Order Ambisonics入力が必要 |
 
 ### 言語・テキスト
 
@@ -142,21 +142,21 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic動画**: 深度(視差)マップ、または**f値/ピントを差し替えて再レンダ** |
 | [Vision Contours](VisionContours/) | SOP | 画像の輪郭を**閉じたLineジオメトリ**へ(Sweep/Extrude/Particle 直結) |
 | [Screen Capture](ScreenCapture/) | TOP | ディスプレイ/単一ウインドウの**画面収録**(最大120fps) |
-| [Process Audio](ProcessAudio/) | CHOP | **指定アプリの音だけ**をタップ(Core Audio Process Tap・macOS 14.4+)or 全システム音→48kHz stereo。Screen Captureより粒度が細かい |
-| [Semantic Index](SemanticIndex/) | DAT | **OS全体のローカルファイル検索**(Spotlight / NSMetadataQuery)— 名前/内容/生kMDItem述語 |
-| [HID](HID/) | CHOP | **任意のUSB/Bluetooth HIDのraw入力**(ゲームパッド/ペダル/ノブ/センサ)IOHIDManager |
+| [CoreAudio Tap](CoreAudioTap/) | CHOP | **指定アプリの音だけ**をタップ(Core Audio Process Tap・macOS 14.4+)or 全システム音→48kHz stereo。Screen Captureより粒度が細かい |
+| [Spotlight](Spotlight/) | DAT | **OS全体のローカルファイル検索**(Spotlight / NSMetadataQuery)— 名前/内容/生kMDItem述語 |
+| [IOHID](IOHID/) | CHOP | **任意のUSB/Bluetooth HIDのraw入力**(ゲームパッド/ペダル/ノブ/センサ)IOHIDManager |
 | [Image Capture](ImageCapture/) | DAT | **テザー接続カメラ/スキャナの列挙**(ImageCaptureCore)— 名前/種別/uuid/接続 |
-| [Beacon](Beacon/) | CHOP | **iBeacon測距**(CoreLocation)— major/minor/rssi/近接度/推定距離 |
+| [CoreLocation Beacon](CoreLocationBeacon/) | CHOP | **iBeacon測距**(CoreLocation)— major/minor/rssi/近接度/推定距離 |
 | [Live Photo](LivePhoto/) | TOP | **Live Photoの動画コンポーネント各フレーム**を任意時刻で(Photos / PHLivePhoto) |
 | [Multipeer In / Out](MultipeerCHOP/) | CHOP | **iPhone/iPad をワイヤレスセンサーに**(ジャイロ/加速度/タッチを低遅延受信)。**iOSアプリ同梱** |
 | [Multipeer In / Out](Multipeer/) | DAT | Mac/iPhone 間の**ローカルP2Pテキスト**(自動接続・サーバー不要) |
 | [Game Controller](GameController/) | CHOP | PS5/Xbox/MFi **ゲームパッド入力**(スティック/トリガー+モーション+ランブル) |
 | [Shortcuts](Shortcuts/) | DAT | **macOSショートカット実行**(HomeKit照明・家電・通知を TD イベントから) |
-| [Gameplay Agents](GameplayAgents/) | CHOP | **群集/フロッキング**(GameplayKit GKAgent)— seek/separate/align/cohere/avoid/wander |
-| [Gameplay Path](GameplayPath/) | SOP | **障害物回避の最短経路**(GameplayKit GKObstacleGraph)→ポリライン |
+| [GameplayKit Agents](GameplayKitAgents/) | CHOP | **群集/フロッキング**(GameplayKit GKAgent)— seek/separate/align/cohere/avoid/wander |
+| [GameplayKit Path](GameplayKitPath/) | SOP | **障害物回避の最短経路**(GameplayKit GKObstacleGraph)→ポリライン |
 | [Quick Look](QuickLook/) | TOP | 任意ファイル(PDF/動画/3D/書類/フォント)の**OS標準サムネイル**(QuickLookThumbnailing) |
-| [PDF Document](PDFDocument/) | DAT / TOP | **PDFKit** — 構造(メタ/アウトライン/テキスト/注釈)+ ページをテクスチャ描画 |
-| [WiFi Monitor](WiFiMonitor/) | CHOP | **Wi-Fiの実測値**(CoreWLAN)— RSSI/ノイズ/SNR/送信レート/チャンネル |
+| [PDFKit](PDFKit/) | DAT / TOP | **PDFKit** — 構造(メタ/アウトライン/テキスト/注釈)+ ページをテクスチャ描画 |
+| [CoreWLAN](CoreWLAN/) | CHOP | **Wi-Fiの実測値**(CoreWLAN)— RSSI/ノイズ/SNR/送信レート/チャンネル |
 | [ColorSync](ColorSync/) | TOP | **ICC/色空間変換**(sRGB ↔ Display P3 / Adobe RGB / Rec.2020 / .icc)で表示装置別の正確な色 |
 
 ## 使い方

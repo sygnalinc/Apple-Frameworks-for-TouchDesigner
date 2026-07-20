@@ -120,10 +120,10 @@ grouped by category.
 | [Speech Activity](SpeechActivity/) | CHOP | **Voice activity detection** (speaking / onset / offset). Start/stop trigger for transcription |
 | [Shazam](Shazam/) | DAT | **Offline matching of your own audio** (ShazamKit). Sync a show to venue audio |
 | [System Audio](SystemAudio/) | CHOP | Capture macOS **system audio** (ScreenCaptureKit, 48kHz stereo) |
-| [Spatial Audio](SpatialAudio/) | CHOP | **3D placement** of a mono source → HRTF binaural (AVAudioEnvironmentNode). Returns audio to TD |
-| [Spatial Mixer](SpatialMixer/) | CHOP | **Multichannel surround → binaural** (5.1 / 7.1 / Quad speaker beds via HRTF). Returns audio to TD |
+| [AVAudio Spatial](AVAudioSpatial/) | CHOP | **3D placement** of a mono source → HRTF binaural (AVAudioEnvironmentNode). Returns audio to TD |
+| [AVAudio Mixer](AVAudioMixer/) | CHOP | **Multichannel surround → binaural** (5.1 / 7.1 / Quad speaker beds via HRTF). Returns audio to TD |
 | [PHASE](Phase/) | CHOP | **Physically-based spatialization** (Apple PHASE) played to the system output device. Dry passthrough in TD; spatial on headphones |
-| [Audio Mix](AudioMix/) | CHOP | **Speech / ambience separation & remix** (AUAudioMix, macOS 26). Needs 4-ch First-Order Ambisonics input |
+| [AudioToolbox Mix](AudioToolboxMix/) | CHOP | **Speech / ambience separation & remix** (AUAudioMix, macOS 26). Needs 4-ch First-Order Ambisonics input |
 
 ### Language & text
 
@@ -144,21 +144,21 @@ grouped by category.
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic video**: depth (disparity) map, or **re-render with adjustable focus / aperture** |
 | [Vision Contours](VisionContours/) | SOP | Image contours → **closed Line geometry** (wire into Sweep / Extrude / Particle) |
 | [Screen Capture](ScreenCapture/) | TOP | **Screen recording** of a display / single window (up to 120fps) |
-| [Process Audio](ProcessAudio/) | CHOP | **Tap a single app's audio** (Core Audio Process Tap, macOS 14.4+) or all system audio → 48kHz stereo. Finer-grained than Screen Capture |
-| [Semantic Index](SemanticIndex/) | DAT | **OS-wide local file search** (Spotlight / NSMetadataQuery) — name / content / raw kMDItem predicate |
-| [HID](HID/) | CHOP | **Raw input from any USB/Bluetooth HID** (gamepad / pedal / knob / sensor) via IOHIDManager |
+| [CoreAudio Tap](CoreAudioTap/) | CHOP | **Tap a single app's audio** (Core Audio Process Tap, macOS 14.4+) or all system audio → 48kHz stereo. Finer-grained than Screen Capture |
+| [Spotlight](Spotlight/) | DAT | **OS-wide local file search** (Spotlight / NSMetadataQuery) — name / content / raw kMDItem predicate |
+| [IOHID](IOHID/) | CHOP | **Raw input from any USB/Bluetooth HID** (gamepad / pedal / knob / sensor) via IOHIDManager |
 | [Image Capture](ImageCapture/) | DAT | **List tethered cameras / scanners** (ImageCaptureCore) — name / type / uuid / transport |
-| [Beacon](Beacon/) | CHOP | **iBeacon ranging** (CoreLocation) — major / minor / rssi / proximity / distance |
+| [CoreLocation Beacon](CoreLocationBeacon/) | CHOP | **iBeacon ranging** (CoreLocation) — major / minor / rssi / proximity / distance |
 | [Live Photo](LivePhoto/) | TOP | **Live Photo video-component frames** at any time (Photos / PHLivePhoto) |
 | [Multipeer In / Out](MultipeerCHOP/) | CHOP | **Turn an iPhone/iPad into a wireless sensor** (low-latency gyro / accel / touch). **iOS app included** |
 | [Multipeer In / Out](Multipeer/) | DAT | **Local P2P text** between Mac / iPhone (auto-connect, no server) |
 | [Game Controller](GameController/) | CHOP | PS5 / Xbox / MFi **gamepad input** (sticks / triggers + motion + rumble) |
 | [Shortcuts](Shortcuts/) | DAT | **Run macOS Shortcuts** (HomeKit lights / appliances / notifications from TD events) |
-| [Gameplay Agents](GameplayAgents/) | CHOP | **Crowd / flocking simulation** (GameplayKit GKAgent) — seek / separate / align / cohere / avoid / wander |
-| [Gameplay Path](GameplayPath/) | SOP | **Obstacle-avoiding shortest path** (GameplayKit GKObstacleGraph) → polyline |
+| [GameplayKit Agents](GameplayKitAgents/) | CHOP | **Crowd / flocking simulation** (GameplayKit GKAgent) — seek / separate / align / cohere / avoid / wander |
+| [GameplayKit Path](GameplayKitPath/) | SOP | **Obstacle-avoiding shortest path** (GameplayKit GKObstacleGraph) → polyline |
 | [Quick Look](QuickLook/) | TOP | **OS-standard thumbnail** of any file (PDF / video / 3D / doc / font) via QuickLookThumbnailing |
-| [PDF Document](PDFDocument/) | DAT / TOP | **PDFKit** — structure (metadata / outline / text / annotations) + render a page to a texture |
-| [WiFi Monitor](WiFiMonitor/) | CHOP | **Live Wi-Fi metrics** (CoreWLAN) — RSSI / noise / SNR / TX rate / channel |
+| [PDFKit](PDFKit/) | DAT / TOP | **PDFKit** — structure (metadata / outline / text / annotations) + render a page to a texture |
+| [CoreWLAN](CoreWLAN/) | CHOP | **Live Wi-Fi metrics** (CoreWLAN) — RSSI / noise / SNR / TX rate / channel |
 | [ColorSync](ColorSync/) | TOP | **ICC / color-space conversion** (sRGB ↔ Display P3 / Adobe RGB / Rec.2020 / .icc) for display-accurate color |
 
 ## Getting started
