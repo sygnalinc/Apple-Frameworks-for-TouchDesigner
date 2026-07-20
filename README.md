@@ -152,6 +152,8 @@ grouped by category.
 | [Gameplay Path](GameplayPath/) | SOP | **Obstacle-avoiding shortest path** (GameplayKit GKObstacleGraph) → polyline |
 | [Quick Look](QuickLook/) | TOP | **OS-standard thumbnail** of any file (PDF / video / 3D / doc / font) via QuickLookThumbnailing |
 | [PDF Document](PDFDocument/) | DAT / TOP | **PDFKit** — structure (metadata / outline / text / annotations) + render a page to a texture |
+| [WiFi Monitor](WiFiMonitor/) | CHOP | **Live Wi-Fi metrics** (CoreWLAN) — RSSI / noise / SNR / TX rate / channel |
+| [ColorSync](ColorSync/) | TOP | **ICC / color-space conversion** (sRGB ↔ Display P3 / Adobe RGB / Rec.2020 / .icc) for display-accurate color |
 
 ## Getting started
 

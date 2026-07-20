@@ -1460,3 +1460,16 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
 - **TD再起動は自分で実施**(quit→open→MCP疎通待ち)。MCPサーバは起動後1〜2分立ち上がりに要することあり
 - 残り: #1 Process Audio、#6 ColorSync、#5 Semantic Index、#7 WiFi Monitor、#4 Image Capture、
   #11 HID、#10 Beacon、#12 Live Photo
+
+### 2026-07-20 有力12(その2): WiFi Monitor CHOP・ColorSync TOP
+
+- **WiFi Monitor CHOP**(`Wifimonitor`・CoreWLAN): 接続中Wi-FiのRSSI/noise/SNR/tx_rate/channel/
+  tx_power/PHYを数値出力、SSID/BSSID/interface/securityをInfo DAT。実測: rssi=-41/noise=-93/snr=52/
+  tx_rate=400Mbps/channel=120。**SSID/BSSIDは最近のmacOSでLocation権限が要る**(無いと空・数値は取れる)。
+  `connected`はchannel関連付け(またはrssi≠0)で判定
+- **ColorSync TOP**(`Colorsync`・CoreGraphics/ICC): 入力TOPをsRGB/Display P3/Adobe RGB/Rec.2020/
+  Generic/Gray/任意.icc間で色空間変換。CGColorSpace(ColorSync管理)のCGImage描画で変換。実測:
+  sRGB(0.9,0.1,0.1)→P3(0.824,0.208,0.165)で成分値が正しく変化
+- 罠: Info DAT の `getInfoDATSize` は **bool返し**(getNumInfoDATSizeは無い)
+- 2件ビルド・署名・インストール・TD検証済み(自分で再起動)。README+ルート一覧(英日)更新
+- 残り: #1 Process Audio、#5 Semantic Index、#4 Image Capture、#11 HID、#10 Beacon、#12 Live Photo

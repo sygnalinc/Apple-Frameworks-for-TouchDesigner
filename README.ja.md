@@ -150,6 +150,8 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Gameplay Path](GameplayPath/) | SOP | **障害物回避の最短経路**(GameplayKit GKObstacleGraph)→ポリライン |
 | [Quick Look](QuickLook/) | TOP | 任意ファイル(PDF/動画/3D/書類/フォント)の**OS標準サムネイル**(QuickLookThumbnailing) |
 | [PDF Document](PDFDocument/) | DAT / TOP | **PDFKit** — 構造(メタ/アウトライン/テキスト/注釈)+ ページをテクスチャ描画 |
+| [WiFi Monitor](WiFiMonitor/) | CHOP | **Wi-Fiの実測値**(CoreWLAN)— RSSI/ノイズ/SNR/送信レート/チャンネル |
+| [ColorSync](ColorSync/) | TOP | **ICC/色空間変換**(sRGB ↔ Display P3 / Adobe RGB / Rec.2020 / .icc)で表示装置別の正確な色 |
 
 ## 使い方
 
