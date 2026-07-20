@@ -1718,3 +1718,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **EXIF Orientation を適用しないとiPhone縦写真は横倒し**(raw横センサー+Orientation=6)。
   `kCGImagePropertyOrientation` を読み、8種を汎用ピクセルリマップで正立化する。color/depth 共通経路にできる
 - **カスタム.pluginはファイルのドラッグ&ドロップ生成に割り当てられない**(OP_CustomOPInfoに拡張子欄なし)
+
+### 2026-07-20 ImageIO File In の Color 向きバグ修正(decodeColorが上下逆でEXIF回転が破綻)
+
+ユーザー実機で Color 表示が「IMG_2540(Orientation=6)=左右反転 / IMG_E2540(Orientation=1)=上下反転」と判明。
+- **原因**: `decodeColor` が `CGContextTranslateCTM(0,H)+ScaleCTM(1,-1)` で**bottom-upバッファ**を作っていた。
+  深度側 `loadAux` は top-down なので、同じ `applyOrientation` を掛けると color だけ縦が逆になり、
+  EXIF Orientation の回転が鏡像/上下逆に化けていた
+- **修正**: decodeColor の反転を撤去し、CGBitmapContext の描画結果(=loadAuxと同じ縦向き)を
+  そのまま使う。これで color/depth が同一経路(top-down → applyOrientation → TOP行反転)になり整合
+- **検証(offline PNG化 + TD .save を Read で目視)**: 全8向き候補を生成し Preview と突合。
+  修正後、IMG_2540(orient=6)・IMG_E2540(orient=1)とも **Color が正立でPreview一致**、
+  Disparity も同じ正立(白箱=左/銀箱=右)を確認。TD実機の .save 出力もPreview一致
+- **教訓**: EXIF Orientation を手動リマップするなら、色と補助データの**縦向き(top-down/bottom-up)を
+  必ず一致させてから**同じ変換を掛ける。片方だけ反転していると回転が鏡像化する(pitfalls反映)

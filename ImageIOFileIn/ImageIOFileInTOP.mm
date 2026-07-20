@@ -169,9 +169,9 @@ private:
         CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
         CGContextRef ctx = CGBitmapContextCreate(out.data(), W, H, 8, (size_t)W * 4, cs,
             kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
-        // 出力バッファを top-down(row0=画像上端)にする
-        CGContextTranslateCTM(ctx, 0, H);
-        CGContextScaleCTM(ctx, 1, -1);
+        // CGBitmapContext の描画結果は補助データ(loadAux)と同じ縦向き(top-down相当)。
+        // ここで反転すると applyOrientation が反転済みバッファに掛かり、EXIF Orientation が
+        // 左右/上下反転する(実測でHEICが鏡像・上下逆になった)。反転せずに描く。
         CGContextDrawImage(ctx, CGRectMake(0, 0, W, H), img);
         CGContextRelease(ctx); CGColorSpaceRelease(cs); CGImageRelease(img);
         return true;

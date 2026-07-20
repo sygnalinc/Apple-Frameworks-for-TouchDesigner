@@ -293,3 +293,11 @@
   browserスレッドが自分のループ内で適用する **polled 方式**にする
 - **NSNetServiceBrowser / NSNetService の生成・破棄・列挙は全て browserスレッドに一極集中**。
   cook 側は不変スナップショット(NSDictionary配列)を `@synchronized` で読むだけにする
+
+## ImageIO / EXIF Orientation
+
+- iPhoneの縦写真は横センサー+**Orientation=6**で保存され、未対応だと横倒し。
+  `kCGImagePropertyOrientation` を読み、8種を適用する
+- **手動でEXIF回転を掛けるなら、主画像(CGBitmapContext描画)と補助データ(loadAux)の縦向きを
+  必ず揃える**。`CGContextTranslateCTM(0,H)+ScaleCTM(1,-1)` は bottom-up を作り、loadAux(top-down)
+  と混ざると回転が鏡像/上下逆に化ける(実測)。両者を top-down に統一してから同じ applyOrientation を掛ける
