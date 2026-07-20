@@ -150,7 +150,7 @@ extern "C" {
 DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     if (!i->setAPIVersion(CHOPCPlusPlusAPIVersion)) return;
     i->customOPInfo.opType->setString("Gameplaykitagents");
-    i->customOPInfo.opLabel->setString("GameplayKit Agents");
+    i->customOPInfo.opLabel->setString("GameKit Agents");
     i->customOPInfo.opIcon->setString("GPA");
     i->customOPInfo.authorName->setString("TDAppleML");
     i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=1;

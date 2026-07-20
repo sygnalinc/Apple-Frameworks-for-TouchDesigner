@@ -93,7 +93,7 @@ extern "C" {
 DLLEXPORT void FillSOPPluginInfo(SOP_PluginInfo* i) {
     if (!i->setAPIVersion(SOPCPlusPlusAPIVersion)) return;
     i->customOPInfo.opType->setString("Gameplaykitpath");
-    i->customOPInfo.opLabel->setString("GameplayKit Path");
+    i->customOPInfo.opLabel->setString("GameKit Path");
     i->customOPInfo.opIcon->setString("GPP");
     i->customOPInfo.authorName->setString("TDAppleML");
     i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=1;

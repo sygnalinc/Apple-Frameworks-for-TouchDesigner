@@ -127,7 +127,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     if (!i->setAPIVersion(TOPCPlusPlusAPIVersion)) return;
     i->executeMode = TOP_ExecuteMode::CPUMem;
     i->customOPInfo.opType->setString("Coreimagehdr");
-    i->customOPInfo.opLabel->setString("CoreImage HDR");
+    i->customOPInfo.opLabel->setString("CI HDR");
     i->customOPInfo.opIcon->setString("CIH");
     i->customOPInfo.authorName->setString("TDAppleML");
     i->customOPInfo.minInputs = 0;

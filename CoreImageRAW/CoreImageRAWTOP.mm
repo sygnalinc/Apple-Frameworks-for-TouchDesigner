@@ -141,7 +141,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     if (!i->setAPIVersion(TOPCPlusPlusAPIVersion)) return;
     i->executeMode = TOP_ExecuteMode::CPUMem;
     i->customOPInfo.opType->setString("Coreimageraw");
-    i->customOPInfo.opLabel->setString("CoreImage RAW");
+    i->customOPInfo.opLabel->setString("CI RAW");
     i->customOPInfo.opIcon->setString("CIR");
     i->customOPInfo.authorName->setString("TDAppleML");
     i->customOPInfo.minInputs = 0;
