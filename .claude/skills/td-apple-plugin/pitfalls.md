@@ -237,3 +237,28 @@
 - MultipeerConnectivity: ローカルネットワーク許可 + Bonjour サービスタイプ
 - GameController / CoreHaptics: 実機パッド接続
 - Shortcuts: `shortcuts` CLI 経由(ユーザー環境のショートカット)
+
+## オーディオフィルタCHOP(音声in→音声out・timeslice)
+
+- **音声フィルタCHOPは `getGeneralInfo` で `timeslice=true`**。入力の現在ブロック(N samples)を
+  処理してN samples出力する。cook内でDSPして良い(重い推論ではないので非ブロック扱い)
+- **`getOutputInfo` で入力と異なるch数を出すなら必ず `true` を返して numChannels を明示する**。
+  入力接続時に `false` を返すと**出力ch数が入力に一致**させられる(inputMatchIndex)。
+  例: モノ入力→バイノーラル2ch出力のつもりで false を返すと出力は1chになり、`channels[1]` への
+  書き込みが**範囲外でTDが即クラッシュ**する(実測)。`return true` + `numChannels=2` にし、
+  さらに execute 冒頭で `out->numChannels < 2` を弾く防御ガードを入れる
+- 空間音響の要は **AVAudioEngine の manual rendering(offline)+ AVAudioSourceNode**:
+  source の renderBlock で「現在のTD入力ブロック」を供給し、`renderOffline:N toBuffer:` で
+  N frames レンダしてTDのオーディオグラフに戻す。**AVAudioSourceNode は AVAudio3DMixing に準拠**
+  するので position/renderingAlgorithm(HRTF等)を直接設定できる(実測: 左定位で eL/eR≈2.9)
+- 多音源(SpatialMixer)で1つの共有読み取り位置を使うと**プル順で壊れる**。音源ごとに独立した
+  read position(vector)を持ち、renderOffline前に全て0リセットする
+- **AUSpatialMixer('3dem')の多ch生設定は manual render で不安定(実測segfault)**。
+  各入力chを標準スピーカー角度の positioned mono source として AVAudioEnvironmentNode に流す方が堅牢
+- **AUAudioMix('amix'・macOS26)は type=`aufc`・入力4ch First-Order Ambisonics(layoutTag 0x930004)
+  専用・出力5ch**。標準ステレオ/モノは setFormat で -10868 拒否。AU自身の inputBusses[0].format を
+  connect に使えば通る。パラメータは Style(0-9)/Remix Amount(0-1)。合成入力では無音で、
+  意味ある分離には実際の空間音声(4ch アンビソニックス)素材が必要
+- **PHASEEngine は出力バッファ取得APIが無く**(start/stopでシステム出力へ直接再生)、
+  レンダ結果をCHOPに戻せない。PHASEは「TD入力→物理ベース定位→デバイス(ヘッドホン)再生」の
+  モデルでのみ使える(TDのオーディオグラフには戻らない)

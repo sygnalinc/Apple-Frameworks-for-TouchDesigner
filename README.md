@@ -120,6 +120,10 @@ grouped by category.
 | [Speech Activity](SpeechActivity/) | CHOP | **Voice activity detection** (speaking / onset / offset). Start/stop trigger for transcription |
 | [Shazam](Shazam/) | DAT | **Offline matching of your own audio** (ShazamKit). Sync a show to venue audio |
 | [System Audio](SystemAudio/) | CHOP | Capture macOS **system audio** (ScreenCaptureKit, 48kHz stereo) |
+| [Spatial Audio](SpatialAudio/) | CHOP | **3D placement** of a mono source → HRTF binaural (AVAudioEnvironmentNode). Returns audio to TD |
+| [Spatial Mixer](SpatialMixer/) | CHOP | **Multichannel surround → binaural** (5.1 / 7.1 / Quad speaker beds via HRTF). Returns audio to TD |
+| [PHASE](Phase/) | CHOP | **Physically-based spatialization** (Apple PHASE) played to the system output device. Dry passthrough in TD; spatial on headphones |
+| [Audio Mix](AudioMix/) | CHOP | **Speech / ambience separation & remix** (AUAudioMix, macOS 26). Needs 4-ch First-Order Ambisonics input |
 
 ### Language & text
 

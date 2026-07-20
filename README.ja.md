@@ -118,6 +118,10 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Speech Activity](SpeechActivity/) | CHOP | **発話区間検出**(speaking/onset/offset)。文字起こしの開始・終了トリガーに |
 | [Shazam](Shazam/) | DAT | **自作音源のオフライン照合**(ShazamKit)。会場音源にショー進行を同期 |
 | [System Audio](SystemAudio/) | CHOP | macOS の**システム音声**を取得(ScreenCaptureKit・48kHz stereo) |
+| [Spatial Audio](SpatialAudio/) | CHOP | モノ音源の**3D配置**→HRTFバイノーラル(AVAudioEnvironmentNode)。音声はTDに戻る |
+| [Spatial Mixer](SpatialMixer/) | CHOP | **多chサラウンド→バイノーラル**(5.1/7.1/Quad をHRTFで空間ダウンミックス)。音声はTDに戻る |
+| [PHASE](Phase/) | CHOP | **物理ベース空間化**(Apple PHASE)をデバイス出力へ再生。TDにはドライをパススルー、空間版はヘッドホン |
+| [Audio Mix](AudioMix/) | CHOP | **前景(speech)/背景(ambience)分離・再ミックス**(AUAudioMix・macOS 26)。4ch First-Order Ambisonics入力が必要 |
 
 ### 言語・テキスト
 

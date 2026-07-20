@@ -1263,3 +1263,156 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
   で prob_circle=1.0、周波数がずれると circle が wave に化ける)。MLActivityClassifier は
   4特徴合成データだと val_acc が伸びない(0.6〜0.7)ので、ライブ実証済みデータ/モデルを使う
 - sample.toe 保存済み。**次回TD再起動で Coremlchop/coremldetect のゴーストは Create Dialog から消える**
+
+### 2026-07-20 README横断調査と次期プラグイン優先順位
+
+- ルートREADMEと全58件の利用例に対応する各READMEを再調査。主要なApple ML/メディア領域は既に広く実装済み:
+  Vision姿勢・顔・手・追跡・OCR・文書・マスク、Core ML TOP/CHOP/DAT、Create ML 8タスク、
+  NaturalLanguage解析、Foundation Models、翻訳、音声認識/合成/分類、Object Capture、深度点群、
+  RealityKit Splat、Cinematic、VideoToolbox補間/超解像/ノイズ除去。
+- 過去候補の `LanguageAnalyze` は既存 **TextAnalyze DAT**(言語/感情/固有表現/類似度)と重複、
+  `ObjectCapture DAT/SOP` は既存 **RealityKit Capture SOP**、`TextToScene` は既存
+  **Foundation Model DATの構造化出力**で構成可能。新規OPを増やす前に既存OP拡張/サンプル化を優先する。
+- README未掲載・未追跡の `SpatialAudio/` と `SpatialMixer/` にCHOP実装ソースとbuild.shが存在する。
+  前者はmono音源のHRTF 3D配置、後者は多ch bedのbinaural mix。まずビルド/TD実音検証、README、
+  ルート一覧、sample.toe、常設登録を完了して正式Plugin化する。
+- 次期優先順位:
+  1. **Spatial Audio CHOP / Spatial Mixer CHOPの完成**(既存未完了資産、音声系の明確な穴)
+  2. **Cinematic Audio Mix CHOP**(設計済み。対応Spatial Audio動画のspeech/ambience再ミックス)
+  3. **Video Writer DAT**(TOP+CHOPをAVAssetWriterでHEVC/H.264/ProResへ記録)
+  4. **Training Recorder DAT**(VisionPose/Hand/音声等をCreateML用recording/label付きDatasetへ収録)
+  5. **Video Timeline / Export DAT**(AVMutableCompositionでカット/結合/速度/音声mix、非同期export)
+  6. **Caption Author DAT**(SpeechText→SRT/WebVTT/AVCaption、動画字幕track書き出し)
+  7. **AR Bridge SOP/CHOP**(既存Multipeer iOS基盤でARKit anchor/mesh/depthをMac TDへ送信)
+  8. **RoomPlan SOP/DAT**(iPhone LiDARで収録したCapturedRoomの壁/開口/家具/寸法を出力)
+  9. **Text Analyze拡張**(新規OPでなく、token/POS/lemmaとembedding vector出力を追加)
+  10. **Foundation Model Tool Calling拡張**(TDノード読取/操作を明示的なtool schemaで接続)
+  11. **FCPXML DAT**(TDの編集結果をFinal Cut Proへ受け渡すinterchange)
+  12. **Spatial Video TOP/DAT**(MV-HEVC左右眼、mono/stereo変換、metadata)
+- `Generated Subtitles(macOS 27)`は主にAVPlayer再生時の自動機能で、任意字幕を抽出する汎用APIでは
+  ないため優先度を下げる。SceneKitはdeprecated、Model I/O単体SOPはTD標準3D I/Oと重複が大きい。
+
+### 2026-07-20 マイナーなmacOS公開API横断調査
+
+- 一般的なVision/Core ML/AVFoundation以外をApple公式資料で調査。TDとの相性が特に高い候補:
+  1. **Core Audio Process Tap CHOP**: macOS 14.2+の`CATapDescription`/
+     `AudioHardwareCreateProcessTap`で、指定アプリまたは複数プロセスの出力だけをcapture。mono/stereo
+     mixdown、exclude、mute可能。現SystemAudio CHOPの画面収録ベース全体音声と明確に差別化できる。
+  2. **Gameplay Agents CHOP/SOP**: `GKAgent2D/3D`、Goal、Behavior、Pathでseek/flee/avoid/separation/
+     alignment/cohesionと経路追従。TDの多数インスタンス/粒子/群集制御に向く。
+  3. **Gameplay Pathfind SOP**: `GKGraph`/Grid/Obstacle/MeshGraphで障害物回避最短経路をPolyline出力。
+  4. **Image Capture DAT/TOP**: ImageCaptureCoreでUSBカメラのファイル/metadata/thumbnail、テザー撮影、
+     スキャナのoverview scan/本scanを制御。通常のAVCapture非対応の静止画カメラ/スキャナ用途。
+  5. **Core Spotlight DAT**: macOS 15+の`CSUserQuery`がアプリ独自indexに対してOS内蔵semantic search。
+     macOS 27はFoundation Models用`SpotlightSearchTool`も追加。ただしMac全体の私的Spotlight indexを
+     無制限に検索するAPIではなく、主に自アプリが登録したコンテンツ向け。
+  6. **Quick Look TOP**: `QLThumbnailGenerator`で画像/RAW/PDF/テキスト/音声/動画など任意ファイルの
+     OS標準thumbnailを非同期CGImage出力。ファイルブラウザ/メディア一覧向け。
+  7. **ColorSync TOP/DAT**: ICC profile列挙・変換、display/device色特性、macOS 27 betaの
+     headroom-adaptive HDR gain curve metadata。展示の複数display/projection色管理に有用。
+  8. **CoreWLAN CHOP/DAT**: Wi-Fi RSSI/noise/channel/rate/interface/event。位置推定より、会場の
+     無線状態可視化・品質連動演出向け。network scan/SSID情報は位置情報権限等の制限を実測確認する。
+  9. **Gameplay Noise TOP/SOP**: Perlin/Billow/Ridged/Voronoi/Cylinder/Sphereの2D/3D procedural field。
+     面白いがTD標準Noise TOP/SOPと重複が大きく、Apple API採用理由は弱い。
+  10. **Live Photo TOP/Writer**: `PHLivePhotoEditingContext.frameProcessor`で写真+短い動画+音声を
+      フレーム編集。Photos権限/asset workflowが必要。
+- 補助候補: PDFKit DAT/TOP(PDF text/outline/form/annotation/render)、MapKit Snapshot TOP(地図/衛星/3D
+  building)、iBeacon CHOP(CoreLocation相対近接)、IOHID CHOP(任意USB HID)、Core Haptics Out CHOP
+  (Mac本体ではなく対応game controller actuator)。
+- **別製品扱い**: CoreMediaIO Virtual CameraはmacOS 12.3+だが署名済みhost app+System Extension+
+  App Group+管理者承認が必要。MediaExtensionの独自format reader/video decoder/RAW processorも
+  ExtensionKit bundle+host appが必要。通常の`.plugin`単体では配布できない。
+- 非推奨/注意: SensorKitはMacの一般センサー取得APIではない。Mac内蔵ambient light等のprivate APIは
+  使用しない。Core HapticsはMac本体のTaptic Trackpadを汎用振動器として制御できず、主にcontroller用。
+
+### 2026-07-20 ImageCaptureCoreテザー撮影・ライブビュー調査
+
+- ImageCaptureCoreにはメーカー/機種の固定compatibility listがなく、接続後の
+  `ICCameraDevice.capabilities`で機能を判定する。リモートシャッターは
+  `ICCameraDeviceCanTakePicture`、本体シャッター併用は
+  `ICCameraDeviceCanTakePictureUsingShutterReleaseOnCamera`、PTP pass-throughは
+  `ICCameraDeviceCanAcceptPTPCommands`を見る。PTP対応でもremote capture対応とは限らない。
+- 公開標準機能: device/file/folder列挙、metadata/thumbnail、部分read/download/delete、battery、clock sync、
+  `requestTakePicture`による静止画capture、新規ファイルevent→自動download。macOS 14以降は標準take
+  picture対応cameraでtetheringが既定有効となり、旧`requestEnableTethering`はdeprecated/no-op。
+- **ImageCaptureCoreに汎用live-view/viewfinder frame stream APIはない**。`requestSendPTPCommand`は可能だが、
+  live viewは多くがCanon/Nikon/Sony固有PTP opcode/data formatであり、メーカー別実装・対応表・SDK規約が必要。
+- リアルタイムpreviewの堅実な経路:
+  1. cameraのUSB webcam/UVC mode→AVFoundation/TD Video Device In
+  2. clean HDMI→capture card→TD Video Device In
+  3. Canon EDSDK / Sony Camera Remote SDK / Nikon Camera Remote SDK(MAID)でEVF/live-view取得
+  4. ImageCaptureCore標準のみなら、撮影→生成file event→thumbnail/full image downloadの低速プレビュー
+- Pluginを作るならv1はブランド非依存の**still tether**に限定し、起動時に実機capability tableをDAT出力。
+  Live Viewは`Backend: UVC / Canon / Sony / Nikon`の別TOPまたは後続版にする。メーカーSDKバイナリは
+  ライセンス確認なしにrepoへ同梱しない。検証対象cameraの正確な型番・firmware・USB modeをREADMEに残す。
+
+### 2026-07-20 Sony α7 Camera Remote SDK対応調査
+
+- 2026-07-20時点の公式Camera Remote SDK最新は **Ver.2.02.00(2026-06-10)**、macOS 14.1/15.1/26、
+  USB・有線LAN・Wi-Fi(実際のphysical layerは機種別)。Apple Silicon対応macOS SDKあり。
+- 公式対応α7系: `ILCE-7RM6 / 7RM5 / 7RM4A / 7RM4 / 7CR / 7SM3 / 7M5 / 7M4 /
+  7CM2 / 7C`。**α7/II/III、α7R/RII/RIII、α7S/SIIはCamera Remote SDK非対応**。Imaging Edge
+  Webcam/Mobileの対応表はより広いが、Camera Remote SDK対応を意味しない。
+- 共通中心機能: device connect/disconnect、live-view frame取得、remote shutter/AF、静止画/動画操作、
+  exposure/ISO/aperture/shutter/WB等property get/set、状態/event、撮影file transfer、複数台制御。
+  個々のproperty・接続方式はSDK同梱Function list/API listとruntime support確認を正とする。
+- 公開release noteから確定する主な差:
+  - **α7 IV**: Wi-Fi、約100設定拡張、full remote、remote control+file transfer同時、optical zoom absolute、
+    exposure通知timing、動画menu/TC/UB、camera内data delete。TD統合の第一検証機に最適。
+  - **α7R V**: full remote、exposure通知timing、動画menu/TC/UB、処理高速化。高解像still向け。
+  - **α7S III**: Wi-Fi、約100設定拡張、camera内data delete、動画/RAW出力色域property変更注意。
+  - **α7CR / α7C II**: focus absolute position、focal length、interval/AF追従等、camera内delete。
+    firmware更新後にfocus position値の再calibrationが必要。
+  - **α7R IV/IVA / α7C**: 初期世代SDKのbasic remote/live view/capture/file transfer中心。
+  - **α7 V / α7R VI**: Ver.2.01/2.02で新規追加。詳細差は登録後の最新版API listで確認する。
+- Sony公式SDKは無償・商用販売可だが、日本ページでは**個人へ提供不可**、利用/商用は法人の許諾申請が
+  必要。したがってrepoへSDK dylib/headerを直接commitせず、ユーザー取得SDKをbuild時に指定する設計。
+  OSS公開可能部分とSony binary dependent backendを分離する。firmwareとSDK versionの組合せも固定記録する。
+
+### 2026-07-20 FUJIFILM Camera Control SDK対応調査
+
+- 公式名は **FUJIFILM X Series and GFX System Digital Camera Control SDK**。現行公開は
+  Ver.1.34(2025-11-12)、macOS 10.12〜26、USBとTCP/IP(Wi-Fi AP経由)対応。画像自動転送と
+  compatible cameraのbasic remote controlsを提供。RAF RAW現像APIは含まれない。
+- 公式対応機種(2026-07-20): X-M5、X-T3、X-T4、X-Pro3、X-S10(FW 2.00+)、X-H2S、X-H2、
+  X-T5、X-S20、GFX 50S/50R/100/100S/50S II/100 II/100S II/100RF、GFX ETERNA 55。
+  X-T2以前、X-T30系、X-T50、X100系等は現行SDK一覧にない。Webcam/XApp対応とSDK対応を混同しない。
+- SDKで期待できる中心機能: connect、camera information/status、live-view/preview、remote shutter、
+  recording control、exposure parameters(Shutter/Aperture/ISO/EV)、WB等の基本property、focus drive、
+  撮影fileの自動transfer。実際のproperty writable/readable差はmodel/FWごとにSDK header/runtime確認。
+- TDでは`Fujifilm Camera TOP`(live view)、CHOP(property/status)、DAT(device/property/file events)に分離し、
+  SDK dylib/headerをrepoへ含めず`FUJIFILM_SDK_PATH`からbuildする方式が妥当。高品質映像はSDK preview
+  ではなくHDMI capture併用を推奨。
+- **重大な契約注意**: 個人向けEULA/公式ページは、SDKで接続・制御した対応cameraがメーカー限定保証の
+  対象外になると明記。利用前にユーザーへ明示し、検証機の保証状態を確認する。SDKはroyalty-freeで、
+  Libraryは自作systemへobject codeとして組み込んで顧客配布可能だが、GPL/LGPL等のOSS条件をSDKへ
+  課すことは禁止。TDAppleML本体のlicenseと分離し、SDK backendはoptional binary componentにする。
+
+### 2026-07-20 空間音響4プラグイン実装(Spatial Audio / Spatial Mixer / PHASE / Audio Mix)
+
+ユーザー指定の空間音響4件を実装。全て純ObjC++(Swiftヘルパ不要)・M2実機検証。
+
+- **Spatial Audio CHOP**(`Spatialaudio`・AVAudioEnvironmentNode): モノ音源を3D配置しHRTF
+  バイノーラルでTDに戻す。manual rendering(offline)+ AVAudioSourceNode。実測: 方位-90°で
+  rmsL/R=1.67、+90°で0.64(定位反転)
+- **Spatial Mixer CHOP**(`Spatialmixer`): 多chサラウンドを各ch標準スピーカー位置のmono sourceとして
+  envでバイノーラル化。実測: ステレオ(左大/右小)でL/R=1.14。AUSpatialMixer('3dem')の多ch生設定は
+  manual renderで不安定(segfault)だったため env+positioned source に変更
+- **PHASE CHOP**(`Phase`): Apple PHASEで物理ベース空間化してデバイス(ヘッドホン)へ再生。
+  **PHASEは出力バッファ取得APIが無くTDに音を戻せない**ため再生モデル。PullStreamNodeの
+  renderBlock(リアルタイムスレッド)へロックフリーSPSCリングバッファでcookから供給。実測:
+  playing=1/buffered=8820/rendering=1(稼働・デバイス再生)。ドライ入力はパススルー
+- **Audio Mix CHOP**(`Audiomix`・AUAudioMix 'amix'・macOS26): 空間音声のspeech/ambience分離。
+  実測: input_ch=4/output_ch=5/renders>0。**'amix'は4ch First-Order Ambisonics(layoutTag 0x930004)
+  入力専用・出力5ch**で、標準ステレオは-10868拒否。AU自身のinputBusses[0].formatでconnect。
+  合成入力は無音で、実分離には4chアンビソニックス素材が必要(未入手のため実分離は未検証)
+
+- **踏んだ罠(pitfalls.md反映)**: ①**オーディオフィルタCHOPは timeslice=true**。入力と異なるch数を
+  出すなら `getOutputInfo` で **true+numChannels明示**が必須(falseだと出力が入力=モノ1chに一致し
+  `channels[1]`書き込みが範囲外で**TD即クラッシュ**・実際に踏んで修正)。②AVAudioSourceNodeは
+  AVAudio3DMixing準拠でposition/HRTF直接設定可。③多音源は音源ごと独立read position(共有だとプル順で
+  壊れる)。④AUSpatialMixer多ch生設定はsegfault。⑤AUAudioMixは4ch FOA専用。⑥PHASEはデバイス出力専用
+- 4件ともビルド・署名・インストール・TD再起動後の生成/実データ検証済み。README(各+ルート英日)更新
+- 検証中にTDが1度クラッシュ(上記①のバグ)→ 修正版で再検証しクラッシュ再現せず
+- 次にやること: PHASEのEarly/Late Reverbの実聴、Audio Mixの4chアンビソニックス実素材での分離検証、
+  sample.toe への利用例追加
