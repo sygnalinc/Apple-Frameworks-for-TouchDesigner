@@ -56,14 +56,14 @@ static bool fileHasContent(const std::string& path)
     return f.good() && f.tellg() > 0;
 }
 
-class TrainingRecorderCHOP final : public CHOP_CPlusPlusBase
+class CreateMLTrainingRecorderCHOP final : public CHOP_CPlusPlusBase
 {
 public:
-    explicit TrainingRecorderCHOP(const OP_NodeInfo*)
+    explicit CreateMLTrainingRecorderCHOP(const OP_NodeInfo*)
     {
         mySessionTag = "r" + std::to_string((long)time(nullptr));
     }
-    ~TrainingRecorderCHOP() override {}
+    ~CreateMLTrainingRecorderCHOP() override {}
 
     void getGeneralInfo(CHOP_GeneralInfo* info, const OP_Inputs* in, void*) override
     {
@@ -155,7 +155,7 @@ public:
 
     void setupParameters(OP_ParameterManager* m, void*) override
     {
-        const char* P = "Training Recorder";
+        const char* P = "CreateML Training Recorder";
         {
             OP_StringParameter p("Outputpath");
             p.label = "Output CSV";
@@ -308,9 +308,9 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* info)
 {
     if (!info->setAPIVersion(CHOPCPlusPlusAPIVersion))
         return;
-    info->customOPInfo.opType->setString("Trainingrecorder");
-    info->customOPInfo.opLabel->setString("Training Recorder");
-    info->customOPInfo.opIcon->setString("TRN");
+    info->customOPInfo.opType->setString("Createmltrainingrecorder");
+    info->customOPInfo.opLabel->setString("CreateML Training Recorder");
+    info->customOPInfo.opIcon->setString("CTR");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;
@@ -318,12 +318,12 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* info)
 
 DLLEXPORT CHOP_CPlusPlusBase* CreateCHOPInstance(const OP_NodeInfo* info)
 {
-    return new TrainingRecorderCHOP(info);
+    return new CreateMLTrainingRecorderCHOP(info);
 }
 
 DLLEXPORT void DestroyCHOPInstance(CHOP_CPlusPlusBase* instance)
 {
-    delete static_cast<TrainingRecorderCHOP*>(instance);
+    delete static_cast<CreateMLTrainingRecorderCHOP*>(instance);
 }
 
 }   // extern "C"

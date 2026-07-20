@@ -1651,3 +1651,43 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **StereoCameraBaseline は micrometers・HorizontalFieldOfView は thousandths of a degree**(CFNumber)
 - **Training Recorder は CHOP**(DATはCHOP入力不可)。CreateML Activity CSV は `recording`/`label` 列名が
   CreateMLHelper の既定と一致している必要がある(recordingで系列化)
+
+### 2026-07-20 2件リネーム(Training Recorder→CreateML Training Recorder / Foundation Model→AFM Core)+ Network Discovery DAT
+
+- **Training Recorder → CreateML Training Recorder**(ユーザー指示「CreateMLとセットで使うと分かる名前に」):
+  opType `Trainingrecorder`→`Createmltrainingrecorder`、opLabel「CreateML Training Recorder」、icon TRN→CTR。
+  フォルダ/ソース/build.sh/README/ルートREADME/バンドルを改名(git mv)
+- **Foundation Model → AFM Core**(ユーザー指示「FoundationModelは一般的すぎる。Apple Foundation Models の
+  ローカル版なので AFM Core に」): opType `Foundationmodel`→`Afmcore`、opLabel「AFM Core」、icon FDM→AFM。
+  フォルダ FoundationModel→AFMCore、ソース FoundationModelDAT.mm→AFMCoreDAT.mm。**Swiftヘルパ(module
+  FMHelper・dylib libFMHelper・C ABI fm_)は内部保持**(build.sh は NAME/ソース/plist識別子のみ置換)
+- 2件とも再ビルド・旧バンドル削除・新バンドル設置。TD再起動後に `Createmltrainingrecorder` /
+  `Afmcore` が errs=0 で生成できることを確認
+- **注意**: opType変更で sample.toe の旧参照(examples の Foundationmodel、fm_structured_demo)は
+  TD再起動後にロードエラー。次に examples 更新時に Afmcore へ貼り直す(ユーザーは.toe破損許容済み)
+
+- **Network Discovery DAT**(新規・`Networkdiscovery`・icon NWD): Bonjour(NSNetServiceBrowser)で
+  LAN内サービスを発見し `service_type/name/hostname/ip4/ip6/port/txt` を出力。Service Types を複数同時
+  ブラウズ、resolve で host/IP/port/TXT を取得
+  - **踏んだ罠①**: NSNetServiceBrowser は**ランループ駆動**。cook スレッド任せでは**コールバックが
+    全く発火せず結果0**。**専用スレッド+常駐ランループ**(NSMachPort でランループを生かす=ビジー
+    ループ防止)でブラウズする
+  - **踏んだ罠②(TDクラッシュ)**: 専用スレッド版で cook から `performSelector:onThread:` で設定を
+    渡した初版が **EXC_BAD_ACCESS でTDクラッシュ**(faultingは別スレッドのPython param binding=
+    ヒープ破壊の疑い)。**cross-thread performSelector を全廃**し、cook は設定を `@synchronized` で
+    **保留キューに積むだけ**、browserスレッドが自分のループ内で保留設定を適用する polled 方式に変更。
+    NSNetServiceBrowser/NSNetService の生成・破棄・列挙は**全て browserスレッド上**に限定し、cook 側は
+    `@synchronized` スナップショット(NSDictionary配列=不変)を読むだけ、で解決
+  - Local Network 権限(責任プロセスはTD本体)が要る。全端末一覧ではなく広告サービスのみ見える。
+    Active IPv4 Scan は将来
+  - **実測**: `_airplay/_raop/_googlecast` で **10サービス発見**、hostname/ip4(192.168.49.10)/
+    ip6/port(7000)/TXT(at=4;model=…)まで resolve。TD安定(クラッシュ再現せず)
+  - README(新規+ルート英日)更新
+
+### 新規ハマりどころ(Network Discovery で発見)
+
+- **Bonjour(NSNetServiceBrowser/NSNetService)は必ず専用スレッド+常駐ランループで回す**。
+  cookスレッド任せだとコールバックが発火しない。さらに **cook→browserスレッドへ
+  `performSelector:onThread:` で状態を渡すのは危険**(TDでEXC_BAD_ACCESSを実際に踏んだ)。
+  設定は `@synchronized` の保留キューに積み、browserスレッドが自分で適用する polled 方式にする。
+  Bonjourオブジェクトの生成/破棄/列挙は browserスレッドに一極集中させ、cookは不変スナップショットを読むだけにする

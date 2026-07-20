@@ -107,7 +107,7 @@ grouped by category.
 | [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img** (Core ML Stable Diffusion / Image Playground) |
 | [CoreImage Code](CoreImageCode/) | TOP | **Generate** QR / Aztec / PDF417 / Code128 (no external library) |
 | [CreateML](CreateML/) | DAT | **Unified on-device trainer** — one `Task` menu for Image / Hand Pose / Action (body) / Hand Action / Sound / Activity (CHOP series) / Tabular classifier & regressor → `.mlmodel`. Output models are read by CoreML TOP / CoreML Motion CHOP / SoundClass etc. |
-| [Training Recorder](TrainingRecorder/) | CHOP | **Record a CHOP time-series → CreateML dataset CSV** (recording / label / feature columns). Capture VisionPose/Hand takes in TD, label them, feed straight to CreateML (Activity) |
+| [CreateML Training Recorder](CreateMLTrainingRecorder/) | CHOP | **Record a CHOP time-series → CreateML dataset CSV** (recording / label / feature columns). Capture VisionPose/Hand takes in TD, label them, feed straight to CreateML (Activity) |
 | [CoreML Motion](CoreMLMotion/) | CHOP | **Live gesture inference** — buffer an input CHOP (VisionPose etc.) over the prediction window and classify motion in real time (per-class prob + confidence). Pairs with CreateML's Activity task |
 
 ### Audio & sound
@@ -130,7 +130,7 @@ grouped by category.
 
 | Plugin | Family | What it does |
 |---|---|---|
-| [Foundation Model](FoundationModel/) | DAT | **Apple Intelligence on-device LLM** (macOS 26+). **Structured output (JSON schema)** + **Tool Calling** (the LLM calls a tool, TouchDesigner executes it and returns the result) straight into show control |
+| [AFM Core](AFMCore/) | DAT | **Apple Intelligence on-device LLM** (macOS 26+). **Structured output (JSON schema)** + **Tool Calling** (the LLM calls a tool, TouchDesigner executes it and returns the result) straight into show control |
 | [Translate](Translate/) | DAT | **On-device translation.** Wire to Speech Text for real-time subtitle translation |
 | [Text Analyze](TextAnalyze/) | DAT | Sentiment / language ID / named entities / semantic similarity (JA supported) + **tokens (token / POS / lemma)** and **embedding vectors** (numeric). "Drive visuals from speech mood/topic" |
 | [Caption Author](CaptionAuthor/) | DAT | **Transcription → SRT / WebVTT** subtitles. Uses start/end columns, or auto-sequences text-only rows (SpeechText). Writes the caption file |
@@ -162,6 +162,7 @@ grouped by category.
 | [Quick Look](QuickLook/) | TOP | **OS-standard thumbnail** of any file (PDF / video / 3D / doc / font) via QuickLookThumbnailing |
 | [PDFKit](PDFKit/) | DAT / TOP | **PDFKit** — structure (metadata / outline / text / annotations) + render a page to a texture |
 | [CoreWLAN](CoreWLAN/) | CHOP | **Live Wi-Fi metrics** (CoreWLAN) — RSSI / noise / SNR / TX rate / channel |
+| [Network Discovery](NetworkDiscovery/) | DAT | **Discover LAN services via Bonjour** → service type / name / hostname / IPv4 / IPv6 / port / TXT (auto-find OSC / HTTP / AirPlay devices) |
 | [ColorSync](ColorSync/) | TOP | **ICC / color-space conversion** (sRGB ↔ Display P3 / Adobe RGB / Rec.2020 / .icc) for display-accurate color |
 
 ## Getting started

@@ -105,7 +105,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img**(Core ML Stable Diffusion / Image Playground) |
 | [CoreImage Code](CoreImageCode/) | TOP | QR / Aztec / PDF417 / Code128 の**生成**(外部ライブラリ不要) |
 | [CreateML](CreateML/) | DAT | **統合オンデバイストレーナ**。`Task`メニューで Image / Hand Pose / Action(体)/ Hand Action / Sound / Activity(CHOP時系列)/ Tabular分類・回帰 を切替→`.mlmodel`。出力は CoreML TOP / CoreML Motion CHOP / SoundClass 等が推論 |
-| [Training Recorder](TrainingRecorder/) | CHOP | **CHOP時系列 → CreateML学習用CSV**(recording / label / 特徴列)。VisionPose/Hand等をTD内で収録・ラベル付けし、CreateML(Activity)へ直結 |
+| [CreateML Training Recorder](CreateMLTrainingRecorder/) | CHOP | **CHOP時系列 → CreateML学習用CSV**(recording / label / 特徴列)。VisionPose/Hand等をTD内で収録・ラベル付けし、CreateML(Activity)へ直結 |
 | [CoreML Motion](CoreMLMotion/) | CHOP | 入力CHOP(VisionPose等)を予測窓ぶんバッファして**ライブでジェスチャ分類**(クラス別確率+confidence)。CreateMLのActivityタスクと対 |
 
 ### 音声・音響
@@ -128,7 +128,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
-| [Foundation Model](FoundationModel/) | DAT | **Apple Intelligence オンデバイスLLM**(macOS26+)。**構造化出力(JSONスキーマ)**+**ツール呼び出し**(LLMがツールを要求→TouchDesignerが実行して結果を返す)でショー制御へ直結 |
+| [AFM Core](AFMCore/) | DAT | **Apple Intelligence オンデバイスLLM**(macOS26+)。**構造化出力(JSONスキーマ)**+**ツール呼び出し**(LLMがツールを要求→TouchDesignerが実行して結果を返す)でショー制御へ直結 |
 | [Translate](Translate/) | DAT | **オンデバイス翻訳**。Speech Text 直結でリアルタイム字幕翻訳 |
 | [Text Analyze](TextAnalyze/) | DAT | 感情スコア・言語判定・固有表現・意味的類似度(日本語対応)+**トークン(token / 品詞 / 見出し語)**と**埋め込みベクトル**(数値)。「発話の感情/話題でビジュアル制御」 |
 | [Caption Author](CaptionAuthor/) | DAT | **文字起こし → SRT / WebVTT** 字幕。start/end列、または text だけの行を自動連番(SpeechText)。字幕ファイルも書き出し |
@@ -160,6 +160,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Quick Look](QuickLook/) | TOP | 任意ファイル(PDF/動画/3D/書類/フォント)の**OS標準サムネイル**(QuickLookThumbnailing) |
 | [PDFKit](PDFKit/) | DAT / TOP | **PDFKit** — 構造(メタ/アウトライン/テキスト/注釈)+ ページをテクスチャ描画 |
 | [CoreWLAN](CoreWLAN/) | CHOP | **Wi-Fiの実測値**(CoreWLAN)— RSSI/ノイズ/SNR/送信レート/チャンネル |
+| [Network Discovery](NetworkDiscovery/) | DAT | **Bonjour でLAN内サービスを発見** → タイプ/名前/ホスト名/IPv4/IPv6/ポート/TXT(OSC/HTTP/AirPlay機器の自動発見) |
 | [ColorSync](ColorSync/) | TOP | **ICC/色空間変換**(sRGB ↔ Display P3 / Adobe RGB / Rec.2020 / .icc)で表示装置別の正確な色 |
 
 ## 使い方

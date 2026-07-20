@@ -49,12 +49,12 @@ struct Turn
     std::string text;
 };
 
-class FoundationModelDAT : public DAT_CPlusPlusBase
+class AFMCoreDAT : public DAT_CPlusPlusBase
 {
 public:
-    explicit FoundationModelDAT(const OP_NodeInfo*) {}
+    explicit AFMCoreDAT(const OP_NodeInfo*) {}
 
-    ~FoundationModelDAT() override
+    ~AFMCoreDAT() override
     {
         if (mySession)
             fm_destroy(mySession);
@@ -173,19 +173,19 @@ public:
         {
             OP_StringParameter p("Instructions");
             p.label = "Instructions (System)";
-            p.page = "Foundation Model";
+            p.page = "AFM Core";
             manager->appendString(p);
         }
         {
             OP_StringParameter p("Prompt");
             p.label = "Prompt";
-            p.page = "Foundation Model";
+            p.page = "AFM Core";
             manager->appendString(p);
         }
         {
             OP_NumericParameter p("Temperature");
             p.label = "Temperature";
-            p.page = "Foundation Model";
+            p.page = "AFM Core";
             p.defaultValues[0] = 0.7;
             p.minSliders[0] = 0.0;
             p.maxSliders[0] = 2.0;
@@ -194,7 +194,7 @@ public:
         {
             OP_NumericParameter p("Maxtokens");
             p.label = "Max Tokens";
-            p.page = "Foundation Model";
+            p.page = "AFM Core";
             p.defaultValues[0] = 512;
             p.minSliders[0] = 16;
             p.maxSliders[0] = 2048;
@@ -205,7 +205,7 @@ public:
         {
             OP_NumericParameter p("Keepcontext");
             p.label = "Keep Context (Multi-turn)";
-            p.page = "Foundation Model";
+            p.page = "AFM Core";
             p.defaultValues[0] = 1;
             manager->appendToggle(p);
         }
@@ -214,13 +214,13 @@ public:
             // 空なら通常のテキスト生成
             OP_StringParameter p("Schema");
             p.label = "Output Schema (name:type)";
-            p.page = "Foundation Model";
+            p.page = "AFM Core";
             manager->appendString(p);
         }
         {
             OP_NumericParameter p("Maxrows");
             p.label = "Max Rows";
-            p.page = "Foundation Model";
+            p.page = "AFM Core";
             p.defaultValues[0] = 50;
             p.minSliders[0] = 1;
             p.maxSliders[0] = 200;
@@ -273,13 +273,13 @@ public:
         {
             OP_NumericParameter p("Submit");
             p.label = "Submit";
-            p.page = "Foundation Model";
+            p.page = "AFM Core";
             manager->appendPulse(p);
         }
         {
             OP_NumericParameter p("Clear");
             p.label = "Clear Conversation";
-            p.page = "Foundation Model";
+            p.page = "AFM Core";
             manager->appendPulse(p);
         }
     }
@@ -394,10 +394,10 @@ FillDATPluginInfo(DAT_PluginInfo* info)
 {
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
-    info->customOPInfo.opType->setString("Foundationmodel");
-    info->customOPInfo.opLabel->setString("Foundation Model");
+    info->customOPInfo.opType->setString("Afmcore");
+    info->customOPInfo.opLabel->setString("AFM Core");
     info->customOPInfo.authorName->setString("sygnal");
-    info->customOPInfo.opIcon->setString("FDM");
+    info->customOPInfo.opIcon->setString("AFM");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
 }
@@ -405,13 +405,13 @@ FillDATPluginInfo(DAT_PluginInfo* info)
 DLLEXPORT DAT_CPlusPlusBase*
 CreateDATInstance(const OP_NodeInfo* info)
 {
-    return new FoundationModelDAT(info);
+    return new AFMCoreDAT(info);
 }
 
 DLLEXPORT void
 DestroyDATInstance(DAT_CPlusPlusBase* instance)
 {
-    delete (FoundationModelDAT*)instance;
+    delete (AFMCoreDAT*)instance;
 }
 
 }   // extern "C"

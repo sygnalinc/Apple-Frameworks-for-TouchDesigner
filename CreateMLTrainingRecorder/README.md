@@ -1,4 +1,4 @@
-# Training Recorder CHOP
+# CreateML Training Recorder CHOP
 
 入力CHOP(VisionPose / VisionHand / SoundFeatures など)の**時系列を、CreateML DAT
 (Activity task)がそのまま学習できるCSVデータセットへ収録**する。TD内で「関節/特徴を
@@ -62,5 +62,5 @@ CreateML DAT の Activity task はこの `recording` 列で系列化し、`label
 ## ビルド
 
 ```
-cd TrainingRecorder && ./build.sh   # → build/TrainingRecorderCHOP.plugin
+cd CreateMLTrainingRecorder && ./build.sh   # → build/TrainingRecorderCHOP.plugin
 ```

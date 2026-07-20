@@ -282,3 +282,14 @@
 - PID指定は `kAudioHardwarePropertyTranslatePIDToProcessObject` で PID→プロセスAudioObjectID変換
 - **Terminalからのprobeは捕捉できるがTD内で0** のときは、まず sampleRate 未設定と Exclude を疑う
   (TCCではなかった。実測でTD内でも peak=0.535 捕捉)
+
+## Network / Bonjour(NSNetServiceBrowser)
+
+- **必ず専用スレッド+常駐ランループで回す**。TDのcookスレッド任せだとブラウズ/リゾルブの
+  コールバックが発火せず結果0になる。ランループは `NSMachPort` を1つ足して生かす
+  (足さないと `runMode:beforeDate:` が即returnしてビジーループ)
+- **cook→browserスレッドへ `performSelector:onThread:` で状態を渡すのは危険**(実測でTDが
+  EXC_BAD_ACCESSクラッシュ)。設定は `@synchronized` の**保留キューに積むだけ**にし、
+  browserスレッドが自分のループ内で適用する **polled 方式**にする
+- **NSNetServiceBrowser / NSNetService の生成・破棄・列挙は全て browserスレッドに一極集中**。
+  cook 側は不変スナップショット(NSDictionary配列)を `@synchronized` で読むだけにする
