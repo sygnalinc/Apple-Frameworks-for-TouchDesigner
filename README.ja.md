@@ -143,13 +143,12 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Spatial Video](SpatialVideo/) | DAT | **MV-HEVC 空間ビデオのメタデータ**: 左右眼・ヒーローアイ・カメラ基線・水平視野角・視差調整 |
 | [Spatial Video](SpatialVideo/) | TOP | **MV-HEVC 立体視の左右眼をデコード** → Left / Right / Side-by-Side BGRA(両レイヤーを tagged buffer group で分離) |
 | [Vision Contours](VisionContours/) | SOP | 画像の輪郭を**閉じたLineジオメトリ**へ(Sweep/Extrude/Particle 直結) |
-| [Screen Capture](ScreenCapture/) | TOP | ディスプレイ/単一ウインドウの**画面収録**(最大120fps) |
+| [Screen Capture](ScreenCapture/) | TOP | ディスプレイ/**名前で選べる単一ウインドウ**の**画面収録**(最大120fps) |
 | [CoreAudio Tap](CoreAudioTap/) | CHOP | **指定アプリの音だけ**をタップ(Core Audio Process Tap・macOS 14.4+)or 全システム音→48kHz stereo。Screen Captureより粒度が細かい |
 | [Spotlight](Spotlight/) | DAT | **OS全体のローカルファイル検索**(Spotlight / NSMetadataQuery)— 名前/内容/生kMDItem述語 |
 | [IOHID](IOHID/) | CHOP | **任意のUSB/Bluetooth HIDのraw入力**(ゲームパッド/ペダル/ノブ/センサ)IOHIDManager |
 | [Image Capture](ImageCapture/) | DAT | **テザー接続カメラ/スキャナの列挙**(ImageCaptureCore)— 名前/種別/uuid/接続 |
 | [CoreLocation Beacon](CoreLocationBeacon/) | CHOP | **iBeacon測距**(CoreLocation)— major/minor/rssi/近接度/推定距離 |
-| [Live Photo](LivePhoto/) | TOP | **Live Photoの動画コンポーネント各フレーム**を任意時刻で(Photos / PHLivePhoto) |
 | [Multipeer In / Out](MultipeerCHOP/) | CHOP | **iPhone/iPad をワイヤレスセンサーに**(ジャイロ/加速度/タッチを低遅延受信)。**iOSアプリ同梱** |
 | [Multipeer In / Out](Multipeer/) | DAT | Mac/iPhone 間の**ローカルP2Pテキスト**(自動接続・サーバー不要) |
 | [Game Controller](GameController/) | CHOP | PS5/Xbox/MFi **ゲームパッド入力**(スティック/トリガー+モーション+ランブル) |

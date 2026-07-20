@@ -145,13 +145,12 @@ grouped by category.
 | [Spatial Video](SpatialVideo/) | DAT | **MV-HEVC spatial video metadata**: left/right eye, hero eye, camera baseline, horizontal FOV, disparity adjustment |
 | [Spatial Video](SpatialVideo/) | TOP | **Decode MV-HEVC stereo eyes** → Left / Right / Side-by-Side BGRA (both video layers via tagged buffer groups) |
 | [Vision Contours](VisionContours/) | SOP | Image contours → **closed Line geometry** (wire into Sweep / Extrude / Particle) |
-| [Screen Capture](ScreenCapture/) | TOP | **Screen recording** of a display / single window (up to 120fps) |
+| [Screen Capture](ScreenCapture/) | TOP | **Screen recording** of a display or **a single window picked by name from a dropdown** (up to 120fps) |
 | [CoreAudio Tap](CoreAudioTap/) | CHOP | **Tap a single app's audio** (Core Audio Process Tap, macOS 14.4+) or all system audio → 48kHz stereo. Finer-grained than Screen Capture |
 | [Spotlight](Spotlight/) | DAT | **OS-wide local file search** (Spotlight / NSMetadataQuery) — name / content / raw kMDItem predicate |
 | [IOHID](IOHID/) | CHOP | **Raw input from any USB/Bluetooth HID** (gamepad / pedal / knob / sensor) via IOHIDManager |
 | [Image Capture](ImageCapture/) | DAT | **List tethered cameras / scanners** (ImageCaptureCore) — name / type / uuid / transport |
 | [CoreLocation Beacon](CoreLocationBeacon/) | CHOP | **iBeacon ranging** (CoreLocation) — major / minor / rssi / proximity / distance |
-| [Live Photo](LivePhoto/) | TOP | **Live Photo video-component frames** at any time (Photos / PHLivePhoto) |
 | [Multipeer In / Out](MultipeerCHOP/) | CHOP | **Turn an iPhone/iPad into a wireless sensor** (low-latency gyro / accel / touch). **iOS app included** |
 | [Multipeer In / Out](Multipeer/) | DAT | **Local P2P text** between Mac / iPhone (auto-connect, no server) |
 | [Game Controller](GameController/) | CHOP | PS5 / Xbox / MFi **gamepad input** (sticks / triggers + motion + rumble) |

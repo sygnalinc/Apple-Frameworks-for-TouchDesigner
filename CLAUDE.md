@@ -1773,3 +1773,18 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   フォルダ git rm・常設バンドル削除・ルートREADME英日から除去・sample.toe の examples/SystemAudio 削除
 - **CoreAudio Tap の opLabel を "CA Tap" → "CA Process Tap"**(表示名のみ。opType `Coreaudiotap`・
   フォルダ・ファイルは不変=sample.toe無傷)。リビルド・再インストール済み
+
+### 2026-07-20 Live Photo 削除 + Screen Capture のウインドウ名プルダウン化
+
+- **Live Photo TOP を削除**(ユーザー判断)。フォルダ git rm・常設バンドル削除・ルートREADME英日から除去
+- **Screen Capture の window 選択を「ウインドウ名の動的プルダウン」に**:
+  - `appendDynamicStringMenu` + `buildDynamicMenu` で「アプリ名 - タイトル」を列挙。内部値は
+    **ウインドウID(安定)**で選択(一覧順が変わってもズレない)
+  - ウインドウ一覧は非同期(SCShareableContent)でキャッシュ。生成時 / Restart / 約120cook毎に更新
+  - start は選択windowIDに一致するSCWindowを使用(無ければ Display Index にフォールバック)
+  - **踏んだ罠**: `appendDynamicStringMenu` は **defaultValue が空文字だと append 失敗**し、
+    パラメータが生成されない(Active/Mode等は出るのに Window だけ出ない現象)。
+    公式サンプル同様、**非空の defaultValue("0")** を設定して解決
+  - **実測**: window モードで **40ウインドウ**を列挙(Chrome/ChatGPT/プレビュー等)、
+    選択したウインドウを 1235x831 で取り込み(警告なし)を確認
+  - 検証中の MCP 切断は TD/MCP の一時不安定(クラッシュレポート無し・TDは稼働継続)

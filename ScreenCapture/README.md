@@ -11,12 +11,19 @@ Info CHOPは`executes / frames / running / sources / width / height`。
 
 ## パラメータ
 
-Display/Window、Source Index、出力Width/Height、Frame Rate、Show Cursor、Restart Capture。
+Source Type(Display / Window)、**Window**(window時=ウインドウ名のプルダウンから選択)、
+Display Index(display時)、出力Width/Height、Frame Rate、Show Cursor、Restart Capture。
+
+- **Window** は「アプリ名 - ウインドウタイトル」の**動的プルダウン**(現在開いている
+  ウインドウを列挙)。内部値はウインドウID(安定)で選択するため、一覧順が変わっても選択が
+  ずれない。約2秒ごと / Restart で一覧を更新
+- Display モードは Display Index で選ぶ
 
 ## 注意
 
 初回はmacOSの画面収録権限が必要。許可後にTouchDesignerの再起動が必要な場合がある。
-ウインドウ一覧は画面上に存在するものだけを対象とし、Indexは一覧順なので起動状況で変化する。
+ウインドウのプルダウンは非同期で列挙するため、作成直後は数百msで埋まる。選んだウインドウが
+閉じられた場合は Restart で選び直す。
 
 ## ビルド
 
