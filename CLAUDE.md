@@ -1582,3 +1582,24 @@ Gaussian Splat の TD 取り込みを実機(macOS 26.4 / Xcode 26.4)で徹底調
 **次にやること(macOS 27で):** `GaussianSplatComponent`+`GaussianSplatResource` を使い、.ply/USDを自前
 パースしてバッファ投入 → RealityKit Splat TOP を真のsplat描画で再実装。オフスクリーンRealityRendererで
 描けるかは27で要検証(不可ならオンスクリーン→Syphon等)
+
+### 2026-07-20 プラグインのファイル名をopLabel規則へ統一(CoreMLDetect / Cinematic)
+
+opLabelとソース/フォルダ/バンドル名がずれていたものを監査して修正(opType・opLabelは不変)。
+
+- **CoreMLDetect → CoreMLDAT**: opLabel統一で「CoreML」になった際に旧機能名"Detect"が
+  ファイル/フォルダ/バンドルに残っていた。`CoreMLDetect/CoreMLDetectDAT.mm` →
+  `CoreMLDAT/CoreMLDAT.mm`(git mv・クラス名/build.sh/README/ルートREADMEリンク更新)。
+  これでCoreML三兄弟がCoreMLTOP.mm / CoreMLCHOP.mm / CoreMLDAT.mm と揃い、常設バンドルも
+  CoreMLTOP/CoreMLCHOP/CoreMLDAT.plugin(+ImageGen/Motion/SAM2)で統一
+- **Cinematic の2ソースをラベルに合わせて改称**: Multipeer In/Out の先例(ファイル名=各opの
+  ラベル)に倣い、`CinematicCHOP.mm`(opLabel "Cinematic Data")→ `CinematicDataCHOP.mm`、
+  `CinematicTOP.mm`(opLabel "Cinematic Video")→ `CinematicVideoTOP.mm`。フォルダは共有の
+  `Cinematic/`、opTypeも共有の`Cinematic`のまま。バンドルも CinematicDataCHOP/CinematicVideoTOP に
+- **Phase は変更しない**(参考): opLabel "PHASE"(Apple表記の頭字語)だが、opTypeは規則上
+  全大文字にできず`Phase`。フォルダ/ファイル`Phase`/`PhaseCHOP.mm`はopType準拠で正しい
+- opTypeを変えていないため sample.toe の既存 examples は無傷。3型を再起動後にcreateして
+  errs=0・opType不変(Coreml/Cinematic)を確認。examples/CoreMLDetect コンテナのみ
+  CoreMLDAT へ改名して保存(Cinematic例は既にCinematicData/CinematicVideoで一致)
+- 旧バンドル(CoreMLDetectDAT/CinematicCHOP/CinematicTOP.plugin)を削除し新名で再インストール・
+  署名検証OK。TD再起動で反映済み

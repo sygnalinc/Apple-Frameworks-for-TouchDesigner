@@ -26,10 +26,10 @@ static int typeCode(const std::string& t) {
     return 0;
 }
 
-class CinematicCHOP final : public CHOP_CPlusPlusBase {
+class CinematicDataCHOP final : public CHOP_CPlusPlusBase {
 public:
-    CinematicCHOP(const OP_NodeInfo*) { myState = cn_create(); }
-    ~CinematicCHOP() override { if (myState) cn_destroy(myState); }
+    CinematicDataCHOP(const OP_NodeInfo*) { myState = cn_create(); }
+    ~CinematicDataCHOP() override { if (myState) cn_destroy(myState); }
 
     void getGeneralInfo(CHOP_GeneralInfo* g, const OP_Inputs*, void*) override { g->cookEveryFrame = false; g->cookEveryFrameIfAsked = true; g->timeslice = false; }
 
@@ -124,6 +124,6 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     i->customOPInfo.authorName->setString("TDAppleML");
     i->customOPInfo.minInputs = 0; i->customOPInfo.maxInputs = 0;
 }
-DLLEXPORT CHOP_CPlusPlusBase* CreateCHOPInstance(const OP_NodeInfo* i) { return new CinematicCHOP(i); }
-DLLEXPORT void DestroyCHOPInstance(CHOP_CPlusPlusBase* i) { delete static_cast<CinematicCHOP*>(i); }
+DLLEXPORT CHOP_CPlusPlusBase* CreateCHOPInstance(const OP_NodeInfo* i) { return new CinematicDataCHOP(i); }
+DLLEXPORT void DestroyCHOPInstance(CHOP_CPlusPlusBase* i) { delete static_cast<CinematicDataCHOP*>(i); }
 }

@@ -38,6 +38,6 @@ PLIST
   echo "built: $(pwd)/build/$NAME.plugin"
 }
 
-build_one CinematicCHOP CinematicCHOP.mm "$SDK_CHOP" cinematic-chop
-build_one CinematicTOP  CinematicTOP.mm  "$SDK_TOP"  cinematic-top
+build_one CinematicDataCHOP CinematicDataCHOP.mm "$SDK_CHOP" cinematic-chop
+build_one CinematicVideoTOP CinematicVideoTOP.mm  "$SDK_TOP"  cinematic-top
 echo "done ($EPOCH)"

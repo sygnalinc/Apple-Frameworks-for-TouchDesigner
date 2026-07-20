@@ -27,10 +27,10 @@ extern "C" {
 namespace {
 struct Job { std::string file; int mode; double time; float fnum, focus; bool flip, norm; };
 
-class CinematicTOP final : public TOP_CPlusPlusBase {
+class CinematicVideoTOP final : public TOP_CPlusPlusBase {
 public:
-    CinematicTOP(const OP_NodeInfo*, TOP_Context* c) : myContext(c) { myState = cn_create(); myThread = std::thread([this]{ worker(); }); }
-    ~CinematicTOP() override { { std::lock_guard<std::mutex> l(myMutex); myQuit = true; } myCond.notify_all(); if (myThread.joinable()) myThread.join(); if (myState) cn_destroy(myState); }
+    CinematicVideoTOP(const OP_NodeInfo*, TOP_Context* c) : myContext(c) { myState = cn_create(); myThread = std::thread([this]{ worker(); }); }
+    ~CinematicVideoTOP() override { { std::lock_guard<std::mutex> l(myMutex); myQuit = true; } myCond.notify_all(); if (myThread.joinable()) myThread.join(); if (myState) cn_destroy(myState); }
 
     void getGeneralInfo(TOP_GeneralInfo* g, const OP_Inputs*, void*) override { g->cookEveryFrameIfAsked = true; }
 
@@ -132,6 +132,6 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     i->customOPInfo.authorName->setString("TDAppleML");
     i->customOPInfo.minInputs = 0; i->customOPInfo.maxInputs = 0;
 }
-DLLEXPORT TOP_CPlusPlusBase* CreateTOPInstance(const OP_NodeInfo* i, TOP_Context* c) { return new CinematicTOP(i, c); }
-DLLEXPORT void DestroyTOPInstance(TOP_CPlusPlusBase* i, TOP_Context*) { delete static_cast<CinematicTOP*>(i); }
+DLLEXPORT TOP_CPlusPlusBase* CreateTOPInstance(const OP_NodeInfo* i, TOP_Context* c) { return new CinematicVideoTOP(i, c); }
+DLLEXPORT void DestroyTOPInstance(TOP_CPlusPlusBase* i, TOP_Context*) { delete static_cast<CinematicVideoTOP*>(i); }
 }

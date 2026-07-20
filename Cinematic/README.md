@@ -67,7 +67,7 @@ Cinematic動画は転送方法を誤ると**通常動画に平坦化され、深
 ## ビルド
 
 ```
-cd Cinematic && ./build.sh   # → build/CinematicCHOP.plugin + build/CinematicTOP.plugin
+cd Cinematic && ./build.sh   # → build/CinematicDataCHOP.plugin + build/CinematicVideoTOP.plugin
 ```
 
 1フォルダから2バンドルを生成(共有ヘルパ `CinematicHelper` を各バンドルに同梱)。

@@ -1,4 +1,4 @@
-// CoreMLDetect DAT — TouchDesigner カスタムオペレータ(macOS / Core ML + Vision)
+// CoreML DAT — TouchDesigner カスタムオペレータ(macOS / Core ML + Vision)
 //
 // 任意の物体検出 Core ML モデル(YOLOv3 等)をロードし、入力 TOP の映像から
 // 「何が・どこに」を検出してテーブル出力する汎用オペレータ。
@@ -44,15 +44,15 @@ struct Detection
 
 static std::string nsstr(NSString* s) { return s ? std::string([s UTF8String]) : std::string(); }
 
-class CoreMLDetectDAT final : public DAT_CPlusPlusBase
+class CoreMLDAT final : public DAT_CPlusPlusBase
 {
 public:
-    explicit CoreMLDetectDAT(const OP_NodeInfo*)
+    explicit CoreMLDAT(const OP_NodeInfo*)
     {
         myWorker = std::thread([this] { workerLoop(); });
     }
 
-    ~CoreMLDetectDAT() override
+    ~CoreMLDAT() override
     {
         {
             std::lock_guard<std::mutex> lock(myMutex);
@@ -510,13 +510,13 @@ FillDATPluginInfo(DAT_PluginInfo* info)
 DLLEXPORT DAT_CPlusPlusBase*
 CreateDATInstance(const OP_NodeInfo* info)
 {
-    return new CoreMLDetectDAT(info);
+    return new CoreMLDAT(info);
 }
 
 DLLEXPORT void
 DestroyDATInstance(DAT_CPlusPlusBase* instance)
 {
-    delete static_cast<CoreMLDetectDAT*>(instance);
+    delete static_cast<CoreMLDAT*>(instance);
 }
 
 }   // extern "C"

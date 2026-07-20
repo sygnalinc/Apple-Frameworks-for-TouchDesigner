@@ -55,7 +55,7 @@ grouped by category.
 
 | Plugin | Family | What it does |
 |---|---|---|
-| [CoreML](CoreMLDetect/) | DAT | **Object detection.** YOLO-style Core ML models → label / confidence / bbox ("what & where") |
+| [CoreML](CoreMLDAT/) | DAT | **Object detection.** YOLO-style Core ML models → label / confidence / bbox ("what & where") |
 | [Vision Classify](VisionClassify/) | DAT | **Image classification** (no extra model). Top-N identifier / confidence |
 | [Vision AnimalPose](VisionAnimalPose/) | CHOP | Dog / cat 2D pose (25 joints, multiple animals) |
 | [Vision Rect](VisionRect/) | CHOP | Rectangle detection → bbox / projected corners (wire straight into Corner Pin) |

@@ -63,5 +63,5 @@ Ultralytics 等で Core ML 変換した YOLOv8/v11(NMS込みエクスポート)�
 ## ビルド
 
 ```
-cd CoreMLDetect && ./build.sh   # → build/CoreMLDetectDAT.plugin
+cd CoreMLDAT && ./build.sh   # → build/CoreMLDATDAT.plugin
 ```
