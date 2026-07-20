@@ -1522,3 +1522,14 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
   ロードが数分かかる(2回目はキャッシュで通常速度。固まったら強制終了→再起動でよい)
 - sample.toe の examples は旧opType参照だった16件を含まない(利用例未追加)ため参照切れ無し
 - 次にやること: リネーム16件の sample.toe 利用例追加(任意)
+
+### 2026-07-20 実素材でLive Photo検証(ユーザー追加素材)
+
+- ユーザーが実素材を追加(Assets/LIVE_Photo_sample/・spatial_video_sample.MOV・gs_sample.ply/NGSP。
+  いずれも大きくgitignore)。これらで未検証プラグインを実データ検証:
+- **Live Photo TOP**: 実Live Photoペアで t=0.5 のフレームを **1308×1744 抽出**・duration=2.93s・
+  中央ピクセル非ゼロの実画像を確認。フレームアクセス(全フレーム)が機能。`is_live_photo` は
+  ペアリング識別子依存で、抽出ファイルでは0になった(抽出自体は識別子非依存で動く)→READMEに明記
+- **AudioToolbox Mix**: spatial_video の音声は **AACステレオ**で 4ch First-Order Ambisonics ではないため
+  検証不可(FOA素材が必要)。**RealityKit Splat**: gs_sample は **NGSP独自形式**・.ply は生3DGS で
+  USD/USDZ ではないため直接ロード不可(USDZ変換が要る)。両者は素材待ちのまま
