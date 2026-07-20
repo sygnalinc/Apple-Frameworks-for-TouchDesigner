@@ -33,6 +33,17 @@ func emit(_ obj: [String: Any]) {
 }
 func logErr(_ s: String) { FileHandle.standardError.write((s + "\n").data(using: .utf8)!) }
 
+// Model 文字列がローカルディレクトリなら .directory（ダウンロード無し・完全オフライン）、
+// そうでなければ HF リポジトリID として扱う。
+func makeConfig(_ model: String) -> ModelConfiguration {
+    var isDir: ObjCBool = false
+    let expanded = (model as NSString).expandingTildeInPath
+    if FileManager.default.fileExists(atPath: expanded, isDirectory: &isDir), isDir.boolValue {
+        return ModelConfiguration(directory: URL(fileURLWithPath: expanded))
+    }
+    return ModelConfiguration(id: model)
+}
+
 func serve() async {
     var container: ModelContainer? = nil
     var session: ChatSession? = nil
@@ -60,7 +71,7 @@ func serve() async {
             do {
                 emit(["type": "status", "text": "loading \(model)"])
                 let cont = try await #huggingFaceLoadModelContainer(
-                    configuration: ModelConfiguration(id: model)
+                    configuration: makeConfig(model)
                 ) { (p: Progress) in
                     emit(["type": "progress", "pct": Int(p.fractionCompleted * 100)])
                 }
@@ -124,7 +135,7 @@ func oneShot(_ modelId: String, _ prompt: String) async {
     do {
         logErr("loading \(modelId) ...")
         let container = try await #huggingFaceLoadModelContainer(
-            configuration: ModelConfiguration(id: modelId)
+            configuration: makeConfig(modelId)
         ) { (p: Progress) in
             logErr("  download \(Int(p.fractionCompleted * 100))%")
         }

@@ -1882,3 +1882,18 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   .build/.xcbuild とモデルは gitignore
 - 次にやること: 大きめモデル(Qwen/Llama)での速度比較、Stop/中断、TOP画像キャプション用に
   MLX VLM(将来)、AFM Core同様のTool Calling拡張
+
+### 2026-07-21 MLX LLM をローカルディレクトリ対応(完全オフライン実行)
+
+- ユーザー「modelフォルダに gemma-4-e2b-it-4bit をDLしてローカルだけで実行して」。
+  HFキャッシュから `models/gemma-4-e2b-it-4bit/`(config/tokenizer/model.safetensors 等・3.3GB・
+  gitignore)へコピー
+- ヘルパに `makeConfig()` を追加: Model 文字列が**存在するディレクトリなら
+  `ModelConfiguration(directory:)`**、そうでなければ従来通り HF リポジトリID。
+  mlx-swift-lm の `resolve()` は `.directory` を **downloader非経由**で扱う(ソース確認済み)ため
+  ネットワーク一切なしでロード
+- **オフライン厳密検証**: HFキャッシュを一時退避 + `HF_HUB_OFFLINE=1` で `models/` から
+  ロード→生成成功("Blue")。TD実機でも例の Model を `project.folder + '/models/gemma-4-e2b-it-4bit'`
+  エクスペッション(.toe位置に追従)にして Load→ready→Submit→**"Hello!"** を確認
+- sample.toe の `/project1/examples/MLXLLM` を更新(ローカルパス+オフライン説明)。README更新
+- リビルド(xcodebuild・incremental)・署名・インストール・TD再起動で反映済み

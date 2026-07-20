@@ -34,7 +34,7 @@ Info DAT は `status`。
 
 | パラメータ | 説明 |
 |---|---|
-| Model | mlx-community のリポジトリID（既定 `mlx-community/gemma-4-e2b-it-4bit`） |
+| Model | mlx-community のリポジトリID、**またはローカルディレクトリの絶対パス**（既定 `mlx-community/gemma-4-e2b-it-4bit`） |
 | System Instructions | システムプロンプト |
 | Prompt | 入力 |
 | Temperature | 0〜2（既定 0.7） |
@@ -60,10 +60,29 @@ Info DAT は `status`。
   会話テーブルへ。2文の回答（約35トークン）が**約1秒**＝インタラクティブ速度
 - マルチターン（Keep Context）で文脈保持を確認（「Red」→「別の色」→「Blue」）
 
+## ローカル（完全オフライン）実行
+
+Model にローカルディレクトリの**絶対パス**を渡すと、Hugging Face へ一切アクセスせず
+そのフォルダから直接ロードする（`ModelConfiguration(directory:)` = ダウンローダ非経由）。
+
+1. モデルを `models/gemma-4-e2b-it-4bit/`（`config.json` / `tokenizer.json` /
+   `model.safetensors` / `*.index.json` 等）に置く。取得例:
+   ```sh
+   # HF CLI で models/ へ直接DL（もしくはHFキャッシュからコピー）
+   huggingface-cli download mlx-community/gemma-4-e2b-it-4bit \
+     --local-dir models/gemma-4-e2b-it-4bit
+   ```
+   `models/` は gitignore 対象（モデルはコミットしない）
+2. Model にそのフォルダの絶対パスを設定（sample.toe の例は
+   `project.folder + '/models/gemma-4-e2b-it-4bit'` のエクスペッションで .toe の場所に追従）
+3. Load Model → **ネットワーク不要**でロード（HFキャッシュを消してもオフラインで起動する
+   ことを実測確認）
+
 ## 注意
 
 - **Apple Silicon 専用**（MLX は Metal を使う）
-- 初回モデルダウンロードに時間がかかる（回線次第）。2回目以降はキャッシュから高速起動
+- HF リポジトリID指定時、初回ダウンロードに時間がかかる（回線次第）。2回目以降はキャッシュから高速起動。
+  ローカルパス指定なら常にオフライン
 - モデルの量子化・サイズで速度と品質が変わる。大きいモデルはメモリを要する
 
 ## ビルド
