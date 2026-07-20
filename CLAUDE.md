@@ -1805,3 +1805,16 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **実測**: Prompt「現在のtemperatureは?」→ LLMが get_sensor を要求→handlerが42を返す→
   **"The current temperature is 42.0 degrees Celsius."**。sensorを15に変えると回答も15.0に追従
   (=LLMがライブTD値を読んでいることを確認)
+
+### 2026-07-20 「TOP→自然文キャプション」デモを sample.toe に追加(Vision Classify → AFM Core)
+
+- `/project1/afm_describe_demo`: src(Movie File In: Assets/test_image_1.jpg)→
+  classify(Vision Classify: 内容タグ)→ driver(Execute DAT onFrameEnd)→ afm(AFM Core)
+- driver は毎フレーム afm を cook(LLM生成をポーリング)し、classify のタグが変わったら
+  タグからプロンプトを組んで Submit。afm が1文キャプションを生成。状態は parent().store('lasttags')
+- Apple公開オンデバイスAPIに画像キャプションは無い(Vision=分類/OCR/検出のみ、FoundationModels=
+  テキスト専用)ため、**Vision Classify(ラベル)→ AFM Core(文章化)** の連携で実現
+- **実測**: test_image_1.jpg → タグ `people, adult, crowd, outdoor, sky, cloudy` →
+  **"A group of people is gathered under a cloudy sky in an outdoor space."**
+- **踏んだ罠**: 非同期C++ DAT(Vision Classify)の更新は datexecuteDAT の onTableChange が
+  安定して発火しない。**executeDAT の onFrameEnd で毎フレーム駆動**する方が確実
