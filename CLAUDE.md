@@ -1897,3 +1897,12 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   エクスペッション(.toe位置に追従)にして Load→ready→Submit→**"Hello!"** を確認
 - sample.toe の `/project1/examples/MLXLLM` を更新(ローカルパス+オフライン説明)。README更新
 - リビルド(xcodebuild・incremental)・署名・インストール・TD再起動で反映済み
+
+### 2026-07-21 ローカルファイル参照デモを sample.toe に追加
+
+- `/project1/mlx_local_demo`: MLX LLM DAT がローカルの `models/gemma-4-e2b-it-4bit` を
+  参照して完全オフライン実行するデモ。構成 = `mlx`(MLX LLM DAT・Model=
+  `project.folder + '/models/gemma-4-e2b-it-4bit'`)+ `info`(status)+ `response`(Text TOP・
+  最新assistant行を表示)+ `note`(手順)
+- 実測: Load(ローカルからDL無しで ready)→ Submit → **"I am Gemma 4, a Large Language Model
+  developed by Google DeepMind."** を生成し response TOP に表示。sample.toe 保存済み
