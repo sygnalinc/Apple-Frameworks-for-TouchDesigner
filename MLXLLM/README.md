@@ -54,10 +54,12 @@ MLX は VLM（Vision-Language Model）にも対応。ヘルパは `MLXLLM` と `
 
 - **画像には VLM 対応モデルが必要**。実測で動作:
   **`mlx-community/Qwen2-VL-2B-Instruct-4bit`**（推奨・軽量）、`Qwen2.5-VL-3B-Instruct-4bit`、
-  `SmolVLM-Instruct-4bit` 等
-- **⚠ `gemma-4-e2b-it-4bit` は現状テキスト専用としてロードされる**（この repo の量子化重みが
-  mlx-swift-lm 3.31.4 の Gemma4 VLM 実装とキー不一致 = `keyNotFound(language_model...)`。
-  自動でテキストLLMにフォールバックし画像は無視される）。**画像は Qwen2-VL 等を使う**
+  `SmolVLM-Instruct-4bit`、**Gemma系なら `mlx-community/gemma-3-4b-it-qat-4bit`**（実測OK・
+  高精度OCR。12b/27b版もあり）、`paligemma-3b-mix-448-8bit` 等
+- **⚠ Gemma 4（`gemma-4-e2b-it-4bit` / `gemma-4-e4b-it-4bit`）は現状テキスト専用としてロードされる**
+  （この repo の量子化重みが mlx-swift-lm 3.31.4 の Gemma4 VLM 実装とキー不一致 =
+  `keyNotFound(language_model...)`。自動でテキストLLMにフォールバックし画像は無視される）。
+  **Gemma で画像を使うなら Gemma 3（`gemma-3-4b-it-qat-4bit`）を使う**
 - 使い方: Model に VLM対応モデル（例 `models/Qwen2-VL-2B-Instruct-4bit` のローカルパス）→
   **Vision ページの Use Image Input をオン** → **Image TOP** に画像TOPを指定 →
   Prompt に質問（例「What is in this image?」）→ Submit。Submit時のTOPフレームを一時PNGに
