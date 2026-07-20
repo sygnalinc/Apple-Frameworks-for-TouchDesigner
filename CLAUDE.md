@@ -1765,3 +1765,11 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - PDFの `drawWithBox:toContext:` は **PDF座標(左下原点=bottom-up)** で描くため、TD表示で上下逆だった
 - 描画後にバッファを**行反転**してからアップロード(ImageIO File In と同じ TD 縦向き対応)
 - 検証: 上=赤/下=青のテストPDFを描画し、TDで**赤が上・青が下**の正立を視認
+
+### 2026-07-20 System Audio 削除 + CA Tap → CA Process Tap リネーム
+
+- **System Audio CHOP を削除**(ユーザー判断)。ScreenCaptureKit ベースのシステム音声取得は
+  CoreAudio Process Tap(CA Process Tap)と機能重複し、画面収録権限も要るため。
+  フォルダ git rm・常設バンドル削除・ルートREADME英日から除去・sample.toe の examples/SystemAudio 削除
+- **CoreAudio Tap の opLabel を "CA Tap" → "CA Process Tap"**(表示名のみ。opType `Coreaudiotap`・
+  フォルダ・ファイルは不変=sample.toe無傷)。リビルド・再インストール済み

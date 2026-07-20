@@ -143,7 +143,7 @@ extern "C" {
 DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     if (!i->setAPIVersion(CHOPCPlusPlusAPIVersion)) return;
     i->customOPInfo.opType->setString("Coreaudiotap");
-    i->customOPInfo.opLabel->setString("CA Tap");
+    i->customOPInfo.opLabel->setString("CA Process Tap");
     i->customOPInfo.opIcon->setString("PAU");
     i->customOPInfo.authorName->setString("TDAppleML");
     i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=0;
