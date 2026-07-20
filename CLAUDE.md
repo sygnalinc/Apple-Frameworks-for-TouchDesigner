@@ -1795,3 +1795,13 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   バンドル除外を追加。メニューバー/オーバーレイ系(コントロールセンター等)がプルダウンから消える
 - 実測: フィルタ前40件 → **11件**(Chrome/ChatGPT/TouchDesigner/Claude/Finder 等の実窓のみ)、
   コントロールセンター項目=0
+
+### 2026-07-20 AFM Core Tool Calling デモを sample.toe に追加
+
+- `/project1/afm_tool_demo`: sensor(constant CHOP: temperature=42/humidity=58)→ afm(AFM Core・
+  Enable Tool Calling・Tool=get_sensor(name:string))+ handler(DAT Execute)+ note
+- handler の onTableChange が `pending_tool_args` を検知→sensor CHOPを名前引き→Tool Result に
+  JSONを書いて Return Tool Result をパルス(ツール往復を自動化)
+- **実測**: Prompt「現在のtemperatureは?」→ LLMが get_sensor を要求→handlerが42を返す→
+  **"The current temperature is 42.0 degrees Celsius."**。sensorを15に変えると回答も15.0に追従
+  (=LLMがライブTD値を読んでいることを確認)
