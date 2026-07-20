@@ -301,3 +301,29 @@
 - **手動でEXIF回転を掛けるなら、主画像(CGBitmapContext描画)と補助データ(loadAux)の縦向きを
   必ず揃える**。`CGContextTranslateCTM(0,H)+ScaleCTM(1,-1)` は bottom-up を作り、loadAux(top-down)
   と混ざると回転が鏡像/上下逆に化ける(実測)。両者を top-down に統一してから同じ applyOrientation を掛ける
+
+## MLX / mlx-swift（ローカルLLM）
+
+- **mlx-swift の Metal シェーダ（`default.metallib`）は `swift build`（コマンドライン）では
+  ビルドできない**。mlx-swift 公式README明記: "SwiftPM (command line) cannot build the Metal
+  shaders so the ultimate build has to be done via Xcode"。`swift build` の実行ファイルは
+  実行時に `MLX error: Failed to load the default metallib` で落ちる（モデルのロード/生成に到達しない）
+- 解決: **xcodebuild でビルドする**。`xcodebuild build -scheme <PackageName> -configuration Release
+  -destination 'platform=macOS,arch=arm64' -derivedDataPath .xcbuild -skipPackagePluginValidation
+  -skipMacroValidation`。metallib は `Build/Products/Release/mlx-swift_Cmlx.bundle/Contents/
+  Resources/default.metallib` に生成される
+- **`-skipPackagePluginValidation` 必須**: mlx-swift の `CudaBuild` ビルドツールプラグインが
+  xcodebuild で対話承認を要求し "Validate plug-in CudaBuild" で BUILD FAILED になる。
+  **`-skipMacroValidation`** も付ける（swift-syntax マクロ MLXHuggingFace の承認回避）
+- xcodebuild の実行ファイルは **静的リンク**（PackageFrameworks不要）。同梱するのは実行ファイル +
+  `mlx-swift_Cmlx.bundle`（metallib）+ `swift-transformers_Hub.bundle`（tokenizer）を隣に置くだけ。
+  SwiftPM実行ファイルの `Bundle.module` は実行ファイルと同じディレクトリを探す
+- **重いLLM推論は dylib 同梱でなく「ヘルパ実行ファイルを別プロセスで spawn」が正解**。理由:
+  metallib/rpath 解決が dylib 同梱だと壊れやすい、多GBモデル+Metalをプロセス隔離できTDを
+  巻き込まない、停止でメモリを確実に解放。DAT は posix_spawn + pipe + reader thread で
+  JSON-lines 通信（cook非ブロック）
+- mlx-swift-lm は huggingface/transformers を内製化（MLXHuggingFace + マクロ）だが、マクロは
+  `HuggingFace.HubClient` / `Tokenizers.AutoTokenizer` に展開されるので、**消費側パッケージも
+  swift-huggingface + swift-transformers に依存**する必要がある。API: `#huggingFaceLoadModelContainer
+  (configuration: ModelConfiguration(id:)) { progress }` → `ChatSession(container)` →
+  `streamResponse(to:)`（AsyncThrowingStream でトークン）

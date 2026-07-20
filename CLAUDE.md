@@ -177,6 +177,7 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
 | Sound Class | Soundclass | SoundAnalysis |
 | Speech Text | Speechtext | SpeechAnalyzer |
 | Foundation Model | Foundationmodel | **フレームワーク名**(他LLM統合と衝突させないため汎用名"LLM"は避けた) |
+| Gemma | Gemma | Google Gemma 4を明示。llama.cppローカルサーバー接続のDAT |
 | Translate | Translate | Translation |
 | Image Gen | Imagegen | **汎用名**(SD以外のバックエンド追加前提。Backendメニューで切替) |
 
@@ -1850,3 +1851,34 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   ③CoreML CHOP は初回 ANE コンパイルで数秒 valid=0 → 数秒後に valid=1/count=512
 - モデル本体は規約通り**コミットしない**(models/ gitignore)。テキストバンクCSVのみ同梱(画像モデルを
   DLすれば動く)。再生成: bpe_simple_vocab → tok.py → textemb.swift(scratchpadに残す)
+
+### 2026-07-21 MLX LLM DAT実装(Apple MLXでGemma 4等のローカルLLM)
+
+- ユーザー「Gemma 4をローカルで動かしたい→MLX LLM opを作る方針」。Apple **MLX**(mlx-swift-lm)で
+  任意の mlx-community モデル(Gemma 4 / Qwen / Llama)を完全オンデバイス実行する **MLX LLM DAT**
+  (opType `Mlxllm`・icon MLX)を新規実装。AFM Core(Apple Intelligence固定モデル)と違い任意モデルを選択
+- **アーキテクチャ: ヘルパ実行ファイルを別プロセスで spawn**(dylib同梱ではない)。DAT は
+  posix_spawn + pipe + reader thread で **JSON-lines プロトコル**通信(load/gen/reset/quit →
+  progress/ready/token/done/error)。cook非ブロック、トークンを会話テーブルへストリーミング。
+  多GBモデル+Metalをプロセス隔離しTDを巻き込まない、停止でメモリ解放
+- **最大の地雷: mlx-swift の Metal(default.metallib)は `swift build` で作れない**(公式README明記)。
+  `swift build` 版は実行時 `Failed to load the default metallib` で生成に到達せず。
+  → **xcodebuild でビルド**: `xcodebuild build -scheme MLXLLMHelper -configuration Release
+  -destination 'platform=macOS,arch=arm64' -derivedDataPath .xcbuild -skipPackagePluginValidation
+  -skipMacroValidation`。**`-skipPackagePluginValidation` 必須**(mlx-swiftのCudaBuildプラグインが
+  対話承認を要求しBUILD FAILED)。metallibは `mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib`
+  に生成。実行ファイルは静的リンク=同梱は実行ファイル+Cmlxバンドル(metallib)+Hubバンドルを隣に置くだけ
+- mlx-swift-lm は huggingface/transformers を内製化(MLXHuggingFace+マクロ)。ただしマクロが
+  `HuggingFace.HubClient`/`Tokenizers.AutoTokenizer` に展開されるので**消費側も swift-huggingface +
+  swift-transformers に依存**が必要。API: `#huggingFaceLoadModelContainer(configuration:
+  ModelConfiguration(id:)){progress}` → `ChatSession(container, instructions:, generateParameters:)`
+  → `streamResponse(to:)`(AsyncThrowingStreamでトークン)
+- **実測(M2)**: `mlx-community/gemma-4-e2b-it-4bit`(3.3GB)。単体CLI・TD内とも生成成功。
+  TDで Load→ready(progress 100)、Submit で「Name one primary color」→**"Red"**、続けて
+  「別の色」→**"Blue"**(マルチターン文脈保持)。2文(~35token)を約1秒=インタラクティブ速度
+- ビルド・署名・`~/Library/.../Plugins/` インストール・**TD再起動後にロード/生成を実機確認**。
+  helperは quarantine xattr無し(ローカルビルド)でGatekeeper非ブロック。sample.toe の
+  `/project1/examples/MLXLLM` に利用例を追加。README(新規+ルート英日)更新。Package.resolvedをコミット、
+  .build/.xcbuild とモデルは gitignore
+- 次にやること: 大きめモデル(Qwen/Llama)での速度比較、Stop/中断、TOP画像キャプション用に
+  MLX VLM(将来)、AFM Core同様のTool Calling拡張
