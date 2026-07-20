@@ -1831,3 +1831,22 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   (動的=発話)** で「speech-like」判定。早送りノイズ解消を確認
 - 教訓(pitfalls既出の補強): **音声を生成して出すCHOPは timeslice=true + out->numSamples**。
   固定ブロック(timeslice=false)は再生速度が実時間とズレてノイズ化する
+
+### 2026-07-21 MobileCLIP(apple/coreml-mobileclip)DL + zero-shot interrogate デモ追加
+
+- **Apple公式 Core ML版 MobileCLIP** をDL: `apple/coreml-mobileclip`(HF)から S0 の image/text
+  エンコーダ `.mlpackage` を `models/`(gitignore)へ。image 23MB / text 96MB
+  - I/O(protoで確認): image= 256x256画像 → `final_emb_1`[1,512]、text= [1,77]int32トークン → [1,512]
+- **テキスト埋め込みバンクを事前計算**(TDでテキストを回すにはトークナイザが要るため):
+  - 純Python の CLIP BPE トークナイザ(`bpe_simple_vocab_16e6.txt.gz`)で36概念を77トークン化
+  - Swift Core ML CLI で text エンコーダを実行 → L2正規化した512次元を `Assets/mobileclip_text_bank.csv`
+    (175KB・コミットする)へ。※coremltools 9はPython3.14でネイティブlib不可→**Swiftで実行**が確実
+- **デモ `/project1/clip_interrogate_demo`**: src(TOP)→ clip(CoreML CHOP: MobileCLIP-S0 image・512次元)
+  → rank(Script DAT: 画像埋め込みと各テキスト埋め込みのコサイン類似度で並べ替え top-8)
+- **実測(discriminative確認)**: 群衆画像 → 「a crowd at an event/a crowd of people/people」上位、
+  動物動画 → 「a cat/an animal」上位。画像内容を正しく識別(トークナイザ/両エンコーダ/ランキングが正しい)
+- **踏んだ罠**: ①Script DAT のスクリプトは inline 不可 → callbacks に Text DAT を指定。
+  ②File In DAT は CSV を1セルで読む(表化しない)→ **rank スクリプトで CSV を直接 open/parse** が確実。
+  ③CoreML CHOP は初回 ANE コンパイルで数秒 valid=0 → 数秒後に valid=1/count=512
+- モデル本体は規約通り**コミットしない**(models/ gitignore)。テキストバンクCSVのみ同梱(画像モデルを
+  DLすれば動く)。再生成: bpe_simple_vocab → tok.py → textemb.swift(scratchpadに残す)
