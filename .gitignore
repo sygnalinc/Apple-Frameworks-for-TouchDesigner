@@ -15,3 +15,6 @@ CrashAutoSave.*
 Assets/cinematic_footage.mov
 Assets/cinematic_footage2.mov
 Assets/IMG_25*
+
+# examples用の学習済みモデル(再生成可能・下記README参照)
+Assets/ml_examples/*.mlmodel

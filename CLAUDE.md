@@ -1236,3 +1236,30 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
   `Coreml`(family指定)で貼り直す。CoreML TOP例はopType不変なので影響なし
 - 次にやること: TD再起動後に3family全て「CoreML」表示・`Coreml` opTypeでの生成を確認、
   sample.toe examples の CoreML CHOP/Detect/CreateML 参照を更新
+
+### 2026-07-20 sample.toe examples を現行OP群に合わせて作り直し + ゴースト解消
+
+- ユーザー指摘「Create Dialogに Coremlchop / coremldetect / CoreML Motion が残る」を調査。
+  **原因はディスク上のバンドルではなく、sample.toe の旧・利用例ノード**
+  (`examples/CoreMLCHOP/Coremlchop1`・`examples/CoreMLDetect/Coremldetect1`)が旧opTypeを
+  抱え、TDが型をレジストリに保持していたため(バンドル無しでも生成可能なゴースト化)
+- インストール済み・リポジトリ・全ディスクを走査し、旧opType `Coremlchop`/`Coremldetect` を
+  登録するバンドルは**存在しない**ことを確認(scratchpadの古いコピー1件のみ・TD非スキャン)。
+  TDプロセスは新バンドル(`Coreml`)を読み込み済み
+- 旧2ノードを新 `Coreml`(CHOP/DAT)へパラメータ・配線維持で置換 → ゴーストの発生源を除去。
+  型はTD再起動時のみ破棄されるため、旧ノード除去済みの.toeを保存すれば次回起動で消える
+- **CoreML Motion(CHOP)は意図的な別OP**(`Coremlmotion`)でありゴーストではない旨をユーザーに回答
+- **不足していた8例を新規作成**(50→58コンテナ)。全てエラーなし・実データ検証:
+  - **CreateML**(DAT): Task=Tabular、同梱CSVで Train パルス→ status=done・val_acc=1.0
+  - **CoreML Motion**(CHOP): 同梱動作モデル+円運動LFO入力→ **prob_circle=1.0**(実証モデルを流用)
+  - **Cinematic Data**(CHOP): ローカル実素材で 83ch・focus_disparity 取得
+  - **Cinematic Video**(TOP): 3840×2160 レンダ
+  - **ImageIO Depth / PointCloud・CoreImage HDR / RAW**: op+パラメータ+説明note(実撮影素材が
+    要るためnote中心)
+- 例の学習データを `Assets/ml_examples/`(sample_tabular.csv / sample_motion.csv + README)に同梱。
+  **.mlmodel はコミットしない**(規約通り `Assets/ml_examples/*.mlmodel` を gitignore・READMEに再生成手順)
+- **CoreML Motion 例の教訓**: モデルパス不変だとCHOPが再ロードしない(ensureModelが早期return)→
+  Model を空→再設定で強制リロード。入力LFOは学習の角速度と一致必須(実証済み `absTime.seconds*9`
+  で prob_circle=1.0、周波数がずれると circle が wave に化ける)。MLActivityClassifier は
+  4特徴合成データだと val_acc が伸びない(0.6〜0.7)ので、ライブ実証済みデータ/モデルを使う
+- sample.toe 保存済み。**次回TD再起動で Coremlchop/coremldetect のゴーストは Create Dialog から消える**
