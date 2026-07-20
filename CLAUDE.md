@@ -1745,3 +1745,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **検証**: IMG_2540(orient=6)で Geo+Camera+Render の点群レンダをPNG化しPreviewと突合。
   修正後 **白箱=左/銀箱=右・正立(机が手前下)** を視認。Applyorientation=1・Flip=0 が正
 - README(パラメータにApply EXIF Orientation追加・Flip既定Off)更新
+
+### 2026-07-20 Cinematic Video の depth 向き修正(disparityにpreferredTransform未適用)
+
+ユーザー指摘「Cinematic Video は color 正しいが depth が上下左右両方逆(=180°)」。
+- **原因**: Rendered(color)は `CNRenderingSession(preferredTransform: info.preferredTransform)` で
+  **preferredTransform を適用**して正立。一方 depth は disparityトラックを生読みするため**変換未適用**。
+  実測: IMG_2531.MOV の video/disparity 両トラックの preferredTransform は **a=-1,b=0,c=0,d=-1 = 180°**。
+  そのため depth だけ 180° ずれていた
+- **修正**: cn_open で `info.preferredTransform` から回転角(atan2(b,a))を求め `CNState.rotDeg` に保存。
+  disparityToFloat に `rotateDisparity`(0/90/180/270の汎用リマップ)を追加し、生disparityへ回転を適用して
+  render と表示向きを揃える(その後に既存のTD用上下反転)。90/270は次元入替えにも対応
+- **検証**: IMG_2531.MOV(180°)で depth/color を並べて .save→Read で目視。修正後、**depthの猫(近い=明)が
+  color と同じ中央下・背景キッチン(遠い=暗)が上** で一致(180°ズレ解消)
+- README更新。90/270素材は未入手のため 180 のみ実測(汎用実装済み)

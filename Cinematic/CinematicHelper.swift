@@ -29,6 +29,7 @@ final class CNState: @unchecked Sendable {
     var device: MTLDevice?
     var queue: MTLCommandQueue?
     var timeScale: CMTimeScale = 600
+    var rotDeg = 0             // preferredTransform の回転(depth を render と揃えるため disparity に適用)
 
     // 深度/再レンダの出力(latest)
     var depthBuf: [Float] = []
@@ -81,9 +82,12 @@ public func cn_open(_ h: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?
             let dur = script.timeRange.duration.seconds
             let fps = (try? await info.frameTimingTrack.load(.nominalFrameRate)).map { Double($0) } ?? 30
             let ts = (try? await info.frameTimingTrack.load(.naturalTimeScale)) ?? 600
+            let tf = info.preferredTransform
+            let rot = ((Int((atan2(tf.b, tf.a) * 180 / .pi).rounded()) % 360) + 360) % 360
             s.lock.lock()
             s.asset = asset; s.info = info; s.attrs = attrs; s.session = session; s.script = script
             s.device = dev; s.queue = q; s.duration = dur; s.fps = fps > 0 ? fps : 30; s.timeScale = ts
+            s.rotDeg = rot
             s.status = "ready"; s.error = ""
             s.lock.unlock()
         } catch {
@@ -170,8 +174,33 @@ private func readFrames(_ s: CNState, timeSec: Double, wantRender: Bool)
     return (reader, imgSB, disSB, metaSB)
 }
 
-// float16 disparity CVPixelBuffer → Float 配列(上下反転してTD正立)
-private func disparityToFloat(_ pb: CVPixelBuffer, flip: Bool, normalize: Bool, out: inout [Float], outW: inout Int, outH: inout Int) {
+// preferredTransform の回転(0/90/180/270)を disparity float バッファへ適用して
+// render(色)と向きを揃える。raw disparity は変換前=生センサー向きのため必要。
+private func rotateDisparity(_ src: [Float], _ W: Int, _ H: Int, _ deg: Int) -> ([Float], Int, Int) {
+    let d = ((deg % 360) + 360) % 360
+    if d == 0 { return (src, W, H) }
+    let swap = (d == 90 || d == 270)
+    let dW = swap ? H : W, dH = swap ? W : H
+    var out = [Float](repeating: 0, count: W * H)
+    src.withUnsafeBufferPointer { s in
+        out.withUnsafeMutableBufferPointer { o in
+            for dy in 0..<dH { for dx in 0..<dW {
+                var sx = 0, sy = 0
+                switch d {
+                case 90:  sx = dy;         sy = H - 1 - dx
+                case 180: sx = W - 1 - dx; sy = H - 1 - dy
+                case 270: sx = W - 1 - dy; sy = dx
+                default:  sx = dx;         sy = dy
+                }
+                o[dy * dW + dx] = s[sy * W + sx]
+            } }
+        }
+    }
+    return (out, dW, dH)
+}
+
+// float16 disparity CVPixelBuffer → Float 配列(preferredTransform適用+TD正立の上下反転)
+private func disparityToFloat(_ pb: CVPixelBuffer, flip: Bool, normalize: Bool, rotDeg: Int, out: inout [Float], outW: inout Int, outH: inout Int) {
     CVPixelBufferLockBaseAddress(pb, .readOnly); defer { CVPixelBufferUnlockBaseAddress(pb, .readOnly) }
     let W = CVPixelBufferGetWidth(pb), H = CVPixelBufferGetHeight(pb)
     let bpr = CVPixelBufferGetBytesPerRow(pb)
@@ -200,16 +229,18 @@ private func disparityToFloat(_ pb: CVPixelBuffer, flip: Bool, normalize: Bool, 
         for v in tmp { if v > 0 { if v < lo { lo = v }; if v > hi { hi = v } } }
         if hi > lo { let inv = 1 / (hi - lo); for i in 0..<tmp.count { tmp[i] = tmp[i] > 0 ? (tmp[i] - lo) * inv : 0 } }
     }
+    // preferredTransform の回転を適用(render と同じ表示向きにする)
+    let (rtmp, rW, rH) = rotateDisparity(tmp, W, H, rotDeg)
     // 安全なポインタベースで上下反転コピー(Swiftの &array[i] を memcpy に渡すのは不安定)
-    var result = [Float](repeating: 0, count: W * H)
+    var result = [Float](repeating: 0, count: rW * rH)
     result.withUnsafeMutableBufferPointer { o in
-        tmp.withUnsafeBufferPointer { t in
-            if flip { for y in 0..<H { memcpy(o.baseAddress! + (H - 1 - y) * W, t.baseAddress! + y * W, W * 4) } }
-            else { memcpy(o.baseAddress!, t.baseAddress!, W * H * 4) }
+        rtmp.withUnsafeBufferPointer { t in
+            if flip { for y in 0..<rH { memcpy(o.baseAddress! + (rH - 1 - y) * rW, t.baseAddress! + y * rW, rW * 4) } }
+            else { memcpy(o.baseAddress!, t.baseAddress!, rW * rH * 4) }
         }
     }
     out = result
-    outW = W; outH = H
+    outW = rW; outH = rH
 }
 
 // Depth: disparity を Float バッファへ。戻り 1=ok 0=fail(cn_latest_depth で取得)
@@ -220,8 +251,9 @@ public func cn_depth(_ h: UnsafeMutableRawPointer?, _ timeSec: Double, _ flip: I
     guard #available(macOS 26.0, *) else { return 0 }
     guard let frames = readFrames(s, timeSec: timeSec, wantRender: false),
           let disSB = frames.disparity, let dis = CMSampleBufferGetImageBuffer(disSB) else { return 0 }
+    s.lock.lock(); let rot = s.rotDeg; s.lock.unlock()
     var buf: [Float] = []; var W = 0, H = 0
-    disparityToFloat(dis, flip: flip != 0, normalize: normalize != 0, out: &buf, outW: &W, outH: &H)
+    disparityToFloat(dis, flip: flip != 0, normalize: normalize != 0, rotDeg: rot, out: &buf, outW: &W, outH: &H)
     _ = disSB  // 変換中はsample bufferを生存させる
     if buf.isEmpty { return 0 }
     s.lock.lock(); s.depthBuf = buf; s.depthW = W; s.depthH = H; s.serialCtr += 1; s.depthSerial = s.serialCtr; s.lock.unlock()
