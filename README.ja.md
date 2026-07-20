@@ -105,6 +105,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img**(Core ML Stable Diffusion / Image Playground) |
 | [CoreImage Code](CoreImageCode/) | TOP | QR / Aztec / PDF417 / Code128 の**生成**(外部ライブラリ不要) |
 | [CreateML](CreateML/) | DAT | **統合オンデバイストレーナ**。`Task`メニューで Image / Hand Pose / Action(体)/ Hand Action / Sound / Activity(CHOP時系列)/ Tabular分類・回帰 を切替→`.mlmodel`。出力は CoreML TOP / CoreML Motion CHOP / SoundClass 等が推論 |
+| [Training Recorder](TrainingRecorder/) | CHOP | **CHOP時系列 → CreateML学習用CSV**(recording / label / 特徴列)。VisionPose/Hand等をTD内で収録・ラベル付けし、CreateML(Activity)へ直結 |
 | [CoreML Motion](CoreMLMotion/) | CHOP | 入力CHOP(VisionPose等)を予測窓ぶんバッファして**ライブでジェスチャ分類**(クラス別確率+confidence)。CreateMLのActivityタスクと対 |
 
 ### 音声・音響
@@ -127,9 +128,10 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
-| [Foundation Model](FoundationModel/) | DAT | **Apple Intelligence オンデバイスLLM**(macOS26+)。**構造化出力(JSONスキーマ)**でショー制御へ直結 |
+| [Foundation Model](FoundationModel/) | DAT | **Apple Intelligence オンデバイスLLM**(macOS26+)。**構造化出力(JSONスキーマ)**+**ツール呼び出し**(LLMがツールを要求→TouchDesignerが実行して結果を返す)でショー制御へ直結 |
 | [Translate](Translate/) | DAT | **オンデバイス翻訳**。Speech Text 直結でリアルタイム字幕翻訳 |
-| [Text Analyze](TextAnalyze/) | DAT | 感情スコア・言語判定・固有表現・意味的類似度(日本語対応)。「発話の感情/話題でビジュアル制御」 |
+| [Text Analyze](TextAnalyze/) | DAT | 感情スコア・言語判定・固有表現・意味的類似度(日本語対応)+**トークン(token / 品詞 / 見出し語)**と**埋め込みベクトル**(数値)。「発話の感情/話題でビジュアル制御」 |
+| [Caption Author](CaptionAuthor/) | DAT | **文字起こし → SRT / WebVTT** 字幕。start/end列、または text だけの行を自動連番(SpeechText)。字幕ファイルも書き出し |
 
 ### 3D・画面・入力デバイス・外部連携
 
@@ -139,6 +141,8 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **写真の深度→3Dポイントクラウド**(カメラ較正/画角で逆投影)。RGBから色サンプル |
 | [Cinematic Data](Cinematic/) | CHOP | **iPhone Cinematic動画のメタデータ**(macOS 26+): フォーカス深度・被写体(type/bbox/depth/trackID) |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic動画**: 深度(視差)マップ、または**f値/ピントを差し替えて再レンダ** |
+| [Spatial Video](SpatialVideo/) | DAT | **MV-HEVC 空間ビデオのメタデータ**: 左右眼・ヒーローアイ・カメラ基線・水平視野角・視差調整 |
+| [Spatial Video](SpatialVideo/) | TOP | **MV-HEVC 立体視の左右眼をデコード** → Left / Right / Side-by-Side BGRA(両レイヤーを tagged buffer group で分離) |
 | [Vision Contours](VisionContours/) | SOP | 画像の輪郭を**閉じたLineジオメトリ**へ(Sweep/Extrude/Particle 直結) |
 | [Screen Capture](ScreenCapture/) | TOP | ディスプレイ/単一ウインドウの**画面収録**(最大120fps) |
 | [CoreAudio Tap](CoreAudioTap/) | CHOP | **指定アプリの音だけ**をタップ(Core Audio Process Tap・macOS 14.4+)or 全システム音→48kHz stereo。Screen Captureより粒度が細かい |

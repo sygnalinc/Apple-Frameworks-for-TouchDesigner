@@ -36,9 +36,21 @@ using namespace TD;
 
 namespace {
 
+struct TokenRow
+{
+    std::string token;   // 語そのもの
+    std::string pos;     // 品詞(NLTagSchemeLexicalClass)
+    std::string lemma;   // 見出し語(NLTagSchemeLemma)
+    int start = 0;       // UTF-16 開始位置
+    int len = 0;         // UTF-16 長さ
+};
+
 struct AnalysisResult
 {
-    std::vector<std::pair<std::string, std::string>> rows;   // key / value
+    std::vector<std::pair<std::string, std::string>> rows;   // key / value(summary)
+    std::vector<TokenRow> tokens;                            // token / pos / lemma(tokens)
+    std::vector<float> embedding;                            // 文埋め込みベクトル(embedding)
+    std::string embInfo;                                     // "lang, dim=N, source" 等
     float sentiment = 0;
     float similarity = 0;
     int entities = 0;
@@ -75,6 +87,7 @@ public:
     {
         myExecCount++;
         const bool active = inputs->getParInt("Active") != 0;
+        myMaxTokens = inputs->getParInt("Maxtokens");
         const bool lastRow = strcmp(inputs->getParString("Textsource"), "lastrow") == 0;
         std::string ref;
         if (const char* r = inputs->getParString("Referencetext"))
@@ -128,17 +141,53 @@ public:
             std::lock_guard<std::mutex> lock(myMutex);
             res = myResult;
         }
-        if (!active)
+        const char* outModeC = inputs->getParString("Output");
+        const std::string outMode = outModeC ? outModeC : "summary";
+        if (!active) {
             res.rows.clear();
+            res.tokens.clear();
+            res.embedding.clear();
+        }
 
         output->setOutputDataType(DAT_OutDataType::Table);
-        output->setTableSize((int32_t)res.rows.size() + 1, 2);
-        output->setCellString(0, 0, "key");
-        output->setCellString(0, 1, "value");
-        for (int i = 0; i < (int)res.rows.size(); i++) {
-            output->setCellString(i + 1, 0, res.rows[i].first.c_str());
-            output->setCellString(i + 1, 1, res.rows[i].second.c_str());
+        if (outMode == "tokens") {
+            // index / token / pos / lemma / start / length
+            output->setTableSize((int32_t)res.tokens.size() + 1, 6);
+            const char* hdr[6] = {"index", "token", "pos", "lemma", "start", "length"};
+            for (int c = 0; c < 6; c++) output->setCellString(0, c, hdr[c]);
+            char b[32];
+            for (int i = 0; i < (int)res.tokens.size(); i++) {
+                const TokenRow& t = res.tokens[i];
+                snprintf(b, sizeof(b), "%d", i); output->setCellString(i + 1, 0, b);
+                output->setCellString(i + 1, 1, t.token.c_str());
+                output->setCellString(i + 1, 2, t.pos.c_str());
+                output->setCellString(i + 1, 3, t.lemma.c_str());
+                snprintf(b, sizeof(b), "%d", t.start); output->setCellString(i + 1, 4, b);
+                snprintf(b, sizeof(b), "%d", t.len);   output->setCellString(i + 1, 5, b);
+            }
+        } else if (outMode == "embedding") {
+            // index / value(文埋め込みベクトルの各成分)
+            output->setTableSize((int32_t)res.embedding.size() + 1, 2);
+            output->setCellString(0, 0, "index");
+            output->setCellString(0, 1, "value");
+            char b[48];
+            for (int i = 0; i < (int)res.embedding.size(); i++) {
+                snprintf(b, sizeof(b), "%d", i);       output->setCellString(i + 1, 0, b);
+                snprintf(b, sizeof(b), "%.6f", res.embedding[i]);
+                output->setCellString(i + 1, 1, b);
+            }
+        } else {
+            // summary(既存): key / value
+            output->setTableSize((int32_t)res.rows.size() + 1, 2);
+            output->setCellString(0, 0, "key");
+            output->setCellString(0, 1, "value");
+            for (int i = 0; i < (int)res.rows.size(); i++) {
+                output->setCellString(i + 1, 0, res.rows[i].first.c_str());
+                output->setCellString(i + 1, 1, res.rows[i].second.c_str());
+            }
         }
+        myTokenCount = (int)res.tokens.size();
+        myEmbDim = (int)res.embedding.size();
         mySentiment = res.sentiment;
         mySimilarity = res.similarity;
         myEntities = res.entities;
@@ -169,16 +218,41 @@ public:
             p.page = "Text Analyze";
             manager->appendString(p);
         }
+        {
+            OP_StringParameter p("Output");
+            p.label = "Output";
+            p.page = "Text Analyze";
+            p.defaultValue = "summary";
+            const char* names[] = {"summary", "tokens", "embedding"};
+            const char* labels[] = {"Summary (key / value)",
+                                    "Tokens (token / POS / lemma)",
+                                    "Embedding Vector (numeric)"};
+            manager->appendMenu(p, 3, names, labels);
+        }
+        {
+            OP_NumericParameter p("Maxtokens");
+            p.label = "Max Tokens";
+            p.page = "Text Analyze";
+            p.defaultValues[0] = 500;
+            p.minValues[0] = 0;
+            p.maxValues[0] = 10000;
+            p.minSliders[0] = 0;
+            p.maxSliders[0] = 1000;
+            p.clampMins[0] = true;
+            manager->appendInt(p);
+        }
     }
 
-    int32_t getNumInfoCHOPChans(void*) override { return 7; }
+    int32_t getNumInfoCHOPChans(void*) override { return 9; }
     void getInfoCHOPChan(int32_t index, OP_InfoCHOPChan* chan, void*) override
     {
-        const char* names[7] = {"executes", "submits", "analyzes", "analyze_ms",
-                                "sentiment", "similarity", "entities"};
-        float values[7] = {(float)myExecCount, (float)mySubmitCount, (float)myAnalyzeCount,
+        const char* names[9] = {"executes", "submits", "analyzes", "analyze_ms",
+                                "sentiment", "similarity", "entities",
+                                "token_count", "embedding_dim"};
+        float values[9] = {(float)myExecCount, (float)mySubmitCount, (float)myAnalyzeCount,
                            myAnalyzeMs.load(), mySentiment.load(), mySimilarity.load(),
-                           (float)myEntities.load()};
+                           (float)myEntities.load(), (float)myTokenCount.load(),
+                           (float)myEmbDim.load()};
         chan->name->setString(names[index]);
         chan->value = values[index];
     }
@@ -240,9 +314,11 @@ private:
             res.rows.push_back({"language", lang ? nsstr(lang) : "unknown"});
 
             // 感情スコア(段落ごとの平均。日本語など未対応言語は 0 のまま)
+            // NLTagger は init で使う全スキームを列挙する必要がある(列挙外だと結果0件)
             NLTagger* tagger = [[NLTagger alloc]
                 initWithTagSchemes:@[NLTagSchemeSentimentScore, NLTagSchemeNameType,
-                                     NLTagSchemeTokenType]];
+                                     NLTagSchemeTokenType, NLTagSchemeLexicalClass,
+                                     NLTagSchemeLemma]];
             tagger.string = nstext;
             __block double sum = 0;
             __block int cnt = 0;
@@ -331,6 +407,77 @@ private:
             res.entities = (int)ents.size();
             for (auto& e : ents)
                 res.rows.push_back(std::move(e));
+
+            // ---- token / POS(品詞) / lemma(見出し語) ----
+            // 品詞を主導に列挙し、各トークンの範囲から token 文字列と lemma を取る
+            NLTagger* posTagger = tagger;
+            __block std::vector<TokenRow> toks;
+            [posTagger enumerateTagsInRange:NSMakeRange(0, nstext.length)
+                                       unit:NLTokenUnitWord
+                                     scheme:NLTagSchemeLexicalClass
+                                    options:NLTaggerOmitWhitespace
+                                 usingBlock:^(NLTag posTag, NSRange range, BOOL* stop) {
+                                     if (myMaxTokens > 0 &&
+                                         (int)toks.size() >= myMaxTokens) {
+                                         *stop = YES;
+                                         return;
+                                     }
+                                     TokenRow tr;
+                                     tr.start = (int)range.location;
+                                     tr.len = (int)range.length;
+                                     tr.token = nsstr([nstext substringWithRange:range]);
+                                     tr.pos = posTag ? nsstr(posTag) : "";
+                                     NLTag lemmaTag =
+                                         [posTagger tagAtIndex:range.location
+                                                          unit:NLTokenUnitWord
+                                                        scheme:NLTagSchemeLemma
+                                                    tokenRange:NULL];
+                                     tr.lemma = lemmaTag ? nsstr(lemmaTag) : "";
+                                     toks.push_back(std::move(tr));
+                                 }];
+            res.tokens = std::move(toks);
+
+            // ---- 文埋め込みベクトル(数値出力) ----
+            // 第一候補: NLEmbedding の sentence embedding(vectorForString)。
+            // 使えない言語では NLContextualEmbedding の平均プーリングへフォールバック。
+            {
+                NLEmbedding* emb = embeddingForLanguage(lang);
+                bool got = false;
+                if (emb) {
+                    NSArray<NSNumber*>* v = [emb vectorForString:nstext];
+                    if (v && v.count > 0) {
+                        res.embedding.reserve(v.count);
+                        for (NSNumber* n in v)
+                            res.embedding.push_back(n.floatValue);
+                        res.embInfo = (lang ? nsstr(lang) : "en") + ", dim=" +
+                                      std::to_string((int)v.count) + ", sentence";
+                        got = true;
+                    }
+                }
+                if (!got) {
+                    if (@available(macOS 14.0, *)) {
+                        NLLanguage use = lang ?: NLLanguageEnglish;
+                        if (!myCtxEmb || ![myCtxLang isEqualToString:use]) {
+                            NLContextualEmbedding* e =
+                                [NLContextualEmbedding
+                                    contextualEmbeddingWithLanguage:use];
+                            if (e && e.hasAvailableAssets && [e loadWithError:nil]) {
+                                myCtxEmb = e;
+                                myCtxLang = use;
+                            }
+                        }
+                        std::vector<double> mv;
+                        if (myCtxEmb && [myCtxLang isEqualToString:use] &&
+                            meanVector(nstext, mv) && !mv.empty()) {
+                            res.embedding.reserve(mv.size());
+                            for (double d : mv)
+                                res.embedding.push_back((float)d);
+                            res.embInfo = nsstr(use) + ", dim=" +
+                                          std::to_string((int)mv.size()) + ", contextual";
+                        }
+                    }
+                }
+            }
 
             res.valid = true;
         }
@@ -437,6 +584,7 @@ private:
 
     std::atomic<int> myExecCount{0}, mySubmitCount{0}, myAnalyzeCount{0};
     std::atomic<int> myEntities{0}, myValid{0};
+    std::atomic<int> myMaxTokens{500}, myTokenCount{0}, myEmbDim{0};
     std::atomic<float> myAnalyzeMs{0.0f}, mySentiment{0.0f}, mySimilarity{0.0f};
 };
 

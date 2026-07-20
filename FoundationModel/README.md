@@ -46,6 +46,22 @@ Output Schema に `name:type` を改行区切りで書くと(type: string|number
 → **color=red / intensity=100 / strobe=1**。
 Select DAT で `field` 行だけ抜けばそのままショー制御に接続できる。
 
+## ツール呼び出し(Tool Calling・TDがツール実行系になる)
+
+`Enable Tool Calling` をオンにすると、LLM に**ツール**を1つ渡せる。LLM がそのツールを
+呼ぶと **TouchDesigner 側がツールを実行して結果を返し**、LLM がその結果を使って回答する。
+
+- `Tool Name` / `Tool Description` / `Tool Params`(`name:type` 改行区切り)でツールを定義
+- LLM がツールを呼ぶと、出力テーブルに `pending_tool` / `pending_tool_args`(引数JSON)行が出る
+  (Info CHOP `tool_pending=1`)
+- TD 側(Python の DAT Execute 等)が `pending_tool_args` を見て値を算出し、
+  `Tool Result` に結果(JSON等)を書いて `Return Tool Result` をパルス → 生成が再開する
+
+実測: ツール `get_sensor`(`name:string`)+ Prompt「temperature センサーの値を報告して」
+→ LLM が `get_sensor({"name":"temperature"})` を要求 → TD が `{"value":42,"unit":"celsius"}`
+を返す → LLM が **"The current temperature in the show is 42 degrees Celsius."** と回答。
+これで LLM から TD ノードの読取/操作を明示的な tool schema で接続できる。
+
 ## 使いどころ（他OPとの生成チェーン）
 
 - **ライブ実況**: SoundClass（歓声）や VisionPose（動き量）の値を CHOP Execute で

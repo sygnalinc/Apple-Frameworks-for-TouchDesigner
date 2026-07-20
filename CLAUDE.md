@@ -1603,3 +1603,51 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   CoreMLDAT へ改名して保存(Cinematic例は既にCinematicData/CinematicVideoで一致)
 - 旧バンドル(CoreMLDetectDAT/CinematicCHOP/CinematicTOP.plugin)を削除し新名で再インストール・
   署名検証OK。TD再起動で反映済み
+
+### 2026-07-20 5件実装(TextAnalyze拡張 / Training Recorder / Caption Author / FM Tool Calling / Spatial Video)
+
+ユーザー指定の5件を実装。全てM2実機・TD MCPで実データ検証済み。
+
+- **TextAnalyze DAT 拡張**(既存OP): `Output` メニュー(summary/tokens/embedding)を追加。
+  tokens=`index/token/pos/lemma/start/length`(NLTagSchemeLexicalClass + Lemma。init に全スキーム
+  列挙必須の罠を踏襲)、embedding=文埋め込みベクトルを `index/value` 数値列(NLEmbedding
+  sentence→NLContextualEmbedding フォールバック)。実測: "visited"→Verb/lemma=visit、英文で512次元
+- **Training Recorder CHOP**(新規・`Trainingrecorder`): 入力CHOP時系列を CreateML Activity 用
+  CSV(`recording,label,<feat...>`・1行=1フレーム)へ収録。DATはCHOP入力を受けられないので**CHOP**が
+  正。Record区間=1収録、Save/停止で確定・追記、session tag付きrecording IDで衝突回避。実測:
+  noise3ch を wave/circle で収録→2 recordings・正しいヘッダのCSVを生成(CreateMLがそのまま読める)
+- **Caption Author DAT**(新規・`Captionauthor`): 文字起こし/字幕テーブル→SRT/WebVTT整形+ファイル
+  書き出し。start/end列があれば使用、無ければ Default Duration で自動連番(SpeechTextの
+  index/text/final をそのまま字幕化)。`Only Finalized Rows` で volatile 行除外。出力は setText。
+  実測: SRT/VTT(ドット区切り)/自動連番 いずれも正しく生成
+- **Foundation Model Tool Calling 拡張**(既存OP+helper): FoundationModels の `Tool` プロトコルを
+  動的スキーマ(`Arguments=GeneratedContent`・`parameters:GenerationSchema`)で実装。**ツール実行を
+  ホスト(TD)へ委譲**する往復: LLMがツール呼び出し→helperが `withCheckedContinuation` で停止し
+  `pending_tool`/`pending_tool_args` を poll に出す→TDが `Tool Result` を書いて `Return Tool Result`
+  →`fm_tool_result` が継続を再開。実測: `get_sensor({"name":"temperature"})` 要求→TDが
+  `{"value":42}` 返す→**"The current temperature in the show is 42 degrees Celsius."** と回答
+- **Spatial Video DAT/TOP**(新規・`Spatialvideo`・1フォルダ2バンドル・純ObjC++): MV-HEVC 空間ビデオ。
+  DAT=メタデータ(CMFormatDescription拡張: HasLeft/Right/HeroEye/StereoCameraBaseline/
+  HorizontalFieldOfView/HorizontalDisparityAdjustment)。TOP=`AVAssetReaderTrackOutput` に
+  `kVTDecompressionPropertyKey_RequestedMVHEVCVideoLayerIDs=[0,1]` を要求し、`CMTaggedBufferGroup` の
+  `kCMTagCategory_VideoLayerID` で左右眼を分離→Left/Right/Side-by-Side BGRA出力。
+  実測(実iPhone空間ビデオ Assets/spatial_video_sample.MOV): 1920×1080・is_spatial=1・
+  baseline 19.255mm・FOV 63.4°、左眼中央px[0.122,0.122,0.137]≠右眼[0.141,0.161,0.161](視差確認)
+
+- 5件ともビルド・署名・常設インストール・TD再起動後の実データ検証済み。README(各+ルート英日)更新
+- 検証用TDノード(_v_*)とテストCSVは削除済み
+
+### 新規ハマりどころ(上記で発見)
+
+- **FoundationModels の動的ツールは `Tool.Arguments=GeneratedContent`+`parameters:GenerationSchema`**
+  (`DynamicGenerationSchema`から構築)。`call(arguments:)` で `arguments.jsonString` が引数JSON。
+  `Output:PromptRepresentable` は String でOK。ホスト実行の往復は `withCheckedContinuation` を
+  helper側に保持し、C ABI(`fm_tool_result`)で resume する(pending は poll JSON で公開)
+- **MV-HEVC両眼デコードは `AVAssetReaderTrackOutput.outputSettings` に
+  `AVVideoDecompressionPropertiesKey → kVTDecompressionPropertyKey_RequestedMVHEVCVideoLayerIDs`**。
+  各 CMSampleBuffer は `CMSampleBufferGetTaggedBufferGroup` で取り、`CMTagCollectionGetTagsWithCategory
+  (…kCMTagCategory_VideoLayerID)` + `CMTagGetSInt64Value` でレイヤーID(0=左/1=右)を判定して
+  `CMTaggedBufferGroupGetCVPixelBufferAtIndex` で各眼を取る
+- **StereoCameraBaseline は micrometers・HorizontalFieldOfView は thousandths of a degree**(CFNumber)
+- **Training Recorder は CHOP**(DATはCHOP入力不可)。CreateML Activity CSV は `recording`/`label` 列名が
+  CreateMLHelper の既定と一致している必要がある(recordingで系列化)

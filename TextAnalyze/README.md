@@ -22,7 +22,19 @@ SpeechText(文字起こし)と直結して「**発話の感情・話題でビジ
 | words | 語数 |
 | person / place / organization | 固有表現(検出数ぶん行が続く) |
 
-数値は Info CHOP(`sentiment / similarity / entities`)からも取れる。
+数値は Info CHOP(`sentiment / similarity / entities / token_count / embedding_dim`)からも取れる。
+
+## Output モード(tokens / embedding)
+
+`Output` メニューでテーブルの内容を切り替える:
+
+- **summary**(既定): 上記 key/value
+- **tokens**: `index / token / pos(品詞) / lemma(見出し語) / start / length`。
+  実測: "visited" → pos=Verb・lemma=**visit**(見出し語化が機能)。`Max Tokens` で上限
+- **embedding**: 文埋め込みベクトルを `index / value` の数値列で出力(NLEmbedding の
+  sentence embedding。使えない言語は NLContextualEmbedding へフォールバック)。
+  実測: 英文で **512次元**の実数ベクトルを取得。画像の VisionSimilarity に対応する
+  「テキストのベクトル化」に使える
 
 ## パラメータ
 
@@ -31,6 +43,8 @@ SpeechText(文字起こし)と直結して「**発話の感情・話題でビジ
 | Active | 解析 On/Off |
 | Text Source | Last Row(既定・ライブ字幕向け)/ All Rows |
 | Reference Text | 類似度の比較対象テキスト。「この話題に近づいたら発火」に使う |
+| Output | Summary / Tokens(token/POS/lemma)/ Embedding Vector |
+| Max Tokens | tokens モードの最大トークン数 |
 
 入力DATに `text` という名前の列があればその列、無ければ最終列を読む
 (SpeechText の出力テーブルにそのまま繋がる)。

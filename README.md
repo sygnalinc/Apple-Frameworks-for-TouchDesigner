@@ -107,6 +107,7 @@ grouped by category.
 | [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img** (Core ML Stable Diffusion / Image Playground) |
 | [CoreImage Code](CoreImageCode/) | TOP | **Generate** QR / Aztec / PDF417 / Code128 (no external library) |
 | [CreateML](CreateML/) | DAT | **Unified on-device trainer** — one `Task` menu for Image / Hand Pose / Action (body) / Hand Action / Sound / Activity (CHOP series) / Tabular classifier & regressor → `.mlmodel`. Output models are read by CoreML TOP / CoreML Motion CHOP / SoundClass etc. |
+| [Training Recorder](TrainingRecorder/) | CHOP | **Record a CHOP time-series → CreateML dataset CSV** (recording / label / feature columns). Capture VisionPose/Hand takes in TD, label them, feed straight to CreateML (Activity) |
 | [CoreML Motion](CoreMLMotion/) | CHOP | **Live gesture inference** — buffer an input CHOP (VisionPose etc.) over the prediction window and classify motion in real time (per-class prob + confidence). Pairs with CreateML's Activity task |
 
 ### Audio & sound
@@ -129,9 +130,10 @@ grouped by category.
 
 | Plugin | Family | What it does |
 |---|---|---|
-| [Foundation Model](FoundationModel/) | DAT | **Apple Intelligence on-device LLM** (macOS 26+). **Structured output (JSON schema)** straight into show control |
+| [Foundation Model](FoundationModel/) | DAT | **Apple Intelligence on-device LLM** (macOS 26+). **Structured output (JSON schema)** + **Tool Calling** (the LLM calls a tool, TouchDesigner executes it and returns the result) straight into show control |
 | [Translate](Translate/) | DAT | **On-device translation.** Wire to Speech Text for real-time subtitle translation |
-| [Text Analyze](TextAnalyze/) | DAT | Sentiment / language ID / named entities / semantic similarity (JA supported). "Drive visuals from speech mood/topic" |
+| [Text Analyze](TextAnalyze/) | DAT | Sentiment / language ID / named entities / semantic similarity (JA supported) + **tokens (token / POS / lemma)** and **embedding vectors** (numeric). "Drive visuals from speech mood/topic" |
+| [Caption Author](CaptionAuthor/) | DAT | **Transcription → SRT / WebVTT** subtitles. Uses start/end columns, or auto-sequences text-only rows (SpeechText). Writes the caption file |
 
 ### 3D, screen, input devices & connectivity
 
@@ -141,6 +143,8 @@ grouped by category.
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **Photo depth → 3D point cloud** (unproject via camera calibration / FOV). Colors sampled from RGB |
 | [Cinematic Data](Cinematic/) | CHOP | **iPhone Cinematic video metadata** (macOS 26+): focus depth, detected subjects (type/bbox/depth/trackID) |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic video**: depth (disparity) map, or **re-render with adjustable focus / aperture** |
+| [Spatial Video](SpatialVideo/) | DAT | **MV-HEVC spatial video metadata**: left/right eye, hero eye, camera baseline, horizontal FOV, disparity adjustment |
+| [Spatial Video](SpatialVideo/) | TOP | **Decode MV-HEVC stereo eyes** → Left / Right / Side-by-Side BGRA (both video layers via tagged buffer groups) |
 | [Vision Contours](VisionContours/) | SOP | Image contours → **closed Line geometry** (wire into Sweep / Extrude / Particle) |
 | [Screen Capture](ScreenCapture/) | TOP | **Screen recording** of a display / single window (up to 120fps) |
 | [CoreAudio Tap](CoreAudioTap/) | CHOP | **Tap a single app's audio** (Core Audio Process Tap, macOS 14.4+) or all system audio → 48kHz stereo. Finer-grained than Screen Capture |

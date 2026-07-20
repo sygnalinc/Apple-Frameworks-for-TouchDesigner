@@ -32,6 +32,10 @@ bool fm_submit_structured(void* handle, const char* prompt, const char* schema,
                           double temperature, int32_t maxTokens, bool keepContext);
 bool fm_submit(void* handle, const char* prompt, double temperature, int32_t maxTokens,
                bool keepContext);
+bool fm_submit_tool(void* handle, const char* prompt, const char* toolName,
+                    const char* toolDesc, const char* toolParams, double temperature,
+                    int32_t maxTokens);
+void fm_tool_result(void* handle, const char* resultJSON);
 int32_t fm_poll(void* handle, char* buffer, int32_t capacity);
 void fm_clear(void* handle);
 void fm_destroy(void* handle);
@@ -80,7 +84,17 @@ public:
             myWantSubmit = false;
             const char* prompt = inputs->getParString("Prompt");
             const char* schema = inputs->getParString("Schema");
-            if (schema && *schema) {
+            const bool useTools = inputs->getParInt("Enabletools") != 0;
+            if (useTools) {
+                // ツール呼び出し: LLM がツールを要求 → TD がツールを実行して結果を返す
+                const char* tn = inputs->getParString("Toolname");
+                const char* td = inputs->getParString("Tooldesc");
+                const char* tp = inputs->getParString("Toolparams");
+                fm_submit_tool(mySession, prompt ? prompt : "", tn ? tn : "",
+                               td ? td : "", tp ? tp : "",
+                               inputs->getParDouble("Temperature"),
+                               (int32_t)inputs->getParInt("Maxtokens"));
+            } else if (schema && *schema) {
                 // 構造化出力: "name:type" 改行区切りのスキーマでJSONを生成させる
                 fm_submit_structured(mySession, prompt ? prompt : "", schema,
                                      inputs->getParDouble("Temperature"),
@@ -92,6 +106,13 @@ public:
                           (int32_t)inputs->getParInt("Maxtokens"),
                           inputs->getParInt("Keepcontext") != 0);
             }
+        }
+        // ツール結果の返却(Return Tool Result パルス、または Auto Tool Result 中で
+        // pending_tool を検知したら Tool Result パラメータの内容を返す)
+        if (myWantToolResult && mySession) {
+            myWantToolResult = false;
+            const char* tr = inputs->getParString("Toolresult");
+            fm_tool_result(mySession, tr ? tr : "{}");
         }
         if (myWantClear && mySession) {
             myWantClear = false;
@@ -110,13 +131,26 @@ public:
         // テーブル出力(構造化フィールド行 → 会話履歴の順)
         const int maxRows = std::max(1, (int)inputs->getParInt("Maxrows"));
         const int begin = std::max(0, (int)history.size() - maxRows);
+        const int toolRows = myPendingTool.empty() ? 0 : 2;
         output->setOutputDataType(DAT_OutDataType::Table);
         output->setTableSize(
-            1 + (int32_t)myStructured.size() + (int32_t)(history.size() - begin), 3);
+            1 + toolRows + (int32_t)myStructured.size() +
+                (int32_t)(history.size() - begin), 3);
         output->setCellString(0, 0, "index");
         output->setCellString(0, 1, "role");
         output->setCellString(0, 2, "text");
         int32_t row = 1;
+        if (toolRows) {
+            // LLM がツール呼び出し待ち。TD 側はこの引数を見て Tool Result を返す
+            output->setCellString(row, 0, "pending_tool");
+            output->setCellString(row, 1, "tool");
+            output->setCellString(row, 2, myPendingTool.c_str());
+            row++;
+            output->setCellString(row, 0, "pending_tool_args");
+            output->setCellString(row, 1, "tool");
+            output->setCellString(row, 2, myPendingToolArgs.c_str());
+            row++;
+        }
         for (auto& kv : myStructured) {
             output->setCellString(row, 0, kv.first.c_str());
             output->setCellString(row, 1, "field");
@@ -192,6 +226,50 @@ public:
             p.maxSliders[0] = 200;
             manager->appendInt(p);
         }
+        // ---- Tool Calling(TDがツール実行系になる)----
+        {
+            OP_NumericParameter p("Enabletools");
+            p.label = "Enable Tool Calling";
+            p.page = "Tools";
+            p.defaultValues[0] = 0;
+            manager->appendToggle(p);
+        }
+        {
+            OP_StringParameter p("Toolname");
+            p.label = "Tool Name";
+            p.page = "Tools";
+            p.defaultValue = "get_td_value";
+            manager->appendString(p);
+        }
+        {
+            OP_StringParameter p("Tooldesc");
+            p.label = "Tool Description";
+            p.page = "Tools";
+            p.defaultValue = "Get a live value from the TouchDesigner project.";
+            manager->appendString(p);
+        }
+        {
+            // ツールの引数スキーマ("name:type" 改行/カンマ区切り)
+            OP_StringParameter p("Toolparams");
+            p.label = "Tool Params (name:type)";
+            p.page = "Tools";
+            p.defaultValue = "query:string";
+            manager->appendString(p);
+        }
+        {
+            // LLM がツールを呼んだとき、この文字列(JSON等)を結果として返す。
+            // pending_tool_args を見て TD 側(Python等)が算出してこのパラメータに書く
+            OP_StringParameter p("Toolresult");
+            p.label = "Tool Result";
+            p.page = "Tools";
+            manager->appendString(p);
+        }
+        {
+            OP_NumericParameter p("Returntoolresult");
+            p.label = "Return Tool Result";
+            p.page = "Tools";
+            manager->appendPulse(p);
+        }
         {
             OP_NumericParameter p("Submit");
             p.label = "Submit";
@@ -212,13 +290,16 @@ public:
             myWantSubmit = true;
         else if (strcmp(name, "Clear") == 0)
             myWantClear = true;
+        else if (strcmp(name, "Returntoolresult") == 0)
+            myWantToolResult = true;
     }
 
-    int32_t getNumInfoCHOPChans(void*) override { return 3; }
+    int32_t getNumInfoCHOPChans(void*) override { return 4; }
     void getInfoCHOPChan(int32_t index, OP_InfoCHOPChan* chan, void*) override
     {
-        const char* names[3] = {"executes", "busy", "turns"};
-        float values[3] = {(float)myExecCount, (float)myBusy, (float)myTurnCount};
+        const char* names[4] = {"executes", "busy", "turns", "tool_pending"};
+        float values[4] = {(float)myExecCount, (float)myBusy, (float)myTurnCount,
+                           (float)(myPendingTool.empty() ? 0 : 1)};
         chan->name->setString(names[index]);
         chan->value = values[index];
     }
@@ -250,6 +331,15 @@ private:
             if ([status isKindOfClass:[NSString class]])
                 myStatus = status.UTF8String;
             myBusy = [dict[@"busy"] boolValue] ? 1 : 0;
+            // ツール呼び出し待ち(pending_tool)を取り出す
+            myPendingTool.clear();
+            myPendingToolArgs.clear();
+            NSString* pt = dict[@"pending_tool"];
+            NSString* pa = dict[@"pending_tool_args"];
+            if ([pt isKindOfClass:[NSString class]] && pt.length > 0)
+                myPendingTool = pt.UTF8String ?: "";
+            if ([pa isKindOfClass:[NSString class]])
+                myPendingToolArgs = pa.UTF8String ?: "";
             // 構造化出力(key/value)を取り出してキー順で保持
             myStructured.clear();
             NSDictionary* st = dict[@"structured"];
@@ -285,7 +375,9 @@ private:
     std::vector<std::pair<std::string, std::string>> myStructured;
     std::atomic<bool> myWantSubmit{false};
     std::atomic<bool> myWantClear{false};
+    std::atomic<bool> myWantToolResult{false};
     std::string myStatus = "no session";
+    std::string myPendingTool, myPendingToolArgs;
     int myBusy = 0;
     int myTurnCount = 0;
     std::atomic<int> myExecCount{0};
