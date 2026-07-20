@@ -1818,3 +1818,16 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   **"A group of people is gathered under a cloudy sky in an outdoor space."**
 - **踏んだ罠**: 非同期C++ DAT(Vision Classify)の更新は datexecuteDAT の onTableChange が
   安定して発火しない。**executeDAT の onFrameEnd で毎フレーム駆動**する方が確実
+
+### 2026-07-21 SpeechSynth CHOP のノイズ修正(timeslice=false→true)
+
+- ユーザー報告「SpeechSynth がノイズ」。原因は **オーディオ生成系CHOP なのに `timeslice=false`+固定
+  `Blocksamples` 出力**していたこと。60fps で毎フレーム固定1024サンプル消費 → 22.05kHz音声を実時間の
+  約2.8倍速で読み出し=早送りノイズになっていた
+- 修正: `getGeneralInfo` を `timeslice=true`、execute のループ上限を `myBlock`→`out->numSamples`
+  (TDが実時間×sampleRateから算出したサンプル数)。これで実時間ペースで再生される
+- **検証**: SpeechSynth→Audio File Out で WAV 実録し解析。22050Hz・**非無音2.94秒の連続発話**
+  (発話1回ぶんの正しい長さ)、peak0.289/rms0.027、**ZCR=0.188(ノイズは~0.5)/energy CoV=0.61
+  (動的=発話)** で「speech-like」判定。早送りノイズ解消を確認
+- 教訓(pitfalls既出の補強): **音声を生成して出すCHOPは timeslice=true + out->numSamples**。
+  固定ブロック(timeslice=false)は再生速度が実時間とズレてノイズ化する
