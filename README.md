@@ -107,6 +107,8 @@ grouped by category.
 | [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img** (Core ML Stable Diffusion / Image Playground) |
 | [CoreImage Code](CoreImageCode/) | TOP | **Generate** QR / Aztec / PDF417 / Code128 (no external library) |
 | [CreateML Image](CreateMLImage/) | DAT | **Train** an image classifier on-device from a labeled folder → `.mlmodel` (usable by CoreML TOP). Capture→label→train→infer loop entirely in TD |
+| [CreateML Motion](CreateMLMotion/) | DAT | **Train** a motion/gesture classifier on-device from recorded CHOP sequences (VisionPose joints + label/recording columns) → `.mlmodel` |
+| [CoreML Motion](CoreMLMotion/) | CHOP | **Live gesture inference** — buffer an input CHOP (VisionPose etc.) over the prediction window and classify motion in real time (per-class prob + confidence) |
 
 ### Audio & sound
 

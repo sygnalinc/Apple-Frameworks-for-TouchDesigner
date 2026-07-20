@@ -189,6 +189,21 @@
   「TD内で撮る→学習→推論」を1つのネットワークで閉じられる
 - pulse パラメータは `pulsePressed(name)` で検出(OP_Inputs無し)→ フラグを立てて
   execute でパラメータを読んで処理する
+- **動作/ジェスチャ分類 `MLActivityClassifier` はフラット表を拒否**する
+  ("<col> type is not a Sequence")。収録IDでグループ化し、**各特徴を `[Double]` 配列にした
+  シーケンス列テーブル(1収録=1行、`MLDataTable(dictionary:)`)**を作って渡す。
+  `train(trainingData:featureColumns:labelColumn:recordingFileColumn:parameters:)`、
+  `ModelParameters(validation:, maximumIterations:, predictionWindowSize:)`。`recording` 列は
+  **動作1回ごとに別ID**(全フレーム同一IDだと1サンプル扱いで学習不能)
+- **ライブ推論CHOP側(CoreML Motion)**: モデル記述の `inputDescriptionsByName` から特徴入力
+  (MultiArray shape[window])と state 入力(名前に "state"・shape[N])を分け、`classLabels` で
+  チャンネル名を作る。入力CHOPを特徴名で**名前一致**バッファ(窓ぶんの deque)し、
+  各特徴 `MLMultiArray[window]` + `stateIn`(初回0・`stateOut`をフィードバック)で予測。
+  窓が埋まるまで無出力(`buffered < window`)
+- **TDテスト入力の落とし穴**: constant CHOP の値式は Python。`sin(...)` は NameError で
+  **式が壊れるとチャンネル自体が空**になり、推論CHOPは特徴不一致で0埋め→静止クラス誤判定。
+  `math.sin`/`math.cos` を使う。推論ロジックの切り分けは**単体C ABI harness**(30/30正答)で先に確定させ、
+  TD側は入力の生成だけを疑う
 
 ## SOP(VisionContours / RealityKit Capture / ImageIO PointCloud)
 

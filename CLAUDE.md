@@ -1163,3 +1163,25 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
 - README+ルート一覧(英日)更新、常設インストール済み(TD再起動で `CreateML Image` 登録)
 - 次にやること: CreateML HandPose(ジェスチャ学習・VisionHandと連携)、TOP画像からの直接学習
   (キャプチャ→一時ラベルフォルダ)、CoreML TOPでのTD内推論デモ
+
+### 2026-07-20 CreateML Motion DAT(学習)+ CoreML Motion CHOP(ライブ推論)実装
+
+- ユーザー「Vision Poseの動きやジェスチャを学習させたい」→ **学習+ライブ推論の2オペレータ**構成で実装
+- **CreateML Motion DAT**(Swiftヘルパ cma_・opType `Createmlmotion`・icon CMM): 録画した時系列
+  CHOP系列のCSV(1行=1フレーム、`label`列+`recording`列+特徴列)から `MLActivityClassifier` で
+  動き/ジェスチャ分類を**オンデバイス学習**し `.mlmodel` を書き出す。特徴列は空欄で自動採用
+- **CoreML Motion CHOP**(ObjC++ CoreML・opType `Coremlmotion`・icon CMO・minInputs=1): 学習モデルを
+  ロードし、入力CHOP(VisionPose等)を予測窓ぶんリングバッファして**ライブ分類**。出力は
+  `prob_<class>` + confidence + predicted + buffered。モデル記述から特徴名/窓/クラスを自動取得、
+  recurrent state(stateOut)を毎フレームフィードバック
+- **実測(M2)**: 合成4特徴・30収録×80フレーム・3クラス(circle/wave/still)で学習→done約1秒・
+  983KB。TDライブ推論で **円運動→prob_circle=1.0、横振動→prob_wave=1.0** を確認(切替追従)
+- **踏んだ罠(skill反映)**: ①`MLActivityClassifier` はフラット表を拒否("x0 type is not a Sequence")。
+  収録IDでグループ化し**各特徴を[Double]配列にしたシーケンス列テーブル**(1収録=1行)を作る必要。
+  ②TD constant CHOP の式は Python なので `sin` 単体は NameError→式が壊れると**チャンネルが空**になり、
+  CHOP側は特徴不一致で0埋め→常に"still"。`math.sin`/`math.cos` を使う(推論ロジックは単体harnessで
+  30/30正答済みだったので、原因はテスト入力側だった)
+- README(英日ルート一覧含む)更新、両プラグイン常設インストール+ad-hoc署名済み(TD再起動で登録)。
+  検証用TDノード(_mvin/_mvinfer/_mvnull)は削除済み
+- 次にやること: 実VisionPose 68ch を録画→学習→ライブ認識のデモを sample.toe に組む、
+  CreateML HandPose(手ジェスチャ)、TOP/CHOP録画ユーティリティ

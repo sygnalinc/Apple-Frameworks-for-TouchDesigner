@@ -105,6 +105,8 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img**(Core ML Stable Diffusion / Image Playground) |
 | [CoreImage Code](CoreImageCode/) | TOP | QR / Aztec / PDF417 / Code128 の**生成**(外部ライブラリ不要) |
 | [CreateML Image](CreateMLImage/) | DAT | ラベル付きフォルダから画像分類を**オンデバイス学習**→`.mlmodel`(CoreML TOPで推論)。TD内で撮る→学習→推論を完結 |
+| [CreateML Motion](CreateMLMotion/) | DAT | 録画したCHOP系列(VisionPose関節+label/recording列)から**動き/ジェスチャ分類を学習**→`.mlmodel` |
+| [CoreML Motion](CoreMLMotion/) | CHOP | 入力CHOP(VisionPose等)を予測窓ぶんバッファして**ライブでジェスチャ分類**(クラス別確率+confidence) |
 
 ### 音声・音響
 
