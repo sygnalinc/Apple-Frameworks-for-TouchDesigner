@@ -1486,3 +1486,20 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
   (強制cookは実時間が進まずr.drainできず無音区間に当たる)
 - ビルド・署名・インストール・TD検証済み(自分で再起動)。README+ルート一覧(英日)更新
 - 残り: #4 Image Capture、#11 HID、#10 Beacon、#12 Live Photo(ハード/素材/権限依存)
+
+### 2026-07-20 有力12(その4・完): HID / Semantic Index / Image Capture / Beacon / Live Photo
+
+指定12件の残り5件を実装。ハード/権限/素材依存が主でロード+構造検証、Semantic Indexは実データ検証。
+
+- **HID CHOP**(`Hid`・IOHIDManager): 任意HIDのraw入力を要素値CHOPに。バックグラウンドrun loopで値変化
+  受信。**入力監視(Input Monitoring)TCC権限**が要る(未許可だと要素0)
+- **Semantic Index DAT**(`Semanticindex`・NSMetadataQuery): OS全体のSpotlightファイル検索。実測:
+  Query=README で15件・first=README.ja.md。**CoreSpotlight CSUserQueryは不採用**(アプリ索引/
+  エンタイトルメント必須でプラグイン文脈0件)。**startQueryはメインキューにdispatch必須**(cookスレッド
+  直呼びだと通知が発火しない)
+- **Image Capture DAT**(`Imagecapture`・ICDeviceBrowser): テザーカメラ/スキャナ列挙。要実機
+- **Beacon CHOP**(`Beacon`・CoreLocation): iBeacon測距(macOS10.15+)。要Location権限+実ビーコン
+- **Live Photo TOP**(`Livephoto`・Photos/PHLivePhoto): Live Photoの動画コンポーネントの任意時刻フレーム。
+  要実素材(image+video)。CoreMediaリンク必須
+- 5件ビルド・署名・インストール・TD再起動後にロード/エラーなし確認(自分で再起動)。全12件完了
+- **これで指定12プラグイン全て完了**。README(各+ルート英日)更新。commit/push

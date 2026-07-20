@@ -143,6 +143,11 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Vision Contours](VisionContours/) | SOP | 画像の輪郭を**閉じたLineジオメトリ**へ(Sweep/Extrude/Particle 直結) |
 | [Screen Capture](ScreenCapture/) | TOP | ディスプレイ/単一ウインドウの**画面収録**(最大120fps) |
 | [Process Audio](ProcessAudio/) | CHOP | **指定アプリの音だけ**をタップ(Core Audio Process Tap・macOS 14.4+)or 全システム音→48kHz stereo。Screen Captureより粒度が細かい |
+| [Semantic Index](SemanticIndex/) | DAT | **OS全体のローカルファイル検索**(Spotlight / NSMetadataQuery)— 名前/内容/生kMDItem述語 |
+| [HID](HID/) | CHOP | **任意のUSB/Bluetooth HIDのraw入力**(ゲームパッド/ペダル/ノブ/センサ)IOHIDManager |
+| [Image Capture](ImageCapture/) | DAT | **テザー接続カメラ/スキャナの列挙**(ImageCaptureCore)— 名前/種別/uuid/接続 |
+| [Beacon](Beacon/) | CHOP | **iBeacon測距**(CoreLocation)— major/minor/rssi/近接度/推定距離 |
+| [Live Photo](LivePhoto/) | TOP | **Live Photoの動画コンポーネント各フレーム**を任意時刻で(Photos / PHLivePhoto) |
 | [Multipeer In / Out](MultipeerCHOP/) | CHOP | **iPhone/iPad をワイヤレスセンサーに**(ジャイロ/加速度/タッチを低遅延受信)。**iOSアプリ同梱** |
 | [Multipeer In / Out](Multipeer/) | DAT | Mac/iPhone 間の**ローカルP2Pテキスト**(自動接続・サーバー不要) |
 | [Game Controller](GameController/) | CHOP | PS5/Xbox/MFi **ゲームパッド入力**(スティック/トリガー+モーション+ランブル) |

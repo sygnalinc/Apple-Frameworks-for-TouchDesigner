@@ -145,6 +145,11 @@ grouped by category.
 | [Vision Contours](VisionContours/) | SOP | Image contours → **closed Line geometry** (wire into Sweep / Extrude / Particle) |
 | [Screen Capture](ScreenCapture/) | TOP | **Screen recording** of a display / single window (up to 120fps) |
 | [Process Audio](ProcessAudio/) | CHOP | **Tap a single app's audio** (Core Audio Process Tap, macOS 14.4+) or all system audio → 48kHz stereo. Finer-grained than Screen Capture |
+| [Semantic Index](SemanticIndex/) | DAT | **OS-wide local file search** (Spotlight / NSMetadataQuery) — name / content / raw kMDItem predicate |
+| [HID](HID/) | CHOP | **Raw input from any USB/Bluetooth HID** (gamepad / pedal / knob / sensor) via IOHIDManager |
+| [Image Capture](ImageCapture/) | DAT | **List tethered cameras / scanners** (ImageCaptureCore) — name / type / uuid / transport |
+| [Beacon](Beacon/) | CHOP | **iBeacon ranging** (CoreLocation) — major / minor / rssi / proximity / distance |
+| [Live Photo](LivePhoto/) | TOP | **Live Photo video-component frames** at any time (Photos / PHLivePhoto) |
 | [Multipeer In / Out](MultipeerCHOP/) | CHOP | **Turn an iPhone/iPad into a wireless sensor** (low-latency gyro / accel / touch). **iOS app included** |
 | [Multipeer In / Out](Multipeer/) | DAT | **Local P2P text** between Mac / iPhone (auto-connect, no server) |
 | [Game Controller](GameController/) | CHOP | PS5 / Xbox / MFi **gamepad input** (sticks / triggers + motion + rumble) |
