@@ -142,6 +142,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic動画**: 深度(視差)マップ、または**f値/ピントを差し替えて再レンダ** |
 | [Vision Contours](VisionContours/) | SOP | 画像の輪郭を**閉じたLineジオメトリ**へ(Sweep/Extrude/Particle 直結) |
 | [Screen Capture](ScreenCapture/) | TOP | ディスプレイ/単一ウインドウの**画面収録**(最大120fps) |
+| [Process Audio](ProcessAudio/) | CHOP | **指定アプリの音だけ**をタップ(Core Audio Process Tap・macOS 14.4+)or 全システム音→48kHz stereo。Screen Captureより粒度が細かい |
 | [Multipeer In / Out](MultipeerCHOP/) | CHOP | **iPhone/iPad をワイヤレスセンサーに**(ジャイロ/加速度/タッチを低遅延受信)。**iOSアプリ同梱** |
 | [Multipeer In / Out](Multipeer/) | DAT | Mac/iPhone 間の**ローカルP2Pテキスト**(自動接続・サーバー不要) |
 | [Game Controller](GameController/) | CHOP | PS5/Xbox/MFi **ゲームパッド入力**(スティック/トリガー+モーション+ランブル) |

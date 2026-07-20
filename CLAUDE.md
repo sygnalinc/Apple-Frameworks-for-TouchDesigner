@@ -1473,3 +1473,16 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
 - 罠: Info DAT の `getInfoDATSize` は **bool返し**(getNumInfoDATSizeは無い)
 - 2件ビルド・署名・インストール・TD検証済み(自分で再起動)。README+ルート一覧(英日)更新
 - 残り: #1 Process Audio、#5 Semantic Index、#4 Image Capture、#11 HID、#10 Beacon、#12 Live Photo
+
+### 2026-07-20 有力12(その3): Process Audio CHOP(Core Audio Process Tap)
+
+- **Process Audio CHOP**(`Processaudio`・Core Audio Process Tap・macOS 14.4+): システム全体または
+  指定プロセス(PID)の音声だけをタップ→48kHz stereo CHOP。IOProc(RTスレッド)→SPSCリング→timeslice出力。
+  実測: Global で `say` 連続音声中に peak=0.535 捕捉(TD内で確認)
+- **踏んだ罠(pitfalls反映)**: ①**オーディオ出力CHOPは getOutputInfo で sampleRate=48000 必須**
+  (未設定だと60Hz扱いでnsamp=12の「音でない」出力)。②`initStereoGlobalTapButExcludeProcesses:` に
+  自プロセス(TD)を渡すと捕捉0になる→Exclude既定Off。③リング溢れ時はread→write-nへ追いつかせる。
+  ④ヘッダは CATapDescription.h と AudioHardwareTapping.h を明示import。⑤検証は実フレームcook+連続音源
+  (強制cookは実時間が進まずr.drainできず無音区間に当たる)
+- ビルド・署名・インストール・TD検証済み(自分で再起動)。README+ルート一覧(英日)更新
+- 残り: #4 Image Capture、#11 HID、#10 Beacon、#12 Live Photo(ハード/素材/権限依存)

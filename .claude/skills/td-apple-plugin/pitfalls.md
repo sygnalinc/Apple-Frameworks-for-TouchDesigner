@@ -262,3 +262,23 @@
 - **PHASEEngine は出力バッファ取得APIが無く**(start/stopでシステム出力へ直接再生)、
   レンダ結果をCHOPに戻せない。PHASEは「TD入力→物理ベース定位→デバイス(ヘッドホン)再生」の
   モデルでのみ使える(TDのオーディオグラフには戻らない)
+
+## Core Audio Process Tap(Process Audio CHOP)
+
+- **フロー**: `CATapDescription`(initStereoGlobalTapButExcludeProcesses / initStereoMixdownOfProcesses)
+  → `AudioHardwareCreateProcessTap(desc,&tapID)` → tap UID(`kAudioTapPropertyUID`)→
+  aggregate device 辞書(`kAudioAggregateDeviceTapListKey` に `{kAudioSubTapUIDKey:tapUID,
+  kAudioSubTapDriftCompensationKey:@1}`, `kAudioAggregateDeviceIsPrivateKey:@1`)→
+  `AudioHardwareCreateAggregateDevice` → `AudioDeviceCreateIOProcIDWithBlock` → `AudioDeviceStart`。
+  IOProcの`in`バッファがタップ音声。ヘッダは `<CoreAudio/CATapDescription.h>` と
+  `<CoreAudio/AudioHardwareTapping.h>` を明示import(CoreAudio.h だけでは足りない)
+- **オーディオ出力CHOPは `getOutputInfo` で `info->sampleRate=48000` を必ず設定**する。未設定だと
+  タイムラインFPS(60Hz)扱いになり timeslice が1cook十数サンプルの「音でない」出力になる(実測nsamp=12)
+- IOProc(リアルタイムスレッド)→ CHOP は**ロックフリーSPSCリングバッファ**。消費(cook)が遅れて
+  リング容量に近づいたら read を write-n へ**追いつかせて**溢れ(データ喪失)を防ぐ。強制cookは実時間が
+  進まずリングを drain できないので、検証は実フレームcook(`run(...,delayFrames=i)`)+ 連続音源で
+- **`initStereoGlobalTapButExcludeProcesses:` に自プロセス(TD)を渡すと捕捉が0になる場合がある**
+  (実測)。Exclude は既定Offにし、必要時のみ使う
+- PID指定は `kAudioHardwarePropertyTranslatePIDToProcessObject` で PID→プロセスAudioObjectID変換
+- **Terminalからのprobeは捕捉できるがTD内で0** のときは、まず sampleRate 未設定と Exclude を疑う
+  (TCCではなかった。実測でTD内でも peak=0.535 捕捉)
