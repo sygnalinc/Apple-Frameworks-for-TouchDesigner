@@ -1691,3 +1691,30 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   `performSelector:onThread:` で状態を渡すのは危険**(TDでEXC_BAD_ACCESSを実際に踏んだ)。
   設定は `@synchronized` の保留キューに積み、browserスレッドが自分で適用する polled 方式にする。
   Bonjourオブジェクトの生成/破棄/列挙は browserスレッドに一極集中させ、cookは不変スナップショットを読むだけにする
+
+### 2026-07-20 ImageIO Depth TOP → ImageIO File In TOP(Color表示・EXIF向き補正を追加)
+
+ユーザー要望「TDでHEIFを表示できない/depthも色も出したい/汎用画像ファイルopに/縦写真が横倒し」を実装。
+
+- **リネーム**: ImageIODepth → **ImageIOFileIn**(opType `Imageiofilein`・label "ImageIO File In"・icon IFI)。
+  フォルダ/ソース/build.sh/README/ルートREADME/バンドルを改名(git mv)
+- **Color 表示を追加**(Data Type メニュー先頭・既定): 主画像を `CGImageSourceCreateImageAtIndex`→
+  BGRA8 出力。**TDのMovie File Inが開けないHEIF/HEICを表示できる代替**になった
+- **EXIF Orientation(1〜8)を適用**して正立化。汎用リマップ関数 `applyOrientation`(4byte/px)で
+  color(BGRA)も depth(float)も同じ経路で回転/反転。iPhone縦写真は横センサー+**Orientation=6**で
+  保存され、旧depthは横倒しだった → 補正で解消
+- Info CHOP に `has_disparity/has_depth/has_matte/width/height` を追加(画像に含まれるデータが分かる)
+- **実測(実iPhoneポートレートHEIC IMG_2540.HEIC・raw 4032×3024・Orientation=6・disparity内蔵)**:
+  Color=**3024×4032 正立ポートレート**を視認確認(横倒し解消)、Disparity=576×768 正立の深度マップを視認。
+  `.save()`でPNG化しReadで目視検証(color=被写体正立・logo可読、depth=手前明/奥暗で正しい向き)
+- sample.toe の examples/ImageIODepth → **ImageIOFileIn**(Color・実HEIC)へ更新して保存
+- **ドラッグ&ドロップでカスタムOP生成は不可**: `OP_CustomOPInfo` にファイル拡張子登録フィールドが
+  無く(SDK確認済み)、TDのファイルドロップ→op生成割り当てはTD内部仕様でカスタム.pluginに割り当て
+  できない。HEIFドロップは標準の Movie File In が作られる。回避は本OPを手動作成 or DAT Execute で
+  moviefilein 生成を監視して差し替える運用(READMEに明記)
+
+### 新規ハマりどころ
+
+- **EXIF Orientation を適用しないとiPhone縦写真は横倒し**(raw横センサー+Orientation=6)。
+  `kCGImagePropertyOrientation` を読み、8種を汎用ピクセルリマップで正立化する。color/depth 共通経路にできる
+- **カスタム.pluginはファイルのドラッグ&ドロップ生成に割り当てられない**(OP_CustomOPInfoに拡張子欄なし)

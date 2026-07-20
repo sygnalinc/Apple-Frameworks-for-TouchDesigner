@@ -96,7 +96,7 @@ grouped by category.
 | [Metal MPSAnalyze](MetalMPSAnalyze/) | CHOP | GPU image statistics (RGBA histogram, average color, luminance distribution — 76ch) |
 | [CoreImage RAW](CoreImageRAW/) | TOP | **Develop DNG / ProRAW** in real time (exposure / WB / noise / sharpness) via CIRAWFilter |
 | [CoreImage HDR](CoreImageHDR/) | TOP | **HDR gain map** extraction + SDR/HDR (EDR) conversion from HEIC |
-| [ImageIO Depth](ImageIODepth/) | TOP | **Depth / disparity / Portrait Matte / semantic mattes** embedded in iPhone photos → Mono32Float |
+| [ImageIO File In](ImageIOFileIn/) | TOP | **Read any image file (incl. HEIF/HEIC that TD can't show)** → Color, plus embedded **depth / disparity / Portrait Matte / semantic mattes**. Applies EXIF orientation |
 
 ### General ML inference & image generation
 

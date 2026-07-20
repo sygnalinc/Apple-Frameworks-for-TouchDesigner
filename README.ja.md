@@ -94,7 +94,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Metal MPSAnalyze](MetalMPSAnalyze/) | CHOP | GPU画像統計(RGBAヒストグラム・平均色・輝度分布 76ch) |
 | [CoreImage RAW](CoreImageRAW/) | TOP | **DNG / ProRAW のリアルタイム現像**(露出/WB/ノイズ/シャープ)。CIRAWFilter |
 | [CoreImage HDR](CoreImageHDR/) | TOP | HEICの**HDRゲインマップ抽出**＋SDR/HDR(EDR)変換 |
-| [ImageIO Depth](ImageIODepth/) | TOP | iPhone写真の**深度/視差/Portrait Matte/セマンティックマット**を Mono32Float で出力 |
+| [ImageIO File In](ImageIOFileIn/) | TOP | **任意の画像ファイルを表示(TDが開けないHEIF/HEICも)** → Color と、埋め込みの**深度/視差/Portrait Matte/セマンティックマット**。EXIFの向きを補正 |
 
 ### 汎用ML推論・画像生成
 
