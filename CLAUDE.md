@@ -1185,3 +1185,54 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
   検証用TDノード(_mvin/_mvinfer/_mvnull)は削除済み
 - 次にやること: 実VisionPose 68ch を録画→学習→ライブ認識のデモを sample.toe に組む、
   CreateML HandPose(手ジェスチャ)、TOP/CHOP録画ユーティリティ
+
+### 2026-07-20 CreateML DAT(汎用トレーナ・全8Task統合)実装
+
+- ユーザー「HandPoseやposeなど汎用的なCreateMLにできるならまとめたい」→ 個別の CreateML Image /
+  CreateML Motion を**1つの汎用 CreateML DAT に統合**(opType `Createml`・label "CreateML"・icon CML)。
+  当初 CLAUDE.md の「汎用 Create ML DAT・Task選択方式」方針に合流
+- **Task メニュー8種**を1オペレータで切替: Image(`MLImageClassifier`)/ Hand Pose
+  (`MLHandPoseClassifier`)/ Action 体(`MLActionClassifier`)/ Hand Action(`MLHandActionClassifier`)/
+  Sound(`MLSoundClassifier`)/ Activity CHOP時系列(`MLActivityClassifier`)/ Tabular 分類
+  (`MLClassifier`)/ Tabular 回帰(`MLRegressor`)。出力 .mlmodel は既存 CoreML TOP /
+  CoreML Motion CHOP / SoundClass 等がそのまま推論
+- **統合ヘルパ `CreateMLHelper.swift`(ml_)**: フォルダ系5種は `.labeledDirectories(at:)`+`MLJob`
+  を汎用 `wireJob<T>()`(job.progress/cancel/精度/書き出しを型消去で配線)で共通化。Activity は
+  シーケンス列 `MLDataTable`、Tabular は `MLDataTable` をバックグラウンドThreadで同期学習
+  (`MLJob`版が無いため)。全Taskの API シグネチャは事前に `swiftc -typecheck` で実SDK確認
+- **ポーズ/ジェスチャの学習ルートは2つ**とREADMEに明記: フォルダ素材(HandPose/Action=CreateMLが
+  Vision抽出)/ CHOP録画(Activity=VisionPose/Hand関節の時系列CSV、追加素材不要・推論は CoreML Motion)
+- **実測(M2・ヘッドレスharness)**: Tabular分類 train/val=1.0、Tabular回帰 RMSE 0.12(metadata付き書き出し)、
+  Activity train1.0/val0.571(特徴自動検出)、Image 学習完走+クラス自動列挙。フォルダ系残り4種は
+  Image と同一機構+型チェック確認済み(実素材=手画像/ラベル動画/音声は未合成)
+- **API確定メモ**: `MLActionClassifier.ModelParameters(validation:batchSize:maximumIterations:`
+  `predictionWindowSize:augmentationOptions:algorithm:targetFrameRate:)`、HandAction も maximumIterations、
+  Image/Sound は maxIterations、HandPose は maximumIterations。Tabular の `write(to:)` は `metadata:` 必須。
+  精度は全分類器 `trainingMetrics/validationMetrics.classificationError`、回帰は `rootMeanSquaredError`
+- 旧 CreateMLImage / CreateMLMotion は**フォルダごと git rm・インストール済みバンドルも削除**して吸収。
+  推論側 CoreML Motion CHOP は独立OPとして残す。README(新規+ルート英日)更新。CreateMLDAT.plugin を
+  常設インストール済み(**TD再起動で `Createml` 登録**)
+- 次にやること: TD再起動後の Createml ロード+Taskメニュー+学習の実機確認、フォルダ系4種の実素材検証、
+  sample.toe の CreateML 例更新(旧 Createmlimage/Createmlmotion 参照を Createml へ)
+
+### 2026-07-20 CoreML汎用推論OPの名前を「CoreML」に統一(TOP/CHOP/DAT)
+
+- ユーザー指示「core ml opの名前が統一されてない。chop/dat/topは色でわかるので全てのCoreMLという
+  同じ名前にして、それらとCoreML ImageGenで整理して」を受け、**汎用CoreML推論の3オペレータを
+  opLabel/opType とも統一**:
+  - CoreML TOP: `Coreml` / "CoreML"(変更なし)
+  - CoreML CHOP: `Coremlchop`/"CoreML CHOP"/icon CMC → **`Coreml`/"CoreML"/CML**
+  - CoreML Detect DAT: `Coremldetect`/"CoreML Detect"/icon CMD → **`Coreml`/"CoreML"/CML**
+- **opType はfamily間で重複可**(既出のMultipeer In/Out同様)。TOP/CHOP/DAT が同じ `Coreml` でも
+  family(色)で区別され、OP Create Dialogでも各familyに1つずつ「CoreML」が出る。ノード自動命名も
+  `coreml1` で揃う
+- **特化型は個別名で維持**(同family衝突&機能特化のため): CoreML Motion(CHOP・動作分類ライブ)、
+  CoreML SAM2(TOP・セグメンテーション)、CoreML ImageGen(TOP・生成)。ユーザーの「ImageGenで整理」
+  =生成系は別枠、の指示通り
+- バンドル名(CoreMLCHOP.plugin / CoreMLDetectDAT.plugin)は不変。中身のopTypeだけ変えて同名上書き
+  インストール。リビルド・署名・インストール済み。README(各+ルート英日)更新
+- **注意**: opType変更で、sample.toe の `Coremlchop`/`Coremldetect` 参照ノードはTD再起動後に
+  ロードエラー(Unknown operator type)になる。ユーザーは.toe破損許容済み。examples再構築時に
+  `Coreml`(family指定)で貼り直す。CoreML TOP例はopType不変なので影響なし
+- 次にやること: TD再起動後に3family全て「CoreML」表示・`Coreml` opTypeでの生成を確認、
+  sample.toe examples の CoreML CHOP/Detect/CreateML 参照を更新

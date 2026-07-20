@@ -1,23 +1,23 @@
 #!/bin/zsh
-# CreateML Image DAT のビルド → build/CreateMLImageDAT.plugin
+# CreateML DAT(汎用トレーナ)のビルド → build/CreateMLDAT.plugin
 # dylib は epoch 名(TD/dyld の install name キャッシュ対策)
 set -e
 cd "$(dirname "$0")"
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
-NAME=CreateMLImageDAT
+NAME=CreateMLDAT
 OUT="build/$NAME.plugin/Contents"
-DYLIB="libCreateMLImageHelper_$(date +%s).dylib"
+DYLIB="libCreateMLHelper_$(date +%s).dylib"
 rm -rf build
 mkdir -p "$OUT/MacOS" "$OUT/Frameworks"
 
-swiftc -O -emit-library -module-name CreateMLImageHelper \
+swiftc -O -emit-library -module-name CreateMLHelper \
   -target arm64-apple-macos14.0 \
-  CreateMLImageHelper.swift -framework CreateML \
+  CreateMLHelper.swift -framework CreateML \
   -Xlinker -install_name -Xlinker "@rpath/$DYLIB" \
   -o "$OUT/Frameworks/$DYLIB"
 
 clang++ -std=c++17 -fobjc-arc -O2 -bundle -I "$SDK" \
-  CreateMLImageDAT.mm -framework Foundation \
+  CreateMLDAT.mm -framework Foundation \
   "$OUT/Frameworks/$DYLIB" -Xlinker -rpath -Xlinker @loader_path/../Frameworks \
   -o "$OUT/MacOS/$NAME"
 
@@ -26,9 +26,9 @@ cat > "$OUT/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleExecutable</key><string>CreateMLImageDAT</string>
-    <key>CFBundleIdentifier</key><string>tokyo.sygnal.createmlimage-dat</string>
-    <key>CFBundleName</key><string>CreateMLImageDAT</string>
+    <key>CFBundleExecutable</key><string>CreateMLDAT</string>
+    <key>CFBundleIdentifier</key><string>tokyo.sygnal.createml-dat</string>
+    <key>CFBundleName</key><string>CreateMLDAT</string>
     <key>CFBundlePackageType</key><string>BNDL</string>
     <key>CFBundleVersion</key><string>0.1.0</string>
 </dict>

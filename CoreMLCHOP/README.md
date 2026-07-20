@@ -1,4 +1,7 @@
-# CoreML CHOP
+# CoreML (CHOP)
+
+> OP名は **CoreML**(family=CHOP)。汎用CoreML推論の TOP/CHOP/DAT は同じ opType `Coreml` に統一され、
+> family(色)で区別する。画像→画像は [CoreML TOP](../CoreML/)、検出→テーブルは [CoreML DAT](../CoreMLDetect/)。
 
 画像入力を1つ持つ任意のCore MLモデルを実行し、`MLMultiArray`出力をCHOPへフラット化する
 汎用オペレータ。埋め込み、キーポイント、ロジット、カスタム姿勢モデル向け。

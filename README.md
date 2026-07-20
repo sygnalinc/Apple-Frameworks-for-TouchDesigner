@@ -55,7 +55,7 @@ grouped by category.
 
 | Plugin | Family | What it does |
 |---|---|---|
-| [CoreML Detect](CoreMLDetect/) | DAT | **Object detection.** YOLO-style Core ML models → label / confidence / bbox ("what & where") |
+| [CoreML](CoreMLDetect/) | DAT | **Object detection.** YOLO-style Core ML models → label / confidence / bbox ("what & where") |
 | [Vision Classify](VisionClassify/) | DAT | **Image classification** (no extra model). Top-N identifier / confidence |
 | [Vision AnimalPose](VisionAnimalPose/) | CHOP | Dog / cat 2D pose (25 joints, multiple animals) |
 | [Vision Rect](VisionRect/) | CHOP | Rectangle detection → bbox / projected corners (wire straight into Corner Pin) |
@@ -103,12 +103,11 @@ grouped by category.
 | Plugin | Family | What it does |
 |---|---|---|
 | [CoreML](CoreML/) | TOP | Run **any Core ML model** by swapping it in (depth, style transfer, classification…). Auto-detects image / array output |
-| [CoreML CHOP](CoreMLCHOP/) | CHOP | **Vector output** of any Core ML model into channels (embeddings, keypoints…) |
+| [CoreML](CoreMLCHOP/) | CHOP | **Vector output** of any Core ML model into channels (embeddings, keypoints…) |
 | [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img** (Core ML Stable Diffusion / Image Playground) |
 | [CoreImage Code](CoreImageCode/) | TOP | **Generate** QR / Aztec / PDF417 / Code128 (no external library) |
-| [CreateML Image](CreateMLImage/) | DAT | **Train** an image classifier on-device from a labeled folder → `.mlmodel` (usable by CoreML TOP). Capture→label→train→infer loop entirely in TD |
-| [CreateML Motion](CreateMLMotion/) | DAT | **Train** a motion/gesture classifier on-device from recorded CHOP sequences (VisionPose joints + label/recording columns) → `.mlmodel` |
-| [CoreML Motion](CoreMLMotion/) | CHOP | **Live gesture inference** — buffer an input CHOP (VisionPose etc.) over the prediction window and classify motion in real time (per-class prob + confidence) |
+| [CreateML](CreateML/) | DAT | **Unified on-device trainer** — one `Task` menu for Image / Hand Pose / Action (body) / Hand Action / Sound / Activity (CHOP series) / Tabular classifier & regressor → `.mlmodel`. Output models are read by CoreML TOP / CoreML Motion CHOP / SoundClass etc. |
+| [CoreML Motion](CoreMLMotion/) | CHOP | **Live gesture inference** — buffer an input CHOP (VisionPose etc.) over the prediction window and classify motion in real time (per-class prob + confidence). Pairs with CreateML's Activity task |
 
 ### Audio & sound
 

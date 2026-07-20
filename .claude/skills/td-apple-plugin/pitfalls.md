@@ -185,8 +185,20 @@
 - 画像分類: `MLImageClassifier.DataSource.labeledDirectories(at:)`(サブフォルダ名=クラス)、
   `ModelParameters(validation:.split(strategy:.automatic), maxIterations:, augmentation:)`。
   `ImageAugmentationOptions` は OptionSet(flip/crop/rotation/blur/exposure/noise)
-- **出力 .mlmodel は既存 CoreML TOP/DAT がそのまま推論**(推論側の追加実装ゼロ)。
-  「TD内で撮る→学習→推論」を1つのネットワークで閉じられる
+- **汎用トレーナ(CreateML DAT)で複数Taskを1本のヘルパに統合**する型: フォルダ系
+  (Image/HandPose/Action/HandAction/Sound)は全て `.labeledDirectories(at:)`+`MLJob` で、
+  ジェネリック `wireJob<T>(job, out, metrics:, write:)`(job.progress/cancel を型消去でstate保持、
+  完了sinkで書き出し+精度)に集約できる。Activity は シーケンス列 `MLDataTable`、Tabular は
+  `MLDataTable` を**バックグラウンドThreadで同期学習**(`MLClassifier/MLRegressor` は `MLJob` 版が無い)
+- **API名の揺れに注意**(`swiftc -typecheck` で実SDK確認してから書く): `maxIterations`(Image/Sound)
+  vs `maximumIterations`(HandPose/Action/HandAction/Activity)。`MLActionClassifier.ModelParameters` は
+  `(validation:batchSize:maximumIterations:predictionWindowSize:augmentationOptions:algorithm:targetFrameRate:)`。
+  **Tabular の `write(to:)` は `metadata: MLModelMetadata` が必須**(他分類器は `write(to:)` だけでよい)
+- 精度は分類器なら全て `trainingMetrics/validationMetrics.classificationError`(accuracy = 1 - error)、
+  回帰は `rootMeanSquaredError`。UIラベルに `(Activity)` `(Tabular)` 等を明記し、Taskごとに
+  使うパラメータ/列だけ意味を持たせる(TDは setupParameters 後の動的enableが無いので**全部出して文書化**)
+- **出力 .mlmodel は既存 CoreML TOP/CHOP/DAT/SoundClass がそのまま推論**(推論側の追加実装ゼロ)。
+  「TD内で集める→学習→推論」を1つのネットワークで閉じられる
 - pulse パラメータは `pulsePressed(name)` で検出(OP_Inputs無し)→ フラグを立てて
   execute でパラメータを読んで処理する
 - **動作/ジェスチャ分類 `MLActivityClassifier` はフラット表を拒否**する

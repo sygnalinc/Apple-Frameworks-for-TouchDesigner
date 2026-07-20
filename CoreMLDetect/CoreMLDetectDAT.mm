@@ -499,10 +499,10 @@ FillDATPluginInfo(DAT_PluginInfo* info)
 {
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
-    info->customOPInfo.opType->setString("Coremldetect");
-    info->customOPInfo.opLabel->setString("CoreML Detect");
+    info->customOPInfo.opType->setString("Coreml");
+    info->customOPInfo.opLabel->setString("CoreML");
     info->customOPInfo.authorName->setString("sygnal");
-    info->customOPInfo.opIcon->setString("CMD");
+    info->customOPInfo.opIcon->setString("CML");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
 }

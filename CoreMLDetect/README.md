@@ -1,4 +1,8 @@
-# CoreMLDetect DAT
+# CoreML (DAT)
+
+> OP名は **CoreML**(family=DAT)。汎用CoreML推論の TOP/CHOP/DAT は同じ opType `Coreml` に統一され、
+> family(色)で区別する。画像→画像は [CoreML TOP](../CoreML/)、→ベクトルは [CoreML CHOP](../CoreMLCHOP/)。
+> この DAT は検出モデル(VNRecognizedObjectObservation)で label/confidence/bbox をテーブル出力する。
 
 任意の**物体検出 Core ML モデル**(YOLOv3 等)をロードし、入力 TOP の映像から
 「**何が・どこに**」を検出してテーブル出力する汎用オペレータ。
