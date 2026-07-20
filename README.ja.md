@@ -146,6 +146,10 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Multipeer In / Out](Multipeer/) | DAT | Mac/iPhone 間の**ローカルP2Pテキスト**(自動接続・サーバー不要) |
 | [Game Controller](GameController/) | CHOP | PS5/Xbox/MFi **ゲームパッド入力**(スティック/トリガー+モーション+ランブル) |
 | [Shortcuts](Shortcuts/) | DAT | **macOSショートカット実行**(HomeKit照明・家電・通知を TD イベントから) |
+| [Gameplay Agents](GameplayAgents/) | CHOP | **群集/フロッキング**(GameplayKit GKAgent)— seek/separate/align/cohere/avoid/wander |
+| [Gameplay Path](GameplayPath/) | SOP | **障害物回避の最短経路**(GameplayKit GKObstacleGraph)→ポリライン |
+| [Quick Look](QuickLook/) | TOP | 任意ファイル(PDF/動画/3D/書類/フォント)の**OS標準サムネイル**(QuickLookThumbnailing) |
+| [PDF Document](PDFDocument/) | DAT / TOP | **PDFKit** — 構造(メタ/アウトライン/テキスト/注釈)+ ページをテクスチャ描画 |
 
 ## 使い方
 

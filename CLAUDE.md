@@ -1388,6 +1388,27 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
   Libraryは自作systemへobject codeとして組み込んで顧客配布可能だが、GPL/LGPL等のOSS条件をSDKへ
   課すことは禁止。TDAppleML本体のlicenseと分離し、SDK backendはoptional binary componentにする。
 
+### 2026-07-20 LAN内デバイス・hostname・IP列挙API調査
+
+- Apple公開APIで堅実なのは **Network.framework Bonjour (`NWBrowser`)** または低レベル
+  **dns_sd (`DNSServiceBrowse/Resolve/GetAddrInfo`)**。Bonjour service instance→service type→hostname/port→
+  IPv4/IPv6/TXTを取得できる。同一hostの複数serviceをhostname/addressでmergeしてDAT化する。
+- `_services._dns-sd._udp.local.`をqueryすればadvertised service type自体を列挙し、その各typeをbrowse可能。
+  ただしarbitrary/all Bonjour type browseはmulticast entitlementが必要になる場合があり、通常は
+  `_ssh._tcp`、`_http._tcp`、`_osc._udp`、`_airplay._tcp`等を明示する方が安全。
+- **BonjourはLAN全端末一覧ではない**。serviceをadvertiseしないcamera、IoT、Windows、sleeping device、
+  firewall越し/VLAN越しのhostは見えない。CoreWLANはAP/SSID/RSSIを扱うが接続client一覧は取れない。
+- 全IPv4 host探索のApple高レベルAPIはない。`getifaddrs`でinterface/subnetを得て、Network.frameworkの
+  bounded TCP probe、ICMP/ARP、reverse DNS/mDNSを組み合わせるactive scanが必要。hostnameはPTR/mDNSが
+  無ければ得られない。IPv6全域scanはaddress space的に不可。routerのDHCP lease/client listも標準APIなし。
+- Plugin案は **Network Discovery DAT**:
+  - Mode `Bonjour`(既定、安全) / `Active IPv4 Scan`(明示pulse)
+  - columns: device/hostname/ip4/ip6/interface/service/type/port/txt/latency/last_seen/source
+  - service TTL/removed eventを反映、重複host merge、scan concurrency/rate/timeoutを制限
+  - `NSLocalNetworkUsageDescription`と`NSBonjourServices`が必要。macOSのLocal Network許可は
+    TouchDesigner本体がresponsible processとなる可能性があるため、.plugin単体でInfo.plistを足して解決
+    できるか実機検証する。必要なら署名host/helper app方式。
+
 ### 2026-07-20 空間音響4プラグイン実装(Spatial Audio / Spatial Mixer / PHASE / Audio Mix)
 
 ユーザー指定の空間音響4件を実装。全て純ObjC++(Swiftヘルパ不要)・M2実機検証。
@@ -1416,3 +1437,26 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
 - 検証中にTDが1度クラッシュ(上記①のバグ)→ 修正版で再検証しクラッシュ再現せず
 - 次にやること: PHASEのEarly/Late Reverbの実聴、Audio Mixの4chアンビソニックス実素材での分離検証、
   sample.toe への利用例追加
+
+### 2026-07-20 有力12プラグイン(その1): Gameplay Agents/Path・Quick Look・PDF実装
+
+ユーザー指定の有力12件を優先度順に実装開始。第1バッチ4件(実データ検証済み)。
+
+- **Gameplay Agents CHOP**(`Gameplayagents`・GameplayKit): GKAgent2D群をGKGoal(seek/separate/
+  align/cohere/avoid/wander/reach-speed)で駆動する群集シミュ。agent{i}/x,y,vx,vy,angle出力。障害物は
+  任意入力CHOP(x,y,radius)。実測: 30体・目標seekで速度(2.92,0.70)の群れ挙動
+- **Gameplay Path SOP**(`Gameplaypath`): GKObstacleGraphで始点→終点の障害物回避経路をLine出力。
+  障害物は入力SOPの点を多角形化。実測: 原点障害物を迂回する(-4,0)→(0,1.42)→(4,0)
+- **Quick Look TOP**(`Quicklook`・QuickLookThumbnailing): 任意ファイルのOS標準サムネイル→BGRA8。
+  実測: PDF→198x256サムネイル
+- **PDF Document DAT+TOP**(`Pdfdocument`・PDFKit・1フォルダ2バンドル): DAT=構造(Info/Outline/
+  Text/Annotations)、TOP=ページ描画。実測: 2ページPDFでpages=2・テキスト抽出・850x1100描画
+
+- **踏んだ罠**: ①**GKPolygonObstacleはCCW巻き順**が正しい(CWは全遮蔽で経路0・harnessで確定)。
+  半径が小さく頂点が始点終点線分上に乗ると迂回しないことがある。②SIMD `vector_float2` の `.x/.y` を
+  `emplace_back` へ直接渡すと"non-const reference cannot bind"→ float に展開してから渡す。
+  ③std::vector<vector_float2> 要素への compound literal 代入も同様に注意
+- 4件(5バンドル)ビルド・署名・インストール・TD再起動後の実データ検証済み。README+ルート一覧(英日)更新
+- **TD再起動は自分で実施**(quit→open→MCP疎通待ち)。MCPサーバは起動後1〜2分立ち上がりに要することあり
+- 残り: #1 Process Audio、#6 ColorSync、#5 Semantic Index、#7 WiFi Monitor、#4 Image Capture、
+  #11 HID、#10 Beacon、#12 Live Photo

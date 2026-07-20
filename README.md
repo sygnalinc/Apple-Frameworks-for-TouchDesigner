@@ -148,6 +148,10 @@ grouped by category.
 | [Multipeer In / Out](Multipeer/) | DAT | **Local P2P text** between Mac / iPhone (auto-connect, no server) |
 | [Game Controller](GameController/) | CHOP | PS5 / Xbox / MFi **gamepad input** (sticks / triggers + motion + rumble) |
 | [Shortcuts](Shortcuts/) | DAT | **Run macOS Shortcuts** (HomeKit lights / appliances / notifications from TD events) |
+| [Gameplay Agents](GameplayAgents/) | CHOP | **Crowd / flocking simulation** (GameplayKit GKAgent) — seek / separate / align / cohere / avoid / wander |
+| [Gameplay Path](GameplayPath/) | SOP | **Obstacle-avoiding shortest path** (GameplayKit GKObstacleGraph) → polyline |
+| [Quick Look](QuickLook/) | TOP | **OS-standard thumbnail** of any file (PDF / video / 3D / doc / font) via QuickLookThumbnailing |
+| [PDF Document](PDFDocument/) | DAT / TOP | **PDFKit** — structure (metadata / outline / text / annotations) + render a page to a texture |
 
 ## Getting started
 
