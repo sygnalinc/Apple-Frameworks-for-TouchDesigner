@@ -19,7 +19,60 @@ using namespace TD;
 
 namespace {
 struct Cloud { std::vector<Position> pts; std::vector<Color> cols; uint64_t serial = 0; };
-struct Params { std::string file; int step; float depthScale, hfov; bool disp2depth, color, flip; int maxPts; };
+struct Params { std::string file; int step; float depthScale, hfov; bool disp2depth, color, flip, applyOrient; int maxPts; };
+
+// EXIF Orientation(1〜8)を適用する汎用リマップ(elem=4byte/px, top-down in/out)
+static void applyOrientation(const uint8_t* src, uint32_t W, uint32_t H, int elem,
+                             int orient, std::vector<uint8_t>& dst, uint32_t& dW, uint32_t& dH) {
+    const bool swap = (orient >= 5 && orient <= 8);
+    dW = swap ? H : W; dH = swap ? W : H;
+    dst.resize((size_t)dW * dH * elem);
+    for (uint32_t dy = 0; dy < dH; dy++) for (uint32_t dx = 0; dx < dW; dx++) {
+        uint32_t sx, sy;
+        switch (orient) {
+            default: case 1: sx = dx; sy = dy; break;
+            case 2: sx = W-1-dx; sy = dy; break;
+            case 3: sx = W-1-dx; sy = H-1-dy; break;
+            case 4: sx = dx; sy = H-1-dy; break;
+            case 5: sx = dy; sy = dx; break;
+            case 6: sx = dy; sy = H-1-dx; break;
+            case 7: sx = W-1-dy; sy = H-1-dx; break;
+            case 8: sx = W-1-dy; sy = dx; break;
+        }
+        memcpy(&dst[((size_t)dy*dW+dx)*elem], &src[((size_t)sy*W+sx)*elem], elem);
+    }
+}
+
+// カメラ内部パラメータ(fx,fy,cx,cy)を向きに合わせて変換(焦点距離の入替え+主点の写像)
+static void orientIntrinsics(int orient, uint32_t W, uint32_t H, float fx, float fy, float cx, float cy,
+                             float& ofx, float& ofy, float& ocx, float& ocy) {
+    const bool swap = (orient >= 5 && orient <= 8);
+    ofx = swap ? fy : fx; ofy = swap ? fx : fy;
+    float x, y;   // 主点 (cx,cy) source → display の順写像
+    switch (orient) {
+        default: case 1: x = cx;       y = cy;       break;
+        case 2: x = W-1-cx; y = cy;       break;
+        case 3: x = W-1-cx; y = H-1-cy; break;
+        case 4: x = cx;       y = H-1-cy; break;
+        case 5: x = cy;       y = cx;       break;
+        case 6: x = H-1-cy; y = cx;       break;
+        case 7: x = H-1-cy; y = W-1-cx; break;
+        case 8: x = cy;       y = W-1-cx; break;
+    }
+    ocx = x; ocy = y;
+}
+
+static int readOrientation(CGImageSourceRef src) {
+    int orient = 1;
+    CFDictionaryRef props = CGImageSourceCopyPropertiesAtIndex(src, 0, nullptr);
+    if (props) {
+        CFNumberRef o = (CFNumberRef)CFDictionaryGetValue(props, kCGImagePropertyOrientation);
+        if (o) CFNumberGetValue(o, kCFNumberIntType, &orient);
+        CFRelease(props);
+    }
+    if (orient < 1 || orient > 8) orient = 1;
+    return orient;
+}
 
 class ImageIOPointCloudSOP final : public SOP_CPlusPlusBase {
 public:
@@ -38,8 +91,9 @@ public:
         p.disp2depth = in->getParInt("Disptodepth") != 0;
         p.color = in->getParInt("Color") != 0;
         p.flip = in->getParInt("Flip") != 0;
+        p.applyOrient = in->getParInt("Applyorientation") != 0;
         p.maxPts = std::max(100, (int)in->getParInt("Maxpoints"));
-        char buf[300]; snprintf(buf, sizeof buf, "%s|%d|%.4f|%.2f|%d|%d|%d|%d", p.file.c_str(), p.step, p.depthScale, p.hfov, p.disp2depth?1:0, p.color?1:0, p.flip?1:0, p.maxPts);
+        char buf[320]; snprintf(buf, sizeof buf, "%s|%d|%.4f|%.2f|%d|%d|%d|%d|%d", p.file.c_str(), p.step, p.depthScale, p.hfov, p.disp2depth?1:0, p.color?1:0, p.flip?1:0, p.applyOrient?1:0, p.maxPts);
         std::string sig = buf;
         if (sig != mySig) {
             mySig = sig;
@@ -66,7 +120,9 @@ public:
         { OP_NumericParameter p("Disptodepth"); p.label = "Disparity → Depth (1/x)"; p.page = PAGE; p.defaultValues[0] = 0; m->appendToggle(p); }
         { OP_NumericParameter p("Hfov"); p.label = "Horizontal FOV (deg, if no calibration)"; p.page = PAGE; p.defaultValues[0] = 60; p.minSliders[0] = 20; p.maxSliders[0] = 120; m->appendFloat(p); }
         { OP_NumericParameter p("Color"); p.label = "Sample Color from RGB"; p.page = PAGE; p.defaultValues[0] = 1; m->appendToggle(p); }
-        { OP_NumericParameter p("Flip"); p.label = "Flip Vertically"; p.page = PAGE; p.defaultValues[0] = 1; m->appendToggle(p); }
+        { OP_NumericParameter p("Applyorientation"); p.label = "Apply EXIF Orientation"; p.page = PAGE; p.defaultValues[0] = 1; m->appendToggle(p); }
+        // 既定Off: EXIF向き適用後の画像上端を 3D の上(+Y)へ。Onにすると上下反転
+        { OP_NumericParameter p("Flip"); p.label = "Flip Vertically"; p.page = PAGE; p.defaultValues[0] = 0; m->appendToggle(p); }
     }
 
     int32_t getNumInfoCHOPChans(void*) override { return 5; }
@@ -121,9 +177,10 @@ private:
             if (!src) { w = "Cannot open file"; return false; }
             std::vector<float> depth; uint32_t W = 0, H = 0; CFDictionaryRef aux = nullptr;
             if (!loadDepth(src, depth, W, H, aux)) { CFRelease(src); w = "No depth/disparity in this file"; return false; }
+            const int orient = p.applyOrient ? readOrientation(src) : 1;
 
-            // 内部パラメータ: AVDepthData のキャリブレーション優先、無ければ FOV
-            float fx, fy, cx = W * 0.5f, cy = H * 0.5f;
+            // 内部パラメータ: AVDepthData のキャリブレーション優先、無ければ FOV(向き適用後に決定)
+            float fx = 0, fy = 0, cx = W * 0.5f, cy = H * 0.5f;
             calib = false;
             if (aux) {
                 NSError* err = nil;
@@ -138,38 +195,54 @@ private:
                     calib = true;
                 }
             }
-            if (!calib) { float f = (W * 0.5f) / std::tan(p.hfov * 0.5f * (float)M_PI / 180.f); fx = fy = f; }
 
-            // カラー用にRGBを縮小デコード
-            std::vector<uint8_t> rgb; uint32_t rw = 0, rh = 0;
+            // カラー用にRGBデコード(深度と同じ sensor W×H, top-down)
+            std::vector<uint8_t> rgb;
             if (p.color) {
                 CGImageRef img = CGImageSourceCreateImageAtIndex(src, 0, nullptr);
                 if (img) {
-                    rw = W; rh = H; rgb.resize((size_t)rw * rh * 4);
+                    rgb.resize((size_t)W * H * 4);
                     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
-                    CGContextRef ctx = CGBitmapContextCreate(rgb.data(), rw, rh, 8, rw * 4, cs, kCGImageAlphaPremultipliedLast);
-                    CGContextDrawImage(ctx, CGRectMake(0, 0, rw, rh), img);
+                    CGContextRef ctx = CGBitmapContextCreate(rgb.data(), W, H, 8, W * 4, cs, kCGImageAlphaPremultipliedLast);
+                    CGContextDrawImage(ctx, CGRectMake(0, 0, W, H), img);
                     CGContextRelease(ctx); CGColorSpaceRelease(cs); CGImageRelease(img);
                 }
             }
             if (aux) CFRelease(aux);
             CFRelease(src);
 
-            // 逆投影(stepで間引き、maxPtsで制限)
-            c.pts.reserve((size_t)(W / p.step) * (H / p.step));
+            // ---- EXIF Orientation を深度・色・内部パラメータへ適用 ----
+            uint32_t dW = W, dH = H;
+            if (orient != 1) {
+                std::vector<uint8_t> od; uint32_t ow, oh;
+                applyOrientation(reinterpret_cast<const uint8_t*>(depth.data()), W, H, 4, orient, od, ow, oh);
+                depth.resize((size_t)ow * oh);
+                memcpy(depth.data(), od.data(), od.size());
+                dW = ow; dH = oh;
+                if (!rgb.empty()) { std::vector<uint8_t> oc; uint32_t cw, ch; applyOrientation(rgb.data(), W, H, 4, orient, oc, cw, ch); rgb = std::move(oc); }
+            }
+            float ofx, ofy, ocx, ocy;
+            if (calib) {
+                orientIntrinsics(orient, W, H, fx, fy, cx, cy, ofx, ofy, ocx, ocy);
+            } else {
+                ofx = ofy = (dW * 0.5f) / std::tan(p.hfov * 0.5f * (float)M_PI / 180.f);
+                ocx = dW * 0.5f; ocy = dH * 0.5f;
+            }
+
+            // 逆投影(向き適用後の dW×dH。stepで間引き、maxPtsで制限)
+            c.pts.reserve((size_t)(dW / p.step) * (dH / p.step));
             bool useCol = p.color && !rgb.empty();
-            for (uint32_t y = 0; y < H; y += p.step) {
-                for (uint32_t x = 0; x < W; x += p.step) {
-                    float d = depth[(size_t)y * W + x];
+            for (uint32_t y = 0; y < dH; y += p.step) {
+                for (uint32_t x = 0; x < dW; x += p.step) {
+                    float d = depth[(size_t)y * dW + x];
                     if (!(d > 0) || !std::isfinite(d)) continue;
                     float Z = p.disp2depth ? (1.f / (d + 1e-4f)) : d;
                     Z *= p.depthScale;
-                    float px = (float)x, py = (float)y;
-                    float X = (px - cx) / fx * Z;
-                    float Y = (py - cy) / fy * Z;
+                    float X = ((float)x - ocx) / ofx * Z;
+                    float Y = ((float)y - ocy) / ofy * Z;
                     Position pos; pos.x = X; pos.y = p.flip ? Y : -Y; pos.z = -Z;
                     c.pts.push_back(pos);
-                    if (useCol) { const uint8_t* pix = &rgb[((size_t)y * rw + x) * 4]; Color col; col.r = pix[0] / 255.f; col.g = pix[1] / 255.f; col.b = pix[2] / 255.f; col.a = 1.f; c.cols.push_back(col); }
+                    if (useCol) { const uint8_t* pix = &rgb[((size_t)y * dW + x) * 4]; Color col; col.r = pix[0] / 255.f; col.g = pix[1] / 255.f; col.b = pix[2] / 255.f; col.a = 1.f; c.cols.push_back(col); }
                     if ((int)c.pts.size() >= p.maxPts) { w = "Reached Max Points (increase step or Max Points)"; return true; }
                 }
             }

@@ -1732,3 +1732,16 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   Disparity も同じ正立(白箱=左/銀箱=右)を確認。TD実機の .save 出力もPreview一致
 - **教訓**: EXIF Orientation を手動リマップするなら、色と補助データの**縦向き(top-down/bottom-up)を
   必ず一致させてから**同じ変換を掛ける。片方だけ反転していると回転が鏡像化する(pitfalls反映)
+
+### 2026-07-20 ImageIO PointCloud も EXIF向き対応(横倒し修正)
+
+ユーザー指摘「PointCloudも向きがおかしい」。ImageIO File In と同根で **EXIF Orientation 未適用**。
+- **修正**: 深度(loadDepth)・色(RGBデコード)・カメラ内部パラメータ の3つに Orientation を適用。
+  - 深度/色は共通 `applyOrientation`(4byte/px)で回転
+  - 内部パラメータは `orientIntrinsics`: 90°回転で **fx↔fy 入替え**+**主点(cx,cy)を順写像**。
+    FOV近似時は向き適用後の dW から再計算
+- **Flip Vertically の既定を On→Off に変更**: 向き適用後は画像上端を 3D上(+Y)へ写すのが正立。
+  旧既定On(pos.y=Y)だと画像上端が3D下になり**上下反転**していた(実測で確認)
+- **検証**: IMG_2540(orient=6)で Geo+Camera+Render の点群レンダをPNG化しPreviewと突合。
+  修正後 **白箱=左/銀箱=右・正立(机が手前下)** を視認。Applyorientation=1・Flip=0 が正
+- README(パラメータにApply EXIF Orientation追加・Flip既定Off)更新

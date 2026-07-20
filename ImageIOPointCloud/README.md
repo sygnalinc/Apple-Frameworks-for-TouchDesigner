@@ -31,13 +31,17 @@
 | Disparity → Depth (1/x) | 視差を距離(1/視差)へ変換。Depthデータならオフ |
 | Horizontal FOV | キャリブレーション無し時の画角(内部パラメータの近似) |
 | Sample Color from RGB | RGB画像から各点の色をサンプル |
-| Flip Vertically | Y反転(既定 On) |
+| Apply EXIF Orientation | EXIFの向きを深度・色・内部パラメータへ適用(既定On) |
+| Flip Vertically | Y反転(既定 Off) |
 
 ## 注意
 
 - 深度/視差はポートレートモード等の写真にのみ含まれる(通常写真は不可・Warning)
+- **EXIF Orientation(1〜8)を適用**して点群を正立させる。iPhoneの縦写真は横センサー+
+  Orientation=6 で保存されるため、未対応だと点群が横倒しになる。深度・色・カメラ内部パラメータ
+  (焦点距離の入替え+主点の写像)をまとめて回転させる
 - 視差データは近似的に 1/視差 で距離化。正確な距離にはキャリブレーションと基線長が必要
-- [ImageIO Depth](../ImageIODepth/) と同じ補助データ抽出を使う(深度をTOPで見たい場合はそちら)
+- [ImageIO File In](../ImageIOFileIn/) と同じ補助データ抽出を使う(深度をTOPで見たい場合はそちら)
 
 ## ビルド
 
