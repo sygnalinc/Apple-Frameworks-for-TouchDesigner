@@ -16,6 +16,8 @@
 //   user / assistant が交互。生成中は最後の assistant 行がトークンで伸びる。
 
 #import <Foundation/Foundation.h>
+#import <CoreGraphics/CoreGraphics.h>
+#import <ImageIO/ImageIO.h>
 
 #include <atomic>
 #include <cstring>
@@ -323,11 +325,12 @@ public:
                 const char* prompt = inputs->getParString("Prompt");
                 const char* sys = inputs->getParString("System");
                 const std::string p = prompt ? prompt : "";
+                const std::string image = captureImage(inputs);   // 画像入力ONなら一時PNGパス
                 myHelper.beginTurn(p);
                 myHelper.sendLine(buildGenCommand(
                     p, sys ? sys : "", inputs->getParDouble("Temperature"),
                     (int)inputs->getParInt("Maxtokens"),
-                    inputs->getParInt("Keepcontext") != 0));
+                    inputs->getParInt("Keepcontext") != 0, image));
             }
         }
 
@@ -423,6 +426,21 @@ public:
             p.minSliders[0] = 1;
             p.maxSliders[0] = 200;
             manager->appendInt(p);
+        }
+        // ---- Vision（画像入力・VLMモデル使用時）----
+        {
+            OP_NumericParameter p("Useimage");
+            p.label = "Use Image Input";
+            p.page = "Vision";
+            p.defaultValues[0] = 0;
+            manager->appendToggle(p);
+        }
+        {
+            // 画像を渡す TOP。VLM モデル(Gemma 4 / Qwen-VL 等)使用時に有効
+            OP_StringParameter p("Image");
+            p.label = "Image TOP";
+            p.page = "Vision";
+            manager->appendTOP(p);
         }
         {
             OP_NumericParameter p("Load");
@@ -528,17 +546,83 @@ private:
     }
 
     static std::string buildGenCommand(const std::string& prompt, const std::string& sys,
-                                       double temp, int maxTok, bool keep)
+                                       double temp, int maxTok, bool keep,
+                                       const std::string& image)
     {
         char nums[128];
-        snprintf(nums, sizeof(nums), ",\"temp\":%.4f,\"max\":%d,\"keep\":%s}", temp,
+        snprintf(nums, sizeof(nums), ",\"temp\":%.4f,\"max\":%d,\"keep\":%s", temp,
                  maxTok, keep ? "true" : "false");
-        return "{\"cmd\":\"gen\",\"prompt\":\"" + jsonEscape(prompt) +
-               "\",\"system\":\"" + jsonEscape(sys) + "\"" + nums;
+        std::string cmd = "{\"cmd\":\"gen\",\"prompt\":\"" + jsonEscape(prompt) +
+                          "\",\"system\":\"" + jsonEscape(sys) + "\"" + nums;
+        if (!image.empty())
+            cmd += ",\"image\":\"" + jsonEscape(image) + "\"";
+        cmd += "}";
+        return cmd;
+    }
+
+    // 画像入力ON時、Image TOP パラメータのテクスチャを一時PNGに書き出しパスを返す。
+    // ヘルパは .url(そのパス) で VLM に渡す。cook上の一時的な stall は Submit 時のみで許容。
+    std::string captureImage(const OP_Inputs* inputs)
+    {
+        if (inputs->getParInt("Useimage") == 0)
+            return "";
+        const OP_TOPInput* top = inputs->getParTOP("Image");
+        if (!top)
+            return "";
+        OP_TOPInputDownloadOptions opts;
+        opts.pixelFormat = OP_PixelFormat::BGRA8Fixed;
+        opts.verticalFlip = true;   // TDは bottom-up。正立画像にして意味処理系(VLM)へ
+        OP_SmartRef<OP_TOPDownloadResult> res = top->downloadTexture(opts, nullptr);
+        if (!res)
+            return "";
+        const uint8_t* data = (const uint8_t*)res->getData();   // 準備できるまで stall
+        int w = (int)res->textureDesc.width;
+        int h = (int)res->textureDesc.height;
+        if (!data || w <= 0 || h <= 0)
+            return "";
+        return writePNG(data, w, h);
+    }
+
+    std::string writePNG(const uint8_t* bgra, int w, int h)
+    {
+        @autoreleasepool {
+            CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+            // BGRA8 を little-endian の XRGB(=メモリ上 B,G,R,X)として解釈。アルファは無視
+            CGContextRef ctx = CGBitmapContextCreate(
+                (void*)bgra, w, h, 8, (size_t)w * 4, cs,
+                kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little);
+            CGColorSpaceRelease(cs);
+            if (!ctx)
+                return "";
+            CGImageRef img = CGBitmapContextCreateImage(ctx);
+            CGContextRelease(ctx);
+            if (!img)
+                return "";
+            if (myTempImagePath.empty()) {
+                NSString* tmp = [NSTemporaryDirectory()
+                    stringByAppendingPathComponent:
+                        [NSString stringWithFormat:@"mlxllm_%p.png", (void*)this]];
+                myTempImagePath = tmp.UTF8String ?: "";
+            }
+            NSURL* url = [NSURL fileURLWithPath:
+                [NSString stringWithUTF8String:myTempImagePath.c_str()]];
+            CGImageDestinationRef dst = CGImageDestinationCreateWithURL(
+                (__bridge CFURLRef)url, (CFStringRef)@"public.png", 1, nullptr);
+            std::string result;
+            if (dst) {
+                CGImageDestinationAddImage(dst, img, nullptr);
+                if (CGImageDestinationFinalize(dst))
+                    result = myTempImagePath;
+                CFRelease(dst);
+            }
+            CGImageRelease(img);
+            return result;
+        }
     }
 
     HelperProcess myHelper;
     std::string myLoadedModel;
+    std::string myTempImagePath;   // 画像入力用の一時PNG
     std::string myStatus = "idle";
     std::atomic<bool> myWantSubmit{false};
     std::atomic<bool> myWantLoad{false};

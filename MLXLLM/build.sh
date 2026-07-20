@@ -48,7 +48,7 @@ fi
 clang++ -std=c++17 -fobjc-arc -O2 -bundle \
   -I "$SDK" \
   MLXLLMDAT.mm \
-  -framework Foundation \
+  -framework Foundation -framework CoreGraphics -framework ImageIO \
   -o "$OUT/MacOS/$NAME"
 
 cat > "$OUT/Info.plist" <<'PLIST'

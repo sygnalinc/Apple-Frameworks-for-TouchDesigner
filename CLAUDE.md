@@ -1906,3 +1906,27 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   最新assistant行を表示)+ `note`(手順)
 - 実測: Load(ローカルからDL無しで ready)→ Submit → **"I am Gemma 4, a Large Language Model
   developed by Google DeepMind."** を生成し response TOP に表示。sample.toe 保存済み
+
+### 2026-07-21 MLX LLM に画像入力(VLM・マルチモーダル)を統合
+
+- ユーザー「既存 MLX LLM DAT に画像入力あり/なしを統合」。`MLXVLM` を追加リンクし、DAT に
+  **Image TOP パラメータ + Use Image トグル(Visionページ)** を追加。Submit時に指定TOPを
+  downloadTexture(BGRA8/verticalFlip)→ ImageIOで一時PNG化 → helperへ image パスを渡し、
+  `session.streamResponse(to:images:[.url(path)])` で VLM に投入
+- **自動LLM/VLM判別**: mlx-swift-lm の `load()` は ModelFactoryRegistry を VLM→LLM の順で試す。
+  MLXVLM をリンクすれば同じ `#huggingFaceLoadModelContainer` が VLMモデルを自動ロード
+- **踏んだ罠(重要)**:
+  1. **`import MLXVLM` だけだと dead-strip されて VLM factory が登録されない**
+     (`NSClassFromString("MLXVLM.TrampolineModelFactory")` が nil)。**`_ = VLMModelFactory.shared`
+     で明示参照**してリンクを強制する(nmで 6MLXVLM…Trampoline シンボルの有無を確認)
+  2. **`gemma-4-e2b-it-4bit` は VLMとしてロードできない**(この量子化repoの重みキーが
+     mlx-swift-lm 3.31.4 の Gemma4 VLM 実装と不一致 = `keyNotFound(language_model.model.layers…)`)。
+     自動でテキストLLMにフォールバックし画像は無視される。**画像は Qwen2-VL 等を使う**
+  3. **DATはTOPをワイヤ入力できない**(DAT入力はDAT)。**TOPパラメータ(appendTOP/getParTOP)**で参照する
+  4. 低temp+短maxだと稀に1トークン("A")で早期停止する(サンプリング挙動)。temp 0.5+/max 128+ で安定
+- **実測(M2・完全オフライン)**: `models/Qwen2-VL-2B-Instruct-4bit`(HFからDL→models/へコピー・
+  1.2GB・gitignore)。TD実機で img TOP(群衆写真)→ **群衆・Pokémonイベントを認識し看板を OCR**
+  ("WELCOME, TRAINERS!" / "May 29 - June 1" / "TOKYO")。sample.toe に `/project1/mlx_vision_demo`
+  (img→mlx(Use Image)→response TOP)を追加
+- build.sh に CoreGraphics/ImageIO を追加。README(画像入力・モデル互換性)更新。リビルド・
+  署名・インストール・TD再起動で実機確認済み

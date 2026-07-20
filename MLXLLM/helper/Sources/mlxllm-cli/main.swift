@@ -1,5 +1,7 @@
 import Foundation
 import MLXLLM
+import MLXVLM   // VLM(画像+テキスト)。リンクするだけで ModelFactoryRegistry に VLM factory が登録され、
+               // 同じ #huggingFaceLoadModelContainer が VLM モデルを自動判別してロードする。
 import MLXLMCommon
 import MLXHuggingFace
 import HuggingFace
@@ -70,10 +72,26 @@ func serve() async {
             }
             do {
                 emit(["type": "status", "text": "loading \(model)"])
-                let cont = try await #huggingFaceLoadModelContainer(
-                    configuration: makeConfig(model)
-                ) { (p: Progress) in
-                    emit(["type": "progress", "pct": Int(p.fractionCompleted * 100)])
+                let cfg = makeConfig(model)
+                let cont: ModelContainer
+                do {
+                    // 画像対応のため VLM factory を明示的に先に試す（失敗時のみ LLM へ）
+                    cont = try await VLMModelFactory.shared.loadContainer(
+                        from: #hubDownloader(),
+                        using: #huggingFaceTokenizerLoader(),
+                        configuration: cfg
+                    ) { (p: Progress) in
+                        emit(["type": "progress", "pct": Int(p.fractionCompleted * 100)])
+                    }
+                    logErr("loaded as VLM")
+                } catch {
+                    logErr("VLM load failed (\(error)); falling back to LLM")
+                    cont = try await #huggingFaceLoadModelContainer(
+                        configuration: cfg
+                    ) { (p: Progress) in
+                        emit(["type": "progress", "pct": Int(p.fractionCompleted * 100)])
+                    }
+                    logErr("loaded as LLM")
                 }
                 container = cont
                 session = ChatSession(cont)
@@ -94,6 +112,7 @@ func serve() async {
             let temp = obj["temp"] as? Double ?? 0.7
             let maxTok = obj["max"] as? Int ?? 512
             let keep = obj["keep"] as? Bool ?? true
+            let imagePath = obj["image"] as? String ?? ""   // 空ならテキストのみ
 
             if !keep || session == nil || system != currentSystem {
                 var gp = GenerateParameters()
@@ -106,7 +125,9 @@ func serve() async {
                 currentSystem = system
             }
             do {
-                for try await chunk in session!.streamResponse(to: prompt) {
+                let images: [UserInput.Image] =
+                    imagePath.isEmpty ? [] : [.url(URL(fileURLWithPath: imagePath))]
+                for try await chunk in session!.streamResponse(to: prompt, images: images) {
                     emit(["type": "token", "text": chunk])
                 }
                 emit(["type": "done"])
@@ -153,6 +174,11 @@ func oneShot(_ modelId: String, _ prompt: String) async {
         exit(1)
     }
 }
+
+// MLXVLM を実行バイナリにリンクさせるための明示参照。未参照だと dead-strip され
+// ModelFactoryRegistry の NSClassFromString("MLXVLM.TrampolineModelFactory") が nil になり、
+// VLM factory が登録されず VLMモデルでも画像が無視される（テキストLLMとしてロードされる）。
+_ = VLMModelFactory.shared
 
 let args = CommandLine.arguments
 if args.contains("--serve") {

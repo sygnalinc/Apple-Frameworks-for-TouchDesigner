@@ -41,9 +41,31 @@ Info DAT は `status`。
 | Max Tokens | 生成上限（既定 512） |
 | Keep Context | オンでマルチターン（会話文脈を保持） |
 | Max Rows | 出力する会話履歴の最大行数 |
+| **Use Image Input**（Visionページ） | オンで画像を添付（**VLMモデル必須**） |
+| **Image TOP**（Visionページ） | 画像を渡す TOP を指定 |
 | Load Model | モデルをロード（初回はダウンロード） |
 | Submit | 生成 |
 | Reset Conversation | 会話文脈をリセット |
+
+## マルチモーダル（画像入力・VLM）
+
+MLX は VLM（Vision-Language Model）にも対応。ヘルパは `MLXLLM` と `MLXVLM` を両方リンクしており
+**モデルの種類を自動判別**する（VLM対応モデルなら画像入力が有効）。
+
+- **画像には VLM 対応モデルが必要**。実測で動作:
+  **`mlx-community/Qwen2-VL-2B-Instruct-4bit`**（推奨・軽量）、`Qwen2.5-VL-3B-Instruct-4bit`、
+  `SmolVLM-Instruct-4bit` 等
+- **⚠ `gemma-4-e2b-it-4bit` は現状テキスト専用としてロードされる**（この repo の量子化重みが
+  mlx-swift-lm 3.31.4 の Gemma4 VLM 実装とキー不一致 = `keyNotFound(language_model...)`。
+  自動でテキストLLMにフォールバックし画像は無視される）。**画像は Qwen2-VL 等を使う**
+- 使い方: Model に VLM対応モデル（例 `models/Qwen2-VL-2B-Instruct-4bit` のローカルパス）→
+  **Vision ページの Use Image Input をオン** → **Image TOP** に画像TOPを指定 →
+  Prompt に質問（例「What is in this image?」）→ Submit。Submit時のTOPフレームを一時PNGに
+  書き出して VLM に渡す（`UserInput.Image.url`）
+- DAT は TOP をワイヤ入力できない（DATの入力はDAT）ため、**TOPはパラメータで参照**する
+- テキストのみのモデルでは画像は無視される
+- **実測（M2）**: Qwen2-VL-2B が群衆写真を認識し、背景の看板を **OCR**（"WELCOME, TRAINERS!" /
+  "May 29 - June 1, TOKYO"）してイベント内容まで説明
 
 ## 使い方
 
