@@ -1533,3 +1533,21 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
 - **AudioToolbox Mix**: spatial_video の音声は **AACステレオ**で 4ch First-Order Ambisonics ではないため
   検証不可(FOA素材が必要)。**RealityKit Splat**: gs_sample は **NGSP独自形式**・.ply は生3DGS で
   USD/USDZ ではないため直接ロード不可(USDZ変換が要る)。両者は素材待ちのまま
+
+### 2026-07-20 Gaussian Splat SOP実装(3DGS .ply→TD点群)
+
+- ユーザー「変換して進めて、変換もpluginからできると尚良い」を受け、gs_sample.ply(3DGS)をTDに取り込む
+  経路を検証:
+  - **RealityKit RealityRenderer は点群(UsdGeomPoints)を描画しない**(実測: 点群USDはロードされ
+    loaded=1 だが出力は黒 nonbg=0)。**3DGS .ply → splat USDZ の公開変換APIは無し**(ModelIOは3DGSの
+    62プロパティで "Corrupt position attribute" となり空USDに)。SDKに gaussian/splat シンボルも無し
+  - → **Gaussian Splat SOP** を新規実装。3DGS .ply(x,y,z,nx,ny,nz,f_dc_*(45+3),opacity,scale_*,rot_*・
+    stride 62 float)を**自前パース**し、位置+Cd(SH DCから色)+pscale(exp(scale))+opacity(sigmoid)を
+    TDの点群SOPに。ヘッダのプロパティ名でオフセットを動的解決。ワーカースレッドでパース(cook非ブロック)
+  - **実測(M2)**: 369085頂点91MBを Maxpoints=150000 で **184543点**にパース。Cdは点ごとに実データ
+    (pt0=(0.58,0.47,0.44)等)、opacity/pscaleも点属性。TDがネイティブに色付き点群描画
+- 真のガウシアン(異方性カーネル)描画は splat入りUSDZ + macOS26 RealityKit のsplat USDスキーマ待ち
+  (未公開)。当面は点群可視化で実用
+- README(新規+ルート英日)更新。TD再起動後に184543点の実splatパースを確認。commit/push
+- **踏んだ罠**: RealityRendererはメッシュは描くが点群は描かない。3DGS .plyはModelIO/RealityKitとも
+  直読み不可。SOPのCd/pscale等は per-point の setCustomAttribute(Color配列はfloat*にキャスト)
