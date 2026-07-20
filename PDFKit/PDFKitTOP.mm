@@ -77,6 +77,13 @@ private:
                             CGContextTranslateCTM(ctx, -box.origin.x, -box.origin.y);
                             [p drawWithBox:kPDFDisplayBoxMediaBox toContext:ctx];
                             CGContextRelease(ctx); CGColorSpaceRelease(cs);
+                            // PDF描画は bottom-up(PDF座標は左下原点)。TD表示に合わせて上下反転する
+                            {
+                                std::vector<uint8_t> fl((size_t)iw*ih*4);
+                                for (int y=0;y<ih;y++)
+                                    memcpy(fl.data()+(size_t)(ih-1-y)*iw*4, r.bgra.data()+(size_t)y*iw*4, (size_t)iw*4);
+                                r.bgra.swap(fl);
+                            }
                             r.w=iw; r.h=ih; r.ok=true;
                         }
                     }
