@@ -1551,3 +1551,34 @@ framework・macOS 26+)。Apple公式サンプル "Playing and editing Cinematic 
 - README(新規+ルート英日)更新。TD再起動後に184543点の実splatパースを確認。commit/push
 - **踏んだ罠**: RealityRendererはメッシュは描くが点群は描かない。3DGS .plyはModelIO/RealityKitとも
   直読み不可。SOPのCd/pscale等は per-point の setCustomAttribute(Color配列はfloat*にキャスト)
+
+### 2026-07-20 Gaussian Splat調査の結論 + Gaussian Splat SOP / RealityKit Splat を削除
+
+Gaussian Splat の TD 取り込みを実機(macOS 26.4 / Xcode 26.4)で徹底調査した結論と、暫定実装の撤去。
+
+**調査の確定事実:**
+- **公開splat API `GaussianSplatComponent` は macOS 27.0(現在ベータ)** で追加(iOS/iPadOS/Mac Catalyst/
+  visionOS も 27.0 beta)。Apple公式ドキュメントJSONで確認。26.4 SDKには未存在
+  (https://developer.apple.com/documentation/realitykit/gaussiansplatcomponent)
+- `GaussianSplatComponent(_:)` + `splatResource: GaussianSplatResource`。**「フレームワークはファイルを
+  直接ロードしない。PLY/USDは自前パースしてバッファ(LowLevelBuffer)を埋める」**とドキュメント明記
+  → 3DGS .plyパーサ(旧Gaussian Splat SOPのもの)が将来そのまま流用可能
+- macOS 26.4時点: 公開API無し / RealityRenderer(オフスクリーン)はsplatも点群も**描画しない**(黒・実測) /
+  USDスキーマ `UsdSplatsPreliminary_GaussianSplatsAPI`(Preliminary=実験的)+ private `Vista.framework`
+  (`VSTSplatProxyRenderer`)+ private `CorePhotogrammetry`(`CPGEnvironmentGSSession*`・splat学習Metal
+  カーネル)は在るが、**公開API・RCP 2.0・Object Captureアプリのいずれからも露出していない**
+- `CPGGaussian3DLoadFromURL` はINRIA .plyを拒否(Apple独自フォーマット専用)。CorePhotogrammetryの
+  splat生成はCVPixelBuffer+カメラ内外パラメータのフルSfM+GS private pipelineで、ヘッダ無し盲目再構成は非現実的
+- **splat USDサンプルファイルは本機に一切存在しない**(Xcode/RCP同梱含む)
+
+**撤去:**
+- 暫定実装だった **Gaussian Splat SOP(`Gaussiansplat`)** と **RealityKit Splat TOP(`Realitykitsplat`)** を
+  ユーザー判断で削除(フォルダ git rm・常設バンドル削除・ルートREADME英日から除去・sample.toeの
+  RealityKitSplat例と残存Gaussiansplat1ノードを除去して保存)
+- 理由: 26.4ではRealityKit Splatは真のsplat描画不可(RealityRenderer非対応)、Gaussian Splat SOPは
+  点群可視化止まり。**macOS 27で `GaussianSplatComponent` が公開されたら、.plyパーサ+同コンポーネントで
+  作り直す**方針(足場は本ログに記録)
+
+**次にやること(macOS 27で):** `GaussianSplatComponent`+`GaussianSplatResource` を使い、.ply/USDを自前
+パースしてバッファ投入 → RealityKit Splat TOP を真のsplat描画で再実装。オフスクリーンRealityRendererで
+描けるかは27で要検証(不可ならオンスクリーン→Syphon等)

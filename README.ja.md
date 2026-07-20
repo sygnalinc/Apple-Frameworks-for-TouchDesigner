@@ -136,8 +136,6 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | プラグイン | 種類 | 内容 |
 |---|---|---|
 | [RealityKit Capture](RealityKitCapture/) | SOP | **写真フォルダ→3Dメッシュ**(RealityKit Object Capture)。テクスチャ付きOBJ出力 |
-| [RealityKit Splat](RealityKitSplat/) | TOP | **USD/USDZシーン(3D Gaussian Splat含む・macOS 26+)をTOPへ描画**(RealityRenderer)。オービットカメラ・自動フレーミング |
-| [Gaussian Splat](GaussianSplat/) | SOP | **3D Gaussian Splatting の `.ply`** を色付き点群に(位置+色/サイズ/不透明度)。TDでネイティブ描画 |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **写真の深度→3Dポイントクラウド**(カメラ較正/画角で逆投影)。RGBから色サンプル |
 | [Cinematic Data](Cinematic/) | CHOP | **iPhone Cinematic動画のメタデータ**(macOS 26+): フォーカス深度・被写体(type/bbox/depth/trackID) |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic動画**: 深度(視差)マップ、または**f値/ピントを差し替えて再レンダ** |
