@@ -1,10 +1,14 @@
 # Image Gen TOP — text2img / img2img（macOS / Core ML 画像生成）
 
-Core ML の画像生成モデルで **TD 内から text2img / img2img** する カスタム TOP。
-現行バックエンドは Apple 公式 [ml-stable-diffusion](https://github.com/apple/ml-stable-diffusion)
+**外部の Core ML 画像生成モデル**（Stable Diffusion 等）で **TD 内から text2img / img2img**
+する カスタム TOP。現行バックエンドは Apple 公式
+[ml-stable-diffusion](https://github.com/apple/ml-stable-diffusion)
 （SD 2.x 系 / SDXL 系をモデルフォルダ内容で自動判定 — TextEncoder2.mlmodelc の有無）。
 **Stable Diffusion 以外の Core ML 生成モデル**にも対応できるよう、推論はヘルパ dylib に
 分離してある（バックエンド追加はヘルパ側の拡張で行う）。
+
+> **CoreML 系は外部モデルを使う**、というルールに統一。外部モデルを使わない Apple 標準の
+> [Image Playground](../ImagePlayground/) は**別の TOP**（`ImagePlayground`）に分離した。
 
 実測（M2 / SD 2.1 base split_einsum / 15 steps / CPU+ANE）:
 **text2img 7.6秒・img2img 4.5秒**。モデルロード（初回のANEコンパイル）は約2分。
@@ -14,16 +18,8 @@ Core ML の画像生成モデルで **TD 内から text2img / img2img** する �
 | Backend | 内容 | 実測(M2) |
 |---|---|---|
 | **Stable Diffusion (Core ML)** | ml-stable-diffusion。SD 2.x / SDXL / SD Turbo を Model Folder で指定(自動判定) | Turbo 1step **0.8秒** / SD2.1 15steps 7.6秒 |
-| **Image Playground** | Apple の ImageCreator API(macOS 15.4+・Apple Intelligence必須)。**モデルフォルダ不要**。Style: Animation / Illustration / Sketch | 1536x1536 **2.7秒** |
 
-パラメータは選択中のバックエンドで使えるものだけ有効になる(使えないものはグレーアウト。
-Strength は Image to Image オン時のみ有効)。
-
-Image Playground の注意:
-- **人物はテキストのみから生成できない**(「顔のソース画像が必要」とエラーになる安全設計)。
-  モノ・風景・動物などのプロンプト向き
-- Steps / Guidance / Seed / img2img は Playground では無効(API仕様)
-- 出力は安全フィルタ済み・スタイルは3種のみ
+Strength は Image to Image オン時のみ有効。
 
 ## 使い方
 
@@ -56,9 +52,7 @@ Seed は固定値にすると連続フレームの見た目が安定し、-1（�
 
 | パラメータ | 既定 | 内容 |
 |---|---|---|
-| Backend | Stable Diffusion | 生成バックエンド(上表) |
-| Style (Playground) | Animation | Image Playground のスタイル |
-| Model Folder | — | Core ML 画像生成モデルのフォルダ(SD バックエンドのみ) |
+| Model Folder | — | Core ML 画像生成モデル(外部)のフォルダ |
 | Compute Units | CPU + Neural Engine | split_einsum は ANE 推奨。ORIGINAL 変換版は CPU+GPU |
 | Prompt / Negative Prompt | — | プロンプト |
 | Steps | 15 | サンプリングステップ（スケジューラは DPM-Solver++） |

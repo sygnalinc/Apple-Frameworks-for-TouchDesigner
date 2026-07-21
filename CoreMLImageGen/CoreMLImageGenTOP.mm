@@ -26,7 +26,7 @@
 
 using namespace TD;
 
-// libSDHelper.dylib（Swift）の C API
+// libImageGenHelper.dylib（Swift）の C API（外部 Core ML 生成モデル・現行は Stable Diffusion）
 extern "C" {
 void* sd_create(const char* modelDir, int32_t computeUnits);
 bool sd_generate(void* handle, const char* prompt, const char* negative,
@@ -35,11 +35,6 @@ bool sd_generate(void* handle, const char* prompt, const char* negative,
 int32_t sd_poll(void* handle, char* buffer, int32_t capacity);
 int64_t sd_copy_image(void* handle, uint8_t* buffer, int64_t capacity);
 void sd_destroy(void* handle);
-void* pg_create(void);
-bool pg_generate(void* handle, const char* prompt, const char* style);
-int32_t pg_poll(void* handle, char* buffer, int32_t capacity);
-int64_t pg_copy_image(void* handle, uint8_t* buffer, int64_t capacity);
-void pg_destroy(void* handle);
 }
 
 namespace {
@@ -53,8 +48,6 @@ public:
     {
         if (mySession)
             sd_destroy(mySession);
-        if (myPGSession)
-            pg_destroy(myPGSession);
     }
 
     void getGeneralInfo(TOP_GeneralInfo* ginfo, const OP_Inputs*, void*) override
@@ -65,36 +58,21 @@ public:
     void execute(TOP_Output* output, const OP_Inputs* inputs, void*) override
     {
         myExecCount++;
-        const bool playground = strcmp(inputs->getParString("Backend"), "playground") == 0;
         const char* modelPar = inputs->getParString("Model");
         const std::string model = modelPar ? modelPar : "";
         const int compute = (int)inputs->getParInt("Compute");
 
-        if (playground) {
-            if (!myPGSession)
-                myPGSession = pg_create();
-        } else {
-            // モデル変更（または初回）でセッションを作り直す
-            if (!model.empty() && (model != myModelPath || compute != myCompute)) {
-                if (mySession)
-                    sd_destroy(mySession);
-                mySession = sd_create(model.c_str(), compute);
-                myModelPath = model;
-                myCompute = compute;
-            }
+        // モデル変更（または初回）でセッションを作り直す
+        if (!model.empty() && (model != myModelPath || compute != myCompute)) {
+            if (mySession)
+                sd_destroy(mySession);
+            mySession = sd_create(model.c_str(), compute);
+            myModelPath = model;
+            myCompute = compute;
         }
-        void* active_session = playground ? myPGSession : mySession;
+        void* active_session = mySession;
 
-        // バックエンドで使わないパラメータをグレーアウト
-        inputs->enablePar("Style", playground);
-        inputs->enablePar("Model", !playground);
-        inputs->enablePar("Compute", !playground);
-        inputs->enablePar("Negativeprompt", !playground);
-        inputs->enablePar("Steps", !playground);
-        inputs->enablePar("Guidance", !playground);
-        inputs->enablePar("Seed", !playground);
-        inputs->enablePar("Img2img", !playground);
-        inputs->enablePar("Strength", !playground && inputs->getParInt("Img2img") != 0);
+        inputs->enablePar("Strength", inputs->getParInt("Img2img") != 0);
 
         // 状態ポーリング（トリガ判定に使うので先に行う）
         myStatus = "no model";
@@ -102,10 +80,7 @@ public:
         bool loaded = false;
         if (active_session) {
             char pbuf[1024];
-            if (playground)
-                pg_poll(active_session, pbuf, sizeof(pbuf));
-            else
-                sd_poll(active_session, pbuf, sizeof(pbuf));
+            sd_poll(active_session, pbuf, sizeof(pbuf));
             loaded = parsePoll(pbuf, imageSerial, imgW, imgH);
         }
 
@@ -113,11 +88,7 @@ public:
         // 最新の入力フレーム/パラメータで自動再生成 = リアルタイム変換モード）
         const bool continuous = inputs->getParInt("Continuous") != 0;
         const bool trigger = myWantGenerate || (continuous && loaded && !myBusy);
-        if (trigger && playground && active_session) {
-            myWantGenerate = false;
-            pg_generate(active_session, inputs->getParString("Prompt") ?: "",
-                        inputs->getParString("Style") ?: "animation");
-        } else if (trigger && !playground && mySession) {
+        if (trigger && mySession) {
             myWantGenerate = false;
             const bool img2img = inputs->getParInt("Img2img") != 0;
             const OP_TOPInput* top = inputs->getInputTOP(0);
@@ -161,9 +132,8 @@ public:
         if (active_session && imageSerial != myUploadedSerial && imgW > 0 && imgH > 0) {
             const uint64_t bytes = (uint64_t)imgW * imgH * 4;
             std::vector<uint8_t> pixels(bytes);
-            const int64_t copied = playground
-                ? pg_copy_image(active_session, pixels.data(), (int64_t)bytes)
-                : sd_copy_image(active_session, pixels.data(), (int64_t)bytes);
+            const int64_t copied =
+                sd_copy_image(active_session, pixels.data(), (int64_t)bytes);
             if (copied == (int64_t)bytes) {
                 OP_SmartRef<TOP_Buffer> buf =
                     myContext->createOutputBuffer(bytes, TOP_BufferFlags::None, nullptr);
@@ -189,26 +159,6 @@ public:
 
     void setupParameters(OP_ParameterManager* manager, void*) override
     {
-        {
-            // 生成バックエンド。sd=Core ML Stable Diffusion(Model Folder必須) /
-            // playground=Apple Image Playground(モデル不要・Apple Intelligence必須)
-            OP_StringParameter p("Backend");
-            p.label = "Backend";
-            p.page = "Image Gen";
-            p.defaultValue = "sd";
-            const char* names[] = {"sd", "playground"};
-            const char* labels[] = {"Stable Diffusion (Core ML)", "Image Playground"};
-            manager->appendMenu(p, 2, names, labels);
-        }
-        {
-            OP_StringParameter p("Style");
-            p.label = "Style (Playground)";
-            p.page = "Image Gen";
-            p.defaultValue = "animation";
-            const char* names[] = {"animation", "illustration", "sketch"};
-            const char* labels[] = {"Animation", "Illustration", "Sketch"};
-            manager->appendMenu(p, 3, names, labels);
-        }
         {
             OP_StringParameter p("Model");
             p.label = "Model Folder";
@@ -374,7 +324,6 @@ private:
 
     TOP_Context* myContext;
     void* mySession = nullptr;
-    void* myPGSession = nullptr;
     std::string myModelPath;
     int myCompute = 0;
     std::atomic<bool> myWantGenerate{false};

@@ -179,7 +179,8 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
 | Foundation Model | Foundationmodel | **フレームワーク名**(他LLM統合と衝突させないため汎用名"LLM"は避けた) |
 | Gemma | Gemma | Google Gemma 4を明示。llama.cppローカルサーバー接続のDAT |
 | Translate | Translate | Translation |
-| Image Gen | Imagegen | **汎用名**(SD以外のバックエンド追加前提。Backendメニューで切替) |
+| CoreML ImageGen | Coremlimagegen | **外部Core MLモデル専用**(SD/SDXL/Turbo。CoreML系=外部モデルのルール) |
+| ImagePlayground | Imageplayground | Apple Image Playground(ImageCreator)。外部モデル不要で別op |
 
 ## 作業引き継ぎログ
 
@@ -1940,3 +1941,22 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 両プラグインをリビルド・署名・インストール。ルートREADME(英日)一覧の表示名と各README見出しを更新
 - 注意: opType未変更のため OP Create Dialog では "LLM AFM"/"LLM MLX" と表示され、生成される
   ノード型は従来通り Afmcore/Mlxllm
+
+### 2026-07-21 CoreML ImageGen を外部モデル専用化 + Image Playground を別opに分離
+
+- ユーザー「CoreML ImageGen は StableDiffusion 等の外部モデル専用に。Image Playground は
+  単一の別opに。CoreML関係は外部モデルを使うというルールに統一」
+- **CoreML ImageGen**(`Coremlimagegen`・TOP): Backend/Style メニューと Image Playground
+  (`pg_*` C ABI・PGSession・igCGImageToRGBA・`import ImagePlayground`)を**全削除**し、
+  **ml-stable-diffusion(外部Core MLモデル)専用**に。Model Folder / Steps / Guidance / Seed /
+  img2img はそのまま。opType/opLabel/icon 不変(既存 examples/CoreMLImageGen は無傷)
+- **ImagePlayground**(`Imageplayground`・opLabel "ImagePlayground"・icon IPG・TOP・新規):
+  ImageCreator(macOS 15.4+・**外部モデル不要**)でテキスト+スタイル生成。Swiftヘルパは
+  SPM不要の素の swiftc dylib(`libPlaygroundHelper`・pg_ プレフィックス・`-framework
+  ImagePlayground`)。Style(animation/illustration/sketch)/Prompt/Generate/Flip
+- 両方ビルド・署名・インストール。CoreMLImageGenのバイナリから Backend/playground 文字列が
+  消えたこと、ImagePlayground が Imageplayground/ImagePlayground で登録されることを strings で確認
+- README(CoreMLImageGen改訂・ImagePlayground新規・ルート英日一覧にImagePlayground追加)更新
+- 注意: 本セッションは TouchDesigner MCP 切断中のため TD実機の生成検証は未実施
+  (ビルド/インストール/バイナリ確認まで)。TD再起動で `Imageplayground` が Create Dialog に出る。
+  ImagePlaygroundの利用例は sample.toe に未追加(MCP復帰後のTODO)

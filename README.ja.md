@@ -102,7 +102,8 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 |---|---|---|
 | [CoreML](CoreML/) | TOP | **任意の Core ML モデル**を差し替えて推論(深度推定・スタイル変換・分類等)。画像/配列出力を自動判別 |
 | [CoreML](CoreMLCHOP/) | CHOP | 任意の Core ML モデルの**ベクトル出力**をCHへ(埋め込み・キーポイント等) |
-| [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img**(Core ML Stable Diffusion / Image Playground) |
+| [CoreML ImageGen](CoreMLImageGen/) | TOP | **外部 Core ML モデルで text2img / img2img**(Stable Diffusion / SDXL / SD Turbo) |
+| [ImagePlayground](ImagePlayground/) | TOP | **Apple Image Playground でテキスト→画像**(`ImageCreator`・macOS 15.4+)。外部モデル不要。Animation / Illustration / Sketch |
 | [CoreImage Code](CoreImageCode/) | TOP | QR / Aztec / PDF417 / Code128 の**生成**(外部ライブラリ不要) |
 | [CreateML](CreateML/) | DAT | **統合オンデバイストレーナ**。`Task`メニューで Image / Hand Pose / Action(体)/ Hand Action / Sound / Activity(CHOP時系列)/ Tabular分類・回帰 を切替→`.mlmodel`。出力は CoreML TOP / CoreML Motion CHOP / SoundClass 等が推論 |
 | [CreateML Training Recorder](CreateMLTrainingRecorder/) | CHOP | **CHOP時系列 → CreateML学習用CSV**(recording / label / 特徴列)。VisionPose/Hand等をTD内で収録・ラベル付けし、CreateML(Activity)へ直結 |
