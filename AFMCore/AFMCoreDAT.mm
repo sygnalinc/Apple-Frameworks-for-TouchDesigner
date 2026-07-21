@@ -173,19 +173,19 @@ public:
         {
             OP_StringParameter p("Instructions");
             p.label = "Instructions (System)";
-            p.page = "AFM Core";
+            p.page = "LLM AFM";
             manager->appendString(p);
         }
         {
             OP_StringParameter p("Prompt");
             p.label = "Prompt";
-            p.page = "AFM Core";
+            p.page = "LLM AFM";
             manager->appendString(p);
         }
         {
             OP_NumericParameter p("Temperature");
             p.label = "Temperature";
-            p.page = "AFM Core";
+            p.page = "LLM AFM";
             p.defaultValues[0] = 0.7;
             p.minSliders[0] = 0.0;
             p.maxSliders[0] = 2.0;
@@ -194,7 +194,7 @@ public:
         {
             OP_NumericParameter p("Maxtokens");
             p.label = "Max Tokens";
-            p.page = "AFM Core";
+            p.page = "LLM AFM";
             p.defaultValues[0] = 512;
             p.minSliders[0] = 16;
             p.maxSliders[0] = 2048;
@@ -205,7 +205,7 @@ public:
         {
             OP_NumericParameter p("Keepcontext");
             p.label = "Keep Context (Multi-turn)";
-            p.page = "AFM Core";
+            p.page = "LLM AFM";
             p.defaultValues[0] = 1;
             manager->appendToggle(p);
         }
@@ -214,13 +214,13 @@ public:
             // 空なら通常のテキスト生成
             OP_StringParameter p("Schema");
             p.label = "Output Schema (name:type)";
-            p.page = "AFM Core";
+            p.page = "LLM AFM";
             manager->appendString(p);
         }
         {
             OP_NumericParameter p("Maxrows");
             p.label = "Max Rows";
-            p.page = "AFM Core";
+            p.page = "LLM AFM";
             p.defaultValues[0] = 50;
             p.minSliders[0] = 1;
             p.maxSliders[0] = 200;
@@ -273,13 +273,13 @@ public:
         {
             OP_NumericParameter p("Submit");
             p.label = "Submit";
-            p.page = "AFM Core";
+            p.page = "LLM AFM";
             manager->appendPulse(p);
         }
         {
             OP_NumericParameter p("Clear");
             p.label = "Clear Conversation";
-            p.page = "AFM Core";
+            p.page = "LLM AFM";
             manager->appendPulse(p);
         }
     }
@@ -395,7 +395,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Afmcore");
-    info->customOPInfo.opLabel->setString("AFM Core");
+    info->customOPInfo.opLabel->setString("LLM AFM");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("AFM");
     info->customOPInfo.minInputs = 0;

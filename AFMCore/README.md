@@ -1,4 +1,4 @@
-# AFM Core DAT — Apple Intelligence オンデバイスLLM（macOS 26+）
+# LLM AFM DAT — Apple Intelligence オンデバイスLLM（macOS 26+）
 
 Apple の **FoundationModels framework**（Apple Intelligence の ~3B オンデバイスLLM）で
 テキスト生成する TD カスタム DAT。**完全オンデバイス・API課金なし・ネットワーク不要**。

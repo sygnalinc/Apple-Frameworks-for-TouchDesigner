@@ -1930,3 +1930,13 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   (img→mlx(Use Image)→response TOP)を追加
 - build.sh に CoreGraphics/ImageIO を追加。README(画像入力・モデル互換性)更新。リビルド・
   署名・インストール・TD再起動で実機確認済み
+
+### 2026-07-21 LLM系OPの表示名を統一(AFM Core→LLM AFM / MLX LLM→LLM MLX)
+
+- ユーザー「LLM関連のopは名前を統一したい」。**opLabel のみ変更**(opType据え置き)で
+  AFM Core→**"LLM AFM"**、MLX LLM→**"LLM MLX"**。opType(`Afmcore`/`Mlxllm`)・opIcon(AFM/MLX)・
+  フォルダ・ファイルは不変なので、既存デモ(afm_tool_demo / afm_describe_demo / mlx_local_demo /
+  mlx_vision_demo)は参照切れせずそのまま動く(「CA Process Tap」と同じ opLabel-only 方針)
+- 両プラグインをリビルド・署名・インストール。ルートREADME(英日)一覧の表示名と各README見出しを更新
+- 注意: opType未変更のため OP Create Dialog では "LLM AFM"/"LLM MLX" と表示され、生成される
+  ノード型は従来通り Afmcore/Mlxllm

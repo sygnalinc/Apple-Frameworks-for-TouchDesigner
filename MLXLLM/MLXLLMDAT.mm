@@ -375,26 +375,26 @@ public:
         {
             OP_StringParameter p("Model");
             p.label = "Model (mlx-community repo)";
-            p.page = "MLX LLM";
+            p.page = "LLM MLX";
             p.defaultValue = "mlx-community/gemma-4-e2b-it-4bit";
             manager->appendString(p);
         }
         {
             OP_StringParameter p("System");
             p.label = "System Instructions";
-            p.page = "MLX LLM";
+            p.page = "LLM MLX";
             manager->appendString(p);
         }
         {
             OP_StringParameter p("Prompt");
             p.label = "Prompt";
-            p.page = "MLX LLM";
+            p.page = "LLM MLX";
             manager->appendString(p);
         }
         {
             OP_NumericParameter p("Temperature");
             p.label = "Temperature";
-            p.page = "MLX LLM";
+            p.page = "LLM MLX";
             p.defaultValues[0] = 0.7;
             p.minSliders[0] = 0.0;
             p.maxSliders[0] = 2.0;
@@ -403,7 +403,7 @@ public:
         {
             OP_NumericParameter p("Maxtokens");
             p.label = "Max Tokens";
-            p.page = "MLX LLM";
+            p.page = "LLM MLX";
             p.defaultValues[0] = 512;
             p.minSliders[0] = 16;
             p.maxSliders[0] = 4096;
@@ -414,14 +414,14 @@ public:
         {
             OP_NumericParameter p("Keepcontext");
             p.label = "Keep Context (Multi-turn)";
-            p.page = "MLX LLM";
+            p.page = "LLM MLX";
             p.defaultValues[0] = 1;
             manager->appendToggle(p);
         }
         {
             OP_NumericParameter p("Maxrows");
             p.label = "Max Rows";
-            p.page = "MLX LLM";
+            p.page = "LLM MLX";
             p.defaultValues[0] = 50;
             p.minSliders[0] = 1;
             p.maxSliders[0] = 200;
@@ -445,19 +445,19 @@ public:
         {
             OP_NumericParameter p("Load");
             p.label = "Load Model";
-            p.page = "MLX LLM";
+            p.page = "LLM MLX";
             manager->appendPulse(p);
         }
         {
             OP_NumericParameter p("Submit");
             p.label = "Submit";
-            p.page = "MLX LLM";
+            p.page = "LLM MLX";
             manager->appendPulse(p);
         }
         {
             OP_NumericParameter p("Reset");
             p.label = "Reset Conversation";
-            p.page = "MLX LLM";
+            p.page = "LLM MLX";
             manager->appendPulse(p);
         }
     }
@@ -646,7 +646,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
     info->customOPInfo.opType->setString("Mlxllm");
-    info->customOPInfo.opLabel->setString("MLX LLM");
+    info->customOPInfo.opLabel->setString("LLM MLX");
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("MLX");
     info->customOPInfo.minInputs = 0;

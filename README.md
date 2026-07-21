@@ -129,9 +129,9 @@ grouped by category.
 
 | Plugin | Family | What it does |
 |---|---|---|
-| [AFM Core](AFMCore/) | DAT | **Apple Intelligence on-device LLM** (macOS 26+). **Structured output (JSON schema)** + **Tool Calling** (the LLM calls a tool, TouchDesigner executes it and returns the result) straight into show control |
+| [LLM AFM](AFMCore/) | DAT | **Apple Intelligence on-device LLM** (macOS 26+). **Structured output (JSON schema)** + **Tool Calling** (the LLM calls a tool, TouchDesigner executes it and returns the result) straight into show control |
 | [Gemma](Gemma/) | DAT | **Google Gemma 4 local LLM** via llama.cpp/Metal. Streaming chat, context history, and local server lifecycle; no API key or model binary in Git |
-| [MLX LLM](MLXLLM/) | DAT | **Local LLM via Apple MLX** (mlx-swift-lm). Runs any mlx-community model (Gemma 4 / Qwen / Llama) fully on-device with token streaming. No API key; model auto-downloads from Hugging Face on first use |
+| [LLM MLX](MLXLLM/) | DAT | **Local LLM via Apple MLX** (mlx-swift-lm). Runs any mlx-community model (Gemma 4 / Qwen / Llama) fully on-device with token streaming. No API key; model auto-downloads from Hugging Face on first use |
 | [Translate](Translate/) | DAT | **On-device translation.** Wire to Speech Text for real-time subtitle translation |
 | [Text Analyze](TextAnalyze/) | DAT | Sentiment / language ID / named entities / semantic similarity (JA supported) + **tokens (token / POS / lemma)** and **embedding vectors** (numeric). "Drive visuals from speech mood/topic" |
 | [Caption Author](CaptionAuthor/) | DAT | **Transcription → SRT / WebVTT** subtitles. Uses start/end columns, or auto-sequences text-only rows (SpeechText). Writes the caption file |

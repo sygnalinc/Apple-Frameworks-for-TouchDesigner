@@ -1,4 +1,4 @@
-# MLX LLM DAT
+# LLM MLX DAT
 
 Apple の **MLX** フレームワーク（[mlx-swift-lm](https://github.com/ml-explore/mlx-swift-lm)）で
 Gemma / Qwen / Llama 等の量子化LLMを **完全ローカル・オンデバイス**で走らせる DAT。
