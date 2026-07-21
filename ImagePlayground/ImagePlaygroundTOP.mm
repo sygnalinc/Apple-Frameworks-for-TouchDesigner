@@ -4,10 +4,12 @@
 // スタイルから画像を生成する TD カスタム TOP。**外部モデル不要**（端末の Apple Intelligence
 // が生成する）。Core ML の外部モデルを使う CoreML ImageGen とは別系統。
 //
-// 制約（Apple 仕様）: 人物はテキストのみからは生成できない（顔ソース画像が必要）。
-// Steps / Seed / img2img 等は無し。スタイルは animation / illustration / sketch の3種。
+// 制約（Apple 仕様）: 人物はテキストのみからは生成できない → **入力0に顔のソース画像 TOP**
+// を接続すると人物を生成できる（ImagePlaygroundConcept.image）。Steps / Seed / img2img は無し。
+// スタイルは animation / illustration / sketch の3種。
 //
-// 使い方: Style と Prompt を設定して Generate をパルス。生成は非同期（cook 非ブロック）。
+// 使い方: Style と Prompt を設定して Generate をパルス。人物なら入力0に顔画像 TOP を接続。
+// 生成は非同期（cook 非ブロック）。
 
 #import <Foundation/Foundation.h>
 
@@ -24,7 +26,8 @@ using namespace TD;
 // libPlaygroundHelper.dylib（Swift）の C API
 extern "C" {
 void* pg_create(void);
-bool pg_generate(void* handle, const char* prompt, const char* style);
+bool pg_generate(void* handle, const char* prompt, const char* style,
+                 const uint8_t* sourceRGBA, int32_t sourceW, int32_t sourceH);
 int32_t pg_poll(void* handle, char* buffer, int32_t capacity);
 int64_t pg_copy_image(void* handle, uint8_t* buffer, int64_t capacity);
 void pg_destroy(void* handle);
@@ -66,8 +69,25 @@ public:
         // Generate パルス
         if (myWantGenerate && mySession) {
             myWantGenerate = false;
+            // 入力0にソース画像（顔）があれば渡す。**人物生成は Apple 仕様で顔ソースが必須**
+            const OP_TOPInput* src = inputs->getInputTOP(0);
+            OP_SmartRef<OP_TOPDownloadResult> dl;
+            const uint8_t* srcData = nullptr;
+            int srcW = 0, srcH = 0;
+            if (src) {
+                OP_TOPInputDownloadOptions opts;
+                opts.pixelFormat = OP_PixelFormat::RGBA8Fixed;   // ヘルパは RGBA 前提
+                opts.verticalFlip = true;   // TD は bottom-up → 正立画像で顔認識
+                dl = src->downloadTexture(opts, nullptr);
+                if (dl) {
+                    srcData = (const uint8_t*)dl->getData();   // 準備できるまで stall
+                    srcW = (int)dl->textureDesc.width;
+                    srcH = (int)dl->textureDesc.height;
+                }
+            }
             pg_generate(mySession, inputs->getParString("Prompt") ?: "",
-                        inputs->getParString("Style") ?: "animation");
+                        inputs->getParString("Style") ?: "animation",
+                        srcData, srcW, srcH);
         }
 
         // 新しい画像ができていたらアップロード
@@ -207,7 +227,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->customOPInfo.authorName->setString("sygnal");
     info->customOPInfo.opIcon->setString("IPG");
     info->customOPInfo.minInputs = 0;
-    info->customOPInfo.maxInputs = 0;
+    info->customOPInfo.maxInputs = 1;   // 入力0 = ソース画像(顔)。人物生成に必須
 }
 
 DLLEXPORT TOP_CPlusPlusBase*

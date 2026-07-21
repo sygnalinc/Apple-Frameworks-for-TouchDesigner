@@ -15,6 +15,18 @@ import Foundation
 import CoreGraphics
 import ImagePlayground
 
+// RGBA8 バイト列 → CGImage（データはコピーするので呼び出し後にバッファを解放してよい）
+func igRGBAToCGImage(_ p: UnsafePointer<UInt8>, _ w: Int, _ h: Int) -> CGImage? {
+    guard w > 0, h > 0 else { return nil }
+    let data = Data(bytes: p, count: w * h * 4)   // コピー
+    guard let provider = CGDataProvider(data: data as CFData) else { return nil }
+    let info = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+    return CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 32,
+                   bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
+                   bitmapInfo: info, provider: provider, decode: nil,
+                   shouldInterpolate: false, intent: .defaultIntent)
+}
+
 // CGImage → RGBA8（top-down・premultipliedLast）
 func igCGImageToRGBA(_ cg: CGImage) -> ([UInt8], Int, Int)? {
     let w = cg.width
@@ -66,7 +78,7 @@ final class PGSession: @unchecked Sendable {
         }
     }
 
-    func generate(prompt: String, style styleName: String) -> Bool {
+    func generate(prompt: String, style styleName: String, source: CGImage?) -> Bool {
         lock.lock()
         if busy || creator == nil {
             lock.unlock()
@@ -75,11 +87,13 @@ final class PGSession: @unchecked Sendable {
         busy = true
         status = "generating"
         lock.unlock()
-        Task { [weak self] in await self?.run(prompt: prompt, styleName: styleName) }
+        Task { [weak self] in
+            await self?.run(prompt: prompt, styleName: styleName, source: source)
+        }
         return true
     }
 
-    private func run(prompt: String, styleName: String) async {
+    private func run(prompt: String, styleName: String, source: CGImage?) async {
         let start = Date()
         lock.lock()
         let creatorRef = creator
@@ -92,7 +106,10 @@ final class PGSession: @unchecked Sendable {
         default: style = .animation
         }
         do {
-            let concepts = [ImagePlaygroundConcept.text(prompt)]
+            // ソース画像（顔）があれば concept に含める。人物生成は Apple 仕様で顔ソースが必須
+            var concepts: [ImagePlaygroundConcept] = []
+            if let source { concepts.append(.image(source)) }
+            if !prompt.isEmpty { concepts.append(.text(prompt)) }
             var got = false
             for try await created in creatorRef.images(for: concepts, style: style, limit: 1) {
                 if let converted = igCGImageToRGBA(created.cgImage) {
@@ -160,12 +177,20 @@ public func pg_create() -> UnsafeMutableRawPointer? {
 @_cdecl("pg_generate")
 public func pg_generate(_ handle: UnsafeMutableRawPointer?,
                         _ prompt: UnsafePointer<CChar>?,
-                        _ style: UnsafePointer<CChar>?) -> Bool {
+                        _ style: UnsafePointer<CChar>?,
+                        _ sourceRGBA: UnsafePointer<UInt8>?,
+                        _ sourceW: Int32, _ sourceH: Int32) -> Bool {
     guard #available(macOS 15.4, *), let handle else { return false }
     let session = Unmanaged<PGSession>.fromOpaque(handle).takeUnretainedValue()
+    // ソース画像（顔）を CGImage 化（データはコピーされるのでこの呼び出し内で完結）
+    var src: CGImage? = nil
+    if let sourceRGBA, sourceW > 0, sourceH > 0 {
+        src = igRGBAToCGImage(sourceRGBA, Int(sourceW), Int(sourceH))
+    }
     return session.generate(
         prompt: prompt.map { String(cString: $0) } ?? "",
-        style: style.map { String(cString: $0) } ?? "animation")
+        style: style.map { String(cString: $0) } ?? "animation",
+        source: src)
 }
 
 @_cdecl("pg_poll")

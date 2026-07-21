@@ -327,3 +327,12 @@
   swift-huggingface + swift-transformers に依存**する必要がある。API: `#huggingFaceLoadModelContainer
   (configuration: ModelConfiguration(id:)) { progress }` → `ChatSession(container)` →
   `streamResponse(to:)`（AsyncThrowingStream でトークン）
+
+## ImagePlayground (ImageCreator)
+
+- **人物はテキストのみからは生成不可**(`conceptsRequirePersonIdentity` = "Provide a source
+  image containing a person's face")。**顔画像を `ImagePlaygroundConcept.image(CGImage)` で
+  concepts に渡す**と生成できる(TOP入力0にソース画像を接続)
+- **ImageCreator の生成は前面GUIアプリ内でのみ動く**。ヘッドレスCLI/バックグラウンドは
+  `backgroundCreationForbidden` で拒否 → ターミナルでの生成検証は不可(TD等の前面アプリで検証する)
+- 顔が小さいと `faceInImageTooSmall`、非対応画像は `unsupportedInputImage`

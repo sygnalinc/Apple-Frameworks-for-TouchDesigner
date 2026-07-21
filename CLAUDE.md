@@ -1975,3 +1975,20 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 注意: 本セッションは TouchDesigner MCP 切断中。sample.toe に IOHID/QuickLook の利用例
   コンテナがあれば TD再起動後に "Unknown operator type"(赤)になる。MCP復帰後に examples の
   該当2コンテナを削除する(.toe破損許容済み)。VisionFlowの可視化デモ追加もMCP復帰後のTODO
+
+### 2026-07-21 ImagePlayground に顔ソース画像入力を追加(人物生成対応)
+
+- ユーザー「ImagePlaygroundで人物を生成すると『Provide a source image containing a person's
+  face』と出る」→ Apple仕様(人物はテキストのみ不可)。**入力0に顔画像TOPを接続**して
+  `ImagePlaygroundConcept.image(CGImage)` として渡す対応を追加
+- **helper**: `pg_generate` に sourceRGBA/w/h を追加、`igRGBAToCGImage`(データコピー)で CGImage 化し
+  concepts に `.image(source)` を先頭追加。**TOP**: maxInputs 0→1、Generate時に入力0を
+  downloadTexture(RGBA8/verticalFlip)して渡す
+- **検証(スタンドアロン)**: `ImagePlaygroundConcept.image(face)+.text(prompt)` で
+  「provide source image」エラーは解消(=顔concept経路に入る)。ただし**ImageCreator生成は
+  前面GUIアプリ内でしか動かず、ヘッドレスCLIは `backgroundCreationForbidden`**(=TDでは動くが
+  ターミナル検証は不可)。API経路・ビルド・入力配線は確認済み
+- README(入力0=顔・「人物を生成する」手順・backgroundCreationForbidden注意)更新。インストール済み
+- **新ハマりどころ**: ImagePlaygroundのImageCreator生成は**前面GUIアプリ限定**。
+  ヘッドレス/バックグラウンドは `backgroundCreationForbidden` で拒否される
+- 注意: 本セッションMCP切断中のためTD実機での人物生成検証は未実施(次回TODO)
