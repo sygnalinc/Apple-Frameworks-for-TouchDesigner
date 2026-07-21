@@ -108,7 +108,7 @@ DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* i) {
     i->customOPInfo.opType->setString("Visiondocument");
     i->customOPInfo.opLabel->setString("Vision Document");
     i->customOPInfo.opIcon->setString("VDC");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs = 0;
     i->customOPInfo.maxInputs = 0;
 }

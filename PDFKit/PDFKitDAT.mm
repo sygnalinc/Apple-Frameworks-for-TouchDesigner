@@ -111,7 +111,7 @@ DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* i) {
     i->customOPInfo.opType->setString("Pdfkit");
     i->customOPInfo.opLabel->setString("PDFKit");
     i->customOPInfo.opIcon->setString("PDF");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=0;
 }
 DLLEXPORT DAT_CPlusPlusBase* CreateDATInstance(const OP_NodeInfo* i) { return new PDFKitDAT(i); }

@@ -126,7 +126,7 @@ private:
 extern "C" {
 DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* i) { if(!i->setAPIVersion(DATCPlusPlusAPIVersion))return;
  i->customOPInfo.opType->setString("Visionclassify"); i->customOPInfo.opLabel->setString("Vision Classify");
- i->customOPInfo.opIcon->setString("VCL"); i->customOPInfo.authorName->setString("TDAppleML");
+ i->customOPInfo.opIcon->setString("VCL"); i->customOPInfo.authorName->setString("SYGNAL Inc.");
  i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=0; }
 DLLEXPORT DAT_CPlusPlusBase* CreateDATInstance(const OP_NodeInfo* i){return new VisionClassifyDAT(i);}
 DLLEXPORT void DestroyDATInstance(DAT_CPlusPlusBase* i){delete static_cast<VisionClassifyDAT*>(i);}

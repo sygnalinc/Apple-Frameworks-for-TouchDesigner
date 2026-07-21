@@ -156,7 +156,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Coremlmotion");
     i->customOPInfo.opLabel->setString("CoreML Motion");
     i->customOPInfo.opIcon->setString("CMO");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs = 1; i->customOPInfo.maxInputs = 1;
 }
 DLLEXPORT CHOP_CPlusPlusBase* CreateCHOPInstance(const OP_NodeInfo* i) { return new CoreMLMotionCHOP(i); }

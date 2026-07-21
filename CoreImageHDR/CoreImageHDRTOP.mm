@@ -129,7 +129,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Coreimagehdr");
     i->customOPInfo.opLabel->setString("CI HDR");
     i->customOPInfo.opIcon->setString("CIH");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs = 0;
     i->customOPInfo.maxInputs = 0;
 }

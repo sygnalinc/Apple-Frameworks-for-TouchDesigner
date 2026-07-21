@@ -397,7 +397,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Soundclass");
     info->customOPInfo.opLabel->setString("Sound Class");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("SND");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;

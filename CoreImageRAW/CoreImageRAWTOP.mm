@@ -143,7 +143,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Coreimageraw");
     i->customOPInfo.opLabel->setString("CI RAW");
     i->customOPInfo.opIcon->setString("CIR");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs = 0;
     i->customOPInfo.maxInputs = 0;
 }

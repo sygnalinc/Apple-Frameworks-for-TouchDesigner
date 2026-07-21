@@ -179,7 +179,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Multipeerin");
     info->customOPInfo.opLabel->setString("Multipeer In");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("MPI");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;

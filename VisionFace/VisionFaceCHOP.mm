@@ -422,7 +422,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Visionface");
     info->customOPInfo.opLabel->setString("Vision Face");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("VFC");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;

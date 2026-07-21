@@ -331,7 +331,7 @@ DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* info)
     info->customOPInfo.opType->setString("Captionauthor");
     info->customOPInfo.opLabel->setString("Caption Author");
     info->customOPInfo.opIcon->setString("CAP");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 1;
 }

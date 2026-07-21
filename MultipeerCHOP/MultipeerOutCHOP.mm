@@ -181,7 +181,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Multipeerout");
     info->customOPInfo.opLabel->setString("Multipeer Out");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("MPO");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;

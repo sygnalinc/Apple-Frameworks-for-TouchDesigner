@@ -348,7 +348,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->executeMode = TOP_ExecuteMode::CPUMem;
     info->customOPInfo.opType->setString("Coremlimagegen");
     info->customOPInfo.opLabel->setString("CoreML ImageGen");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("IMG");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 1;

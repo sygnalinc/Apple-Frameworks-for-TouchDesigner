@@ -463,7 +463,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->executeMode = TOP_ExecuteMode::CPUMem;
     info->customOPInfo.opType->setString("Metalframeinterp");
     info->customOPInfo.opLabel->setString("Metal Frame Interp");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("MFI");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;

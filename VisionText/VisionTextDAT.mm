@@ -323,7 +323,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Visiontext");
     info->customOPInfo.opLabel->setString("Vision Text");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("VTX");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;

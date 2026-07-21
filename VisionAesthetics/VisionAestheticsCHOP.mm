@@ -222,7 +222,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Visionaesthetics");
     info->customOPInfo.opLabel->setString("Vision Aesthetics");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("VAE");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;

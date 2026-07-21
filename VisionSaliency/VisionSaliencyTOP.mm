@@ -434,7 +434,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->executeMode = TOP_ExecuteMode::CPUMem;
     info->customOPInfo.opType->setString("Visionsaliency");
     info->customOPInfo.opLabel->setString("Vision Saliency");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("VSL");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;

@@ -404,7 +404,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->executeMode = TOP_ExecuteMode::CPUMem;
     info->customOPInfo.opType->setString("Metaldenoise");
     info->customOPInfo.opLabel->setString("Metal Denoise");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("MDN");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;

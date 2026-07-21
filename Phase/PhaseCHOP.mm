@@ -181,7 +181,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Phase");
     i->customOPInfo.opLabel->setString("PHASE");
     i->customOPInfo.opIcon->setString("PHS");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs=1; i->customOPInfo.maxInputs=1;
 }
 DLLEXPORT CHOP_CPlusPlusBase* CreateCHOPInstance(const OP_NodeInfo* i) { return new PhaseCHOP(i); }

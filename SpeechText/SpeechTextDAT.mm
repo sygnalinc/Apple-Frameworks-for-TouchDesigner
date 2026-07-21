@@ -295,7 +295,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Speechtext");
     info->customOPInfo.opLabel->setString("Speech Text");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("SPT");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;

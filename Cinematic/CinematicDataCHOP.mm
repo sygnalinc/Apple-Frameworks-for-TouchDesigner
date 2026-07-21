@@ -121,7 +121,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Cinematic");
     i->customOPInfo.opLabel->setString("Cinematic Data");
     i->customOPInfo.opIcon->setString("CND");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs = 0; i->customOPInfo.maxInputs = 0;
 }
 DLLEXPORT CHOP_CPlusPlusBase* CreateCHOPInstance(const OP_NodeInfo* i) { return new CinematicDataCHOP(i); }

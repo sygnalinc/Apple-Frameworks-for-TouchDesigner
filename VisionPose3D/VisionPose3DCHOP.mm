@@ -322,7 +322,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Visionpose3d");
     info->customOPInfo.opLabel->setString("Vision Pose 3D");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("VPD");   // アイコンは英字のみ(数字はTD起動時の検証で弾かれる)
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;

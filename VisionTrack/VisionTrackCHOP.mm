@@ -383,7 +383,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Visiontrack");
     info->customOPInfo.opLabel->setString("Vision Track");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("VTR");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;

@@ -669,7 +669,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->executeMode = TOP_ExecuteMode::CPUMem;
     info->customOPInfo.opType->setString("Coremlsam2");
     info->customOPInfo.opLabel->setString("CoreML SAM2");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("SAM");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;

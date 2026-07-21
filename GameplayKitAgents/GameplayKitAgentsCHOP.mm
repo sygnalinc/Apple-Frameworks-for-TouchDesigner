@@ -152,7 +152,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Gameplaykitagents");
     i->customOPInfo.opLabel->setString("GameKit Agents");
     i->customOPInfo.opIcon->setString("GPA");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=1;
 }
 DLLEXPORT CHOP_CPlusPlusBase* CreateCHOPInstance(const OP_NodeInfo* i) { return new GameplayKitAgentsCHOP(i); }

@@ -601,7 +601,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Textanalyze");
     info->customOPInfo.opLabel->setString("Text Analyze");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("TXA");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 1;

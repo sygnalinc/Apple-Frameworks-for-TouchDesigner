@@ -72,7 +72,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Corewlan");
     i->customOPInfo.opLabel->setString("CoreWLAN");
     i->customOPInfo.opIcon->setString("WIF");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=0;
 }
 DLLEXPORT CHOP_CPlusPlusBase* CreateCHOPInstance(const OP_NodeInfo* i) { return new CoreWLANCHOP(i); }

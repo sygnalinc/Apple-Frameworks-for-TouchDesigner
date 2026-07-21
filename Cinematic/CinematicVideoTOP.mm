@@ -129,7 +129,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Cinematic");
     i->customOPInfo.opLabel->setString("Cinematic Video");
     i->customOPInfo.opIcon->setString("CNV");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs = 0; i->customOPInfo.maxInputs = 0;
 }
 DLLEXPORT TOP_CPlusPlusBase* CreateTOPInstance(const OP_NodeInfo* i, TOP_Context* c) { return new CinematicVideoTOP(i, c); }

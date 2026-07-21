@@ -132,7 +132,7 @@ DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* i) {
     i->customOPInfo.opType->setString("Spotlight");
     i->customOPInfo.opLabel->setString("Spotlight");
     i->customOPInfo.opIcon->setString("SIX");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=0;
 }
 DLLEXPORT DAT_CPlusPlusBase* CreateDATInstance(const OP_NodeInfo* i) { return new SpotlightDAT(i); }

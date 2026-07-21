@@ -125,7 +125,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Colorsync");
     i->customOPInfo.opLabel->setString("ColorSync");
     i->customOPInfo.opIcon->setString("CSY");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs=1; i->customOPInfo.maxInputs=1;
 }
 DLLEXPORT TOP_CPlusPlusBase* CreateTOPInstance(const OP_NodeInfo* i, TOP_Context* c) { return new ColorSyncTOP(i,c); }

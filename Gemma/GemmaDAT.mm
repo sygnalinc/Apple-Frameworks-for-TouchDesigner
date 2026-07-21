@@ -60,6 +60,6 @@ private:
     void* session=nullptr; std::vector<Turn>history; std::string status="idle"; int busy=0,serverRunning=0; std::atomic<int>executes{0}; std::atomic<bool>wantSubmit{false},wantStart{false},wantStop{false},wantCancel{false},wantClear{false};
 };}
 extern "C" {
-DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo*i){if(!i->setAPIVersion(DATCPlusPlusAPIVersion))return;i->customOPInfo.opType->setString("Gemma");i->customOPInfo.opLabel->setString("Gemma");i->customOPInfo.authorName->setString("sygnal");i->customOPInfo.opIcon->setString("GEM");i->customOPInfo.minInputs=0;i->customOPInfo.maxInputs=0;}
+DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo*i){if(!i->setAPIVersion(DATCPlusPlusAPIVersion))return;i->customOPInfo.opType->setString("Gemma");i->customOPInfo.opLabel->setString("Gemma");i->customOPInfo.authorName->setString("SYGNAL Inc.");i->customOPInfo.opIcon->setString("GEM");i->customOPInfo.minInputs=0;i->customOPInfo.maxInputs=0;}
 DLLEXPORT DAT_CPlusPlusBase* CreateDATInstance(const OP_NodeInfo*i){return new GemmaDAT(i);} DLLEXPORT void DestroyDATInstance(DAT_CPlusPlusBase*i){delete(GemmaDAT*)i;}
 }

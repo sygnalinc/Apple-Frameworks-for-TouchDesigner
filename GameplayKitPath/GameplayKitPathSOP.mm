@@ -95,7 +95,7 @@ DLLEXPORT void FillSOPPluginInfo(SOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Gameplaykitpath");
     i->customOPInfo.opLabel->setString("GameKit Path");
     i->customOPInfo.opIcon->setString("GPP");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=1;
 }
 DLLEXPORT SOP_CPlusPlusBase* CreateSOPInstance(const OP_NodeInfo* i) { return new GameplayKitPathSOP(i); }

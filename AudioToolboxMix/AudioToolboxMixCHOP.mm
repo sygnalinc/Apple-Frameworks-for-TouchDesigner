@@ -148,7 +148,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Audiotoolboxmix");
     i->customOPInfo.opLabel->setString("AudioToolbox Mix");
     i->customOPInfo.opIcon->setString("AMX");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs=1; i->customOPInfo.maxInputs=1;
 }
 DLLEXPORT CHOP_CPlusPlusBase* CreateCHOPInstance(const OP_NodeInfo* i) { return new AudioToolboxMixCHOP(i); }

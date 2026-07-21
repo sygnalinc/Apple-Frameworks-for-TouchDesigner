@@ -307,7 +307,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Shortcuts");
     info->customOPInfo.opLabel->setString("Shortcuts");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("SHC");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 1;

@@ -320,7 +320,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->executeMode = TOP_ExecuteMode::CPUMem;
     info->customOPInfo.opType->setString("Visionflow");
     info->customOPInfo.opLabel->setString("Vision Flow");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("VFL");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;

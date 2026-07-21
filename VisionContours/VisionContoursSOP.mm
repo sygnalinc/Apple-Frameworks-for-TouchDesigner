@@ -432,7 +432,7 @@ DLLEXPORT void FillSOPPluginInfo(SOP_PluginInfo* info)
     info->customOPInfo.opType->setString("Visioncontours");
     info->customOPInfo.opLabel->setString("Vision Contours");
     info->customOPInfo.opIcon->setString("VCS");
-    info->customOPInfo.authorName->setString("TDAppleML");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
 }

@@ -800,7 +800,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->executeMode = TOP_ExecuteMode::CPUMem;
     info->customOPInfo.opType->setString("Coreml");
     info->customOPInfo.opLabel->setString("CoreML");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("CML");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;

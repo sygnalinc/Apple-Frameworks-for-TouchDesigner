@@ -160,7 +160,7 @@ DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* i) {
     i->customOPInfo.opType->setString("Createml");
     i->customOPInfo.opLabel->setString("CreateML");
     i->customOPInfo.opIcon->setString("CML");
-    i->customOPInfo.authorName->setString("TDAppleML");
+    i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs = 0; i->customOPInfo.maxInputs = 0;
 }
 DLLEXPORT DAT_CPlusPlusBase* CreateDATInstance(const OP_NodeInfo* i) { return new CreateMLDAT(i); }

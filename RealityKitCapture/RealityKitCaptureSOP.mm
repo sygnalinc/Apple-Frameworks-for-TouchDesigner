@@ -390,7 +390,7 @@ FillSOPPluginInfo(SOP_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Realitykitcapture");
     info->customOPInfo.opLabel->setString("RealityKit Capture");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("RKC");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;

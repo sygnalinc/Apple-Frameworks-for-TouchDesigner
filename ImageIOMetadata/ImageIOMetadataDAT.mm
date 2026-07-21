@@ -279,7 +279,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Imageiometadata");
     info->customOPInfo.opLabel->setString("ImageIO Metadata");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("IMD");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;

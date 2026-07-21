@@ -308,7 +308,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* info)
     info->customOPInfo.opType->setString("Visionanimalpose");
     info->customOPInfo.opLabel->setString("Vision Animal Pose");
     info->customOPInfo.opIcon->setString("VAP");
-    info->customOPInfo.authorName->setString("TDAppleML");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.minInputs = 0; info->customOPInfo.maxInputs = 0;
 }
 DLLEXPORT CHOP_CPlusPlusBase* CreateCHOPInstance(const OP_NodeInfo* info)

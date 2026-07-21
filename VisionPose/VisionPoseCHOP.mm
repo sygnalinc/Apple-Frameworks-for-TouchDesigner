@@ -491,7 +491,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Visionpose");
     info->customOPInfo.opLabel->setString("Vision Pose");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("VPS");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;

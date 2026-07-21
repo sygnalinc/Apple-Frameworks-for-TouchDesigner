@@ -242,7 +242,7 @@ DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* info)
     info->customOPInfo.opType->setString("Spatialvideo");
     info->customOPInfo.opLabel->setString("Spatial Video");
     info->customOPInfo.opIcon->setString("SPV");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
 }

@@ -396,7 +396,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
         return;
     info->customOPInfo.opType->setString("Afmcore");
     info->customOPInfo.opLabel->setString("LLM AFM");
-    info->customOPInfo.authorName->setString("sygnal");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("AFM");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
