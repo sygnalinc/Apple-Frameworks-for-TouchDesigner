@@ -2223,3 +2223,22 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **踏んだ罠**: TD等GUIアプリからの `shortcuts run` CLI は責任プロセスの権限で走り、外部アプリ操作系
   ショートカットは「見つからない」で失敗する。**URLスキーム(open shortcuts://)でShortcuts.appに
   委譲**すれば回避できる(出力は諦める)。listは読み取りのみで権限不要
+
+### 2026-07-22 Shortcuts DAT のUX改善(プルダウン選択 + 常時status表示)
+
+- ユーザー「DATの画面に一覧もstatusも出て分かりづらい。プロパティからプルダウンで選び、画面は
+  常にstatus/情報が出る形に」
+- **Shortcut を動的メニュー(プルダウン)化**: `appendDynamicStringMenu` + `buildDynamicMenu`。
+  **起動時にワーカースレッドで `shortcuts list` を自動取得**してメニューに入れる(21件)。
+  `Refresh List` パルスで再取得。動的メニューは**非空の既定値が必要**(ScreenCaptureの教訓)→
+  `defaultValue="(refresh list)"`
+- **画面(出力テーブル)は常に status/情報**: `status / shortcut / method / output / took_ms /
+  shortcuts(一覧数)`。一覧はテーブルにダンプせずプルダウンへ。旧 `List Shortcuts`(テーブルダンプ)
+  は廃止し `Refresh List`(プルダウン更新)に
+- 状態は myList(プルダウン用)/ myStatus,myLastShortcut,myLastOutput,myLastMethod,myTookMs
+  (常時表示用)に分離。Info CHOP に `shortcuts` 数を追加
+- **実測**: TD再起動後、起動時自動取得で21件がプルダウンに、画面は `status=ready shortcuts=21`。
+  プルダウン選択→Run(App方式)で Music再生を確認(status=launched)。ショートカット自身の挙動
+  (「再生中のアルバムを再生」はMusic停止中だと何もしない)はOP外
+- **踏んだ罠**: `appendDynamicStringMenu` は非空 defaultValue 必須。buildDynamicMenu は
+  `info->name` で対象par判定し `addMenuEntry(value,label)`。一覧はmutex保護のスナップショットを読む

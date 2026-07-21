@@ -5,10 +5,13 @@
 
 ## 使い方
 
-1. **List Shortcuts** をパルス → 利用可能な一覧がテーブルに出る(読み取りのみ・安全)
-2. **Shortcut Name** に一覧の名前を正確に入れて **Run** をパルス
-3. 入力: **Input Text**、または入力DATの cell(0,0) がショートカットの入力になる
-4. 出力テーブル: `status / shortcut / output / took_ms`
+1. **Shortcut** プルダウンから選ぶ(**起動時に一覧を自動取得**。増減したら **Refresh List** で更新)
+2. **Run Method** を選ぶ(下記)
+3. 入力が要るなら **Input Text**、または入力DATの cell(0,0) を接続
+4. **Run** をパルスで実行
+5. **DATの画面は常に status/情報を表示**: `status / shortcut / method / output / took_ms / shortcuts`(一覧数)
+
+一覧はテーブルに"ダンプ"されない(プルダウンに入る)ので、画面は常に現在の状態が見える。
 
 ## Run Method(重要 — ここでハマる)
 
@@ -27,19 +30,21 @@ TD に権限が無いのが原因(macOS の仕様)。
 
 ## 実測(M2・macOS 26.5.1)
 
-- List: ユーザーの実ショートカット21件を一覧取得
+- 起動時に自動でユーザーの実ショートカット21件をプルダウンに取得。画面は常に status を表示
 - Run(App方式): 「今聴いているアルバムの全曲を再生」を実行 → **Music.app が `playing` に**(TDのOPから)
 - CLI方式で同じショートカットを実行すると「見つかりません」エラー(TD権限不足)を確認 → App方式で解決
+- ※ ショートカット自身の挙動には依存する(例「"再生中の"アルバムを再生」はMusicが停止中だと対象が
+  無く何もしない)。OPは launch まで確実に行う
 
 ## パラメータ
 
 | パラメータ | 説明 |
 |---|---|
-| Shortcut Name | 実行するショートカット名(List でコピー) |
+| Shortcut | 実行するショートカット(**プルダウン**。起動時に自動取得) |
 | Input Text | ショートカットへの入力(入力DATがあればその cell(0,0) を優先) |
 | Run Method | app(Shortcuts.app委譲・既定)/ cli(出力を返す) |
 | Run | 実行(パルス) |
-| List Shortcuts | 一覧取得(パルス) |
+| Refresh List | プルダウンの一覧を再取得(パルス) |
 
 ## 注意
 
