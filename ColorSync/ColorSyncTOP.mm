@@ -125,6 +125,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Colorsync");
     i->customOPInfo.opLabel->setString("ColorSync");
     i->customOPInfo.opIcon->setString("CSY");
+    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/ColorSync/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs=1; i->customOPInfo.maxInputs=1;
 }

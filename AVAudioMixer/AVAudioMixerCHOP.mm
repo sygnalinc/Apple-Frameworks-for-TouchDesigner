@@ -177,6 +177,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Avaudiomixer");
     i->customOPInfo.opLabel->setString("AVAudio Mixer");
     i->customOPInfo.opIcon->setString("SPM");
+    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/AVAudioMixer/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs=1; i->customOPInfo.maxInputs=1;
 }

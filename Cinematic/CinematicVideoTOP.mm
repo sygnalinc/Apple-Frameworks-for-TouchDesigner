@@ -129,6 +129,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Cinematic");
     i->customOPInfo.opLabel->setString("Cinematic Video");
     i->customOPInfo.opIcon->setString("CNV");
+    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/Cinematic/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs = 0; i->customOPInfo.maxInputs = 0;
 }

@@ -183,6 +183,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     info->customOPInfo.opLabel->setString("Multipeer Out");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("MPO");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/MultipeerCHOP/README.md");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;
 }

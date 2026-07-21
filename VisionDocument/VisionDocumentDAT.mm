@@ -108,6 +108,7 @@ DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* i) {
     i->customOPInfo.opType->setString("Visiondocument");
     i->customOPInfo.opLabel->setString("Vision Document");
     i->customOPInfo.opIcon->setString("VDC");
+    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/VisionDocument/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs = 0;
     i->customOPInfo.maxInputs = 0;

@@ -156,6 +156,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Coremlmotion");
     i->customOPInfo.opLabel->setString("CoreML Motion");
     i->customOPInfo.opIcon->setString("CMO");
+    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/CoreMLMotion/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs = 1; i->customOPInfo.maxInputs = 1;
 }

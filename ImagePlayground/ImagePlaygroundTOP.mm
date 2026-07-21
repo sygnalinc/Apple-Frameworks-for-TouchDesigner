@@ -226,6 +226,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->customOPInfo.opLabel->setString("ImagePlayground");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("IPG");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/ImagePlayground/README.md");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 1;   // 入力0 = ソース画像(顔)。人物生成に必須
 }

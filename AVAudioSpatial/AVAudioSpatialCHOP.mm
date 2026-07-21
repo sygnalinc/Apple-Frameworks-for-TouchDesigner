@@ -228,6 +228,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Avaudiospatial");
     i->customOPInfo.opLabel->setString("AVAudio Spatial");
     i->customOPInfo.opIcon->setString("SPA");
+    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/AVAudioSpatial/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs = 1; i->customOPInfo.maxInputs = 1;
 }

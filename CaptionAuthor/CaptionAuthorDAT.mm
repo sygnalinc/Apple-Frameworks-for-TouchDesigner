@@ -331,6 +331,7 @@ DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* info)
     info->customOPInfo.opType->setString("Captionauthor");
     info->customOPInfo.opLabel->setString("Caption Author");
     info->customOPInfo.opIcon->setString("CAP");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/CaptionAuthor/README.md");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 1;

@@ -15,7 +15,9 @@
 #import <CoreVideo/CoreVideo.h>
 #import <Vision/Vision.h>
 
+#include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <chrono>
 #include <condition_variable>
 #include <cstring>
@@ -36,6 +38,7 @@ struct FrameResult
     uint32_t width = 0;
     uint32_t height = 0;
     uint64_t serial = 0;
+    bool rgba = false;   // true=RGBA8可視化 / false=RG32Floatの生フロー
 };
 
 class VisionFlowTOP : public TOP_CPlusPlusBase
@@ -68,6 +71,7 @@ public:
         const bool active = inputs->getParInt("Active") != 0;
         myFlip = inputs->getParInt("Flip") != 0;
         myUV = strcmp(inputs->getParString("Units"), "uv") == 0;
+        myVisualize = strcmp(inputs->getParString("Output"), "visualize") == 0;
         const char* a = inputs->getParString("Accuracy");
         myAccuracy = (strcmp(a, "veryhigh") == 0) ? 3
                    : (strcmp(a, "high") == 0)     ? 2
@@ -104,7 +108,8 @@ public:
         info.textureDesc.texDim = OP_TexDim::e2D;
         info.textureDesc.width = frame.width;
         info.textureDesc.height = frame.height;
-        info.textureDesc.pixelFormat = OP_PixelFormat::RG32Float;
+        info.textureDesc.pixelFormat =
+            frame.rgba ? OP_PixelFormat::RGBA8Fixed : OP_PixelFormat::RG32Float;
         OP_SmartRef<TOP_Buffer> buf =
             myContext->createOutputBuffer(frame.data.size(), TOP_BufferFlags::None, nullptr);
         if (!buf)
@@ -130,6 +135,17 @@ public:
             const char* names[] = {"low", "medium", "high", "veryhigh"};
             const char* labels[] = {"Low (Fast)", "Medium", "High", "Very High (Slow)"};
             manager->appendMenu(p, 4, names, labels);
+        }
+        {
+            // 出力: flow=生ベクトル(RG32Float・下流で使う用) / visualize=色で可視化(RGBA8・
+            // 向き=色相・速さ=明るさ。増幅ノード無しでそのまま見える)
+            OP_StringParameter p("Output");
+            p.label = "Output";
+            p.page = "Vision Flow";
+            p.defaultValue = "flow";
+            const char* names[] = {"flow", "visualize"};
+            const char* labels[] = {"Flow Vectors (RG32Float)", "Visualize (Color)"};
+            manager->appendMenu(p, 2, names, labels);
         }
         {
             OP_StringParameter p("Units");
@@ -167,7 +183,7 @@ private:
         while (true) {
             OP_SmartRef<OP_TOPDownloadResult> download;
             int accuracy;
-            bool uv;
+            bool uv, visualize;
             {
                 std::unique_lock<std::mutex> lock(myMutex);
                 myCond.wait(lock, [this] { return myQuit || myHasPending; });
@@ -178,10 +194,11 @@ private:
                 myBusy = true;
                 accuracy = myAccuracy;
                 uv = myUV;
+                visualize = myVisualize;
             }
             FrameResult result;
             const auto t0 = std::chrono::steady_clock::now();
-            analyze(download, accuracy, uv, result);
+            analyze(download, accuracy, uv, visualize, result);
             myAnalyzeMs = std::chrono::duration<float, std::milli>(
                               std::chrono::steady_clock::now() - t0).count();
             myAnalyzeCount++;
@@ -197,7 +214,7 @@ private:
     }
 
     void analyze(OP_SmartRef<OP_TOPDownloadResult>& download, int accuracy, bool uv,
-                 FrameResult& out)
+                 bool visualize, FrameResult& out)
     {
         if (!download)
             return;
@@ -236,7 +253,7 @@ private:
                     if ([handler performRequests:@[request] error:nil]) {
                         VNPixelBufferObservation* obs = request.results.firstObject;
                         if (obs)
-                            copyFlow(obs.pixelBuffer, uv, out);
+                            copyFlow(obs.pixelBuffer, uv, visualize, out);
                     }
                 }
                 if (cur)
@@ -251,9 +268,31 @@ private:
         }
     }
 
-    // Vision のフロー(top-down)を TD 向けに行反転してコピー。UV モードでは正規化し
-    // dy の符号を反転(TD の v は上向き)
-    static void copyFlow(CVPixelBufferRef flow, bool uv, FrameResult& out)
+    // HSV(h,s,v ∈ 0..1)→ RGB 8bit
+    static void hsv2rgb(float h, float s, float v, uint8_t& r, uint8_t& g, uint8_t& b)
+    {
+        h = h - (float)floor(h);
+        const int i = (int)(h * 6.0f) % 6;
+        const float f = h * 6.0f - (float)((int)(h * 6.0f));
+        const float p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+        float rf, gf, bf;
+        switch (i) {
+            case 0: rf = v; gf = t; bf = p; break;
+            case 1: rf = q; gf = v; bf = p; break;
+            case 2: rf = p; gf = v; bf = t; break;
+            case 3: rf = p; gf = q; bf = v; break;
+            case 4: rf = t; gf = p; bf = v; break;
+            default: rf = v; gf = p; bf = q; break;
+        }
+        r = (uint8_t)std::clamp(rf * 255.0f, 0.0f, 255.0f);
+        g = (uint8_t)std::clamp(gf * 255.0f, 0.0f, 255.0f);
+        b = (uint8_t)std::clamp(bf * 255.0f, 0.0f, 255.0f);
+    }
+
+    // Vision のフロー(top-down)を TD 向けに行反転してコピー。
+    // visualize=false: 生ベクトル RG32Float(UVモードは正規化・dy符号反転で +v 上向き)
+    // visualize=true : RGBA8 で色可視化(向き=色相・速さ=明るさ・フレーム最大で自動スケール)
+    static void copyFlow(CVPixelBufferRef flow, bool uv, bool visualize, FrameResult& out)
     {
         if (!flow)
             return;
@@ -265,16 +304,51 @@ private:
         if (src && fw && fh) {
             out.width = fw;
             out.height = fh;
-            out.data.resize((size_t)fw * fh * 2 * sizeof(float));
-            float* dst = (float*)out.data.data();
-            const float su = uv ? 1.0f / (float)fw : 1.0f;
-            const float sv = uv ? -1.0f / (float)fh : 1.0f;
-            for (uint32_t y = 0; y < fh; y++) {
-                const float* row = (const float*)(src + (size_t)y * stride);
-                float* drow = dst + (size_t)(fh - 1 - y) * fw * 2;
-                for (uint32_t x = 0; x < fw; x++) {
-                    drow[x * 2 + 0] = row[x * 2 + 0] * su;
-                    drow[x * 2 + 1] = row[x * 2 + 1] * sv;
+            out.rgba = visualize;
+            if (!visualize) {
+                out.data.resize((size_t)fw * fh * 2 * sizeof(float));
+                float* dst = (float*)out.data.data();
+                const float su = uv ? 1.0f / (float)fw : 1.0f;
+                const float sv = uv ? -1.0f / (float)fh : 1.0f;
+                for (uint32_t y = 0; y < fh; y++) {
+                    const float* row = (const float*)(src + (size_t)y * stride);
+                    float* drow = dst + (size_t)(fh - 1 - y) * fw * 2;
+                    for (uint32_t x = 0; x < fw; x++) {
+                        drow[x * 2 + 0] = row[x * 2 + 0] * su;
+                        drow[x * 2 + 1] = row[x * 2 + 1] * sv;
+                    }
+                }
+            } else {
+                // フレーム最大の動き量でスケール(常に見える)
+                float maxMag = 0.0f;
+                for (uint32_t y = 0; y < fh; y++) {
+                    const float* row = (const float*)(src + (size_t)y * stride);
+                    for (uint32_t x = 0; x < fw; x++) {
+                        const float dx = row[x * 2], dy = row[x * 2 + 1];
+                        const float m = sqrtf(dx * dx + dy * dy);
+                        if (m > maxMag)
+                            maxMag = m;
+                    }
+                }
+                const float norm = std::max(maxMag * 0.5f, 1.0f);
+                out.data.resize((size_t)fw * fh * 4);
+                uint8_t* dst = out.data.data();
+                for (uint32_t y = 0; y < fh; y++) {
+                    const float* row = (const float*)(src + (size_t)y * stride);
+                    uint8_t* drow = dst + (size_t)(fh - 1 - y) * fw * 4;
+                    for (uint32_t x = 0; x < fw; x++) {
+                        const float dx = row[x * 2], dy = row[x * 2 + 1];
+                        const float mag = sqrtf(dx * dx + dy * dy);
+                        float ang = atan2f(dy, dx) / (2.0f * (float)M_PI);
+                        if (ang < 0) ang += 1.0f;
+                        const float v = std::min(1.0f, mag / norm);
+                        uint8_t r, g, b;
+                        hsv2rgb(ang, 1.0f, v, r, g, b);
+                        drow[x * 4 + 0] = r;
+                        drow[x * 4 + 1] = g;
+                        drow[x * 4 + 2] = b;
+                        drow[x * 4 + 3] = 255;
+                    }
                 }
             }
         }
@@ -296,7 +370,7 @@ private:
     uint64_t myUploadedSerial = 0;
     int64_t myLastCookSeen = -1;
     int myAccuracy = 1;
-    std::atomic<bool> myFlip{true}, myUV{true};
+    std::atomic<bool> myFlip{true}, myUV{true}, myVisualize{false};
 
     // ワーカー専用(前フレーム保持)
     std::vector<uint8_t> myPrev;
@@ -322,6 +396,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->customOPInfo.opLabel->setString("Vision Flow");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("VFL");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/VisionFlow/README.md");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;
 }

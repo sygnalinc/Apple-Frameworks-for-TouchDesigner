@@ -242,6 +242,7 @@ DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* info)
     info->customOPInfo.opType->setString("Spatialvideo");
     info->customOPInfo.opLabel->setString("Spatial Video");
     info->customOPInfo.opIcon->setString("SPV");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/SpatialVideo/README.md");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;

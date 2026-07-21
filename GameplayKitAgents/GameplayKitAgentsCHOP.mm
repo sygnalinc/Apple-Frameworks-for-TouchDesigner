@@ -152,6 +152,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Gameplaykitagents");
     i->customOPInfo.opLabel->setString("GameKit Agents");
     i->customOPInfo.opIcon->setString("GPA");
+    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/GameplayKitAgents/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=1;
 }

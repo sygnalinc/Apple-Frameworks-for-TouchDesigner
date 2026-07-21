@@ -264,6 +264,7 @@ DLLEXPORT void FillSOPPluginInfo(SOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Imageiopointcloud");
     i->customOPInfo.opLabel->setString("ImageIO PointCloud");
     i->customOPInfo.opIcon->setString("IPC");
+    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/ImageIOPointCloud/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs = 0;
     i->customOPInfo.maxInputs = 0;

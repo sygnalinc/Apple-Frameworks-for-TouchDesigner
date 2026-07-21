@@ -224,6 +224,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     info->customOPInfo.opLabel->setString("Vision Aesthetics");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("VAE");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/VisionAesthetics/README.md");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
 }

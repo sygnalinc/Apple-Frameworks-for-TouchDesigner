@@ -281,6 +281,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     info->customOPInfo.opLabel->setString("ImageIO Metadata");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("IMD");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/ImageIOMetadata/README.md");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
 }

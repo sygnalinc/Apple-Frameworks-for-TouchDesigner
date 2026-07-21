@@ -95,6 +95,7 @@ DLLEXPORT void FillSOPPluginInfo(SOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Gameplaykitpath");
     i->customOPInfo.opLabel->setString("GameKit Path");
     i->customOPInfo.opIcon->setString("GPP");
+    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/GameplayKitPath/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=1;
 }

@@ -406,6 +406,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->customOPInfo.opLabel->setString("Metal Denoise");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("MDN");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/MetalDenoise/README.md");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;
 }

@@ -465,6 +465,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->customOPInfo.opLabel->setString("Metal Frame Interp");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("MFI");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/MetalFrameInterp/README.md");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;
 }

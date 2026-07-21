@@ -671,6 +671,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->customOPInfo.opLabel->setString("CoreML SAM2");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("SAM");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/CoreMLSAM2/README.md");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;
 }
