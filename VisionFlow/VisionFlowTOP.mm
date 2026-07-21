@@ -142,7 +142,7 @@ public:
             OP_StringParameter p("Output");
             p.label = "Output";
             p.page = "Vision Flow";
-            p.defaultValue = "flow";
+            p.defaultValue = "visualize";   // 既定は色可視化(そのまま動きが見える)
             const char* names[] = {"flow", "visualize"};
             const char* labels[] = {"Flow Vectors (RG32Float)", "Visualize (Color)"};
             manager->appendMenu(p, 2, names, labels);

@@ -26,7 +26,7 @@ RG32Float の2チャンネルテクスチャ。R=dx, G=dy(前フレーム→現�
 |---|---|
 | Active | 解析の実行 On/Off |
 | Accuracy | Low / Medium(既定)/ High / Very High。高精度ほど遅い |
-| **Output** | **Flow Vectors(RG32Float・既定・下流で使う用) / Visualize(RGBA8・色で可視化)** |
+| **Output** | **Visualize(RGBA8・色で可視化・既定) / Flow Vectors(RG32Float・下流で使う用)** |
 | Output Units | UV / Pixels(Flow時のみ意味を持つ) |
 | Flip Image Vertically | 入力の上下反転(既定On・必須) |
 
