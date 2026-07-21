@@ -2162,3 +2162,22 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   強制終了(`pkill -9`)→再起動で2回目はキャッシュで通常起動(CLAUDE.md既知挙動どおり)
 - README(smb列・実測注記・パラメータ)+ルート英日更新。これで LanScan Pro の全列(IP/MAC/
   Hostname/Vendor/DNS/mDNS/SMB Name/SMB Domain)に対応
+
+### 2026-07-22 WiFi SSID取得の検証: CoreLocation組み込みでも取れない(結論)
+
+- ユーザー「CoreWLANプラグインに位置情報リクエストを組み込んでSSID取得を試す」。CoreLocationの
+  許可リクエストを実装し、プラグインと同じ処理を単体アプリで段階検証した結果、**macOS 26.5.1では
+  SSIDは取れない**と判明。コードは追加せず結論をREADME/本ログに記録
+- **実測(スタンドアロン)**:
+  - 裸のCLI(Info.plist用途文字列なし)= 許可プロンプトすら出ず notDetermined 固定 → ssid=nil
+  - 正しい.app + `NSLocationWhenInUseUsageDescription` = **authorizedAlways取得してもssid=nil**
+  - + 実位置フィックス(実座標35.33,139.49が返る) = **ssid=nil**
+  - + フル精度認可(`requestTemporaryFullAccuracyAuthorization`) = **ssid=nil**
+  - `ipconfig getsummary en0`=`SSID : <redacted>`、`system_profiler`=`<redacted>`(システムレベルで伏せ)
+- **結論**: macOS 26 は SSID を Location権限＋正規署名(ad-hoc不可)の両方でゲート。教科書通りの
+  完全条件でも第三者アプリからは返らない
+- **TDプラグイン固有の決定的な壁**: 責任プロセス TouchDesigner.app の Info.plist に `NSLocation*`
+  用途文字列が無い → プラグインから `requestWhenInUseAuthorization()` を呼んでもサイレント無反応
+  (プロンプト出ない=SFSpeechRecognizerで踏んだTCCの壁と同構造)。`.plugin`単体でplistキーを足せず、
+  TD.appのplist改変は署名を壊す。よって**位置情報リクエストの組み込みは断念**(常にnilの動かない
+  トグルになるため)。数値(RSSI/SNR/channel/rate/PHY)は現状CoreWLANプラグインで問題なく取れる
