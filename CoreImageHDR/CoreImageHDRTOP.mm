@@ -126,7 +126,7 @@ extern "C" {
 DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     if (!i->setAPIVersion(TOPCPlusPlusAPIVersion)) return;
     i->executeMode = TOP_ExecuteMode::CPUMem;
-    i->customOPInfo.opType->setString("Coreimagehdr");
+    i->customOPInfo.opType->setString("Cihdr");
     i->customOPInfo.opLabel->setString("CI HDR");
     i->customOPInfo.opIcon->setString("CIH");
     if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/CoreImageHDR/README.md");

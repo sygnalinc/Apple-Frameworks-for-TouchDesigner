@@ -140,7 +140,7 @@ extern "C" {
 DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     if (!i->setAPIVersion(TOPCPlusPlusAPIVersion)) return;
     i->executeMode = TOP_ExecuteMode::CPUMem;
-    i->customOPInfo.opType->setString("Coreimageraw");
+    i->customOPInfo.opType->setString("Ciraw");
     i->customOPInfo.opLabel->setString("CI RAW");
     i->customOPInfo.opIcon->setString("CIR");
     if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/CoreImageRAW/README.md");

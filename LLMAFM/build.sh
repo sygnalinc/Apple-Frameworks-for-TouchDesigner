@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")"
 
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
-NAME=AFMCoreDAT
+NAME=LLMAFMDAT
 DYLIB="libFMHelper_$(date +%s).dylib"
 OUT="build/$NAME.plugin/Contents"
 rm -rf build
@@ -22,7 +22,7 @@ swiftc -O -emit-library -module-name FMHelper \
 # ② プラグイン本体
 clang++ -std=c++17 -fobjc-arc -O2 -bundle \
   -I "$SDK" \
-  AFMCoreDAT.mm \
+  LLMAFMDAT.mm \
   -framework Foundation \
   "$OUT/Frameworks/$DYLIB" \
   -Xlinker -rpath -Xlinker @loader_path/../Frameworks \
@@ -33,9 +33,9 @@ cat > "$OUT/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleExecutable</key><string>AFMCoreDAT</string>
-    <key>CFBundleIdentifier</key><string>tokyo.sygnal.afmcore-dat</string>
-    <key>CFBundleName</key><string>AFMCoreDAT</string>
+    <key>CFBundleExecutable</key><string>LLMAFMDAT</string>
+    <key>CFBundleIdentifier</key><string>tokyo.sygnal.llmafm-dat</string>
+    <key>CFBundleName</key><string>LLMAFMDAT</string>
     <key>CFBundlePackageType</key><string>BNDL</string>
     <key>CFBundleVersion</key><string>0.1.0</string>
 </dict>

@@ -645,11 +645,11 @@ FillDATPluginInfo(DAT_PluginInfo* info)
 {
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
-    info->customOPInfo.opType->setString("Mlxllm");
+    info->customOPInfo.opType->setString("Llmmlx");
     info->customOPInfo.opLabel->setString("LLM MLX");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.opIcon->setString("MLX");
-    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/MLXLLM/README.md");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/LLMMLX/README.md");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
 }

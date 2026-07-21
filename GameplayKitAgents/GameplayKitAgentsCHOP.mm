@@ -149,7 +149,7 @@ private:
 extern "C" {
 DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     if (!i->setAPIVersion(CHOPCPlusPlusAPIVersion)) return;
-    i->customOPInfo.opType->setString("Gameplaykitagents");
+    i->customOPInfo.opType->setString("Gamekitagents");
     i->customOPInfo.opLabel->setString("GameKit Agents");
     i->customOPInfo.opIcon->setString("GPA");
     if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/GameplayKitAgents/README.md");

@@ -12,7 +12,7 @@ set -e
 cd "$(dirname "$0")"
 
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
-NAME=MLXLLMDAT
+NAME=LLMMLXDAT
 OUT="build/$NAME.plugin/Contents"
 PRODUCTS="helper/.xcbuild/Build/Products/Release"
 
@@ -47,7 +47,7 @@ fi
 # ② プラグイン本体（DAT）
 clang++ -std=c++17 -fobjc-arc -O2 -bundle \
   -I "$SDK" \
-  MLXLLMDAT.mm \
+  LLMMLXDAT.mm \
   -framework Foundation -framework CoreGraphics -framework ImageIO \
   -o "$OUT/MacOS/$NAME"
 
@@ -56,9 +56,9 @@ cat > "$OUT/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleExecutable</key><string>MLXLLMDAT</string>
-    <key>CFBundleIdentifier</key><string>tokyo.sygnal.mlxllm-dat</string>
-    <key>CFBundleName</key><string>MLXLLMDAT</string>
+    <key>CFBundleExecutable</key><string>LLMMLXDAT</string>
+    <key>CFBundleIdentifier</key><string>tokyo.sygnal.llmmlx-dat</string>
+    <key>CFBundleName</key><string>LLMMLXDAT</string>
     <key>CFBundlePackageType</key><string>BNDL</string>
     <key>CFBundleVersion</key><string>0.1.0</string>
 </dict>

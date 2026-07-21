@@ -118,7 +118,7 @@ private:
 extern "C" {
 DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     if (!i->setAPIVersion(CHOPCPlusPlusAPIVersion)) return;
-    i->customOPInfo.opType->setString("Cinematic");
+    i->customOPInfo.opType->setString("Cinematicdata");
     i->customOPInfo.opLabel->setString("Cinematic Data");
     i->customOPInfo.opIcon->setString("CND");
     if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/Cinematic/README.md");

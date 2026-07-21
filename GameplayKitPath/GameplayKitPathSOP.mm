@@ -92,7 +92,7 @@ private:
 extern "C" {
 DLLEXPORT void FillSOPPluginInfo(SOP_PluginInfo* i) {
     if (!i->setAPIVersion(SOPCPlusPlusAPIVersion)) return;
-    i->customOPInfo.opType->setString("Gameplaykitpath");
+    i->customOPInfo.opType->setString("Gamekitpath");
     i->customOPInfo.opLabel->setString("GameKit Path");
     i->customOPInfo.opIcon->setString("GPP");
     if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/GameplayKitPath/README.md");
