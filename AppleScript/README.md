@@ -25,6 +25,24 @@ Shortcuts DAT より**自由度が高く結果も返る**のが特徴(Shortcuts�
 | applescript | `tell application "Finder" to return name of home` | `murata` |
 | applescript | `tell application "Music" to play` | (再生開始) |
 | applescript | `tell application "Music" to return name of current track` | 曲名 |
+| applescript | `do shell script "open '/path/to/MyWorkflow.app'"` | Automator製 .app を起動 |
+| applescript | `do shell script "automator '/path/to/foo.workflow'"` | Automator の .workflow を実行 |
+
+## Automator の .app / .workflow を実行する
+
+専用OPは不要。この AppleScript DAT からそのまま叩ける:
+
+- **Automator で「アプリケーション」として書き出した .app**: 普通のアプリバンドルなので起動するだけ。
+  - `do shell script "open '/Users/you/MyWorkflow.app'"`
+  - または `tell application "/Users/you/MyWorkflow.app" to activate`
+- **Automator の .workflow ファイル(文書)**: `/usr/bin/automator` に渡す。
+  - `do shell script "automator '/Users/you/foo.workflow'"`
+  - 入力を渡すなら `automator -i <input> foo.workflow`(automator の仕様に従う)
+
+補足: Apple の `NSUserAutomatorTask` API は `.workflow` 専用かつ
+`~/Library/Application Scripts/<bundle id>/` 配下に置いたものしか実行できない制約があるため、
+TD からは上記の `do shell script "automator ..."` 経由が扱いやすい。`.app` は `NSUserAutomatorTask`
+の対象外(普通のアプリなので `open` で起動する)。
 
 ## 実測(M2・macOS 26.5.1)
 
