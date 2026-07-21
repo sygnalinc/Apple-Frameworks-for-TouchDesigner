@@ -321,6 +321,49 @@ static bool autoSubnet(uint32_t& net, uint32_t& mask, uint32_t& self)
     return found;
 }
 
+// 自機の en* IPv4 アドレス一覧(ip4 / mac / hostname)。「自分のIP」を必ず表に出すため。
+static std::vector<ScanHost> localIPv4s()
+{
+    std::vector<ScanHost> out;
+    struct ifaddrs* ifap = nullptr;
+    if (getifaddrs(&ifap) != 0)
+        return out;
+    // まず AF_LINK から interface 名→MAC を集める
+    std::map<std::string, std::string> macByIf;
+    for (struct ifaddrs* ifa = ifap; ifa; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_LINK) {
+            struct sockaddr_dl* sdl = (struct sockaddr_dl*)ifa->ifa_addr;
+            if (sdl->sdl_alen == 6 && ifa->ifa_name) {
+                const unsigned char* m = (const unsigned char*)LLADDR(sdl);
+                char mac[18];
+                snprintf(mac, sizeof(mac), "%02x:%02x:%02x:%02x:%02x:%02x",
+                         m[0], m[1], m[2], m[3], m[4], m[5]);
+                macByIf[ifa->ifa_name] = mac;
+            }
+        }
+    }
+    char hn[256] = {0};
+    std::string host = (gethostname(hn, sizeof(hn)) == 0) ? hn : "";
+    for (struct ifaddrs* ifa = ifap; ifa; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET)
+            continue;
+        if (!(ifa->ifa_flags & IFF_UP) || (ifa->ifa_flags & IFF_LOOPBACK))
+            continue;
+        std::string nm = ifa->ifa_name ? ifa->ifa_name : "";
+        if (nm.rfind("en", 0) != 0)
+            continue;
+        char buf[INET_ADDRSTRLEN] = {0};
+        inet_ntop(AF_INET, &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr, buf, sizeof(buf));
+        ScanHost h;
+        h.ip4 = buf;
+        h.mac = macByIf.count(nm) ? macByIf[nm] : "";
+        h.hostname = host;
+        out.push_back(std::move(h));
+    }
+    freeifaddrs(ifap);
+    return out;
+}
+
 // "a.b.c.d/nn" を net/mask/self に。self は不明なので 0。失敗で false。
 static bool parseCidr(const std::string& s, uint32_t& net, uint32_t& mask, uint32_t& self)
 {
@@ -618,6 +661,30 @@ public:
                     r.mac = h.mac;
                     r.host = h.hostname;
                     r.source = "arp";
+                    int idx = (int)rows.size();
+                    ipToRows.insert({r.ip4, idx});
+                    rows.push_back(std::move(r));
+                }
+            }
+
+            // 自機のIP/MACを必ず表示(Bonjour/ARPで既に出ていれば source に "self" を足す)
+            for (ScanHost& h : localIPv4s()) {
+                auto range = ipToRows.equal_range(h.ip4);
+                if (range.first != range.second) {
+                    for (auto it = range.first; it != range.second; ++it) {
+                        Row& r = rows[it->second];
+                        if (r.mac.empty()) r.mac = h.mac;
+                        if (r.host.empty()) r.host = h.hostname;
+                        if (r.source.find("self") == std::string::npos) r.source += "+self";
+                    }
+                } else {
+                    Row r;
+                    r.ip4 = h.ip4;
+                    r.mac = h.mac;
+                    r.host = h.hostname;
+                    r.source = "self";
+                    int idx = (int)rows.size();
+                    ipToRows.insert({r.ip4, idx});
                     rows.push_back(std::move(r));
                 }
             }

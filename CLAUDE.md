@@ -2108,3 +2108,11 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   Scan Timeout / Max Hosts / Reverse DNS / Restart Bonjour。**Max Hosts で大サブネット暴走を防止**
 - 注意: ARP非応答機器・別VLAN・FW越し・スリープ端末は見えない。IPv6全域は不可。DHCPリース一覧APIは無い。
   MACベンダー(OUI)名は未対応(将来候補)。README(新規節+ルート英日)更新。バンドル再ビルド・インストール済み
+
+### 2026-07-22 Network Discovery に自機IP表示を追加
+
+- ユーザー「自分のIPアドレスもわかるように」。自機はBonjour広告(_raop等)がある時しか表に出ず、
+  無ければ全く出なかった。`getifaddrs` で自機の en* IPv4 + MAC(AF_LINKのsockaddr_dl)+ `gethostname`
+  を取得し、**Mode に関わらず必ず self 行を注入**(既存のBonjour/ARP行と一致すれば source に "self" を足す)
+- 実測(M2・TD): 自機 192.168.49.16 が **`source=bonjour+arp+self`** でMAC/ホスト名付きで表示。
+  スタンドアロンで en0 の ip/mac/host 取得も確認。バンドル再ビルド・インストール済み

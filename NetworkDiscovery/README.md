@@ -41,7 +41,10 @@ mac / port / txt / source` をテーブル出力する。会場機器の一覧�
 | mac | MACアドレス(Active Scan由来) |
 | port | ポート番号(Bonjour由来) |
 | txt | TXTレコード(`key=value; ...`) |
-| source | `bonjour` / `arp` / `bonjour+arp` |
+| source | `bonjour` / `arp` / `self`(自機)/ 組合せ `bonjour+arp+self` など |
+
+**自機(このMac)の IP/MAC/ホスト名は Mode に関わらず必ず行として出す**(`source` に `self` が付く)。
+Bonjour/ARPで既に出ている場合はその行に統合される(例 `bonjour+arp+self`)。複数の en* を持つ場合は各IPを出す。
 
 行は ip4 昇順にソート。Info CHOP: `executes / services / scan_hosts / rows / scanning`
 
