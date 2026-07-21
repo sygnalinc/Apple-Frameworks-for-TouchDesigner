@@ -1,7 +1,48 @@
 {
   "_note": "TDAppleOps custom op catalog. Generated from .mm sources (best-effort). Use 'create' with parent().create('<create>', name) or MCP create. Param defaults/menus are source-derived; for exact live schema, introspect op.pars() in TD.",
-  "_count": 78,
+  "_count": 79,
   "ops": {
+    "ApplescriptDAT": {
+      "create": "ApplescriptDAT",
+      "opType": "Applescript",
+      "label": "AppleScript",
+      "family": "DAT",
+      "icon": "ASC",
+      "minInputs": 0,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "AppleScript",
+      "readme": "AppleScript/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/AppleScript/README.md",
+      "params": [
+        {
+          "name": "Language",
+          "type": "menu",
+          "default": "applescript",
+          "menu": [
+            "applescript",
+            "javascript"
+          ]
+        },
+        {
+          "name": "Script",
+          "type": "string"
+        },
+        {
+          "name": "Run",
+          "type": "pulse"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "runs",
+        "running"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/AppleScript",
+      "source": "AppleScript/AppleScriptDAT.mm"
+    },
     "AudiotoolboxmixCHOP": {
       "create": "AudiotoolboxmixCHOP",
       "opType": "Audiotoolboxmix",
@@ -3001,30 +3042,37 @@
       "params": [
         {
           "name": "Shortcutname",
-          "type": "string",
-          "page": "Shortcuts"
+          "type": "dynamicstringmenu",
+          "default": "(refresh list)"
         },
         {
           "name": "Inputtext",
-          "type": "string",
-          "page": "Shortcuts"
+          "type": "string"
+        },
+        {
+          "name": "Method",
+          "type": "menu",
+          "default": "app",
+          "menu": [
+            "app",
+            "cli"
+          ]
         },
         {
           "name": "Run",
-          "type": "pulse",
-          "page": "Shortcuts"
+          "type": "pulse"
         },
         {
-          "name": "Listshortcuts",
-          "type": "pulse",
-          "page": "Shortcuts"
+          "name": "Refreshlist",
+          "type": "pulse"
         }
       ],
       "topParams": [],
       "infoChop": [
         "executes",
         "runs",
-        "running"
+        "running",
+        "shortcuts"
       ],
       "statusDat": false,
       "example": "/project1/examples/Shortcuts",

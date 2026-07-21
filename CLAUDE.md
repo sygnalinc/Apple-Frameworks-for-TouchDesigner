@@ -2242,3 +2242,21 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   (「再生中のアルバムを再生」はMusic停止中だと何もしない)はOP外
 - **踏んだ罠**: `appendDynamicStringMenu` は非空 defaultValue 必須。buildDynamicMenu は
   `info->name` で対象par判定し `addMenuEntry(value,label)`。一覧はmutex保護のスナップショットを読む
+
+### 2026-07-22 AppleScript DAT 実装(汎用オートメーション・osascript)
+
+- ユーザー要望「AppleScript実行DAT」。Shortcuts DATの権限問題(TD権限で外部アプリ制御が失敗)の
+  流れで、AppleScript/JXAを実行して結果も返す汎用オートメーションOPを実装
+- **AppleScript DAT**(opType `Applescript`・icon ASC): `osascript` をワーカースレッドで実行
+  (スクリプトは stdin へ流す)。Language=applescript/javascript(JXA)。スクリプトは**入力DAT優先**
+  (全セルを改行連結・複数行に最適)、なければ Script パラメータ。画面は常に
+  `status / result / error / took_ms / language` を表示(Shortcuts DATと同じUX)
+- **実測(M2・macOS26.5.1)全部OP経由で成功**: `(10+5)*2`→30、JXA `6*7`→42、
+  `system version`→26.5.1、`Finder home name`→murata、構文エラー→status=error+error列に理由(落ちない)、
+  **`tell application "Music" to play`→playing**(TD権限で外部アプリ制御が成功・結果も取れる)
+- **Shortcutsとの違い**: Shortcuts CLI方式は外部アプリ操作が「見つかりません」で失敗したが、
+  AppleScript は**正規の Automation TCC 許可フロー**に乗る。初回に「TouchDesignerが<アプリ>を制御
+  しようとしています」ダイアログ→許可すればTDから直接アプリ制御でき結果も返る。Shortcutsより自由度高い
+- sample.toe `/project1/applescript_demo`(system info実行+手順note)追加。README(新規+ルート英日)更新
+- **踏んだ罠**: osascript は stdin からスクリプトを読める(`echo '...' | osascript`)。-l で言語指定。
+  他アプリ制御は Automation権限(TCC)必須で、責任プロセスはTD本体(初回ダイアログで許可が要る)

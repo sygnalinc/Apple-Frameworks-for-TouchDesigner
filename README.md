@@ -154,6 +154,7 @@ grouped by category.
 | [Multipeer In / Out](MultipeerDAT/) | DAT | **Local P2P text** between Mac / iPhone (auto-connect, no server) |
 | [Game Controller](GameController/) | CHOP | PS5 / Xbox / MFi **gamepad input** (sticks / triggers + motion + rumble) |
 | [Shortcuts](Shortcuts/) | DAT | **Run macOS Shortcuts** (HomeKit lights / appliances / notifications from TD events) |
+| [AppleScript](AppleScript/) | DAT | **Run AppleScript / JavaScript (JXA) from TD** (osascript). Control other apps (Music/Finder/…), get system info, automate workflows — **returns the result text too**. App control needs Automation permission |
 | [GameplayKit Agents](GameplayKitAgents/) | CHOP | **Crowd / flocking simulation** (GameplayKit GKAgent) — seek / separate / align / cohere / avoid / wander |
 | [GameplayKit Path](GameplayKitPath/) | SOP | **Obstacle-avoiding shortest path** (GameplayKit GKObstacleGraph) → polyline |
 | [PDFKit](PDFKit/) | TOP | **PDFKit** — render a page to a texture; structure (metadata / outline / text / annotations) on its **Info DAT** |

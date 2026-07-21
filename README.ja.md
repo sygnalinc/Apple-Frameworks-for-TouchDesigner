@@ -152,6 +152,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Multipeer In / Out](MultipeerDAT/) | DAT | Mac/iPhone 間の**ローカルP2Pテキスト**(自動接続・サーバー不要) |
 | [Game Controller](GameController/) | CHOP | PS5/Xbox/MFi **ゲームパッド入力**(スティック/トリガー+モーション+ランブル) |
 | [Shortcuts](Shortcuts/) | DAT | **macOSショートカット実行**(HomeKit照明・家電・通知を TD イベントから) |
+| [AppleScript](AppleScript/) | DAT | **AppleScript / JavaScript(JXA)をTDから実行**(osascript)。他アプリ制御(Music/Finder等)・システム情報取得・自動化。**結果テキストも返る**。アプリ制御はAutomation権限が要る |
 | [GameplayKit Agents](GameplayKitAgents/) | CHOP | **群集/フロッキング**(GameplayKit GKAgent)— seek/separate/align/cohere/avoid/wander |
 | [GameplayKit Path](GameplayKitPath/) | SOP | **障害物回避の最短経路**(GameplayKit GKObstacleGraph)→ポリライン |
 | [PDFKit](PDFKit/) | TOP | **PDFKit** — ページをテクスチャ描画。構造(メタ/アウトライン/テキスト/注釈)は**Info DAT**で出力 |
