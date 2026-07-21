@@ -161,6 +161,10 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
 - 実測値(fps・生成秒数・解像度)は必ずREADMEに書く。M2での値を基準とする
 - カメラ不要の映像テストは `dummy_camera.mp4`(5人・5ゾーン分散)級の素材をループ再生。
   音声テストは `say -v Kyoko` で生成、音楽はTD同梱サンプル
+- **TDのダイアログは computer-use で自分でクリックして対応する**(プラグイン追加/再インストール後の
+  読み込み確認、再起動時の "Save changes?" 等)。放置するとTD操作が止まる。TD再起動は
+  quit→screenshotでダイアログ確認→クリック→open。保存ダイアログはコミット済み.toeを正とし、
+  UI状態だけの軽微差分は "Don't Save"、MCPで意図的に保存した未保存内容があれば "Save"
 
 ## ドキュメント規約
 
@@ -1992,3 +1996,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **新ハマりどころ**: ImagePlaygroundのImageCreator生成は**前面GUIアプリ限定**。
   ヘッドレス/バックグラウンドは `backgroundCreationForbidden` で拒否される
 - 注意: 本セッションMCP切断中のためTD実機での人物生成検証は未実施(次回TODO)
+
+### 2026-07-21 TDダイアログのclick対応を標準化 + README/CLAUDE.md最新化
+
+- ユーザー「TDのプラグイン追加時・終了時のダイアログも自分でクリックして対応して」→ 標準運用化。
+  computer-use(request_access→screenshot→left_click)でダイアログを処理する。memory
+  (feedback: handle-td-dialogs-via-clicking)と本CLAUDE.mdの検証の作法に反映
+- README(英日)を最新化して監査: 削除済みop(IOHID/QuickLook/System Audio/Live Photo/Music/
+  Gaussian Splat/RealityKit Splat)の残存参照なし、ハードコードのop数なし、を確認。
+  ImagePlayground行に「人物は入力0に顔画像」を追記
+- **現状の主要な棚卸し(2026-07-21時点)**:
+  - LLM系: LLM AFM(Afmcore)/ LLM MLX(Mlxllm・任意mlx-communityモデル+VLM画像入力)/ Gemma(llama.cpp)
+  - 生成系: CoreML ImageGen(外部SDモデル専用)/ ImagePlayground(ImageCreator・顔入力で人物可)
+  - 直近削除: IOHID, QuickLook(使い所不明)
+  - VisionFlowは正常(黒画面は静止入力orUV正規化で値が小さいため。READMEに可視化手順)
