@@ -148,7 +148,6 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Screen Capture](ScreenCapture/) | TOP | ディスプレイ/**名前で選べる単一ウインドウ**の**画面収録**(最大120fps) |
 | [CoreAudio Tap](CoreAudioTap/) | CHOP | **指定アプリの音だけ**をタップ(Core Audio Process Tap・macOS 14.4+)or 全システム音→48kHz stereo。Screen Captureより粒度が細かい |
 | [Spotlight](Spotlight/) | DAT | **OS全体のローカルファイル検索**(Spotlight / NSMetadataQuery)— 名前/内容/生kMDItem述語 |
-| [IOHID](IOHID/) | CHOP | **任意のUSB/Bluetooth HIDのraw入力**(ゲームパッド/ペダル/ノブ/センサ)IOHIDManager |
 | [Image Capture](ImageCapture/) | DAT | **テザー接続カメラ/スキャナの列挙**(ImageCaptureCore)— 名前/種別/uuid/接続 |
 | [CoreLocation Beacon](CoreLocationBeacon/) | CHOP | **iBeacon測距**(CoreLocation)— major/minor/rssi/近接度/推定距離 |
 | [Multipeer In / Out](MultipeerCHOP/) | CHOP | **iPhone/iPad をワイヤレスセンサーに**(ジャイロ/加速度/タッチを低遅延受信)。**iOSアプリ同梱** |
@@ -157,7 +156,6 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Shortcuts](Shortcuts/) | DAT | **macOSショートカット実行**(HomeKit照明・家電・通知を TD イベントから) |
 | [GameplayKit Agents](GameplayKitAgents/) | CHOP | **群集/フロッキング**(GameplayKit GKAgent)— seek/separate/align/cohere/avoid/wander |
 | [GameplayKit Path](GameplayKitPath/) | SOP | **障害物回避の最短経路**(GameplayKit GKObstacleGraph)→ポリライン |
-| [Quick Look](QuickLook/) | TOP | 任意ファイル(PDF/動画/3D/書類/フォント)の**OS標準サムネイル**(QuickLookThumbnailing) |
 | [PDFKit](PDFKit/) | DAT / TOP | **PDFKit** — 構造(メタ/アウトライン/テキスト/注釈)+ ページをテクスチャ描画 |
 | [CoreWLAN](CoreWLAN/) | CHOP | **Wi-Fiの実測値**(CoreWLAN)— RSSI/ノイズ/SNR/送信レート/チャンネル |
 | [Network Discovery](NetworkDiscovery/) | DAT | **Bonjour でLAN内サービスを発見** → タイプ/名前/ホスト名/IPv4/IPv6/ポート/TXT(OSC/HTTP/AirPlay機器の自動発見) |

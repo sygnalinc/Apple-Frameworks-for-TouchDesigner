@@ -151,7 +151,6 @@ grouped by category.
 | [Screen Capture](ScreenCapture/) | TOP | **Screen recording** of a display or **a single window picked by name from a dropdown** (up to 120fps) |
 | [CoreAudio Tap](CoreAudioTap/) | CHOP | **Tap a single app's audio** (Core Audio Process Tap, macOS 14.4+) or all system audio → 48kHz stereo. Finer-grained than Screen Capture |
 | [Spotlight](Spotlight/) | DAT | **OS-wide local file search** (Spotlight / NSMetadataQuery) — name / content / raw kMDItem predicate |
-| [IOHID](IOHID/) | CHOP | **Raw input from any USB/Bluetooth HID** (gamepad / pedal / knob / sensor) via IOHIDManager |
 | [Image Capture](ImageCapture/) | DAT | **List tethered cameras / scanners** (ImageCaptureCore) — name / type / uuid / transport |
 | [CoreLocation Beacon](CoreLocationBeacon/) | CHOP | **iBeacon ranging** (CoreLocation) — major / minor / rssi / proximity / distance |
 | [Multipeer In / Out](MultipeerCHOP/) | CHOP | **Turn an iPhone/iPad into a wireless sensor** (low-latency gyro / accel / touch). **iOS app included** |
@@ -160,7 +159,6 @@ grouped by category.
 | [Shortcuts](Shortcuts/) | DAT | **Run macOS Shortcuts** (HomeKit lights / appliances / notifications from TD events) |
 | [GameplayKit Agents](GameplayKitAgents/) | CHOP | **Crowd / flocking simulation** (GameplayKit GKAgent) — seek / separate / align / cohere / avoid / wander |
 | [GameplayKit Path](GameplayKitPath/) | SOP | **Obstacle-avoiding shortest path** (GameplayKit GKObstacleGraph) → polyline |
-| [Quick Look](QuickLook/) | TOP | **OS-standard thumbnail** of any file (PDF / video / 3D / doc / font) via QuickLookThumbnailing |
 | [PDFKit](PDFKit/) | DAT / TOP | **PDFKit** — structure (metadata / outline / text / annotations) + render a page to a texture |
 | [CoreWLAN](CoreWLAN/) | CHOP | **Live Wi-Fi metrics** (CoreWLAN) — RSSI / noise / SNR / TX rate / channel |
 | [Network Discovery](NetworkDiscovery/) | DAT | **Discover LAN services via Bonjour** → service type / name / hostname / IPv4 / IPv6 / port / TXT (auto-find OSC / HTTP / AirPlay devices) |

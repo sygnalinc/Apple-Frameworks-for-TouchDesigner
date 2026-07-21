@@ -1960,3 +1960,18 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 注意: 本セッションは TouchDesigner MCP 切断中のため TD実機の生成検証は未実施
   (ビルド/インストール/バイナリ確認まで)。TD再起動で `Imageplayground` が Create Dialog に出る。
   ImagePlaygroundの利用例は sample.toe に未追加(MCP復帰後のTODO)
+
+### 2026-07-21 VisionFlow 動作確認(黒画面は仕様) + IOHID / QuickLook 削除
+
+- ユーザー「VisionFlowが黒画面しか見えない」→ **プラグインは正常**。スタンドアロンの Vision
+  テスト(2フレームで物体を+30px移動)で `VNGenerateOpticalFlowRequest` を実行し、**最大フロー
+  ≈23px・動いた領域でdxが負**(動き検出・方向とも正しい)を実測確認。黒く見える原因は
+  ①**入力が静止**(静止画は1フレームしか来ずフロー未計算=常時黒 / 動画でも動きが無ければ0=黒)
+  ②**UVモード既定は解像度で正規化=値が極小**(肉眼で黒。Math TOPで×20〜50増幅、または
+  Pixelsモード、+0.5オフセットで可視化)。VisionFlow README に「黒い画面に見えるとき」節を追記
+- **IOHID / QuickLook を削除**(ユーザー判断「使い所が分からない」)。リポジトリの `IOHID/`
+  `QuickLook/` を git rm、常設バンドル `IOHIDCHOP.plugin`/`QuickLookTOP.plugin` を削除、
+  ルートREADME(英日)の該当行を削除
+- 注意: 本セッションは TouchDesigner MCP 切断中。sample.toe に IOHID/QuickLook の利用例
+  コンテナがあれば TD再起動後に "Unknown operator type"(赤)になる。MCP復帰後に examples の
+  該当2コンテナを削除する(.toe破損許容済み)。VisionFlowの可視化デモ追加もMCP復帰後のTODO
