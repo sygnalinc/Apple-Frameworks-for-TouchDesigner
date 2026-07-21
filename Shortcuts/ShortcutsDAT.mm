@@ -11,6 +11,15 @@
 // 出力テーブル: key/value(status / output / shortcut / took_ms)、一覧モードでは名前リスト。
 //
 // 実装: 実行はワーカースレッド(NSTask)。cook はブロックしない。
+//
+// Method(重要):
+//   - App (shortcuts://): `open shortcuts://run-shortcut` で **Shortcuts.app に委譲**して実行する
+//     (既定)。TouchDesigner から `shortcuts run` CLI を直接叩くと TD のプロセス権限で走り、
+//     Music/HomeKit等を操作するショートカットは「見つかりません」エラーで失敗する。App方式なら
+//     権限を持つ Shortcuts.app 側で走るので確実。ただし**出力テキストは受け取れない**(fire&forget)
+//   - CLI (output): `shortcuts run` CLI。**出力テキストを受け取れる**が、外部アプリを操作する
+//     ショートカットは TD に権限が無いと失敗する。純粋に値を返すだけのショートカット向け
+//   ※ List は常に CLI(読み取りのみなので権限不要)
 
 #import <Foundation/Foundation.h>
 
@@ -59,11 +68,13 @@ public:
     void execute(DAT_Output* output, const OP_Inputs* inputs, void*) override
     {
         myExecCount++;
-        std::string name, text;
+        std::string name, text, method;
         if (const char* n = inputs->getParString("Shortcutname"))
             name = n;
         if (const char* t = inputs->getParString("Inputtext"))
             text = t;
+        if (const char* m = inputs->getParString("Method"))
+            method = m;
         // 入力DATがあれば cell(0,0) を優先
         const OP_DATInput* in = inputs->getInputDAT(0);
         if (in && in->numRows > 0 && in->numCols > 0) {
@@ -76,7 +87,7 @@ public:
             std::lock_guard<std::mutex> lock(myMutex);
             if (myRunRequested && !name.empty()) {
                 myRunRequested = false;
-                myJob = Job{JobKind::Run, name, text};
+                myJob = Job{JobKind::Run, name, text, method != "cli"};
                 myHasPending = true;
                 myCond.notify_one();
             } else if (myListRequested) {
@@ -118,6 +129,15 @@ public:
             p.label = "Input Text";
             p.page = "Shortcuts";
             manager->appendString(p);
+        }
+        {
+            OP_StringParameter p("Method");
+            p.label = "Run Method";
+            p.page = "Shortcuts";
+            p.defaultValue = "app";
+            const char* names[] = {"app", "cli"};
+            const char* labels[] = {"App (shortcuts://, reliable)", "CLI (returns output)"};
+            manager->appendMenu(p, 2, names, labels);
         }
         {
             OP_NumericParameter p("Run");
@@ -164,6 +184,7 @@ private:
     {
         JobKind kind = JobKind::Run;
         std::string name, input;
+        bool useApp = true;   // true=shortcuts:// 委譲(既定) / false=CLI
     };
 
     void workerLoop()
@@ -182,6 +203,8 @@ private:
             std::vector<std::pair<std::string, std::string>> rows;
             if (job.kind == JobKind::List)
                 runList(rows);
+            else if (job.useApp)
+                runShortcutApp(job.name, job.input, rows);
             else
                 runShortcut(job.name, job.input, rows);
             myRunCount++;
@@ -248,6 +271,46 @@ private:
                 rows.push_back({"shortcut" + std::to_string(i++), line});
             pos = nl + 1;
         }
+    }
+
+    // App方式: `open -g shortcuts://run-shortcut?name=...&input=...` で Shortcuts.app に委譲。
+    // TD の権限に依存せず確実に走る(Music/HomeKit等の操作も可)。出力テキストは受け取れない。
+    static void runShortcutApp(const std::string& name, const std::string& input,
+                               std::vector<std::pair<std::string, std::string>>& rows)
+    {
+        const auto t0 = std::chrono::steady_clock::now();
+        std::string err;
+        int code = -1;
+        @autoreleasepool {
+            NSURLComponents* comp = [NSURLComponents componentsWithString:@"shortcuts://run-shortcut"];
+            NSMutableArray<NSURLQueryItem*>* items = [NSMutableArray array];
+            [items addObject:[NSURLQueryItem queryItemWithName:@"name"
+                                                         value:[NSString stringWithUTF8String:name.c_str()]]];
+            if (!input.empty())
+                [items addObject:[NSURLQueryItem queryItemWithName:@"input"
+                                                             value:[NSString stringWithUTF8String:input.c_str()]]];
+            comp.queryItems = items;
+            NSURL* url = comp.URL;
+            if (!url) { rows.push_back({"status", "error: bad url"}); return; }
+            // /usr/bin/open で URL を開く(-g: 前面に出さない)
+            NSTask* task = [[NSTask alloc] init];
+            task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/open"];
+            task.arguments = @[ @"-g", url.absoluteString ];
+            NSError* e = nil;
+            if ([task launchAndReturnError:&e]) {
+                [task waitUntilExit];
+                code = task.terminationStatus;
+            } else {
+                err = nsstr(e.localizedDescription);
+            }
+        }
+        const float ms = std::chrono::duration<float, std::milli>(
+                             std::chrono::steady_clock::now() - t0).count();
+        char buf[32]; snprintf(buf, sizeof(buf), "%.0f", ms);
+        rows.push_back({"status", code == 0 ? "launched (Shortcuts app)" : ("error: " + err)});
+        rows.push_back({"shortcut", name});
+        rows.push_back({"output", "(App方式は出力を返しません。出力が要る場合は Method=CLI)"});
+        rows.push_back({"took_ms", buf});
     }
 
     static void runShortcut(const std::string& name, const std::string& input,

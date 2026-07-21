@@ -2202,3 +2202,24 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **踏んだ罠**: `channelWidth`(20/40/80/160MHz)と `channelBand`(2GHz/5GHz)から中心周波数を
   計算して帯域重なりを出す。2.4GHzは ch14=2484 の特例、他は 2412+(ch-1)*5。5GHzは 5000+ch*5
 - README(新規+ルート英日)更新。バンドル常設インストール済み(TD再起動で `Corewlanscan` 登録)
+
+### 2026-07-22 Shortcuts DAT の Run が失敗する問題を修正(URLスキーム委譲)
+
+- ユーザー「musicアプリで再生するショートカットを実行して」。Shortcuts DATの `Run`(`shortcuts run` CLI)
+  が **「操作を完了できませんでした。ショートカットが見つかりませんでした」** で失敗
+- **切り分け**: ①名前は完全一致(NFC・生バイト一致・正規化問題ではない)②ターミナルからの
+  `shortcuts run` は TTY無し/nohup/最小envでも全て成功(exit 0)③プラグインの `list` は成功
+  (21件取得)、`run` だけ失敗。→ **原因は責任プロセス=TouchDesigner の権限**。`list` は読み取りのみ
+  で通るが、`run` は Music/HomeKit等を操作するため実行権限が要り、TD未認可だと「見つからない」という
+  紛らわしいエラーになる(macOSの仕様)
+- **修正**: `open -g shortcuts://run-shortcut?name=...&input=...` で **Shortcuts.app に委譲**する
+  App方式を追加し既定に。権限を持つ Shortcuts.app 側で走るので確実。`Run Method` メニュー
+  (app=既定/cli=出力を返す)を追加。URL構築は `NSURLComponents`+`NSURLQueryItem` で正しくエンコード
+- **トレードオフ**: App方式は**出力テキストを受け取れない**(fire&forget)。値を返すショートカットは
+  CLI方式(ただしTD権限が要る)。動作させたいだけなら App、出力が要るなら CLI、と使い分け
+- **実測**: OP経由(App方式)で「今聴いているアルバムの全曲を再生」→ **Music.app が playing**。
+  CLI方式では「見つからない」を再現。sample.toe の `/project1/shortcuts_demo`(List実行済み+手順note)
+  も保存
+- **踏んだ罠**: TD等GUIアプリからの `shortcuts run` CLI は責任プロセスの権限で走り、外部アプリ操作系
+  ショートカットは「見つからない」で失敗する。**URLスキーム(open shortcuts://)でShortcuts.appに
+  委譲**すれば回避できる(出力は諦める)。listは読み取りのみで権限不要
