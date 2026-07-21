@@ -2578,14 +2578,23 @@
       "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/NetworkDiscovery/README.md",
       "params": [
         {
-          "name": "Active",
-          "type": "toggle",
-          "default": "1"
+          "name": "Mode",
+          "type": "menu",
+          "default": "both",
+          "menu": [
+            "bonjour",
+            "scan",
+            "both"
+          ]
+        },
+        {
+          "name": "Rescan",
+          "type": "pulse"
         },
         {
           "name": "Servicetypes",
           "type": "string",
-          "default": "_ssh._tcp,_http._tcp,_osc._udp,_airplay._tcp"
+          "default": "_ssh._tcp,_http._tcp,_osc._udp,_airplay._tcp,_raop._tcp,_googlecast._tcp"
         },
         {
           "name": "Domain",
@@ -2598,6 +2607,26 @@
           "default": "5.0"
         },
         {
+          "name": "Subnet",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "name": "Scantimeout",
+          "type": "float",
+          "default": "2.0"
+        },
+        {
+          "name": "Maxhosts",
+          "type": "int",
+          "default": "1024"
+        },
+        {
+          "name": "Reversedns",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
           "name": "Restart",
           "type": "pulse"
         }
@@ -2606,7 +2635,9 @@
       "infoChop": [
         "executes",
         "services",
-        "resolved"
+        "scan_hosts",
+        "rows",
+        "scanning"
       ],
       "statusDat": false,
       "example": "/project1/examples/NetworkDiscovery",

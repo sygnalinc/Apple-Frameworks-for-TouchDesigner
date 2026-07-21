@@ -2085,3 +2085,26 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   再署名で解決。③Info DATの内容はop本体のcook+worker完了後に反映(パラメータ変更→即読みは旧値)
 - 注意: 旧opType(Cinematicdata/Spatialvideo DAT/Pdfkit DAT)を参照する.toeはロードエラーになる。
   sample.toeは修復済み。catalog 80→77op。README(各+ルート英日)更新
+
+### 2026-07-22 Network Discovery に「全デバイス検出」(Active IPv4 Scan)を追加
+
+- ユーザー「ネットワークのデバイスを全て検出できるように」。従来はBonjour(広告サービス)のみ
+  だったので、**アクティブIPv4スキャンを追加**して Bonjour非対応機器も含めLAN全機器を拾えるように
+- **仕組み(特権不要)**: サブネット内の各ホストへ 1byte UDP を投げる→カーネルが送信前に **ARP解決**
+  →応答した機器だけ ARPエントリが complete(MACあり)になる→`sysctl(CTL_NET,PF_ROUTE,NET_RT_FLAGS)`
+  で ARPテーブルを読む(=`arp -an` 相当)。ICMPも raw socket も不要。逆引きは `getnameinfo`(DNS/mDNS)。
+  **全IPv4探索の高レベル Apple API は無い**のでこの方式が現実的(既存調査どおり)
+- **Mode: Bonjour / Active IPv4 scan / Both(既定)**。Bothは同一IPをBonjourサービスとARP結果で
+  マージ(Bonjour行にMAC補完・`source=bonjour+arp`)、ARPのみの機器は別行。出力列に **mac / source** 追加、
+  ip4昇順ソート。スキャンは専用ワーカースレッド(cook非ブロック・一回スイープ、Rescan/設定変更/初回で起動)
+- **実測(M2・自宅LAN 192.168.49.0/24)**: **20機器**検出。Bonjour非広告の機器(ルータ/各種端末)が
+  MAC付きで並び、AppleTV/FireTV(.21)は複数Bonjour行に同一MAC補完、自Mac(.16)も _raop+MACでマージ。
+  スタンドアロンharnessで先にARP読取を検証(18機器)→TD実機でも同数+Bonjour。エラー/警告なし
+- **踏んだ罠**: ①ARPテーブルにサブネットブロードキャスト(.255・MAC全ff)が載る→`iph==bcast` と
+  `mac=="ff:ff:ff:ff:ff:ff"` で除外。②`sockaddr_inarp` は `<netinet/if_ether.h>`、`sockaddr_dl`/LLADDR は
+  `<net/if_dl.h>`、route message 内の sdl オフセットは `roundup4(sin_len)`(SA_SIZE相当を自前定義)。
+  ③en* インターフェースのみ対象(utun/awdl/llw/bridge除外)。④逆引きは件数多いと遅い→ワーカースレッドで
+- パラメータ: Mode / Rescan Now / Service Types / Domain / Resolve Timeout / Subnet(空=自動) /
+  Scan Timeout / Max Hosts / Reverse DNS / Restart Bonjour。**Max Hosts で大サブネット暴走を防止**
+- 注意: ARP非応答機器・別VLAN・FW越し・スリープ端末は見えない。IPv6全域は不可。DHCPリース一覧APIは無い。
+  MACベンダー(OUI)名は未対応(将来候補)。README(新規節+ルート英日)更新。バンドル再ビルド・インストール済み

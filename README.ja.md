@@ -156,7 +156,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [GameplayKit Path](GameplayKitPath/) | SOP | **障害物回避の最短経路**(GameplayKit GKObstacleGraph)→ポリライン |
 | [PDFKit](PDFKit/) | TOP | **PDFKit** — ページをテクスチャ描画。構造(メタ/アウトライン/テキスト/注釈)は**Info DAT**で出力 |
 | [CoreWLAN](CoreWLAN/) | CHOP | **Wi-Fiの実測値**(CoreWLAN)— RSSI/ノイズ/SNR/送信レート/チャンネル |
-| [Network Discovery](NetworkDiscovery/) | DAT | **Bonjour でLAN内サービスを発見** → タイプ/名前/ホスト名/IPv4/IPv6/ポート/TXT(OSC/HTTP/AirPlay機器の自動発見) |
+| [Network Discovery](NetworkDiscovery/) | DAT | **LAN上の全デバイスを発見**: Bonjour + **アクティブIPv4スキャン**(ARPスイープでBonjour非対応機器もMAC/ホスト名付き) → タイプ/名前/ホスト名/IPv4/IPv6/MAC/ポート/TXTをマージ |
 | [ColorSync](ColorSync/) | TOP | **ICC/色空間変換**(sRGB ↔ Display P3 / Adobe RGB / Rec.2020 / .icc)で表示装置別の正確な色 |
 
 ## 使い方
