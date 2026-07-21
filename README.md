@@ -158,6 +158,7 @@ grouped by category.
 | [GameplayKit Path](GameplayKitPath/) | SOP | **Obstacle-avoiding shortest path** (GameplayKit GKObstacleGraph) → polyline |
 | [PDFKit](PDFKit/) | TOP | **PDFKit** — render a page to a texture; structure (metadata / outline / text / annotations) on its **Info DAT** |
 | [CoreWLAN](CoreWLAN/) | CHOP | **Live Wi-Fi metrics** (CoreWLAN) — RSSI / noise / SNR / TX rate / channel |
+| [CoreWLAN Scan](CoreWLANScan/) | CHOP | **Scan nearby Wi-Fi → per-channel congestion / AP count / max RSSI** and the least-congested channel (2.4/5GHz). Find a free channel / monitor RF congestion. SSID names are redacted by macOS |
 | [Network Discovery](NetworkDiscovery/) | DAT | **Discover all LAN devices**: Bonjour services + **active IPv4 scan** (ARP sweep → MAC / hostname of every host, even non-Bonjour); merged IP / MAC / **vendor (OUI)** / DNS name / mDNS name / **SMB name & domain (NetBIOS)** / port / TXT (LanScan Pro-like) |
 | [ColorSync](ColorSync/) | TOP | **ICC / color-space conversion** (sRGB ↔ Display P3 / Adobe RGB / Rec.2020 / .icc) for display-accurate color |
 

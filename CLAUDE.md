@@ -2181,3 +2181,24 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   (プロンプト出ない=SFSpeechRecognizerで踏んだTCCの壁と同構造)。`.plugin`単体でplistキーを足せず、
   TD.appのplist改変は署名を壊す。よって**位置情報リクエストの組み込みは断念**(常にnilの動かない
   トグルになるため)。数値(RSSI/SNR/channel/rate/PHY)は現状CoreWLANプラグインで問題なく取れる
+
+### 2026-07-22 CoreWLAN Scan CHOP 実装(電波混雑・空きチャンネル探し)
+
+- ユーザー「周りに飛んでるSSID一覧は取れる?」→ 検証: `scanForNetworks` は動くが **SSID名/BSSIDは
+  macOS 14+ privacyで伏せられ取得不可**(接続中SSIDと同じLocationゲート・プラグインからは実質不可)。
+  ただし **AP数・RSSI・帯域(2.4/5GHz)・チャンネル幅は取れる**。ユーザー了承のもと「名前抜きの
+  電波環境スキャン(混雑度・空きch探し)」を新規OPで実装
+- **CoreWLAN Scan CHOP**(opType `Corewlanscan`・icon CWS・別OP。接続中数値の CoreWLAN CHOP とは別):
+  - **混雑度モデル**: 各APの占有帯域(中心周波数±幅/2)を各20MHz枠との重なり割合で按分し
+    線形強度 `10^(rssi/10)` を加算。**40/80MHz幅APの隣接ch干渉も反映**。バンドごとに最大=1へ正規化。
+    `best_ch` = 最も混雑度が低いch
+  - 出力126ch: 診断5 + 2.4GHz(ch1-14)×(aps/rssi/congestion) + 5GHz(36-165の25ch)×3 +
+    best_ch/best_congestion×2バンド
+  - **scanForNetworks はブロックするのでワーカースレッド**で実行(Scan Interval秒 or Rescanパルス)、
+    cookは集計スナップショットを読むだけ(非ブロック)
+- **実測(M2・macOS 26.5.1)**: 6ネットワーク検出。ch10の40MHz強AP(-44dBm)が ch8-12 に干渉する
+  グラデーション、**best 2.4=ch1 / best 5=ch36** を正しく提示。スタンドアロンで混雑度モデルを
+  先に検証してからTD実機で126ch・エラーなしを確認
+- **踏んだ罠**: `channelWidth`(20/40/80/160MHz)と `channelBand`(2GHz/5GHz)から中心周波数を
+  計算して帯域重なりを出す。2.4GHzは ch14=2484 の特例、他は 2412+(ch-1)*5。5GHzは 5000+ch*5
+- README(新規+ルート英日)更新。バンドル常設インストール済み(TD再起動で `Corewlanscan` 登録)

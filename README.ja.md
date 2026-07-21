@@ -156,6 +156,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [GameplayKit Path](GameplayKitPath/) | SOP | **障害物回避の最短経路**(GameplayKit GKObstacleGraph)→ポリライン |
 | [PDFKit](PDFKit/) | TOP | **PDFKit** — ページをテクスチャ描画。構造(メタ/アウトライン/テキスト/注釈)は**Info DAT**で出力 |
 | [CoreWLAN](CoreWLAN/) | CHOP | **Wi-Fiの実測値**(CoreWLAN)— RSSI/ノイズ/SNR/送信レート/チャンネル |
+| [CoreWLAN Scan](CoreWLANScan/) | CHOP | **周辺Wi-Fiをスキャン→チャンネル別の混雑度/AP数/最大RSSI**と最も空いてるch(2.4/5GHz)。空きch探し・電波混雑モニタに。SSID名はmacOSが伏せる |
 | [Network Discovery](NetworkDiscovery/) | DAT | **LAN上の全デバイスを発見**: Bonjour + **アクティブIPv4スキャン**(ARPスイープでBonjour非対応機器もMAC/ホスト名付き) → IP/MAC/**ベンダー(OUI)**/DNS名/mDNS名/**SMB名・ドメイン(NetBIOS)**/ポート/TXT(LanScan Pro相当) |
 | [ColorSync](ColorSync/) | TOP | **ICC/色空間変換**(sRGB ↔ Display P3 / Adobe RGB / Rec.2020 / .icc)で表示装置別の正確な色 |
 

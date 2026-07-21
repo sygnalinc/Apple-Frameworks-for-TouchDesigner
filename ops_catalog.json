@@ -1,6 +1,6 @@
 {
   "_note": "TDAppleOps custom op catalog. Generated from .mm sources (best-effort). Use 'create' with parent().create('<create>', name) or MCP create. Param defaults/menus are source-derived; for exact live schema, introspect op.pars() in TD.",
-  "_count": 77,
+  "_count": 78,
   "ops": {
     "AudiotoolboxmixCHOP": {
       "create": "AudiotoolboxmixCHOP",
@@ -1385,6 +1385,39 @@
       "statusDat": false,
       "example": "/project1/examples/CoreWLAN",
       "source": "CoreWLAN/CoreWLANCHOP.mm"
+    },
+    "CorewlanscanCHOP": {
+      "create": "CorewlanscanCHOP",
+      "opType": "Corewlanscan",
+      "label": "CoreWLAN Scan",
+      "family": "CHOP",
+      "icon": "CWS",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreWLANScan",
+      "readme": "CoreWLANScan/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreWLANScan/README.md",
+      "params": [
+        {
+          "name": "Scaninterval",
+          "type": "float",
+          "default": "10"
+        },
+        {
+          "name": "Rescan",
+          "type": "pulse"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "scans",
+        "networks"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CoreWLANScan",
+      "source": "CoreWLANScan/CoreWLANScanCHOP.mm"
     },
     "CreatemlDAT": {
       "create": "CreatemlDAT",
