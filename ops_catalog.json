@@ -1,6 +1,6 @@
 {
   "_note": "TDAppleOps custom op catalog. Generated from .mm sources (best-effort). Use 'create' with parent().create('<create>', name) or MCP create. Param defaults/menus are source-derived; for exact live schema, introspect op.pars() in TD.",
-  "_count": 81,
+  "_count": 80,
   "ops": {
     "AfmcoreDAT": {
       "create": "AfmcoreDAT",
@@ -1878,103 +1878,6 @@
       "statusDat": false,
       "example": "/project1/examples/GameplayKitPath",
       "source": "GameplayKitPath/GameplayKitPathSOP.mm"
-    },
-    "GemmaDAT": {
-      "create": "GemmaDAT",
-      "opType": "Gemma",
-      "label": "Gemma",
-      "family": "DAT",
-      "icon": "GEM",
-      "minInputs": 0,
-      "maxInputs": 0,
-      "author": "SYGNAL Inc.",
-      "folder": "Gemma",
-      "readme": "Gemma/README.md",
-      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/Gemma/README.md",
-      "params": [
-        {
-          "name": "Instructions",
-          "type": "string"
-        },
-        {
-          "name": "Prompt",
-          "type": "string"
-        },
-        {
-          "name": "Temperature",
-          "type": "number"
-        },
-        {
-          "name": "Maxtokens",
-          "type": "number"
-        },
-        {
-          "name": "Keepcontext",
-          "type": "toggle"
-        },
-        {
-          "name": "Maxrows",
-          "type": "number"
-        },
-        {
-          "name": "Submit",
-          "type": "pulse"
-        },
-        {
-          "name": "Cancel",
-          "type": "pulse"
-        },
-        {
-          "name": "Clear",
-          "type": "pulse"
-        },
-        {
-          "name": "Endpoint",
-          "type": "string"
-        },
-        {
-          "name": "Model",
-          "type": "string"
-        },
-        {
-          "name": "Serverbinary",
-          "type": "string"
-        },
-        {
-          "name": "Modelfile",
-          "type": "string"
-        },
-        {
-          "name": "Port",
-          "type": "number"
-        },
-        {
-          "name": "Context",
-          "type": "number"
-        },
-        {
-          "name": "Gpulayers",
-          "type": "number"
-        },
-        {
-          "name": "Startserver",
-          "type": "pulse"
-        },
-        {
-          "name": "Stopserver",
-          "type": "pulse"
-        }
-      ],
-      "topParams": [],
-      "infoChop": [
-        "executes",
-        "busy",
-        "turns",
-        "server"
-      ],
-      "statusDat": true,
-      "example": "/project1/examples/Gemma",
-      "source": "Gemma/GemmaDAT.mm"
     },
     "ImagecaptureDAT": {
       "create": "ImagecaptureDAT",
