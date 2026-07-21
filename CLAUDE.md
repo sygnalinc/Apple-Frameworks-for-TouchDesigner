@@ -2010,3 +2010,18 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   - 生成系: CoreML ImageGen(外部SDモデル専用)/ ImagePlayground(ImageCreator・顔入力で人物可)
   - 直近削除: IOHID, QuickLook(使い所不明)
   - VisionFlowは正常(黒画面は静止入力orUV正規化で値が小さいため。READMEに可視化手順)
+
+### 2026-07-21 全プラグイン opHelpURL付与 + authorName統一 + VisionFlow可視化モード
+
+- **authorName → "SYGNAL Inc."** 全81プラグイン統一(旧 TDAppleML/sygnal 混在)。会社名で表示。
+  codesignは会社名にできず現状ad-hoc維持(要 Developer ID 法人証明書)。gitコミット作者は個人のまま
+- **opHelpURL 追加**(全81): `FillXXXPluginInfo` に `https://github.com/sygnalinc/TDAppleOps/
+  blob/main/<Folder>/README.md` を **null ガード付き**で。OPの Help(`?`)ボタンから README が開く。
+  **OP Create Dialog のホバー説明は SDK に該当フィールドが無く不可**(opHelpURL が代替)
+- **VisionFlow に Output メニュー追加**: `flow`(生RG32Float・従来) / `visualize`(RGBA8カラー・
+  向き=色相/速さ=明るさ/フレーム最大で自動スケール)。**増幅ノード無しで動きがそのまま見える**
+  (黒画面問題の恒久対策)。実映像2フレームで非ゼロフロー(max2.78px・6.1%可動)を可視化検証済み
+- 全プラグイン リビルド+再インストール(75/76自動+Gemmaは build.sh の実行ビット欠落で手動)。
+  バイナリで SYGNAL Inc./opHelpURL/visualize を確認。81 bundle インストール済み
+- **新ハマりどころ**: `opHelpURL` は構造体で `=nullptr` 既定。TDが未確保でも安全なよう
+  `if(x.opHelpURL) x.opHelpURL->setString(...)` とガードする。opIcon等はTDが確保するがopHelpURLは要確認

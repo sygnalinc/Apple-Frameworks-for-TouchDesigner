@@ -336,3 +336,13 @@
 - **ImageCreator の生成は前面GUIアプリ内でのみ動く**。ヘッドレスCLI/バックグラウンドは
   `backgroundCreationForbidden` で拒否 → ターミナルでの生成検証は不可(TD等の前面アプリで検証する)
 - 顔が小さいと `faceInImageTooSmall`、非対応画像は `unsupportedInputImage`
+
+## Custom OP メタデータ (OP_CustomOPInfo)
+
+- **OP Create Dialog のホバー説明はカスタムopでは出せない**(SDKに該当フィールド無し)。
+  代替は `opHelpURL`(Helpボタン→URL)と `pythonDoc`(docstring)
+- **`opHelpURL` は構造体で `=nullptr` 既定**。opType/opLabel/opIcon はTDが確保するが opHelpURL は
+  未確保の可能性 → `if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString(url);`
+  と null ガードして安全に設定する
+- codesign の署名者名は証明書のCommon Name依存。Apple Development証明書は個人名が出る。
+  会社名(SYGNAL Inc.)で署名するには Developer ID(法人アカウント)証明書が必要

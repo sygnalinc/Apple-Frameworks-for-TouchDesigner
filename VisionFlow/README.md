@@ -26,7 +26,8 @@ RG32Float の2チャンネルテクスチャ。R=dx, G=dy(前フレーム→現�
 |---|---|
 | Active | 解析の実行 On/Off |
 | Accuracy | Low / Medium(既定)/ High / Very High。高精度ほど遅い |
-| Output Units | UV / Pixels(上記) |
+| **Output** | **Flow Vectors(RG32Float・既定・下流で使う用) / Visualize(RGBA8・色で可視化)** |
+| Output Units | UV / Pixels(Flow時のみ意味を持つ) |
 | Flip Image Vertically | 入力の上下反転(既定On・必須) |
 
 ## Info CHOP
@@ -35,8 +36,11 @@ RG32Float の2チャンネルテクスチャ。R=dx, G=dy(前フレーム→現�
 
 ## 黒い画面に見えるとき（重要）
 
-オプティカルフローの出力は「動きベクトル場」なので、**そのままだとほぼ黒く見えるのが正常**。
-Nvidia の Optical Flow TOP も同じ。以下を確認する:
+**一番かんたん: `Output` を `Visualize (Color)` にする。** 動きが色（向き=色相・速さ=明るさ）で
+そのまま見える（増幅ノード不要）。生ベクトルが要るとき（下流でフロー値を使う）だけ `Flow` にする。
+
+オプティカルフローの生出力（`Flow`）は「動きベクトル場」なので、**そのままだとほぼ黒く見えるのが
+正常**。Nvidia の Optical Flow TOP も同じ。以下を確認する:
 
 1. **入力が動いている映像か**。静止画・止まった映像だとフローは 0 = 真っ黒。
    さらに**静止画は1フレームしか来ない**ので、フロー自体が一度も計算されない
