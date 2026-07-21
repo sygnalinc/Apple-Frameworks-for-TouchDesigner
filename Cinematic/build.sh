@@ -1,9 +1,8 @@
 #!/bin/zsh
-# Cinematic CHOP / TOP を1フォルダから2バンドル生成(共有Swiftヘルパ CinematicHelper を各バンドルに同梱)。
+# Cinematic Video TOP(旧 Cinematic Data CHOP のメタデータは Info CHOP に統合済み)。
 # dylib は epoch 名(TD/dyld の install name キャッシュ対策)。
 set -e
 cd "$(dirname "$0")"
-SDK_CHOP="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
 SDK_TOP="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP"
 EPOCH=$(date +%s)
 rm -rf build
@@ -38,6 +37,5 @@ PLIST
   echo "built: $(pwd)/build/$NAME.plugin"
 }
 
-build_one CinematicDataCHOP CinematicDataCHOP.mm "$SDK_CHOP" cinematic-chop
-build_one CinematicVideoTOP CinematicVideoTOP.mm  "$SDK_TOP"  cinematic-top
+build_one CinematicVideoTOP CinematicVideoTOP.mm "$SDK_TOP" cinematic-top
 echo "done ($EPOCH)"

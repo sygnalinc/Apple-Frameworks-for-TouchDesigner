@@ -1,6 +1,6 @@
 {
   "_note": "TDAppleOps custom op catalog. Generated from .mm sources (best-effort). Use 'create' with parent().create('<create>', name) or MCP create. Param defaults/menus are source-derived; for exact live schema, introspect op.pars() in TD.",
-  "_count": 80,
+  "_count": 77,
   "ops": {
     "AudiotoolboxmixCHOP": {
       "create": "AudiotoolboxmixCHOP",
@@ -657,45 +657,6 @@
       "example": "/project1/examples/CoreImageKeystone",
       "source": "CoreImageKeystone/CoreImageKeystoneTOP.mm"
     },
-    "CinematicdataCHOP": {
-      "create": "CinematicdataCHOP",
-      "opType": "Cinematicdata",
-      "label": "Cinematic Data",
-      "family": "CHOP",
-      "icon": "CND",
-      "minInputs": 0,
-      "maxInputs": 0,
-      "author": "SYGNAL Inc.",
-      "folder": "Cinematic",
-      "readme": "Cinematic/README.md",
-      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/Cinematic/README.md",
-      "params": [
-        {
-          "name": "File",
-          "type": "file"
-        },
-        {
-          "name": "Position",
-          "type": "float",
-          "default": "0"
-        },
-        {
-          "name": "Maxsubjects",
-          "type": "int",
-          "default": "10"
-        }
-      ],
-      "topParams": [],
-      "infoChop": [
-        "executes",
-        "ready",
-        "loading",
-        "duration"
-      ],
-      "statusDat": false,
-      "example": "/project1/examples/Cinematic",
-      "source": "Cinematic/CinematicDataCHOP.mm"
-    },
     "CinematicvideoTOP": {
       "create": "CinematicvideoTOP",
       "opType": "Cinematicvideo",
@@ -746,6 +707,11 @@
           "name": "Flip",
           "type": "toggle",
           "default": "1"
+        },
+        {
+          "name": "Maxsubjects",
+          "type": "int",
+          "default": "10"
         }
       ],
       "topParams": [],
@@ -753,7 +719,11 @@
         "executes",
         "submits",
         "frames",
-        "ready"
+        "ready",
+        "duration",
+        "focus_disparity",
+        "focus_strong",
+        "subjects"
       ],
       "statusDat": false,
       "example": "/project1/examples/Cinematic",
@@ -2642,49 +2612,6 @@
       "example": "/project1/examples/NetworkDiscovery",
       "source": "NetworkDiscovery/NetworkDiscoveryDAT.mm"
     },
-    "PdfkitDAT": {
-      "create": "PdfkitDAT",
-      "opType": "Pdfkit",
-      "label": "PDFKit",
-      "family": "DAT",
-      "icon": "PDF",
-      "minInputs": 0,
-      "maxInputs": 0,
-      "author": "SYGNAL Inc.",
-      "folder": "PDFKit",
-      "readme": "PDFKit/README.md",
-      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/PDFKit/README.md",
-      "params": [
-        {
-          "name": "File",
-          "type": "file"
-        },
-        {
-          "name": "Mode",
-          "type": "menu",
-          "default": "Info",
-          "menu": [
-            "Info",
-            "Outline",
-            "Text",
-            "Annotations"
-          ]
-        },
-        {
-          "name": "Page",
-          "type": "int",
-          "default": "0"
-        }
-      ],
-      "topParams": [],
-      "infoChop": [
-        "executes",
-        "pages"
-      ],
-      "statusDat": false,
-      "example": "/project1/examples/PDFKit",
-      "source": "PDFKit/PDFKitDAT.mm"
-    },
     "PdfkitTOP": {
       "create": "PdfkitTOP",
       "opType": "Pdfkit",
@@ -2711,13 +2638,25 @@
           "name": "Dpi",
           "type": "float",
           "default": "150"
+        },
+        {
+          "name": "Infomode",
+          "type": "menu",
+          "default": "Info",
+          "menu": [
+            "Info",
+            "Outline",
+            "Text",
+            "Annotations"
+          ]
         }
       ],
       "topParams": [],
       "infoChop": [
         "executes",
         "width",
-        "height"
+        "height",
+        "pages"
       ],
       "statusDat": false,
       "example": "/project1/examples/PDFKit",
@@ -3119,37 +3058,6 @@
       "example": "/project1/examples/SoundFeatures",
       "source": "SoundFeatures/SoundFeaturesCHOP.mm"
     },
-    "SpatialvideoDAT": {
-      "create": "SpatialvideoDAT",
-      "opType": "Spatialvideo",
-      "label": "Spatial Video",
-      "family": "DAT",
-      "icon": "SPV",
-      "minInputs": 0,
-      "maxInputs": 0,
-      "author": "SYGNAL Inc.",
-      "folder": "SpatialVideo",
-      "readme": "SpatialVideo/README.md",
-      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/SpatialVideo/README.md",
-      "params": [
-        {
-          "name": "File",
-          "type": "file",
-          "page": "Spatial Video"
-        }
-      ],
-      "topParams": [],
-      "infoChop": [
-        "executes",
-        "is_spatial",
-        "width",
-        "height",
-        "baseline_mm"
-      ],
-      "statusDat": false,
-      "example": "/project1/examples/SpatialVideo",
-      "source": "SpatialVideo/SpatialVideoDAT.mm"
-    },
     "SpatialvideoTOP": {
       "create": "SpatialvideoTOP",
       "opType": "Spatialvideo",
@@ -3188,7 +3096,16 @@
         "executes",
         "submits",
         "decodes",
-        "is_spatial"
+        "is_spatial",
+        "width",
+        "height",
+        "duration",
+        "fps",
+        "baseline_mm",
+        "horizontal_fov_deg",
+        "disparity_adjustment",
+        "has_left_eye",
+        "has_right_eye"
       ],
       "statusDat": false,
       "example": "/project1/examples/SpatialVideo",

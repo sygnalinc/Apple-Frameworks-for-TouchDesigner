@@ -1,7 +1,7 @@
 #!/bin/zsh
+# PDFKit TOP(旧 PDFKit DAT の構造テーブルは Info DAT に統合済み)。
 set -e
 cd "$(dirname "$0")"
-SDK_DAT="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
 SDK_TOP="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP"
 rm -rf build
 build_one() {
@@ -23,5 +23,4 @@ PLIST
   codesign --force --deep -s - "build/$NAME.plugin"
   echo "built: $(pwd)/build/$NAME.plugin"
 }
-build_one PDFKitDAT PDFKitDAT.mm "$SDK_DAT" pdfkit-dat
 build_one PDFKitTOP PDFKitTOP.mm "$SDK_TOP" pdfkit-top

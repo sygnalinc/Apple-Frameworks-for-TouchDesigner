@@ -1,8 +1,7 @@
 #!/bin/zsh
-# Spatial Video DAT / TOP を1フォルダから2バンドル生成(純ObjC++・Swiftヘルパ無し)。
+# Spatial Video TOP(旧 Spatial Video DAT のメタデータは Info CHOP / Info DAT に統合済み)。
 set -e
 cd "$(dirname "$0")"
-SDK_DAT="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
 SDK_TOP="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP"
 rm -rf build
 
@@ -32,6 +31,5 @@ PLIST
   echo "built: $(pwd)/build/$NAME.plugin"
 }
 
-build_one SpatialVideoDAT SpatialVideoDAT.mm "$SDK_DAT" spatialvideo-dat
 build_one SpatialVideoTOP SpatialVideoTOP.mm "$SDK_TOP" spatialvideo-top
 echo "done"

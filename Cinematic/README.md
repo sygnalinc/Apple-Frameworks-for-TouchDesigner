@@ -1,47 +1,48 @@
-# Cinematic — iPhone Cinematicモード動画
+# Cinematic Video TOP — iPhone Cinematicモード動画
 
-iPhone(13以降)の**Cinematicモード動画**に埋め込まれた深度・被写体・フォーカス情報を扱う
-2プラグイン。Apple の `Cinematic` framework(macOS 26+)を使う。
+iPhone(13以降)の**Cinematicモード動画**に埋め込まれた深度・被写体・フォーカス情報を扱う。
+Apple の `Cinematic` framework(macOS 26+)を使う。
 
-- **Cinematic Data(CHOP)** — メタデータを数値で出す(フォーカス深度・被写体スロット)
-- **Cinematic Video(TOP)** — 深度(視差)マップ、または **f値/ピントを差し替えて再レンダ**した映像を出す
+- **映像出力**: 深度(視差)マップ、または **f値/ピントを差し替えて再レンダ**した映像
+- **メタデータ出力**: フォーカス深度・被写体スロットを **Info CHOP チャンネル**で出す
+  (旧 **Cinematic Data CHOP** を統合。Info CHOP をこのノードに向けるだけで同じデータが得られる)
 
-両者は共有Swiftヘルパ(`CinematicHelper`)で動画を時刻指定デコードする。
-
-## Cinematic Data(CHOP)
-
-`CNScript` から時刻(Position)のメタデータを取得(ピクセルデコード不要):
-
-- `focus_disparity` — その時刻の合焦面の深度
-- `focus_strong` — フォーカス判断が強い(ユーザー確定)か
-- `subjects` — 検出被写体数
-- `subject{i}/`: `valid` / `type`(1顔 2頭 3胴体 4猫 5犬 6ボール)/ `u,v,w,h`(bbox)/ `depth` / `trackid`
-
-## Cinematic Video(TOP)
+## 映像出力(Mode)
 
 | Mode | 出力 | 内容 |
 |---|---|---|
 | **Depth** | Mono32Float | フレーム毎の視差(深度)マップ(低解像度) |
 | **Rendered** | RGBA16Float | Aperture(f値)と Focus を差し替えて被写界深度を**再レンダ**(`CNRenderingSession`) |
 
-- **CHOP の subject depth を TOP の Focus に配線 → TDからリアルタイムでピント送り**
-- デコード/レンダはワーカースレッドで行い cook をブロックしない
+デコード/レンダはワーカースレッドで行い cook をブロックしない。
+
+## Info CHOP(メタデータ・旧 Cinematic Data CHOP)
+
+`CNScript` から時刻(Position)のメタデータを取得(ピクセルデコード不要・低コスト):
+
+- 診断: `executes / submits / frames / ready / duration`
+- `focus_disparity` — その時刻の合焦面の深度
+- `focus_strong` — フォーカス判断が強い(ユーザー確定)か
+- `subjects` — 検出被写体数
+- `subject{i}/`: `valid` / `type`(1顔 2頭 3胴体 4猫 5犬 6ボール)/ `u,v,w,h`(bbox)/ `depth` / `trackid`
+
+**subject depth を Focus パラメータに配線 → TDからリアルタイムでピント送り**ができる。
 
 ## パラメータ
 
-**共通**: `Cinematic Video (iPhone)`(ファイル)/ `Position (0..1)`(再生位置=時刻)
-
-**CHOP**: `Max Subjects`
-**TOP**: `Mode` / `Aperture (f-number)` / `Focus Disparity Override`(0=script準拠)/ `Normalize Depth` / `Flip`
+`Cinematic Video (iPhone)`(ファイル)/ `Mode` / `Position (0..1)`(再生位置。内部で秒に変換)/
+`Aperture (f-number)` / `Focus Disparity Override`(0=script準拠)/ `Normalize Depth` / `Flip` /
+`Max Subjects (Info CHOP)`
 
 ## 検証状況(M2・実Cinematic動画で全機能確認済み)
 
 iPhone 17 Pro のCinematic動画(3840×2160・視差512×288)で **全機能を実データ視認**:
 
-- ✅ **Cinematic Data(CHOP)**: focus_disparity=0.75、被写体4個(猫=pet depth 2.0、物体 depth 0.18)を取得
-- ✅ **Cinematic Video / Depth**: 手前=近い の視差深度マップを正しく出力
-- ✅ **Cinematic Video / Rendered**: f値でボケが変化(f/2.0=背景大ボケ ↔ f/16=背景くっきり)を視認。
+- ✅ **Depth**: 手前=近い の視差深度マップを正しく出力
+- ✅ **Rendered**: f値でボケが変化(f/2.0=背景大ボケ ↔ f/16=背景くっきり)を視認。
   3840×2160の再レンダをGPUで実行
+- ✅ **Info CHOP メタデータ**(統合後): duration=17.26s、focus_disparity=2.049、focus_strong=1、
+  被写体2スロット(bbox・depth 2.03)を取得
 - 実装は Apple サンプル "Playing and editing Cinematic mode video" の API に準拠
 
 ## 重要: Cinematic動画は「深度を保持して転送」する
@@ -63,11 +64,12 @@ Cinematic動画は転送方法を誤ると**通常動画に平坦化され、深
 - **macOS 26+ 必須**(Cinematic framework)
 - 視差トラックは映像より低解像度。深度TOPもその解像度
 - 時刻指定デコードは AVAssetReader。スクラブ多用時は負荷が上がる(将来 AVSampleBufferGenerator 化候補)
+- 旧 **Cinematic Data CHOP** は本TOPのInfo CHOPに統合され廃止(2026-07-21)
 
 ## ビルド
 
 ```
-cd Cinematic && ./build.sh   # → build/CinematicDataCHOP.plugin + build/CinematicVideoTOP.plugin
+cd Cinematic && ./build.sh   # → build/CinematicVideoTOP.plugin
 ```
 
-1フォルダから2バンドルを生成(共有ヘルパ `CinematicHelper` を各バンドルに同梱)。
+Swiftヘルパ `CinematicHelper` を同梱(epoch付きdylib名でキャッシュ回避)。

@@ -6,6 +6,10 @@
 //   Time(0..1)でスクラブ。デコードはワーカースレッド(cook 非ブロック)。
 //
 // これで空間ビデオの各眼を TD の映像として扱える(立体視の分解・視差合成の素材)。
+//
+// メタデータ(旧 Spatial Video DAT を統合): CMFormatDescription 拡張から
+// baseline / FOV / hero eye 等を読み、数値は Info CHOP、全項目は Info DAT(key/value)に出す。
+// Info CHOP / Info DAT をこのノードに向けるだけで旧DATと同じ情報が得られる。
 #import <Foundation/Foundation.h>
 #import <AVFoundation/AVFoundation.h>
 #import <CoreMedia/CoreMedia.h>
@@ -32,6 +36,13 @@ struct Frame
     bool ok = false;
     bool spatial = false;
 };
+
+static std::string fourcc(uint32_t c)
+{
+    char b[5] = {(char)((c >> 24) & 0xff), (char)((c >> 16) & 0xff),
+                 (char)((c >> 8) & 0xff), (char)(c & 0xff), 0};
+    return b;
+}
 
 class SpatialVideoTOP final : public TOP_CPlusPlusBase
 {
@@ -97,7 +108,6 @@ public:
             return;
         memcpy(b->data, r.bgra.data(), r.bgra.size());
         out->uploadBuffer(&b, ui, nullptr);
-        mySpatial = r.spatial ? 1 : 0;
     }
 
     void setupParameters(OP_ParameterManager* m, void*) override
@@ -129,14 +139,48 @@ public:
         }
     }
 
-    int32_t getNumInfoCHOPChans(void*) override { return 4; }
+    // Info CHOP: 診断 + 旧 Spatial Video DAT の数値メタデータ
+    int32_t getNumInfoCHOPChans(void*) override { return 13; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override
     {
-        const char* n[4] = {"executes", "submits", "decodes", "is_spatial"};
-        float v[4] = {(float)myExec.load(), (float)mySubmit.load(),
-                      (float)myDecodes.load(), (float)mySpatial.load()};
+        const char* n[13] = {"executes", "submits", "decodes", "is_spatial",
+                             "width", "height", "duration", "fps",
+                             "baseline_mm", "horizontal_fov_deg", "disparity_adjustment",
+                             "has_left_eye", "has_right_eye"};
+        float v[13] = {(float)myExec.load(), (float)mySubmit.load(),
+                       (float)myDecodes.load(), (float)mySpatial.load(),
+                       (float)myMetaW.load(), (float)myMetaH.load(),
+                       myMetaDur.load(), myMetaFps.load(),
+                       myBaselineMm.load(), myFovDeg.load(), (float)myDispAdj.load(),
+                       (float)myHasL.load(), (float)myHasR.load()};
         c->name->setString(n[i]);
         c->value = v[i];
+    }
+
+    // Info DAT: 旧 Spatial Video DAT の key/value テーブル(codec / hero_eye 等の文字列も含む)
+    bool getInfoDATSize(OP_InfoDATSize* s, void*) override
+    {
+        std::lock_guard<std::mutex> l(myMutex);
+        s->rows = (int32_t)myMetaRows.size() + 1;
+        s->cols = 2;
+        s->byColumn = false;
+        return true;
+    }
+    void getInfoDATEntries(int32_t index, int32_t nEntries, OP_InfoDATEntries* e, void*) override
+    {
+        if (nEntries < 2)
+            return;
+        if (index == 0) {
+            e->values[0]->setString("key");
+            e->values[1]->setString("value");
+            return;
+        }
+        std::lock_guard<std::mutex> l(myMutex);
+        int i = index - 1;
+        if (i < 0 || i >= (int)myMetaRows.size())
+            return;
+        e->values[0]->setString(myMetaRows[i].first.c_str());
+        e->values[1]->setString(myMetaRows[i].second.c_str());
     }
 
     void getWarningString(OP_String* s, void*) override
@@ -163,6 +207,10 @@ private:
                 eye = myEye;
                 t = myT;
             }
+            if (path != myMetaPath) {   // ファイル変更時のみメタデータ解析(worker上・cook非ブロック)
+                myMetaPath = path;
+                analyze(path);
+            }
             Frame r;
             r.serial = ++mySerial;
             std::string warn;
@@ -176,6 +224,103 @@ private:
                 myBusy = false;
             }
         }
+    }
+
+    // 旧 Spatial Video DAT のメタデータ解析。key/value 行と数値 atomics を更新する
+    void analyze(const std::string& path)
+    {
+        std::vector<std::pair<std::string, std::string>> rows;
+        myMetaW = myMetaH = myDispAdj = myHasL = myHasR = 0;
+        myMetaDur = myMetaFps = myBaselineMm = myFovDeg = 0.0f;
+        mySpatial = 0;
+        if (path.empty()) {
+            std::lock_guard<std::mutex> l(myMutex);
+            myMetaRows.clear();
+            return;
+        }
+        @autoreleasepool {
+            NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:path.c_str()]];
+            AVURLAsset* asset = [AVURLAsset assetWithURL:url];
+            AVAssetTrack* vt = [asset tracksWithMediaType:AVMediaTypeVideo].firstObject;
+            CMFormatDescriptionRef fmt =
+                vt ? (__bridge CMFormatDescriptionRef)vt.formatDescriptions.firstObject : nullptr;
+            if (!fmt) {
+                rows.push_back({"error", vt ? "no format description" : "no video track"});
+                std::lock_guard<std::mutex> l(myMutex);
+                myMetaRows = std::move(rows);
+                return;
+            }
+            CMVideoDimensions dim = CMVideoFormatDescriptionGetDimensions(fmt);
+            uint32_t codec = CMFormatDescriptionGetMediaSubType(fmt);
+            double dur = CMTimeGetSeconds(asset.duration);
+            float fps = vt.nominalFrameRate;
+
+            auto ext = [&](CFStringRef key) -> CFTypeRef {
+                return CMFormatDescriptionGetExtension(fmt, key);
+            };
+            auto boolExt = [](CFTypeRef v) {
+                return v && CFGetTypeID(v) == CFBooleanGetTypeID() && CFBooleanGetValue((CFBooleanRef)v);
+            };
+            bool hasLeft = boolExt(ext(kCMFormatDescriptionExtension_HasLeftStereoEyeView));
+            bool hasRight = boolExt(ext(kCMFormatDescriptionExtension_HasRightStereoEyeView));
+            bool spatial = hasLeft && hasRight;
+
+            char b[64];
+            rows.push_back({"codec", fourcc(codec)});
+            rows.push_back({"width", std::to_string(dim.width)});
+            rows.push_back({"height", std::to_string(dim.height)});
+            snprintf(b, sizeof(b), "%.3f", dur);
+            rows.push_back({"duration", b});
+            snprintf(b, sizeof(b), "%.3f", fps);
+            rows.push_back({"fps", b});
+            rows.push_back({"is_spatial", spatial ? "1" : "0"});
+            rows.push_back({"has_left_eye", hasLeft ? "1" : "0"});
+            rows.push_back({"has_right_eye", hasRight ? "1" : "0"});
+
+            CFStringRef hero = (CFStringRef)ext(kCMFormatDescriptionExtension_HeroEye);
+            std::string heroStr = "none";
+            if (hero) {
+                if (CFEqual(hero, kCMFormatDescriptionHeroEye_Left))
+                    heroStr = "left";
+                else if (CFEqual(hero, kCMFormatDescriptionHeroEye_Right))
+                    heroStr = "right";
+            }
+            rows.push_back({"hero_eye", heroStr});
+
+            // 基線: micrometers → mm
+            if (CFNumberRef n = (CFNumberRef)ext(kCMFormatDescriptionExtension_StereoCameraBaseline)) {
+                uint32_t micrometers = 0;
+                CFNumberGetValue(n, kCFNumberSInt32Type, &micrometers);
+                myBaselineMm = (float)(micrometers / 1000.0);
+                snprintf(b, sizeof(b), "%.3f", micrometers / 1000.0);
+                rows.push_back({"baseline_mm", b});
+            }
+            // 水平視野角: thousandths of a degree → degree
+            if (CFNumberRef n = (CFNumberRef)ext(kCMFormatDescriptionExtension_HorizontalFieldOfView)) {
+                uint32_t thou = 0;
+                CFNumberGetValue(n, kCFNumberSInt32Type, &thou);
+                myFovDeg = (float)(thou / 1000.0);
+                snprintf(b, sizeof(b), "%.3f", thou / 1000.0);
+                rows.push_back({"horizontal_fov_deg", b});
+            }
+            // 水平視差調整(正規化値・符号付き)
+            if (CFNumberRef n = (CFNumberRef)ext(kCMFormatDescriptionExtension_HorizontalDisparityAdjustment)) {
+                int32_t v = 0;
+                CFNumberGetValue(n, kCFNumberSInt32Type, &v);
+                myDispAdj = v;
+                rows.push_back({"horizontal_disparity_adjustment", std::to_string(v)});
+            }
+
+            myMetaW = dim.width;
+            myMetaH = dim.height;
+            myMetaDur = (float)dur;
+            myMetaFps = fps;
+            myHasL = hasLeft ? 1 : 0;
+            myHasR = hasRight ? 1 : 0;
+            mySpatial = spatial ? 1 : 0;
+        }
+        std::lock_guard<std::mutex> l(myMutex);
+        myMetaRows = std::move(rows);
     }
 
     // CVPixelBuffer(BGRA)を行コピーで vector に
@@ -330,6 +475,11 @@ private:
     uint64_t myUploaded = 0;
     std::atomic<uint64_t> mySerial{0};
     std::atomic<int> myExec{0}, mySubmit{0}, myDecodes{0}, mySpatial{0};
+    // メタデータ(旧 Spatial Video DAT)
+    std::string myMetaPath = "\x01";   // worker専用
+    std::vector<std::pair<std::string, std::string>> myMetaRows;   // myMutex 保護
+    std::atomic<int> myMetaW{0}, myMetaH{0}, myDispAdj{0}, myHasL{0}, myHasR{0};
+    std::atomic<float> myMetaDur{0.0f}, myMetaFps{0.0f}, myBaselineMm{0.0f}, myFovDeg{0.0f};
 };
 
 }   // namespace

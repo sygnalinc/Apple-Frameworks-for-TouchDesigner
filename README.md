@@ -142,10 +142,8 @@ grouped by category.
 |---|---|---|
 | [RealityKit Capture](RealityKitCapture/) | SOP | **Photo folder → 3D mesh** (RealityKit Object Capture). Textured OBJ output |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **Photo depth → 3D point cloud** (unproject via camera calibration / FOV). Colors sampled from RGB |
-| [Cinematic Data](Cinematic/) | CHOP | **iPhone Cinematic video metadata** (macOS 26+): focus depth, detected subjects (type/bbox/depth/trackID) |
-| [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic video**: depth (disparity) map, or **re-render with adjustable focus / aperture** |
-| [Spatial Video](SpatialVideo/) | DAT | **MV-HEVC spatial video metadata**: left/right eye, hero eye, camera baseline, horizontal FOV, disparity adjustment |
-| [Spatial Video](SpatialVideo/) | TOP | **Decode MV-HEVC stereo eyes** → Left / Right / Side-by-Side BGRA (both video layers via tagged buffer groups) |
+| [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic video** (macOS 26+): depth (disparity) map or **re-render with adjustable focus / aperture**; metadata (focus depth, subjects) on its **Info CHOP** |
+| [Spatial Video](SpatialVideo/) | TOP | **Decode MV-HEVC stereo eyes** → Left / Right / Side-by-Side BGRA; metadata (baseline, FOV, hero eye ...) on its **Info CHOP / Info DAT** |
 | [Vision Contours](VisionContours/) | SOP | Image contours → **closed Line geometry** (wire into Sweep / Extrude / Particle) |
 | [Screen Capture](ScreenCapture/) | TOP | **Screen recording** of a display or **a single window picked by name from a dropdown** (up to 120fps) |
 | [CA Process Tap](CoreAudioProcessTap/) | CHOP | **Tap a single app's audio** (Core Audio Process Tap, macOS 14.4+) or all system audio → 48kHz stereo. Finer-grained than Screen Capture |
@@ -158,7 +156,7 @@ grouped by category.
 | [Shortcuts](Shortcuts/) | DAT | **Run macOS Shortcuts** (HomeKit lights / appliances / notifications from TD events) |
 | [GameplayKit Agents](GameplayKitAgents/) | CHOP | **Crowd / flocking simulation** (GameplayKit GKAgent) — seek / separate / align / cohere / avoid / wander |
 | [GameplayKit Path](GameplayKitPath/) | SOP | **Obstacle-avoiding shortest path** (GameplayKit GKObstacleGraph) → polyline |
-| [PDFKit](PDFKit/) | DAT / TOP | **PDFKit** — structure (metadata / outline / text / annotations) + render a page to a texture |
+| [PDFKit](PDFKit/) | TOP | **PDFKit** — render a page to a texture; structure (metadata / outline / text / annotations) on its **Info DAT** |
 | [CoreWLAN](CoreWLAN/) | CHOP | **Live Wi-Fi metrics** (CoreWLAN) — RSSI / noise / SNR / TX rate / channel |
 | [Network Discovery](NetworkDiscovery/) | DAT | **Discover LAN services via Bonjour** → service type / name / hostname / IPv4 / IPv6 / port / TXT (auto-find OSC / HTTP / AirPlay devices) |
 | [ColorSync](ColorSync/) | TOP | **ICC / color-space conversion** (sRGB ↔ Display P3 / Adobe RGB / Rec.2020 / .icc) for display-accurate color |

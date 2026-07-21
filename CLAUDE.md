@@ -2056,3 +2056,32 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   outputConnectors で配線再接続 → old.destroy → 新を旧名にrename。これで .toe を新opTypeに移行できる
 - ゴースト注意: 旧opTypeは実行中TDのメモリに残る(Create Dialogに出る)が、新opTypeのみ参照する
   .toeを保存すれば次回クリーン再起動で消える
+
+### 2026-07-21 セットop統合(Cinematic Data / Spatial Video DAT / PDFKit DAT を各TOPへ吸収)
+
+- ユーザー「GLSL TOPの様に設置で相方も生成できないか?できるなら他もまとめて」→ SDK調査の結論:
+  **OP_CustomOPInfo に設置時の別ノード自動生成フックは無い**(実ヘッダ確認。pythonCallbacksDAT は
+  Callbacks DAT**パラメータ**追加のみ。GLSL TOPのドックDATはTD内部の組み込み専用挙動)。
+  代替は **①Info CHOP/Info DATへの統合(TD標準流儀・Movie File Inと同じ)②palette .tox**
+- ユーザー指示で3ペアを統合(補助op削除):
+  - **Cinematic Data CHOP → Cinematic Video TOP の Info CHOP**: 診断5ch+`focus_disparity/
+    focus_strong/subjects`+`subject{i}/8ch`(Max Subjects par追加・cn_meta呼び出しはworkerに
+    直列化)。**ついでにPosition(0..1)を秒として渡していた潜在バグを pos×duration に修正**
+    (旧TOPは全尺スクラブ不可だった)
+  - **Spatial Video DAT → Spatial Video TOP**: 数値(baseline_mm/FOV/is_spatial等13ch)は
+    Info CHOP、全key/value(codec/hero_eye含む)は Info DAT。メタ解析はファイル変更時にworkerで
+  - **PDFKit DAT → PDFKit TOP の Info DAT**: `Info DAT Mode` par(Info/Outline/Text/Annotations)
+    追加。テーブルはworkerが構築したキャッシュを getInfoDATSize/Entries が返す。Textモードは
+    行ごと(line/text)の表形式に変更。Page parは描画とText/Annotationsで共用
+- 3フォルダとも build.sh を1バンドル化、旧バンドル(CinematicDataCHOP/SpatialVideoDAT/
+  PDFKitDAT.plugin)を常設Pluginsから削除。**PDFKit/Multipeer以外で「1フォルダ2バンドル」は解消**
+- **実測(M2・実素材)**: Cinematic=IMG_2531で duration 17.26s/focus_disparity 2.049/被写体2
+  スロット取得、Spatial=19.255mm基線/63.4°FOV/disparity_adjustment 200 を Info CHOP+DAT両方で、
+  PDF=自作 `Assets/sample_doc.pdf`(コミット済み15KB)で pages/title/Text行分割/Annotations(none)
+  と 1275×1650 描画。3例(CinematicVideo/SpatialVideo/PDFKit=新設)を sample.toe に反映・
+  全ノード0エラーで保存
+- **罠**: ①稼働中TDでの検証ノード編集中にTDが落ち、**未保存のsample.toe編集が消えた**(保存は
+  こまめに)。②cp -R したバンドルが codesign verify 失敗(sealed resource invalid)→ コピー後に
+  再署名で解決。③Info DATの内容はop本体のcook+worker完了後に反映(パラメータ変更→即読みは旧値)
+- 注意: 旧opType(Cinematicdata/Spatialvideo DAT/Pdfkit DAT)を参照する.toeはロードエラーになる。
+  sample.toeは修復済み。catalog 80→77op。README(各+ルート英日)更新
