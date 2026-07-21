@@ -2025,3 +2025,16 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   バイナリで SYGNAL Inc./opHelpURL/visualize を確認。81 bundle インストール済み
 - **新ハマりどころ**: `opHelpURL` は構造体で `=nullptr` 既定。TDが未確保でも安全なよう
   `if(x.opHelpURL) x.opHelpURL->setString(...)` とガードする。opIcon等はTDが確保するがopHelpURLは要確認
+
+### 2026-07-21 opLabel↔opType 全op整合 + folder規約統一 + Gemma削除
+
+- ユーザー「opLabelとopTypeはなるべく揃えて。Folderも基本opLabelだがCI/CAは展開して」
+- **opType=opLabel(スペース除去)** に統一(0不一致): CI×6(Cibokeh等)/ GameKit×2 /
+  CA Process Tap(Caprocesstap)/ LLM AFM(Llmafm)/ LLM MLX(Llmmlx)/ Cinematic Data・Video
+- **folder=opLabel(CI/CA展開)**: CoreAudioTap→CoreAudioProcessTap / AFMCore→LLMAFM /
+  MLXLLM→LLMMLX / Multipeer→MultipeerDAT(CoreML同様 family接尾)。CI/GameKitのフォルダは
+  展開済(CoreImage…/GameplayKit…)で維持。ファイル・バンドルも新フォルダ名に追従
+- **Gemma op 削除**(役割重複)。三層命名ルールを skill/naming.md に明文化
+- 影響: opType変更13件で sample.toe の examples/デモが赤(Unknown operator type)。**MCP復帰後に
+  新opTypeで貼り直し必要**(ユーザー .toe破損許容済み)。ops_catalog/README(英日)は更新済み
+- LLMMLX は folder移動で .xcbuild を消してフルリビルド(mlx-swift C++再コンパイル・十数分)

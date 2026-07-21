@@ -55,3 +55,24 @@ TDは起動時にカスタムOPの名前を検証する。規約違反は**起�
 | Translate | Translate | Translation |
 | RealityKit Capture | Realitykitcapture | RealityKit Object Capture |
 | ImageIO Metadata | Imageiometadata | ImageIO |
+
+## 命名の三層ルール(opLabel / opType / folder)
+
+2026-07-21 に全op統一。原則:
+
+1. **opType = opLabel からスペースを除いた文字列**(先頭大文字+以降小文字数字)。
+   opLabel が略称なら opType も略称を反映する。
+   例: `Vision Pose`→`Visionpose` / `CI Bokeh`→`Cibokeh` / `CA Process Tap`→`Caprocesstap` /
+   `LLM MLX`→`Llmmlx` / `Cinematic Data`→`Cinematicdata`
+2. **folder = opLabel(スペース除去・CamelCase)。ただし略称(CI/CA/GameKit 等)はフレームワーク名に展開**。
+   例: `CI Bokeh`→`CoreImageBokeh` / `CA Process Tap`→`CoreAudioProcessTap` /
+   `GameKit Agents`→`GameplayKitAgents` / `LLM MLX`→`LLMMLX`(LLMは展開不要)
+3. **ファイル名 = folder + Family**(例 `CoreImageBokehTOP.mm`)。バンドル名も同じ
+4. **同一ラベルを複数familyで出す場合は folder = ラベル+Family**(衝突回避):
+   `CoreML` TOP/CHOP/DAT → `CoreML/`・`CoreMLCHOP/`・`CoreMLDAT/`、
+   Multipeer → `MultipeerCHOP/`・`MultipeerDAT/`。この時のみ folder≠label は規約として許容
+5. **1フォルダ2opの共有(Cinematic 等)は folder=フレームワーク**、opType は op ごとに分ける
+   (`Cinematicdata`/`Cinematicvideo`)
+
+**opType を変えると sample.toe の該当ノードが Unknown operator type(赤)になる**。改名時は
+examples/デモの貼り直しをセットで行う(MCP必須)。
