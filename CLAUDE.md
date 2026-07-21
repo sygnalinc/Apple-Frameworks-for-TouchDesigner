@@ -2038,3 +2038,21 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 影響: opType変更13件で sample.toe の examples/デモが赤(Unknown operator type)。**MCP復帰後に
   新opTypeで貼り直し必要**(ユーザー .toe破損許容済み)。ops_catalog/README(英日)は更新済み
 - LLMMLX は folder移動で .xcbuild を消してフルリビルド(mlx-swift C++再コンパイル・十数分)
+
+### 2026-07-21 sample.toe 修復 + TD MCPをHTTP直送で駆動(重要テクニック)
+
+- opType改名で参照切れになった sample.toe の16ノードを新opTypeへ貼り替え(examples CI×6 /
+  Cinematic×2 / LLM×2 と afm_*/mlx_* デモ)。パラメータ・配線を保持し、例ノードは`<NewOpType>1`、
+  例コンテナ AFMCore/MLXLLM→LLMAFM/LLMMLX に改名。全ノード0エラーで保存
+- **重要: touchdesigner MCP クライアントがセッション未登録でも、TD内の `td_mcp_server` の
+  HTTPエンドポイントに直接JSON-RPCを投げて駆動できる**([[td-mcp-http-direct]] にメモ):
+  - TDのリスニングポートを `lsof -nP -iTCP -sTCP:LISTEN -p <tdpid>` で調べる(今回 9988)
+  - エンドポイントは `http://127.0.0.1:<port>/mcp`。`initialize`→`notifications/initialized`→
+    `tools/call`(run/create/set/wire等)を JSON-RPC で送る。session id は初期化応答の
+    `Mcp-Session-Id` ヘッダを以降のリクエストに付ける
+  - scratchpad の `tdmcp.py`(最小HTTPクライアント)で `run(python)` を実行した
+- **ノードのopType付け替え手順**: 旧ノードの parent/name/pos/color/入出力接続/customパラメータを退避
+  → 新opTypeで create → `new.copyParameters(old)`(同名paramは値/式ごとコピー)→ inputConnectors/
+  outputConnectors で配線再接続 → old.destroy → 新を旧名にrename。これで .toe を新opTypeに移行できる
+- ゴースト注意: 旧opTypeは実行中TDのメモリに残る(Create Dialogに出る)が、新opTypeのみ参照する
+  .toeを保存すれば次回クリーン再起動で消える
