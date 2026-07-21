@@ -23,6 +23,8 @@
 //     一覧を取るAPIは標準に無い
 #import <Foundation/Foundation.h>
 #include <arpa/inet.h>
+#include <dlfcn.h>
+#include <dns_sd.h>
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -30,6 +32,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <unistd.h>
@@ -40,6 +43,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 #include "DAT_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
@@ -243,7 +247,156 @@ using namespace TD;
 // ============================== Active IPv4 Scan ==============================
 namespace {
 
-struct ScanHost { std::string ip4, mac, hostname; };
+struct ScanHost { std::string ip4, mac, dns, mdns; };
+
+// ---- MACベンダー(OUI)ルックアップ。プラグイン同梱の oui.txt を1回だけ読む ----
+// oui.txt: "prefixhex(小文字)\tvendor" 各行。prefix は 24/28/36bit(6/7/9桁)。
+static std::unordered_map<std::string, std::string>& ouiMap()
+{
+    static std::unordered_map<std::string, std::string> m;
+    static std::once_flag once;
+    std::call_once(once, [] {
+        // 自分(このバンドル)の実行ファイルパスから Resources/oui.txt を導く
+        Dl_info info;
+        std::string path;
+        if (dladdr((const void*)&ouiMap, &info) && info.dli_fname) {
+            std::string exe = info.dli_fname;   // .../Contents/MacOS/NetworkDiscoveryDAT
+            size_t pos = exe.rfind("/MacOS/");
+            if (pos != std::string::npos)
+                path = exe.substr(0, pos) + "/Resources/oui.txt";
+        }
+        if (path.empty())
+            return;
+        FILE* f = fopen(path.c_str(), "rb");
+        if (!f)
+            return;
+        char line[512];
+        while (fgets(line, sizeof(line), f)) {
+            char* tab = strchr(line, '\t');
+            if (!tab)
+                continue;
+            *tab = 0;
+            std::string pfx = line;
+            std::string ven = tab + 1;
+            while (!ven.empty() && (ven.back() == '\n' || ven.back() == '\r'))
+                ven.pop_back();
+            if (!pfx.empty() && !ven.empty())
+                m.emplace(std::move(pfx), std::move(ven));
+        }
+        fclose(f);
+    });
+    return m;
+}
+
+// "aa:bb:cc:dd:ee:ff" → ベンダー名(longest-match 36→28→24bit)。不明/ランダム化MACは空。
+static std::string vendorForMac(const std::string& mac)
+{
+    if (mac.empty())
+        return "";
+    std::string h;
+    for (char c : mac)
+        if (c != ':')
+            h.push_back((char)tolower(c));
+    if (h.size() < 6)
+        return "";
+    auto& m = ouiMap();
+    for (int L : {9, 7, 6}) {
+        if ((int)h.size() < L)
+            continue;
+        auto it = m.find(h.substr(0, L));
+        if (it != m.end())
+            return it->second;
+    }
+    return "";
+}
+
+// ---- mDNS 逆引き(強制マルチキャストの PTR クエリ)。Bonjour非広告の機器の .local 名を得る ----
+namespace {
+struct PtrCtx { std::string name; bool got = false; };
+static void ptrCallback(DNSServiceRef, DNSServiceFlags, uint32_t, DNSServiceErrorType err,
+                        const char*, uint16_t rrtype, uint16_t, uint16_t rdlen,
+                        const void* rdata, uint32_t, void* ctx)
+{
+    PtrCtx* c = (PtrCtx*)ctx;
+    if (err || rrtype != kDNSServiceType_PTR || !rdata)
+        return;
+    // PTR rdata = DNS wire-format ドメイン名。単純ラベル列のみ扱う(圧縮ポインタが来たら中断)
+    const uint8_t* p = (const uint8_t*)rdata;
+    const uint8_t* end = p + rdlen;
+    std::string name;
+    while (p < end) {
+        uint8_t len = *p++;
+        if (len == 0)
+            break;
+        if (len > 63 || p + len > end)
+            return;   // 圧縮/不正 → 破棄
+        if (!name.empty())
+            name += '.';
+        name.append((const char*)p, len);
+        p += len;
+    }
+    // 末尾の ".local" は残す(LanScanのmDNS列に合わせ、短縮はしない)
+    c->name = name;
+    c->got = true;
+}
+}   // namespace
+
+static std::string mdnsReverse(const std::string& ip, double timeoutSec)
+{
+    struct in_addr a;
+    if (inet_pton(AF_INET, ip.c_str(), &a) != 1)
+        return "";
+    uint32_t h = ntohl(a.s_addr);
+    char rev[64];
+    snprintf(rev, sizeof(rev), "%u.%u.%u.%u.in-addr.arpa.", h & 0xff, (h >> 8) & 0xff,
+             (h >> 16) & 0xff, (h >> 24) & 0xff);
+    DNSServiceRef sd = nullptr;
+    PtrCtx ctx;
+    if (DNSServiceQueryRecord(&sd, kDNSServiceFlagsForceMulticast, 0, rev,
+                              kDNSServiceType_PTR, kDNSServiceClass_IN, ptrCallback,
+                              &ctx) != kDNSServiceErr_NoError)
+        return "";
+    int fd = DNSServiceRefSockFD(sd);
+    double deadline = timeoutSec;
+    while (!ctx.got && deadline > 0) {
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        FD_SET(fd, &rfds);
+        struct timeval tv;
+        double slice = std::min(0.3, deadline);
+        tv.tv_sec = (int)slice;
+        tv.tv_usec = (int)((slice - tv.tv_sec) * 1e6);
+        int r = select(fd + 1, &rfds, nullptr, nullptr, &tv);
+        if (r > 0 && FD_ISSET(fd, &rfds))
+            DNSServiceProcessResult(sd);
+        else if (r == 0)
+            deadline -= slice;
+        else
+            break;
+        if (r > 0)
+            deadline -= slice;
+    }
+    DNSServiceRefDeallocate(sd);
+    return ctx.name;
+}
+
+// 逆引き結果を dns / mdns に振り分ける(.local 系は mdns、それ以外は dns)
+static void assignRevName(const std::string& name, std::string& dns, std::string& mdns)
+{
+    if (name.empty())
+        return;
+    std::string n = name;
+    if (!n.empty() && n.back() == '.')
+        n.pop_back();   // 末尾ドット除去
+    bool isLocal = n.size() >= 6 && n.compare(n.size() - 6, 6, ".local") == 0;
+    if (isLocal) {
+        if (mdns.empty())
+            mdns = n;
+    } else {
+        if (dns.empty())
+            dns = n;
+    }
+}
 
 // sockaddr の 4byte アライン繰り上げ(route message 内のオフセット計算)
 static inline uint32_t roundup4(uint32_t a)
@@ -357,7 +510,7 @@ static std::vector<ScanHost> localIPv4s()
         ScanHost h;
         h.ip4 = buf;
         h.mac = macByIf.count(nm) ? macByIf[nm] : "";
-        h.hostname = host;
+        assignRevName(host, h.dns, h.mdns);   // gethostname は通常 .local → mdns
         out.push_back(std::move(h));
     }
     freeifaddrs(ifap);
@@ -503,7 +656,8 @@ private:
             out.push_back(std::move(e));
         }
 
-        // 逆引き(DNS/mDNS)。LANの Apple 機器は .local 名が返る。ワーカースレッドなので block 可
+        // 逆引き: dns_name = 標準リゾルバ(ユニキャストPTR。ルータ提供名など)、
+        //         mdns_name = 強制マルチキャストPTR(.local 名。Bonjour非広告機器も拾う)
         if (rdns) {
             for (ScanHost& h : out) {
                 struct sockaddr_in sa;
@@ -513,7 +667,9 @@ private:
                 char host[NI_MAXHOST] = {0};
                 if (getnameinfo((struct sockaddr*)&sa, sizeof(sa), host, sizeof(host), nullptr,
                                 0, NI_NAMEREQD) == 0)
-                    h.hostname = host;
+                    assignRevName(host, h.dns, h.mdns);
+                if (h.mdns.empty())
+                    assignRevName(mdnsReverse(h.ip4, 1.0), h.dns, h.mdns);
             }
         }
         return out;
@@ -541,7 +697,7 @@ static uint32_t ipKey(const std::string& ip)
 }
 
 struct Row {
-    std::string type, name, host, ip4, ip6, mac, port, txt, source;
+    std::string type, name, dns, mdns, ip4, ip6, mac, vendor, port, txt, source;
 };
 
 class NetworkDiscoveryDAT final : public DAT_CPlusPlusBase
@@ -632,7 +788,9 @@ public:
                 Row r;
                 r.type = nsToStd(d[@"type"]);
                 r.name = nsToStd(d[@"name"]);
-                r.host = nsToStd(d[@"host"]);
+                r.mdns = nsToStd(d[@"host"]);   // Bonjour解決名は .local(mDNS名)
+                if (!r.mdns.empty() && r.mdns.back() == '.')
+                    r.mdns.pop_back();
                 r.ip4 = nsToStd(d[@"ip4"]);
                 r.ip6 = nsToStd(d[@"ip6"]);
                 r.port = nsToStd(d[@"port"]);
@@ -648,18 +806,20 @@ public:
                 scanCount++;
                 auto range = ipToRows.equal_range(h.ip4);
                 if (range.first != range.second) {
-                    // 既にBonjourで見えている機器 → 全該当行にMAC/ホスト名を補完
+                    // 既にBonjourで見えている機器 → 全該当行にMAC/名前を補完
                     for (auto it = range.first; it != range.second; ++it) {
                         Row& r = rows[it->second];
                         if (r.mac.empty()) r.mac = h.mac;
-                        if (r.host.empty()) r.host = h.hostname;
+                        if (r.dns.empty()) r.dns = h.dns;
+                        if (r.mdns.empty()) r.mdns = h.mdns;
                         if (r.source.find("arp") == std::string::npos) r.source += "+arp";
                     }
                 } else {
                     Row r;
                     r.ip4 = h.ip4;
                     r.mac = h.mac;
-                    r.host = h.hostname;
+                    r.dns = h.dns;
+                    r.mdns = h.mdns;
                     r.source = "arp";
                     int idx = (int)rows.size();
                     ipToRows.insert({r.ip4, idx});
@@ -674,20 +834,32 @@ public:
                     for (auto it = range.first; it != range.second; ++it) {
                         Row& r = rows[it->second];
                         if (r.mac.empty()) r.mac = h.mac;
-                        if (r.host.empty()) r.host = h.hostname;
+                        if (r.dns.empty()) r.dns = h.dns;
+                        if (r.mdns.empty()) r.mdns = h.mdns;
                         if (r.source.find("self") == std::string::npos) r.source += "+self";
                     }
                 } else {
                     Row r;
                     r.ip4 = h.ip4;
                     r.mac = h.mac;
-                    r.host = h.hostname;
+                    r.dns = h.dns;
+                    r.mdns = h.mdns;
                     r.source = "self";
                     int idx = (int)rows.size();
                     ipToRows.insert({r.ip4, idx});
                     rows.push_back(std::move(r));
                 }
             }
+
+            // MACからベンダー(OUI)を補完
+            for (Row& r : rows)
+                if (r.vendor.empty() && !r.mac.empty())
+                    r.vendor = vendorForMac(r.mac);
+
+            // 実体のない行(IP/MAC/名前が全て空 = 未解決Bonjour等)を除外
+            rows.erase(std::remove_if(rows.begin(), rows.end(), [](const Row& r) {
+                           return r.ip4.empty() && r.mac.empty() && r.name.empty();
+                       }), rows.end());
 
             // ip4 昇順→type でソート(空IPは末尾)
             std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) {
@@ -702,23 +874,25 @@ public:
             myRows = (int)rows.size();
 
             // --- 出力 ---
-            const char* hdr[9] = {"service_type", "name", "hostname", "ip4", "ip6",
-                                  "mac", "port", "txt", "source"};
+            const char* hdr[11] = {"ip4", "mac", "vendor", "dns_name", "mdns_name",
+                                   "service_type", "name", "ip6", "port", "txt", "source"};
             output->setOutputDataType(DAT_OutDataType::Table);
-            output->setTableSize((int)rows.size() + 1, 9);
-            for (int c = 0; c < 9; c++)
+            output->setTableSize((int)rows.size() + 1, 11);
+            for (int c = 0; c < 11; c++)
                 output->setCellString(0, c, hdr[c]);
             int row = 1;
             for (const Row& r : rows) {
-                output->setCellString(row, 0, r.type.c_str());
-                output->setCellString(row, 1, r.name.c_str());
-                output->setCellString(row, 2, r.host.c_str());
-                output->setCellString(row, 3, r.ip4.c_str());
-                output->setCellString(row, 4, r.ip6.c_str());
-                output->setCellString(row, 5, r.mac.c_str());
-                output->setCellString(row, 6, r.port.c_str());
-                output->setCellString(row, 7, r.txt.c_str());
-                output->setCellString(row, 8, r.source.c_str());
+                output->setCellString(row, 0, r.ip4.c_str());
+                output->setCellString(row, 1, r.mac.c_str());
+                output->setCellString(row, 2, r.vendor.c_str());
+                output->setCellString(row, 3, r.dns.c_str());
+                output->setCellString(row, 4, r.mdns.c_str());
+                output->setCellString(row, 5, r.type.c_str());
+                output->setCellString(row, 6, r.name.c_str());
+                output->setCellString(row, 7, r.ip6.c_str());
+                output->setCellString(row, 8, r.port.c_str());
+                output->setCellString(row, 9, r.txt.c_str());
+                output->setCellString(row, 10, r.source.c_str());
                 row++;
             }
         }

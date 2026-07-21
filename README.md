@@ -158,7 +158,7 @@ grouped by category.
 | [GameplayKit Path](GameplayKitPath/) | SOP | **Obstacle-avoiding shortest path** (GameplayKit GKObstacleGraph) → polyline |
 | [PDFKit](PDFKit/) | TOP | **PDFKit** — render a page to a texture; structure (metadata / outline / text / annotations) on its **Info DAT** |
 | [CoreWLAN](CoreWLAN/) | CHOP | **Live Wi-Fi metrics** (CoreWLAN) — RSSI / noise / SNR / TX rate / channel |
-| [Network Discovery](NetworkDiscovery/) | DAT | **Discover all LAN devices**: Bonjour services + **active IPv4 scan** (ARP sweep → MAC / hostname of every host, even non-Bonjour); merged type / name / hostname / IPv4 / IPv6 / MAC / port / TXT |
+| [Network Discovery](NetworkDiscovery/) | DAT | **Discover all LAN devices**: Bonjour services + **active IPv4 scan** (ARP sweep → MAC / hostname of every host, even non-Bonjour); merged IP / MAC / **vendor (OUI)** / DNS name / mDNS name / port / TXT (LanScan Pro-like) |
 | [ColorSync](ColorSync/) | TOP | **ICC / color-space conversion** (sRGB ↔ Display P3 / Adobe RGB / Rec.2020 / .icc) for display-accurate color |
 
 ## Getting started

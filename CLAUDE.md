@@ -2116,3 +2116,28 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   を取得し、**Mode に関わらず必ず self 行を注入**(既存のBonjour/ARP行と一致すれば source に "self" を足す)
 - 実測(M2・TD): 自機 192.168.49.16 が **`source=bonjour+arp+self`** でMAC/ホスト名付きで表示。
   スタンドアロンで en0 の ip/mac/host 取得も確認。バンドル再ビルド・インストール済み
+
+### 2026-07-22 Network Discovery を LanScan Pro 相当に(MACベンダー/DNS名・mDNS名分離)
+
+- ユーザーがLanScan Proのスクショを提示「同じような情報を取得したい」。不足していた
+  **Vendor(MACベンダー)** と **DNS名/mDNS名の分離** を追加
+- **Vendor(OUI)**: IEEE公式から MA-L/MA-M/MA-S を取得し `oui.txt`(約53000件・1.65MB・**コミット**)
+  を生成、プラグインの `Contents/Resources/` に同梱。実行時に `dladdr(&関数)` で自バンドルの
+  MacOS実行ファイルパス→`../Resources/oui.txt` を導いて1回ロード(`std::call_once`)。MAC先頭
+  24/28/36bit を **longest-match**。ランダム化MAC(ローカルアドミニスタード)は空欄。
+  生成スクリプトは `tools/gen_oui.py`
+- **DNS名 / mDNS名の分離**: `dns_name`=標準リゾルバの逆引き(getnameinfo・ユニキャストPTR。
+  `.local`以外)、`mdns_name`=**強制マルチキャスト逆引きPTR**(`DNSServiceQueryRecord` +
+  `kDNSServiceFlagsForceMulticast`・`.local`)。`assignRevName` で `.local` 判定して振り分け。
+  Bonjour解決名は mdns_name に入れる
+- 出力列を **ip4 / mac / vendor / dns_name / mdns_name / service_type / name / ip6 / port / txt /
+  source** に再編(LanScan Pro相当)。実体のない行(ip/mac/name全空)は除外
+- **実測(M2・自宅LAN)— LanScanと一致**: BUFFALO.INC/Espressif/Amazon/Hitachi Global Life
+  Solutions/Panasonic/ATOM tech/Intel、mdns=linux-2.local/HITACHI.local/各iPhone.local、
+  dns=ルータのap50c4dd…。スタンドアロンで mDNS逆引き(dns_sd)を先に検証してから TD 実機で確認
+- **踏んだ罠**: ①`DNSServiceRefSockFD`(末尾FD大文字。SockFdではない)。②dns_sdは追加フレームワーク
+  不要(libSystem)。③OUIロードは `dladdr` でバンドルResourcesパスを取得(C++クラスなのでNSBundle
+  bundleForClass不可)。④逆引きは1台~1秒×件数でスキャンが数十秒になる(ワーカースレッドなのでcookは
+  非ブロック)
+- **未対応**: SMB Name/Domain(NetBIOS 137/445)は LanScan にあるが未実装(将来候補)。README
+  (新規節+実測表+ルート英日)更新。build.sh に oui.txt 同梱処理追加
