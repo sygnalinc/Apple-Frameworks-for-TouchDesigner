@@ -39,6 +39,8 @@ mac / port / txt / source` をテーブル出力する。会場機器の一覧�
 | **vendor** | **MACベンダー名**(同梱 IEEE OUIデータベースから。例 `BUFFALO.INC` / `Espressif Inc.` / `Amazon Technologies Inc.` / `Hitachi ...` / `Intel Corporate`) |
 | **dns_name** | **ユニキャスト逆引きDNS名**(ルータ提供のPTRなど。`.local`以外) |
 | **mdns_name** | **mDNS名**(`.local`。Bonjour解決名 or 強制マルチキャスト逆引きPTR。Bonjour非広告機器も拾う) |
+| **smb_name** | **NetBIOS/SMBコンピュータ名**(Windows/NAS/Samba。unique 0x00) |
+| **smb_domain** | **NetBIOSワークグループ/ドメイン名**(group 0x00) |
 | service_type | Bonjour サービスタイプ(`_osc._udp.` など。ARP由来行は空) |
 | name | Bonjour サービスのインスタンス名 |
 | ip6 | IPv6アドレス(Bonjour解決時) |
@@ -70,7 +72,12 @@ Bonjour/ARPでも出ていれば統合される(例 `bonjour+arp+self`)。複数
 | .16(自機) | (randomized) | | mrt-MacBook-Air.local |
 | .23 | Intel Corporate | | |
 
-ベンダー・mDNS名とも LanScan Pro の表示値と一致。**SMB Name/Domain(NetBIOS)は未対応**(将来候補)。
+ベンダー・mDNS名とも LanScan Pro の表示値と一致。
+
+**SMB名/ドメイン(NetBIOS)**: NetBIOS Name Service(UDP 137)の Node Status(NBSTAT)クエリで
+Windows/NAS/Samba のコンピュータ名・ワークグループを取得する。**実装は疑似レスポンダで
+フル送受信+パース検証済み**(`smb_name=NAS-SERVER / smb_domain=HOME`)。現代の機器は NetBIOS を
+無効にしていることが多く、応答機器がLAN上に無いと空欄になる(macOS の netbiosd も既定オフ)。
 
 ## パラメータ
 
@@ -85,6 +92,7 @@ Bonjour/ARPでも出ていれば統合される(例 `bonjour+arp+self`)。複数
 | Scan Timeout (s) | ARP完了を待つ時間(既定2s) |
 | Max Hosts | スイープ上限(大きなサブネットの暴走防止・既定1024) |
 | Reverse DNS / mDNS | 逆引きでホスト名を取得(既定On。件数が多いと遅くなる) |
+| NetBIOS / SMB Name | NetBIOS(UDP 137)で SMB名/ドメインを取得(既定On。1台あたり最大0.6s) |
 | Restart Bonjour | Bonjourブラウズをやり直す(パルス) |
 
 ## 注意
@@ -98,9 +106,9 @@ Bonjour/ARPでも出ていれば統合される(例 `bonjour+arp+self`)。複数
   **IPv6全域スキャンはアドレス空間的に不可**
 - Active Scan はサブネット全ホストへ1バイトUDPを送る(自分のLANのみ・最小限)。
   セキュリティソフトがポートスキャンとみなす場合がある
-- **SMB Name / SMB Domain(NetBIOS 137/445)は未対応**(LanScan Proにはあるが本OPは未実装・将来候補)
-- 逆引き(DNS + mDNS)は1台あたり最大 ~1秒。ARP応答機器が多いとスキャン全体が数十秒かかることがある
-  (件数分だけワーカースレッドで直列実行・cook は非ブロック)
+- 逆引き(DNS + mDNS)+ NetBIOS は1台あたり最大 ~1.6秒。ARP応答機器が多いとスキャン全体が
+  数十秒かかることがある(件数分だけワーカースレッドで直列実行・cook は非ブロック)。
+  不要なら `Reverse DNS` / `NetBIOS` トグルを Off にすると速くなる
 - 同一機器が複数のBonjourサービスを広告している場合、サービスごとに行が出る(service_type/name で区別)
 
 ## OUIデータベースの更新

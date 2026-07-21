@@ -2141,3 +2141,24 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   非ブロック)
 - **未対応**: SMB Name/Domain(NetBIOS 137/445)は LanScan にあるが未実装(将来候補)。README
   (新規節+実測表+ルート英日)更新。build.sh に oui.txt 同梱処理追加
+
+### 2026-07-22 Network Discovery に SMB名/ドメイン(NetBIOS)を追加(LanScan Pro完全対応)
+
+- ユーザー「SMB Name/Domain(NetBIOS)追加して」。NetBIOS Name Service(UDP 137)の
+  **Node Status(NBSTAT)クエリ**で Windows/NAS/Samba のコンピュータ名・ワークグループを取得
+- **リクエスト**: 特殊名 "*"+null15 を first-level encoding(各バイト→2ニブル+'A')し、
+  QTYPE=NBSTAT(0x21)/QCLASS=IN で UDP 137 へ。**応答パース**: RR の RDATA から numNames→
+  各 16byte名+2byte flags。unique 0x00=`smb_name`(コンピュータ名)、group 0x00=`smb_domain`
+  (ワークグループ)。`__MSBROWSE__` は除外
+- 出力列を **ip4/mac/vendor/dns_name/mdns_name/smb_name/smb_domain/service_type/name/ip6/port/
+  txt/source**(13列)に拡張。`NetBIOS / SMB Name` トグル(既定On・1台0.6s)
+- **検証**: ①合成NBSTAT応答でパーサが `MYPC`/`WORKGROUP` を抽出 ②**疑似レスポンダで
+  フル送受信ラウンドトリップ**(高ポートにバインド→リクエスト受信→合成応答→`NAS-SERVER`/`HOME`
+  を取得)③TD実機で13列・Netbiosパラメータ・エラーなしを確認。**このLANはNetBIOS応答機器が
+  無く実機のSMB値は空**(現代の機器はNetBIOS無効が多い・macOSのnetbiosdも既定オフ)
+- **踏んだ罠**: NBNSは応答が無くてもエラーにならない(応答機器が無いだけ)。フル検証には
+  疑似レスポンダを立てる(137は特権ポートなのでテストは高ポートで送受信を確認)
+- **TD起動が固まった**: バンドル入れ替え後の初回起動が7分たっても "Loading" のまま→
+  強制終了(`pkill -9`)→再起動で2回目はキャッシュで通常起動(CLAUDE.md既知挙動どおり)
+- README(smb列・実測注記・パラメータ)+ルート英日更新。これで LanScan Pro の全列(IP/MAC/
+  Hostname/Vendor/DNS/mDNS/SMB Name/SMB Domain)に対応

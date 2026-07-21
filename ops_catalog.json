@@ -2627,6 +2627,11 @@
           "default": "1"
         },
         {
+          "name": "Netbios",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
           "name": "Restart",
           "type": "pulse"
         }

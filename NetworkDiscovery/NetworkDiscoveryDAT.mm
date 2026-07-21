@@ -247,7 +247,7 @@ using namespace TD;
 // ============================== Active IPv4 Scan ==============================
 namespace {
 
-struct ScanHost { std::string ip4, mac, dns, mdns; };
+struct ScanHost { std::string ip4, mac, dns, mdns, smbName, smbDomain; };
 
 // ---- MACベンダー(OUI)ルックアップ。プラグイン同梱の oui.txt を1回だけ読む ----
 // oui.txt: "prefixhex(小文字)\tvendor" 各行。prefix は 24/28/36bit(6/7/9桁)。
@@ -378,6 +378,95 @@ static std::string mdnsReverse(const std::string& ip, double timeoutSec)
     }
     DNSServiceRefDeallocate(sd);
     return ctx.name;
+}
+
+// ---- NetBIOS Name Service(UDP 137)の Node Status クエリで SMB名/ドメインを得る ----
+// Windows/NAS/Samba 機器の コンピュータ名(unique 0x00)と ワークグループ/ドメイン(group 0x00)。
+static void nbnsQuery(const std::string& ip, double timeoutSec, std::string& smbName,
+                      std::string& smbDomain)
+{
+    int s = socket(AF_INET, SOCK_DGRAM, 0);
+    if (s < 0)
+        return;
+    unsigned char req[64];
+    int n = 0;
+    req[n++] = 0x00; req[n++] = 0x00;   // transaction id
+    req[n++] = 0x00; req[n++] = 0x00;   // flags(query)
+    req[n++] = 0x00; req[n++] = 0x01;   // QDCOUNT=1
+    req[n++] = 0x00; req[n++] = 0x00;   // ANCOUNT
+    req[n++] = 0x00; req[n++] = 0x00;   // NSCOUNT
+    req[n++] = 0x00; req[n++] = 0x00;   // ARCOUNT
+    req[n++] = 0x20;                    // QNAME length = 32
+    unsigned char nb[16] = {0};
+    nb[0] = '*';                        // 特殊名 "*" + null15
+    for (int i = 0; i < 16; i++) {      // first-level encoding(各バイト→2ニブル+'A')
+        req[n++] = 'A' + ((nb[i] >> 4) & 0xF);
+        req[n++] = 'A' + (nb[i] & 0xF);
+    }
+    req[n++] = 0x00;                    // QNAME terminator
+    req[n++] = 0x00; req[n++] = 0x21;   // QTYPE = NBSTAT(0x21)
+    req[n++] = 0x00; req[n++] = 0x01;   // QCLASS = IN
+
+    struct sockaddr_in dst;
+    memset(&dst, 0, sizeof(dst));
+    dst.sin_family = AF_INET;
+    dst.sin_port = htons(137);
+    if (inet_pton(AF_INET, ip.c_str(), &dst.sin_addr) != 1) {
+        close(s);
+        return;
+    }
+    sendto(s, req, n, 0, (struct sockaddr*)&dst, sizeof(dst));
+
+    fd_set rfds;
+    FD_ZERO(&rfds);
+    FD_SET(s, &rfds);
+    struct timeval tv;
+    tv.tv_sec = (int)timeoutSec;
+    tv.tv_usec = (int)((timeoutSec - tv.tv_sec) * 1e6);
+    if (select(s + 1, &rfds, nullptr, nullptr, &tv) <= 0) {
+        close(s);
+        return;
+    }
+    unsigned char buf[1500];
+    ssize_t len = recv(s, buf, sizeof(buf), 0);
+    close(s);
+    if (len < 57)
+        return;
+
+    int p = 12;                                  // ヘッダをスキップ
+    while (p < len && buf[p] != 0x00)            // 質問名(ラベル列)をスキップ
+        p += buf[p] + 1;
+    p += 1 + 4;                                  // 0x00 + QTYPE + QCLASS
+    if (p + 2 > len)
+        return;
+    if ((buf[p] & 0xC0) == 0xC0)                 // 応答名(圧縮ポインタ or ラベル列)
+        p += 2;
+    else {
+        while (p < len && buf[p] != 0x00)
+            p += buf[p] + 1;
+        p += 1;
+    }
+    p += 8;                                       // TYPE + CLASS + TTL
+    if (p + 2 > len)
+        return;
+    p += 2;                                       // RDLENGTH
+    if (p + 1 > len)
+        return;
+    int numNames = buf[p++];
+    for (int i = 0; i < numNames && p + 18 <= len; i++) {
+        std::string name((const char*)(buf + p), 15);
+        unsigned char suffix = buf[p + 15];
+        bool group = (buf[p + 16] & 0x80) != 0;   // flags 上位バイトの GROUP ビット
+        p += 18;
+        size_t e = name.find_last_not_of(" \t");
+        name = (e == std::string::npos) ? "" : name.substr(0, e + 1);
+        if (name.empty() || name == "__MSBROWSE__")
+            continue;
+        if (!group && suffix == 0x00 && smbName.empty())
+            smbName = name;                       // unique 0x00 = コンピュータ名
+        else if (group && suffix == 0x00 && smbDomain.empty())
+            smbDomain = name;                     // group 0x00 = ワークグループ/ドメイン
+    }
 }
 
 // 逆引き結果を dns / mdns に振り分ける(.local 系は mdns、それ以外は dns)
@@ -548,13 +637,14 @@ public:
         if (myThread.joinable())
             myThread.join();
     }
-    void request(const std::string& subnet, double timeout, int maxHosts, bool rdns)
+    void request(const std::string& subnet, double timeout, int maxHosts, bool rdns, bool netbios)
     {
         std::lock_guard<std::mutex> l(myMx);
         mySubnet = subnet;
         myTimeout = timeout;
         myMax = maxHosts;
         myRdns = rdns;
+        myNetbios = netbios;
         myPending = true;
         myCv.notify_all();
     }
@@ -577,7 +667,7 @@ private:
             std::string subnet;
             double timeout;
             int maxHosts;
-            bool rdns;
+            bool rdns, netbios;
             {
                 std::unique_lock<std::mutex> l(myMx);
                 myCv.wait(l, [this] { return myPending || myQuit; });
@@ -589,8 +679,9 @@ private:
                 timeout = myTimeout;
                 maxHosts = myMax;
                 rdns = myRdns;
+                netbios = myNetbios;
             }
-            std::vector<ScanHost> res = scan(subnet, timeout, maxHosts, rdns);
+            std::vector<ScanHost> res = scan(subnet, timeout, maxHosts, rdns, netbios);
             {
                 std::lock_guard<std::mutex> l(myMx);
                 myResult = std::move(res);
@@ -600,7 +691,7 @@ private:
     }
 
     std::vector<ScanHost> scan(const std::string& subnetStr, double timeout, int maxHosts,
-                               bool rdns)
+                               bool rdns, bool netbios)
     {
         uint32_t net = 0, mask = 0, self = 0;
         bool ok = subnetStr.empty() ? autoSubnet(net, mask, self)
@@ -672,6 +763,11 @@ private:
                     assignRevName(mdnsReverse(h.ip4, 1.0), h.dns, h.mdns);
             }
         }
+        // NetBIOS(SMB)名/ドメイン
+        if (netbios) {
+            for (ScanHost& h : out)
+                nbnsQuery(h.ip4, 0.6, h.smbName, h.smbDomain);
+        }
         return out;
     }
 
@@ -682,7 +778,7 @@ private:
     std::string mySubnet;
     double myTimeout = 2.0;
     int myMax = 1024;
-    bool myRdns = true;
+    bool myRdns = true, myNetbios = true;
     std::vector<ScanHost> myResult;
     std::atomic<int> myScanned{0};
 };
@@ -697,7 +793,7 @@ static uint32_t ipKey(const std::string& ip)
 }
 
 struct Row {
-    std::string type, name, dns, mdns, ip4, ip6, mac, vendor, port, txt, source;
+    std::string type, name, dns, mdns, smbName, smbDomain, ip4, ip6, mac, vendor, port, txt, source;
 };
 
 class NetworkDiscoveryDAT final : public DAT_CPlusPlusBase
@@ -745,8 +841,10 @@ public:
             double stimeout = inputs->getParDouble("Scantimeout");
             int maxhosts = std::max(1, (int)inputs->getParInt("Maxhosts"));
             bool rdns = inputs->getParInt("Reversedns") != 0;
-            char sb[64];
-            snprintf(sb, sizeof(sb), "|%s|%.2f|%d|%d", subnet.c_str(), stimeout, maxhosts, rdns ? 1 : 0);
+            bool netbios = inputs->getParInt("Netbios") != 0;
+            char sb[80];
+            snprintf(sb, sizeof(sb), "|%s|%.2f|%d|%d|%d", subnet.c_str(), stimeout, maxhosts,
+                     rdns ? 1 : 0, netbios ? 1 : 0);
             std::string ssig = (wantScan ? "1" : "0") + std::string(sb);
 
             if (myRestart) {
@@ -772,7 +870,7 @@ public:
             // Scan: 設定変化 or 初回 or Rescan で一回スイープを起動(常時スキャンはしない)
             if (wantScan && ssig != myScanSig) {
                 myScanSig = ssig;
-                myScanner->request(subnet, stimeout, maxhosts, rdns);
+                myScanner->request(subnet, stimeout, maxhosts, rdns, netbios);
             }
             if (!wantScan)
                 myScanSig.clear();   // 次に有効化したとき確実に走るよう
@@ -812,6 +910,8 @@ public:
                         if (r.mac.empty()) r.mac = h.mac;
                         if (r.dns.empty()) r.dns = h.dns;
                         if (r.mdns.empty()) r.mdns = h.mdns;
+                        if (r.smbName.empty()) r.smbName = h.smbName;
+                        if (r.smbDomain.empty()) r.smbDomain = h.smbDomain;
                         if (r.source.find("arp") == std::string::npos) r.source += "+arp";
                     }
                 } else {
@@ -820,6 +920,8 @@ public:
                     r.mac = h.mac;
                     r.dns = h.dns;
                     r.mdns = h.mdns;
+                    r.smbName = h.smbName;
+                    r.smbDomain = h.smbDomain;
                     r.source = "arp";
                     int idx = (int)rows.size();
                     ipToRows.insert({r.ip4, idx});
@@ -874,11 +976,12 @@ public:
             myRows = (int)rows.size();
 
             // --- 出力 ---
-            const char* hdr[11] = {"ip4", "mac", "vendor", "dns_name", "mdns_name",
-                                   "service_type", "name", "ip6", "port", "txt", "source"};
+            const char* hdr[13] = {"ip4", "mac", "vendor", "dns_name", "mdns_name",
+                                   "smb_name", "smb_domain", "service_type", "name",
+                                   "ip6", "port", "txt", "source"};
             output->setOutputDataType(DAT_OutDataType::Table);
-            output->setTableSize((int)rows.size() + 1, 11);
-            for (int c = 0; c < 11; c++)
+            output->setTableSize((int)rows.size() + 1, 13);
+            for (int c = 0; c < 13; c++)
                 output->setCellString(0, c, hdr[c]);
             int row = 1;
             for (const Row& r : rows) {
@@ -887,12 +990,14 @@ public:
                 output->setCellString(row, 2, r.vendor.c_str());
                 output->setCellString(row, 3, r.dns.c_str());
                 output->setCellString(row, 4, r.mdns.c_str());
-                output->setCellString(row, 5, r.type.c_str());
-                output->setCellString(row, 6, r.name.c_str());
-                output->setCellString(row, 7, r.ip6.c_str());
-                output->setCellString(row, 8, r.port.c_str());
-                output->setCellString(row, 9, r.txt.c_str());
-                output->setCellString(row, 10, r.source.c_str());
+                output->setCellString(row, 5, r.smbName.c_str());
+                output->setCellString(row, 6, r.smbDomain.c_str());
+                output->setCellString(row, 7, r.type.c_str());
+                output->setCellString(row, 8, r.name.c_str());
+                output->setCellString(row, 9, r.ip6.c_str());
+                output->setCellString(row, 10, r.port.c_str());
+                output->setCellString(row, 11, r.txt.c_str());
+                output->setCellString(row, 12, r.source.c_str());
                 row++;
             }
         }
@@ -971,6 +1076,13 @@ public:
         {
             OP_NumericParameter p("Reversedns");
             p.label = "Reverse DNS / mDNS";
+            p.page = P;
+            p.defaultValues[0] = 1;
+            m->appendToggle(p);
+        }
+        {
+            OP_NumericParameter p("Netbios");
+            p.label = "NetBIOS / SMB Name";
             p.page = P;
             p.defaultValues[0] = 1;
             m->appendToggle(p);
