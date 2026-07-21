@@ -1,0 +1,4849 @@
+{
+  "_note": "TDAppleOps custom op catalog. Generated from .mm sources (best-effort). Use 'create' with parent().create('<create>', name) or MCP create. Param defaults/menus are source-derived; for exact live schema, introspect op.pars() in TD.",
+  "_count": 81,
+  "ops": {
+    "AfmcoreDAT": {
+      "create": "AfmcoreDAT",
+      "opType": "Afmcore",
+      "label": "LLM AFM",
+      "family": "DAT",
+      "icon": "AFM",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "AFMCore",
+      "readme": "AFMCore/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/AFMCore/README.md",
+      "params": [
+        {
+          "name": "Instructions",
+          "type": "string",
+          "page": "LLM AFM"
+        },
+        {
+          "name": "Prompt",
+          "type": "string",
+          "page": "LLM AFM"
+        },
+        {
+          "name": "Temperature",
+          "type": "float",
+          "page": "LLM AFM",
+          "default": "0.7"
+        },
+        {
+          "name": "Maxtokens",
+          "type": "int",
+          "page": "LLM AFM",
+          "default": "512"
+        },
+        {
+          "name": "Keepcontext",
+          "type": "toggle",
+          "page": "LLM AFM",
+          "default": "1"
+        },
+        {
+          "name": "Schema",
+          "type": "string",
+          "page": "LLM AFM"
+        },
+        {
+          "name": "Maxrows",
+          "type": "int",
+          "page": "LLM AFM",
+          "default": "50"
+        },
+        {
+          "name": "Enabletools",
+          "type": "toggle",
+          "page": "Tools",
+          "default": "0"
+        },
+        {
+          "name": "Toolname",
+          "type": "string",
+          "page": "Tools",
+          "default": "get_td_value"
+        },
+        {
+          "name": "Tooldesc",
+          "type": "string",
+          "page": "Tools",
+          "default": "Get a live value from the TouchDesigner project."
+        },
+        {
+          "name": "Toolparams",
+          "type": "string",
+          "page": "Tools",
+          "default": "query:string"
+        },
+        {
+          "name": "Toolresult",
+          "type": "string",
+          "page": "Tools"
+        },
+        {
+          "name": "Returntoolresult",
+          "type": "pulse",
+          "page": "Tools"
+        },
+        {
+          "name": "Submit",
+          "type": "pulse",
+          "page": "LLM AFM"
+        },
+        {
+          "name": "Clear",
+          "type": "pulse",
+          "page": "LLM AFM"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "busy",
+        "turns",
+        "tool_pending"
+      ],
+      "statusDat": true,
+      "example": "/project1/examples/AFMCore",
+      "source": "AFMCore/AFMCoreDAT.mm"
+    },
+    "AudiotoolboxmixCHOP": {
+      "create": "AudiotoolboxmixCHOP",
+      "opType": "Audiotoolboxmix",
+      "label": "AudioToolbox Mix",
+      "family": "CHOP",
+      "icon": "AMX",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "AudioToolboxMix",
+      "readme": "AudioToolboxMix/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/AudioToolboxMix/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Style",
+          "type": "int",
+          "default": "0"
+        },
+        {
+          "name": "Remix",
+          "type": "float",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "renders",
+        "input_channels",
+        "output_channels",
+        "ready"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/AudioToolboxMix",
+      "source": "AudioToolboxMix/AudioToolboxMixCHOP.mm"
+    },
+    "AvaudiomixerCHOP": {
+      "create": "AvaudiomixerCHOP",
+      "opType": "Avaudiomixer",
+      "label": "AVAudio Mixer",
+      "family": "CHOP",
+      "icon": "SPM",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "AVAudioMixer",
+      "readme": "AVAudioMixer/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/AVAudioMixer/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Layout",
+          "type": "menu",
+          "default": "Auto",
+          "menu": [
+            "Auto",
+            "Stereo",
+            "Quad",
+            "Fivepoint1",
+            "Sevenpoint1"
+          ]
+        },
+        {
+          "name": "Distance",
+          "type": "float",
+          "default": "2"
+        },
+        {
+          "name": "Algorithm",
+          "type": "menu",
+          "default": "Hrtf",
+          "menu": [
+            "Hrtf",
+            "Hrtfhq",
+            "Sphericalhead"
+          ]
+        },
+        {
+          "name": "Outputtype",
+          "type": "menu",
+          "default": "Headphones",
+          "menu": [
+            "Headphones",
+            "Speakers"
+          ]
+        },
+        {
+          "name": "Listeneryaw",
+          "type": "float",
+          "default": "0"
+        },
+        {
+          "name": "Reverb",
+          "type": "float",
+          "default": "0"
+        },
+        {
+          "name": "Gain",
+          "type": "float",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "renders",
+        "sources",
+        "ready"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/AVAudioMixer",
+      "source": "AVAudioMixer/AVAudioMixerCHOP.mm"
+    },
+    "AvaudiospatialCHOP": {
+      "create": "AvaudiospatialCHOP",
+      "opType": "Avaudiospatial",
+      "label": "AVAudio Spatial",
+      "family": "CHOP",
+      "icon": "SPA",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "AVAudioSpatial",
+      "readme": "AVAudioSpatial/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/AVAudioSpatial/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Positionmode",
+          "type": "menu",
+          "default": "Polar",
+          "menu": [
+            "Polar",
+            "Cartesian"
+          ]
+        },
+        {
+          "name": "Azimuth",
+          "type": "float",
+          "default": "0"
+        },
+        {
+          "name": "Elevation",
+          "type": "float",
+          "default": "0"
+        },
+        {
+          "name": "Distance",
+          "type": "float",
+          "default": "3"
+        },
+        {
+          "name": "Position",
+          "type": "xyz",
+          "default": "0"
+        },
+        {
+          "name": "Algorithm",
+          "type": "menu",
+          "default": "Hrtf",
+          "menu": [
+            "Hrtf",
+            "Hrtfhq",
+            "Sphericalhead",
+            "Equalpower"
+          ]
+        },
+        {
+          "name": "Outputtype",
+          "type": "menu",
+          "default": "Headphones",
+          "menu": [
+            "Headphones",
+            "Speakers"
+          ]
+        },
+        {
+          "name": "Listeneryaw",
+          "type": "float",
+          "default": "0"
+        },
+        {
+          "name": "Listenerpitch",
+          "type": "float",
+          "default": "0"
+        },
+        {
+          "name": "Distanceatten",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Refdistance",
+          "type": "float",
+          "default": "1"
+        },
+        {
+          "name": "Maxdistance",
+          "type": "float",
+          "default": "30"
+        },
+        {
+          "name": "Reverb",
+          "type": "float",
+          "default": "0"
+        },
+        {
+          "name": "Occlusion",
+          "type": "float",
+          "default": "0"
+        },
+        {
+          "name": "Gain",
+          "type": "float",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "renders",
+        "samplerate",
+        "ready"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/AVAudioSpatial",
+      "source": "AVAudioSpatial/AVAudioSpatialCHOP.mm"
+    },
+    "CaptionauthorDAT": {
+      "create": "CaptionauthorDAT",
+      "opType": "Captionauthor",
+      "label": "Caption Author",
+      "family": "DAT",
+      "icon": "CAP",
+      "minInputs": 0,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "CaptionAuthor",
+      "readme": "CaptionAuthor/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CaptionAuthor/README.md",
+      "params": [
+        {
+          "name": "Format",
+          "type": "menu",
+          "default": "srt",
+          "menu": [
+            "srt",
+            "vtt"
+          ]
+        },
+        {
+          "name": "Textcol",
+          "type": "string",
+          "default": "text"
+        },
+        {
+          "name": "Startcol",
+          "type": "string",
+          "default": "start"
+        },
+        {
+          "name": "Endcol",
+          "type": "string",
+          "default": "end"
+        },
+        {
+          "name": "Timeunit",
+          "type": "menu",
+          "default": "seconds",
+          "menu": [
+            "seconds",
+            "milliseconds",
+            "timecode"
+          ]
+        },
+        {
+          "name": "Defaultduration",
+          "type": "float",
+          "default": "2.0"
+        },
+        {
+          "name": "Onlyfinal",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Outputpath",
+          "type": "file"
+        },
+        {
+          "name": "Autowrite",
+          "type": "toggle",
+          "default": "0"
+        },
+        {
+          "name": "Write",
+          "type": "pulse"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "cues",
+        "writes"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CaptionAuthor",
+      "source": "CaptionAuthor/CaptionAuthorDAT.mm"
+    },
+    "CinematicCHOP": {
+      "create": "CinematicCHOP",
+      "opType": "Cinematic",
+      "label": "Cinematic Data",
+      "family": "CHOP",
+      "icon": "CND",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "Cinematic",
+      "readme": "Cinematic/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/Cinematic/README.md",
+      "params": [
+        {
+          "name": "File",
+          "type": "file"
+        },
+        {
+          "name": "Position",
+          "type": "float",
+          "default": "0"
+        },
+        {
+          "name": "Maxsubjects",
+          "type": "int",
+          "default": "10"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "ready",
+        "loading",
+        "duration"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/Cinematic",
+      "source": "Cinematic/CinematicDataCHOP.mm"
+    },
+    "CinematicTOP": {
+      "create": "CinematicTOP",
+      "opType": "Cinematic",
+      "label": "Cinematic Video",
+      "family": "TOP",
+      "icon": "CNV",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "Cinematic",
+      "readme": "Cinematic/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/Cinematic/README.md",
+      "params": [
+        {
+          "name": "File",
+          "type": "file"
+        },
+        {
+          "name": "Mode",
+          "type": "menu",
+          "default": "Rendered",
+          "menu": [
+            "Depth",
+            "Rendered"
+          ]
+        },
+        {
+          "name": "Position",
+          "type": "float",
+          "default": "0"
+        },
+        {
+          "name": "Fnumber",
+          "type": "float",
+          "default": "4.0"
+        },
+        {
+          "name": "Focus",
+          "type": "float",
+          "default": "0"
+        },
+        {
+          "name": "Normalize",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "frames",
+        "ready"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/Cinematic",
+      "source": "Cinematic/CinematicVideoTOP.mm"
+    },
+    "ColorsyncTOP": {
+      "create": "ColorsyncTOP",
+      "opType": "Colorsync",
+      "label": "ColorSync",
+      "family": "TOP",
+      "icon": "CSY",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "ColorSync",
+      "readme": "ColorSync/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/ColorSync/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Source",
+          "type": "menu",
+          "default": "Srgb"
+        },
+        {
+          "name": "Dest",
+          "type": "menu",
+          "default": "Displayp3"
+        },
+        {
+          "name": "Sourcefile",
+          "type": "file"
+        },
+        {
+          "name": "Destfile",
+          "type": "file"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "converts"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/ColorSync",
+      "source": "ColorSync/ColorSyncTOP.mm"
+    },
+    "CoreaudiotapCHOP": {
+      "create": "CoreaudiotapCHOP",
+      "opType": "Coreaudiotap",
+      "label": "CA Process Tap",
+      "family": "CHOP",
+      "icon": "PAU",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreAudioTap",
+      "readme": "CoreAudioTap/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreAudioTap/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Mode",
+          "type": "menu",
+          "default": "Global",
+          "menu": [
+            "Global",
+            "Process"
+          ]
+        },
+        {
+          "name": "Pid",
+          "type": "int",
+          "default": "0"
+        },
+        {
+          "name": "Excludeself",
+          "type": "toggle",
+          "default": "0"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "running",
+        "buffered",
+        "underruns",
+        "samplerate"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CoreAudioTap",
+      "source": "CoreAudioTap/CoreAudioTapCHOP.mm"
+    },
+    "CoreimagebokehTOP": {
+      "create": "CoreimagebokehTOP",
+      "opType": "Coreimagebokeh",
+      "label": "CI Bokeh",
+      "family": "TOP",
+      "icon": "CIB",
+      "minInputs": 2,
+      "maxInputs": 2,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreImageBokeh",
+      "readme": "CoreImageBokeh/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreImageBokeh/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Bokeh",
+          "default": "1"
+        },
+        {
+          "name": "Radius",
+          "type": "float",
+          "page": "Vision Bokeh",
+          "default": "20"
+        },
+        {
+          "name": "Background",
+          "type": "toggle",
+          "page": "Vision Bokeh",
+          "default": "1"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Bokeh",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "processes",
+        "process_ms",
+        "valid"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CoreImageBokeh",
+      "source": "CoreImageBokeh/CoreImageBokehTOP.mm"
+    },
+    "CoreimagecodeTOP": {
+      "create": "CoreimagecodeTOP",
+      "opType": "Coreimagecode",
+      "label": "CI Code",
+      "family": "TOP",
+      "icon": "CIC",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreImageCode",
+      "readme": "CoreImageCode/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreImageCode/README.md",
+      "params": [
+        {
+          "name": "Text",
+          "type": "string",
+          "page": "Core Image Code",
+          "default": "TDAppleML"
+        },
+        {
+          "name": "Type",
+          "type": "menu",
+          "page": "Core Image Code",
+          "default": "qr",
+          "menu": [
+            "qr",
+            "aztec",
+            "pdf417",
+            "code128"
+          ]
+        },
+        {
+          "name": "Correction",
+          "type": "menu",
+          "page": "Core Image Code",
+          "default": "M",
+          "menu": [
+            "L",
+            "M",
+            "Q",
+            "H"
+          ]
+        },
+        {
+          "name": "Width",
+          "type": "int"
+        },
+        {
+          "name": "Height",
+          "type": "int"
+        },
+        {
+          "name": "Quietzone",
+          "type": "int"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "generates",
+        "generate_ms",
+        "valid"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CoreImageCode",
+      "source": "CoreImageCode/CoreImageCodeTOP.mm"
+    },
+    "CoreimageenhanceTOP": {
+      "create": "CoreimageenhanceTOP",
+      "opType": "Coreimageenhance",
+      "label": "CI Enhance",
+      "family": "TOP",
+      "icon": "CIE",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreImageEnhance",
+      "readme": "CoreImageEnhance/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreImageEnhance/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle"
+        },
+        {
+          "name": "Redeye",
+          "type": "toggle"
+        },
+        {
+          "name": "Crop",
+          "type": "toggle"
+        },
+        {
+          "name": "Level",
+          "type": "toggle"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "processes",
+        "process_ms",
+        "filters",
+        "valid"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CoreImageEnhance",
+      "source": "CoreImageEnhance/CoreImageEnhanceTOP.mm"
+    },
+    "CoreimagehdrTOP": {
+      "create": "CoreimagehdrTOP",
+      "opType": "Coreimagehdr",
+      "label": "CI HDR",
+      "family": "TOP",
+      "icon": "CIH",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreImageHDR",
+      "readme": "CoreImageHDR/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreImageHDR/README.md",
+      "params": [
+        {
+          "name": "File",
+          "type": "file"
+        },
+        {
+          "name": "Mode",
+          "type": "menu",
+          "default": "Hdr",
+          "menu": [
+            "Sdr",
+            "Gainmap",
+            "Hdr"
+          ]
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "loads",
+        "valid",
+        "max_value"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CoreImageHDR",
+      "source": "CoreImageHDR/CoreImageHDRTOP.mm"
+    },
+    "CoreimagekeystoneTOP": {
+      "create": "CoreimagekeystoneTOP",
+      "opType": "Coreimagekeystone",
+      "label": "CI Keystone",
+      "family": "TOP",
+      "icon": "CIK",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreImageKeystone",
+      "readme": "CoreImageKeystone/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreImageKeystone/README.md",
+      "params": [
+        {
+          "name": "Cornerchop",
+          "type": "CHOP",
+          "page": "Vision Keystone"
+        },
+        {
+          "name": "Slot",
+          "type": "int",
+          "page": "Vision Keystone",
+          "default": "1"
+        },
+        {
+          "name": "Active",
+          "type": "toggle"
+        },
+        {
+          "name": "Usechop",
+          "type": "toggle"
+        },
+        {
+          "name": "Topleft",
+          "type": "string"
+        },
+        {
+          "name": "Topright",
+          "type": "string"
+        },
+        {
+          "name": "Bottomright",
+          "type": "string"
+        },
+        {
+          "name": "Bottomleft",
+          "type": "string"
+        },
+        {
+          "name": "Outputwidth",
+          "type": "int"
+        },
+        {
+          "name": "Outputheight",
+          "type": "int"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "processes",
+        "process_ms",
+        "valid"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CoreImageKeystone",
+      "source": "CoreImageKeystone/CoreImageKeystoneTOP.mm"
+    },
+    "CoreimagerawTOP": {
+      "create": "CoreimagerawTOP",
+      "opType": "Coreimageraw",
+      "label": "CI RAW",
+      "family": "TOP",
+      "icon": "CIR",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreImageRAW",
+      "readme": "CoreImageRAW/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreImageRAW/README.md",
+      "params": [
+        {
+          "name": "File",
+          "type": "file"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "develops",
+        "valid"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CoreImageRAW",
+      "source": "CoreImageRAW/CoreImageRAWTOP.mm"
+    },
+    "CorelocationbeaconCHOP": {
+      "create": "CorelocationbeaconCHOP",
+      "opType": "Corelocationbeacon",
+      "label": "CoreLocation Beacon",
+      "family": "CHOP",
+      "icon": "BCN",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreLocationBeacon",
+      "readme": "CoreLocationBeacon/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreLocationBeacon/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Uuid",
+          "type": "string",
+          "default": "00000000-0000-0000-0000-000000000000"
+        },
+        {
+          "name": "Major",
+          "type": "int",
+          "default": "0"
+        },
+        {
+          "name": "Minor",
+          "type": "int",
+          "default": "0"
+        },
+        {
+          "name": "Maxbeacons",
+          "type": "int",
+          "default": "10"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "beacons",
+        "auth"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CoreLocationBeacon",
+      "source": "CoreLocationBeacon/CoreLocationBeaconCHOP.mm"
+    },
+    "CoremlCHOP": {
+      "create": "CoremlCHOP",
+      "opType": "Coreml",
+      "label": "CoreML",
+      "family": "CHOP",
+      "icon": "CML",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreMLCHOP",
+      "readme": "CoreMLCHOP/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreMLCHOP/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "CoreML CHOP"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "CoreML CHOP",
+          "default": "1"
+        },
+        {
+          "name": "Modelfile",
+          "type": "file",
+          "page": "CoreML CHOP"
+        },
+        {
+          "name": "Reloadmodel",
+          "type": "pulse",
+          "page": "CoreML CHOP"
+        },
+        {
+          "name": "Computeunits",
+          "type": "menu",
+          "page": "CoreML CHOP",
+          "default": "all",
+          "menu": [
+            "all",
+            "cpugpu",
+            "cpuonly",
+            "cpuane"
+          ]
+        },
+        {
+          "name": "Scaling",
+          "type": "menu",
+          "page": "CoreML CHOP",
+          "default": "scalefill",
+          "menu": [
+            "scalefill",
+            "centercrop",
+            "scalefit"
+          ]
+        },
+        {
+          "name": "Outputname",
+          "type": "string",
+          "page": "CoreML CHOP"
+        },
+        {
+          "name": "Maxvalues",
+          "type": "int",
+          "page": "CoreML CHOP",
+          "default": "256"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "CoreML CHOP",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "loaded",
+        "inference_ms",
+        "total_values",
+        "returned_values"
+      ],
+      "statusDat": true,
+      "example": "/project1/examples/CoreMLCHOP",
+      "source": "CoreMLCHOP/CoreMLCHOP.mm"
+    },
+    "CoremlDAT": {
+      "create": "CoremlDAT",
+      "opType": "Coreml",
+      "label": "CoreML",
+      "family": "DAT",
+      "icon": "CML",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreMLDAT",
+      "readme": "CoreMLDAT/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreMLDAT/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "CoreML Detect"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "CoreML Detect",
+          "default": "1"
+        },
+        {
+          "name": "Modelfile",
+          "type": "file",
+          "page": "CoreML Detect"
+        },
+        {
+          "name": "Reloadmodel",
+          "type": "pulse",
+          "page": "CoreML Detect"
+        },
+        {
+          "name": "Computeunits",
+          "type": "menu",
+          "page": "CoreML Detect",
+          "default": "all",
+          "menu": [
+            "all",
+            "cpugpu",
+            "cpuonly",
+            "cpuane"
+          ]
+        },
+        {
+          "name": "Scaling",
+          "type": "menu",
+          "page": "CoreML Detect",
+          "default": "scalefill",
+          "menu": [
+            "scalefill",
+            "centercrop",
+            "scalefit"
+          ]
+        },
+        {
+          "name": "Maxdetections",
+          "type": "int",
+          "page": "CoreML Detect",
+          "default": "20"
+        },
+        {
+          "name": "Minconfidence",
+          "type": "float",
+          "page": "CoreML Detect",
+          "default": "0.25"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "CoreML Detect",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms",
+        "detections",
+        "loaded"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CoreMLDAT",
+      "source": "CoreMLDAT/CoreMLDAT.mm"
+    },
+    "CoremlTOP": {
+      "create": "CoremlTOP",
+      "opType": "Coreml",
+      "label": "CoreML",
+      "family": "TOP",
+      "icon": "CML",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreML",
+      "readme": "CoreML/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreML/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "CoreML",
+          "default": "1"
+        },
+        {
+          "name": "Modelfile",
+          "type": "file",
+          "page": "CoreML"
+        },
+        {
+          "name": "Reloadmodel",
+          "type": "pulse",
+          "page": "CoreML"
+        },
+        {
+          "name": "Computeunits",
+          "type": "menu",
+          "page": "CoreML",
+          "default": "all",
+          "menu": [
+            "all",
+            "cpugpu",
+            "cpuonly",
+            "cpuane"
+          ]
+        },
+        {
+          "name": "Scaling",
+          "type": "menu",
+          "page": "CoreML",
+          "default": "scalefill",
+          "menu": [
+            "scalefill",
+            "centercrop",
+            "scalefit"
+          ]
+        },
+        {
+          "name": "Outputrange",
+          "type": "menu",
+          "page": "CoreML",
+          "default": "auto",
+          "menu": [
+            "auto",
+            "raw",
+            "manual"
+          ]
+        },
+        {
+          "name": "Rangemin",
+          "type": "float",
+          "page": "CoreML",
+          "default": "0.0"
+        },
+        {
+          "name": "Rangemax",
+          "type": "float",
+          "page": "CoreML",
+          "default": "1.0"
+        },
+        {
+          "name": "Invert",
+          "type": "toggle",
+          "page": "CoreML",
+          "default": "0"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "CoreML",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "loaded",
+        "inference_ms",
+        "out_w",
+        "out_h"
+      ],
+      "statusDat": true,
+      "example": "/project1/examples/CoreML",
+      "source": "CoreML/CoreMLTOP.mm"
+    },
+    "CoremlimagegenTOP": {
+      "create": "CoremlimagegenTOP",
+      "opType": "Coremlimagegen",
+      "label": "CoreML ImageGen",
+      "family": "TOP",
+      "icon": "IMG",
+      "minInputs": 0,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreMLImageGen",
+      "readme": "CoreMLImageGen/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreMLImageGen/README.md",
+      "params": [
+        {
+          "name": "Model",
+          "type": "folder",
+          "page": "Image Gen"
+        },
+        {
+          "name": "Compute",
+          "type": "menu",
+          "page": "Image Gen",
+          "default": "0",
+          "menu": [
+            "0",
+            "1",
+            "2"
+          ]
+        },
+        {
+          "name": "Prompt",
+          "type": "string",
+          "page": "Image Gen"
+        },
+        {
+          "name": "Negativeprompt",
+          "type": "string",
+          "page": "Image Gen"
+        },
+        {
+          "name": "Steps",
+          "type": "int",
+          "page": "Image Gen",
+          "default": "15"
+        },
+        {
+          "name": "Guidance",
+          "type": "float",
+          "page": "Image Gen",
+          "default": "7.5"
+        },
+        {
+          "name": "Seed",
+          "type": "int",
+          "page": "Image Gen",
+          "default": "-1"
+        },
+        {
+          "name": "Img2img",
+          "type": "toggle",
+          "page": "Image Gen",
+          "default": "0"
+        },
+        {
+          "name": "Strength",
+          "type": "float",
+          "page": "Image Gen",
+          "default": "0.6"
+        },
+        {
+          "name": "Generate",
+          "type": "pulse",
+          "page": "Image Gen"
+        },
+        {
+          "name": "Continuous",
+          "type": "toggle",
+          "page": "Image Gen",
+          "default": "0"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Image Gen",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "busy",
+        "step",
+        "steps",
+        "gen_seconds",
+        "image_serial",
+        "executes"
+      ],
+      "statusDat": true,
+      "example": "/project1/examples/CoreMLImageGen",
+      "source": "CoreMLImageGen/CoreMLImageGenTOP.mm"
+    },
+    "CoremlmotionCHOP": {
+      "create": "CoremlmotionCHOP",
+      "opType": "Coremlmotion",
+      "label": "CoreML Motion",
+      "family": "CHOP",
+      "icon": "CMO",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreMLMotion",
+      "readme": "CoreMLMotion/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreMLMotion/README.md",
+      "params": [
+        {
+          "name": "Model",
+          "type": "file"
+        },
+        {
+          "name": "Reset",
+          "type": "pulse"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "predictions",
+        "window",
+        "num_classes"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CoreMLMotion",
+      "source": "CoreMLMotion/CoreMLMotionCHOP.mm"
+    },
+    "Coremlsam2TOP": {
+      "create": "Coremlsam2TOP",
+      "opType": "Coremlsam2",
+      "label": "CoreML SAM2",
+      "family": "TOP",
+      "icon": "SAM",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreMLSAM2",
+      "readme": "CoreMLSAM2/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreMLSAM2/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "SAM2",
+          "default": "1"
+        },
+        {
+          "name": "Modelfolder",
+          "type": "folder",
+          "page": "SAM2"
+        },
+        {
+          "name": "Reloadmodel",
+          "type": "pulse",
+          "page": "SAM2"
+        },
+        {
+          "name": "Computeunits",
+          "type": "menu",
+          "page": "SAM2",
+          "default": "all",
+          "menu": [
+            "all",
+            "cpugpu"
+          ]
+        },
+        {
+          "name": "Promptpoint",
+          "type": "xy",
+          "page": "SAM2",
+          "default": "0.5"
+        },
+        {
+          "name": "Maskselect",
+          "type": "menu",
+          "page": "SAM2",
+          "default": "largest",
+          "menu": [
+            "largest",
+            "score"
+          ]
+        },
+        {
+          "name": "Usebgpoint",
+          "type": "toggle",
+          "page": "SAM2",
+          "default": "0"
+        },
+        {
+          "name": "Bgpoint",
+          "type": "xy",
+          "page": "SAM2",
+          "default": "0.1"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "SAM2",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "encode_ms",
+        "decode_ms",
+        "score",
+        "loaded"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CoreMLSAM2",
+      "source": "CoreMLSAM2/CoreMLSAM2TOP.mm"
+    },
+    "CorewlanCHOP": {
+      "create": "CorewlanCHOP",
+      "opType": "Corewlan",
+      "label": "CoreWLAN",
+      "family": "CHOP",
+      "icon": "WIF",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "CoreWLAN",
+      "readme": "CoreWLAN/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CoreWLAN/README.md",
+      "params": [],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "rssi"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CoreWLAN",
+      "source": "CoreWLAN/CoreWLANCHOP.mm"
+    },
+    "CreatemlDAT": {
+      "create": "CreatemlDAT",
+      "opType": "Createml",
+      "label": "CreateML",
+      "family": "DAT",
+      "icon": "CML",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "CreateML",
+      "readme": "CreateML/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CreateML/README.md",
+      "params": [
+        {
+          "name": "Task",
+          "type": "menu",
+          "default": "Image",
+          "menu": [
+            "Image",
+            "Handpose",
+            "Action",
+            "Handaction",
+            "Sound",
+            "Activity",
+            "Tabularcls",
+            "Tabularreg"
+          ]
+        },
+        {
+          "name": "Trainingpath",
+          "type": "folder"
+        },
+        {
+          "name": "Outputmodel",
+          "type": "file",
+          "default": "model.mlmodel"
+        },
+        {
+          "name": "Train",
+          "type": "pulse"
+        },
+        {
+          "name": "Cancel",
+          "type": "pulse"
+        },
+        {
+          "name": "Labelcolumn",
+          "type": "string",
+          "default": "label"
+        },
+        {
+          "name": "Recordingcolumn",
+          "type": "string",
+          "default": "recording"
+        },
+        {
+          "name": "Targetcolumn",
+          "type": "string",
+          "default": "target"
+        },
+        {
+          "name": "Featurecolumns",
+          "type": "string"
+        },
+        {
+          "name": "Maxiterations",
+          "type": "int",
+          "default": "25"
+        },
+        {
+          "name": "Predictionwindow",
+          "type": "int",
+          "default": "30"
+        },
+        {
+          "name": "Augflip",
+          "type": "toggle"
+        },
+        {
+          "name": "Augcrop",
+          "type": "toggle"
+        },
+        {
+          "name": "Augrotation",
+          "type": "toggle"
+        },
+        {
+          "name": "Augblur",
+          "type": "toggle"
+        },
+        {
+          "name": "Augexposure",
+          "type": "toggle"
+        },
+        {
+          "name": "Augnoise",
+          "type": "toggle"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "progress",
+        "train_metric",
+        "val_metric",
+        "training",
+        "done"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/CreateML",
+      "source": "CreateML/CreateMLDAT.mm"
+    },
+    "CreatemltrainingrecorderCHOP": {
+      "create": "CreatemltrainingrecorderCHOP",
+      "opType": "Createmltrainingrecorder",
+      "label": "CreateML Training Recorder",
+      "family": "CHOP",
+      "icon": "CTR",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "CreateMLTrainingRecorder",
+      "readme": "CreateMLTrainingRecorder/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/CreateMLTrainingRecorder/README.md",
+      "params": [
+        {
+          "name": "Outputpath",
+          "type": "file"
+        },
+        {
+          "name": "Label",
+          "type": "string",
+          "default": "gesture"
+        },
+        {
+          "name": "Record",
+          "type": "toggle",
+          "default": "0"
+        },
+        {
+          "name": "Autosave",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Save",
+          "type": "pulse"
+        },
+        {
+          "name": "Clearfile",
+          "type": "pulse"
+        },
+        {
+          "name": "Stride",
+          "type": "int",
+          "default": "1"
+        },
+        {
+          "name": "Sample",
+          "type": "menu",
+          "default": "last",
+          "menu": [
+            "last",
+            "first"
+          ]
+        }
+      ],
+      "topParams": [],
+      "infoChop": [],
+      "statusDat": false,
+      "example": "/project1/examples/CreateMLTrainingRecorder",
+      "source": "CreateMLTrainingRecorder/CreateMLTrainingRecorderCHOP.mm"
+    },
+    "GamecontrollerCHOP": {
+      "create": "GamecontrollerCHOP",
+      "opType": "Gamecontroller",
+      "label": "Game Controller",
+      "family": "CHOP",
+      "icon": "GCT",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "GameController",
+      "readme": "GameController/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/GameController/README.md",
+      "params": [
+        {
+          "name": "Controllerindex",
+          "type": "int",
+          "page": "Game Controller",
+          "default": "0"
+        },
+        {
+          "name": "Motion",
+          "type": "toggle",
+          "page": "Game Controller",
+          "default": "0"
+        },
+        {
+          "name": "Rumble",
+          "type": "float",
+          "page": "Game Controller",
+          "default": "0"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "controllers"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/GameController",
+      "source": "GameController/GameControllerCHOP.mm"
+    },
+    "GameplaykitagentsCHOP": {
+      "create": "GameplaykitagentsCHOP",
+      "opType": "Gameplaykitagents",
+      "label": "GameKit Agents",
+      "family": "CHOP",
+      "icon": "GPA",
+      "minInputs": 0,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "GameplayKitAgents",
+      "readme": "GameplayKitAgents/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/GameplayKitAgents/README.md",
+      "params": [
+        {
+          "name": "Maxagents",
+          "type": "int",
+          "default": "30"
+        },
+        {
+          "name": "Reset",
+          "type": "pulse"
+        },
+        {
+          "name": "Seed",
+          "type": "int",
+          "default": "1"
+        },
+        {
+          "name": "Spawn",
+          "type": "float",
+          "default": "4"
+        },
+        {
+          "name": "Target",
+          "type": "xy",
+          "default": "0"
+        },
+        {
+          "name": "Speed",
+          "type": "float",
+          "default": "1"
+        },
+        {
+          "name": "Maxspeed",
+          "type": "float",
+          "default": "3"
+        },
+        {
+          "name": "Maxaccel",
+          "type": "float",
+          "default": "8"
+        },
+        {
+          "name": "Radius",
+          "type": "float",
+          "default": "0.3"
+        },
+        {
+          "name": "Boundenable",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Bounds",
+          "type": "xy",
+          "default": "6"
+        },
+        {
+          "name": "Sepdist",
+          "type": "float",
+          "default": "1.0"
+        },
+        {
+          "name": "Neighdist",
+          "type": "float",
+          "default": "2.5"
+        },
+        {
+          "name": "Targetspeed",
+          "type": "float",
+          "default": "2"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "agents"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/GameplayKitAgents",
+      "source": "GameplayKitAgents/GameplayKitAgentsCHOP.mm"
+    },
+    "GameplaykitpathSOP": {
+      "create": "GameplaykitpathSOP",
+      "opType": "Gameplaykitpath",
+      "label": "GameKit Path",
+      "family": "SOP",
+      "icon": "GPP",
+      "minInputs": 0,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "GameplayKitPath",
+      "readme": "GameplayKitPath/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/GameplayKitPath/README.md",
+      "params": [
+        {
+          "name": "Start",
+          "type": "xy",
+          "default": "-4"
+        },
+        {
+          "name": "End",
+          "type": "xy",
+          "default": "4"
+        },
+        {
+          "name": "Obstacleradius",
+          "type": "float",
+          "default": "0.8"
+        },
+        {
+          "name": "Bufferradius",
+          "type": "float",
+          "default": "0.2"
+        },
+        {
+          "name": "Sides",
+          "type": "int",
+          "default": "8"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "found",
+        "length"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/GameplayKitPath",
+      "source": "GameplayKitPath/GameplayKitPathSOP.mm"
+    },
+    "GemmaDAT": {
+      "create": "GemmaDAT",
+      "opType": "Gemma",
+      "label": "Gemma",
+      "family": "DAT",
+      "icon": "GEM",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "Gemma",
+      "readme": "Gemma/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/Gemma/README.md",
+      "params": [
+        {
+          "name": "Instructions",
+          "type": "string"
+        },
+        {
+          "name": "Prompt",
+          "type": "string"
+        },
+        {
+          "name": "Temperature",
+          "type": "number"
+        },
+        {
+          "name": "Maxtokens",
+          "type": "number"
+        },
+        {
+          "name": "Keepcontext",
+          "type": "toggle"
+        },
+        {
+          "name": "Maxrows",
+          "type": "number"
+        },
+        {
+          "name": "Submit",
+          "type": "pulse"
+        },
+        {
+          "name": "Cancel",
+          "type": "pulse"
+        },
+        {
+          "name": "Clear",
+          "type": "pulse"
+        },
+        {
+          "name": "Endpoint",
+          "type": "string"
+        },
+        {
+          "name": "Model",
+          "type": "string"
+        },
+        {
+          "name": "Serverbinary",
+          "type": "string"
+        },
+        {
+          "name": "Modelfile",
+          "type": "string"
+        },
+        {
+          "name": "Port",
+          "type": "number"
+        },
+        {
+          "name": "Context",
+          "type": "number"
+        },
+        {
+          "name": "Gpulayers",
+          "type": "number"
+        },
+        {
+          "name": "Startserver",
+          "type": "pulse"
+        },
+        {
+          "name": "Stopserver",
+          "type": "pulse"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "busy",
+        "turns",
+        "server"
+      ],
+      "statusDat": true,
+      "example": "/project1/examples/Gemma",
+      "source": "Gemma/GemmaDAT.mm"
+    },
+    "ImagecaptureDAT": {
+      "create": "ImagecaptureDAT",
+      "opType": "Imagecapture",
+      "label": "Image Capture",
+      "family": "DAT",
+      "icon": "ICP",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "ImageCapture",
+      "readme": "ImageCapture/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/ImageCapture/README.md",
+      "params": [],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "devices"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/ImageCapture",
+      "source": "ImageCapture/ImageCaptureDAT.mm"
+    },
+    "ImageiofileinTOP": {
+      "create": "ImageiofileinTOP",
+      "opType": "Imageiofilein",
+      "label": "ImageIO File In",
+      "family": "TOP",
+      "icon": "IFI",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "ImageIOFileIn",
+      "readme": "ImageIOFileIn/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/ImageIOFileIn/README.md",
+      "params": [
+        {
+          "name": "File",
+          "type": "file"
+        },
+        {
+          "name": "Datatype",
+          "type": "menu",
+          "default": "Color",
+          "menu": [
+            "Color",
+            "Auto",
+            "Disparity",
+            "Depth",
+            "Portraitmatte",
+            "Skinmatte",
+            "Hairmatte",
+            "Skymatte",
+            "Teethmatte",
+            "Glassesmatte"
+          ]
+        },
+        {
+          "name": "Applyorientation",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Normalize",
+          "type": "toggle",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "extracts",
+        "valid",
+        "range_min",
+        "range_max",
+        "width",
+        "height",
+        "has_disparity",
+        "has_depth",
+        "has_matte"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/ImageIOFileIn",
+      "source": "ImageIOFileIn/ImageIOFileInTOP.mm"
+    },
+    "ImageiometadataDAT": {
+      "create": "ImageiometadataDAT",
+      "opType": "Imageiometadata",
+      "label": "ImageIO Metadata",
+      "family": "DAT",
+      "icon": "IMD",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "ImageIOMetadata",
+      "readme": "ImageIOMetadata/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/ImageIOMetadata/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Image Metadata",
+          "default": "1"
+        },
+        {
+          "name": "File",
+          "type": "file",
+          "page": "Image Metadata"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "reads",
+        "keys"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/ImageIOMetadata",
+      "source": "ImageIOMetadata/ImageIOMetadataDAT.mm"
+    },
+    "ImageiopointcloudSOP": {
+      "create": "ImageiopointcloudSOP",
+      "opType": "Imageiopointcloud",
+      "label": "ImageIO PointCloud",
+      "family": "SOP",
+      "icon": "IPC",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "ImageIOPointCloud",
+      "readme": "ImageIOPointCloud/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/ImageIOPointCloud/README.md",
+      "params": [
+        {
+          "name": "File",
+          "type": "file"
+        },
+        {
+          "name": "Step",
+          "type": "int",
+          "default": "2"
+        },
+        {
+          "name": "Maxpoints",
+          "type": "int",
+          "default": "200000"
+        },
+        {
+          "name": "Depthscale",
+          "type": "float",
+          "default": "1.0"
+        },
+        {
+          "name": "Disptodepth",
+          "type": "toggle",
+          "default": "0"
+        },
+        {
+          "name": "Hfov",
+          "type": "float",
+          "default": "60"
+        },
+        {
+          "name": "Color",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Applyorientation",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "default": "0"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "builds",
+        "points",
+        "has_calibration"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/ImageIOPointCloud",
+      "source": "ImageIOPointCloud/ImageIOPointCloudSOP.mm"
+    },
+    "ImageplaygroundTOP": {
+      "create": "ImageplaygroundTOP",
+      "opType": "Imageplayground",
+      "label": "ImagePlayground",
+      "family": "TOP",
+      "icon": "IPG",
+      "minInputs": 0,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "ImagePlayground",
+      "readme": "ImagePlayground/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/ImagePlayground/README.md",
+      "params": [
+        {
+          "name": "Style",
+          "type": "menu",
+          "page": "Image Playground",
+          "default": "animation",
+          "menu": [
+            "animation",
+            "illustration",
+            "sketch"
+          ]
+        },
+        {
+          "name": "Prompt",
+          "type": "string",
+          "page": "Image Playground"
+        },
+        {
+          "name": "Generate",
+          "type": "pulse",
+          "page": "Image Playground"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Image Playground",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "busy",
+        "gen_seconds",
+        "image_serial",
+        "executes"
+      ],
+      "statusDat": true,
+      "example": "/project1/examples/ImagePlayground",
+      "source": "ImagePlayground/ImagePlaygroundTOP.mm"
+    },
+    "MetaldenoiseTOP": {
+      "create": "MetaldenoiseTOP",
+      "opType": "Metaldenoise",
+      "label": "Metal Denoise",
+      "family": "TOP",
+      "icon": "MDN",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "MetalDenoise",
+      "readme": "MetalDenoise/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/MetalDenoise/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Denoise",
+          "default": "1"
+        },
+        {
+          "name": "Strength",
+          "type": "float",
+          "page": "Denoise",
+          "default": "0.5"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "process_ms"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/MetalDenoise",
+      "source": "MetalDenoise/MetalDenoiseTOP.mm"
+    },
+    "MetalframeinterpTOP": {
+      "create": "MetalframeinterpTOP",
+      "opType": "Metalframeinterp",
+      "label": "Metal Frame Interp",
+      "family": "TOP",
+      "icon": "MFI",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "MetalFrameInterp",
+      "readme": "MetalFrameInterp/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/MetalFrameInterp/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Frame Interp",
+          "default": "1"
+        },
+        {
+          "name": "Mode",
+          "type": "menu",
+          "page": "Frame Interp",
+          "default": "interpolate",
+          "menu": [
+            "interpolate",
+            "motionblur"
+          ]
+        },
+        {
+          "name": "Phase",
+          "type": "float",
+          "page": "Frame Interp",
+          "default": "0.5"
+        },
+        {
+          "name": "Strength",
+          "type": "int",
+          "page": "Frame Interp",
+          "default": "50"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "process_ms"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/MetalFrameInterp",
+      "source": "MetalFrameInterp/MetalFrameInterpTOP.mm"
+    },
+    "MetalmpsanalyzeCHOP": {
+      "create": "MetalmpsanalyzeCHOP",
+      "opType": "Metalmpsanalyze",
+      "label": "Metal MPS Analyze",
+      "family": "CHOP",
+      "icon": "MPS",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "MetalMPSAnalyze",
+      "readme": "MetalMPSAnalyze/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/MetalMPSAnalyze/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "MPS Analyze"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "MPS Analyze",
+          "default": "1"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "MPS Analyze",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms",
+        "pixels"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/MetalMPSAnalyze",
+      "source": "MetalMPSAnalyze/MetalMPSAnalyzeCHOP.mm"
+    },
+    "MetalupscaleTOP": {
+      "create": "MetalupscaleTOP",
+      "opType": "Metalupscale",
+      "label": "Metal Upscale",
+      "family": "TOP",
+      "icon": "MUP",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "MetalUpscale",
+      "readme": "MetalUpscale/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/MetalUpscale/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Upscale",
+          "default": "1"
+        },
+        {
+          "name": "Backend",
+          "type": "menu",
+          "page": "Upscale",
+          "default": "metalfx",
+          "menu": [
+            "metalfx",
+            "vtsuper",
+            "vtlow"
+          ]
+        },
+        {
+          "name": "Scale",
+          "type": "float",
+          "page": "Upscale",
+          "default": "2.0"
+        },
+        {
+          "name": "Downloadmodel",
+          "type": "pulse",
+          "page": "Upscale"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "process_ms",
+        "model_status"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/MetalUpscale",
+      "source": "MetalUpscale/MetalUpscaleTOP.mm"
+    },
+    "MlxllmDAT": {
+      "create": "MlxllmDAT",
+      "opType": "Mlxllm",
+      "label": "LLM MLX",
+      "family": "DAT",
+      "icon": "MLX",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "MLXLLM",
+      "readme": "MLXLLM/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/MLXLLM/README.md",
+      "params": [
+        {
+          "name": "Model",
+          "type": "string",
+          "page": "LLM MLX",
+          "default": "mlx-community/gemma-4-e2b-it-4bit"
+        },
+        {
+          "name": "System",
+          "type": "string",
+          "page": "LLM MLX"
+        },
+        {
+          "name": "Prompt",
+          "type": "string",
+          "page": "LLM MLX"
+        },
+        {
+          "name": "Temperature",
+          "type": "float",
+          "page": "LLM MLX",
+          "default": "0.7"
+        },
+        {
+          "name": "Maxtokens",
+          "type": "int",
+          "page": "LLM MLX",
+          "default": "512"
+        },
+        {
+          "name": "Keepcontext",
+          "type": "toggle",
+          "page": "LLM MLX",
+          "default": "1"
+        },
+        {
+          "name": "Maxrows",
+          "type": "int",
+          "page": "LLM MLX",
+          "default": "50"
+        },
+        {
+          "name": "Useimage",
+          "type": "toggle",
+          "page": "Vision",
+          "default": "0"
+        },
+        {
+          "name": "Image",
+          "type": "TOP",
+          "page": "Vision"
+        },
+        {
+          "name": "Load",
+          "type": "pulse",
+          "page": "LLM MLX"
+        },
+        {
+          "name": "Submit",
+          "type": "pulse",
+          "page": "LLM MLX"
+        },
+        {
+          "name": "Reset",
+          "type": "pulse",
+          "page": "LLM MLX"
+        }
+      ],
+      "topParams": [
+        "Image"
+      ],
+      "infoChop": [
+        "executes",
+        "busy",
+        "ready",
+        "progress",
+        "turns"
+      ],
+      "statusDat": true,
+      "example": "/project1/examples/MLXLLM",
+      "source": "MLXLLM/MLXLLMDAT.mm"
+    },
+    "MultipeerinCHOP": {
+      "create": "MultipeerinCHOP",
+      "opType": "Multipeerin",
+      "label": "Multipeer In",
+      "family": "CHOP",
+      "icon": "MPI",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "MultipeerCHOP",
+      "readme": "MultipeerCHOP/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/MultipeerCHOP/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Multipeer In",
+          "default": "1"
+        },
+        {
+          "name": "Peername",
+          "type": "string",
+          "page": "Multipeer In",
+          "default": "td-mac"
+        },
+        {
+          "name": "Servicetype",
+          "type": "string",
+          "page": "Multipeer In",
+          "default": "td-sensor"
+        },
+        {
+          "name": "Prefixpeer",
+          "type": "toggle",
+          "page": "Multipeer In",
+          "default": "0"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "peers",
+        "channels"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/MultipeerCHOP",
+      "source": "MultipeerCHOP/MultipeerInCHOP.mm"
+    },
+    "MultipeerinDAT": {
+      "create": "MultipeerinDAT",
+      "opType": "Multipeerin",
+      "label": "Multipeer In",
+      "family": "DAT",
+      "icon": "MPI",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "Multipeer",
+      "readme": "Multipeer/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/Multipeer/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Multipeer In",
+          "default": "1"
+        },
+        {
+          "name": "Peername",
+          "type": "string",
+          "page": "Multipeer In",
+          "default": "td-mac"
+        },
+        {
+          "name": "Servicetype",
+          "type": "string",
+          "page": "Multipeer In",
+          "default": "td-appleml"
+        },
+        {
+          "name": "Maxmessages",
+          "type": "int",
+          "page": "Multipeer In",
+          "default": "20"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "peers"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/Multipeer",
+      "source": "Multipeer/MultipeerInDAT.mm"
+    },
+    "MultipeeroutCHOP": {
+      "create": "MultipeeroutCHOP",
+      "opType": "Multipeerout",
+      "label": "Multipeer Out",
+      "family": "CHOP",
+      "icon": "MPO",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "MultipeerCHOP",
+      "readme": "MultipeerCHOP/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/MultipeerCHOP/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Multipeer Out",
+          "default": "1"
+        },
+        {
+          "name": "Peername",
+          "type": "string",
+          "page": "Multipeer Out",
+          "default": "td-mac-out"
+        },
+        {
+          "name": "Servicetype",
+          "type": "string",
+          "page": "Multipeer Out",
+          "default": "td-sensor"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "peers",
+        "sent_chans"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/MultipeerCHOP",
+      "source": "MultipeerCHOP/MultipeerOutCHOP.mm"
+    },
+    "MultipeeroutDAT": {
+      "create": "MultipeeroutDAT",
+      "opType": "Multipeerout",
+      "label": "Multipeer Out",
+      "family": "DAT",
+      "icon": "MPO",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "Multipeer",
+      "readme": "Multipeer/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/Multipeer/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Multipeer Out",
+          "default": "1"
+        },
+        {
+          "name": "Peername",
+          "type": "string",
+          "page": "Multipeer Out",
+          "default": "td-mac-out"
+        },
+        {
+          "name": "Servicetype",
+          "type": "string",
+          "page": "Multipeer Out",
+          "default": "td-appleml"
+        },
+        {
+          "name": "Autosend",
+          "type": "toggle",
+          "page": "Multipeer Out",
+          "default": "1"
+        },
+        {
+          "name": "Send",
+          "type": "pulse",
+          "page": "Multipeer Out"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "peers",
+        "sends"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/Multipeer",
+      "source": "Multipeer/MultipeerOutDAT.mm"
+    },
+    "NetworkdiscoveryDAT": {
+      "create": "NetworkdiscoveryDAT",
+      "opType": "Networkdiscovery",
+      "label": "Network Discovery",
+      "family": "DAT",
+      "icon": "NWD",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "NetworkDiscovery",
+      "readme": "NetworkDiscovery/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/NetworkDiscovery/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Servicetypes",
+          "type": "string",
+          "default": "_ssh._tcp,_http._tcp,_osc._udp,_airplay._tcp"
+        },
+        {
+          "name": "Domain",
+          "type": "string",
+          "default": "local."
+        },
+        {
+          "name": "Resolvetimeout",
+          "type": "float",
+          "default": "5.0"
+        },
+        {
+          "name": "Restart",
+          "type": "pulse"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "services",
+        "resolved"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/NetworkDiscovery",
+      "source": "NetworkDiscovery/NetworkDiscoveryDAT.mm"
+    },
+    "PdfkitDAT": {
+      "create": "PdfkitDAT",
+      "opType": "Pdfkit",
+      "label": "PDFKit",
+      "family": "DAT",
+      "icon": "PDF",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "PDFKit",
+      "readme": "PDFKit/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/PDFKit/README.md",
+      "params": [
+        {
+          "name": "File",
+          "type": "file"
+        },
+        {
+          "name": "Mode",
+          "type": "menu",
+          "default": "Info",
+          "menu": [
+            "Info",
+            "Outline",
+            "Text",
+            "Annotations"
+          ]
+        },
+        {
+          "name": "Page",
+          "type": "int",
+          "default": "0"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "pages"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/PDFKit",
+      "source": "PDFKit/PDFKitDAT.mm"
+    },
+    "PdfkitTOP": {
+      "create": "PdfkitTOP",
+      "opType": "Pdfkit",
+      "label": "PDFKit",
+      "family": "TOP",
+      "icon": "PDF",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "PDFKit",
+      "readme": "PDFKit/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/PDFKit/README.md",
+      "params": [
+        {
+          "name": "File",
+          "type": "file"
+        },
+        {
+          "name": "Page",
+          "type": "int",
+          "default": "0"
+        },
+        {
+          "name": "Dpi",
+          "type": "float",
+          "default": "150"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "width",
+        "height"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/PDFKit",
+      "source": "PDFKit/PDFKitTOP.mm"
+    },
+    "PhaseCHOP": {
+      "create": "PhaseCHOP",
+      "opType": "Phase",
+      "label": "PHASE",
+      "family": "CHOP",
+      "icon": "PHS",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "Phase",
+      "readme": "Phase/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/Phase/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Play",
+          "type": "toggle",
+          "default": "0"
+        },
+        {
+          "name": "Azimuth",
+          "type": "float",
+          "default": "0"
+        },
+        {
+          "name": "Elevation",
+          "type": "float",
+          "default": "0"
+        },
+        {
+          "name": "Distance",
+          "type": "float",
+          "default": "3"
+        },
+        {
+          "name": "Gain",
+          "type": "float",
+          "default": "1"
+        },
+        {
+          "name": "Directpath",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Earlyreflections",
+          "type": "toggle",
+          "default": "0"
+        },
+        {
+          "name": "Latereverb",
+          "type": "toggle",
+          "default": "0"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "playing",
+        "buffered",
+        "underruns",
+        "rendering"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/Phase",
+      "source": "Phase/PhaseCHOP.mm"
+    },
+    "RealitykitcaptureSOP": {
+      "create": "RealitykitcaptureSOP",
+      "opType": "Realitykitcapture",
+      "label": "RealityKit Capture",
+      "family": "SOP",
+      "icon": "RKC",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "RealityKitCapture",
+      "readme": "RealityKitCapture/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/RealityKitCapture/README.md",
+      "params": [
+        {
+          "name": "Imagefolder",
+          "type": "folder",
+          "page": "Photogrammetry"
+        },
+        {
+          "name": "Outputfile",
+          "type": "file",
+          "page": "Photogrammetry",
+          "default": "scan.obj"
+        },
+        {
+          "name": "Detail",
+          "type": "menu",
+          "page": "Photogrammetry",
+          "default": "medium",
+          "menu": [
+            "preview",
+            "reduced",
+            "medium",
+            "full"
+          ]
+        },
+        {
+          "name": "Start",
+          "type": "pulse",
+          "page": "Photogrammetry"
+        },
+        {
+          "name": "Cancel",
+          "type": "pulse",
+          "page": "Photogrammetry"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "progress",
+        "points"
+      ],
+      "statusDat": true,
+      "example": "/project1/examples/RealityKitCapture",
+      "source": "RealityKitCapture/RealityKitCaptureSOP.mm"
+    },
+    "ScreencaptureTOP": {
+      "create": "ScreencaptureTOP",
+      "opType": "Screencapture",
+      "label": "Screen Capture",
+      "family": "TOP",
+      "icon": "SCP",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "ScreenCapture",
+      "readme": "ScreenCapture/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/ScreenCapture/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Screen Capture",
+          "default": "1"
+        },
+        {
+          "name": "Mode",
+          "type": "menu",
+          "page": "Screen Capture",
+          "default": "display",
+          "menu": [
+            "display",
+            "window"
+          ]
+        },
+        {
+          "name": "Window",
+          "type": "dynamicstringmenu",
+          "page": "Screen Capture",
+          "default": "0"
+        },
+        {
+          "name": "Cursor",
+          "type": "toggle",
+          "page": "Screen Capture",
+          "default": "1"
+        },
+        {
+          "name": "Restart",
+          "type": "pulse",
+          "page": "Screen Capture"
+        },
+        {
+          "name": "Index",
+          "type": "int"
+        },
+        {
+          "name": "Width",
+          "type": "int"
+        },
+        {
+          "name": "Height",
+          "type": "int"
+        },
+        {
+          "name": "Fps",
+          "type": "int"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "frames",
+        "running",
+        "sources",
+        "width",
+        "height"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/ScreenCapture",
+      "source": "ScreenCapture/ScreenCaptureTOP.mm"
+    },
+    "ShazamDAT": {
+      "create": "ShazamDAT",
+      "opType": "Shazam",
+      "label": "Shazam",
+      "family": "DAT",
+      "icon": "SHZ",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "Shazam",
+      "readme": "Shazam/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/Shazam/README.md",
+      "params": [
+        {
+          "name": "Audio",
+          "type": "CHOP",
+          "page": "Shazam"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Shazam",
+          "default": "1"
+        },
+        {
+          "name": "Referencefolder",
+          "type": "folder",
+          "page": "Shazam"
+        },
+        {
+          "name": "Buildcatalog",
+          "type": "pulse",
+          "page": "Shazam"
+        },
+        {
+          "name": "Reset",
+          "type": "pulse",
+          "page": "Shazam"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "matched",
+        "offset",
+        "tracks"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/Shazam",
+      "source": "Shazam/ShazamDAT.mm"
+    },
+    "ShortcutsDAT": {
+      "create": "ShortcutsDAT",
+      "opType": "Shortcuts",
+      "label": "Shortcuts",
+      "family": "DAT",
+      "icon": "SHC",
+      "minInputs": 0,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "Shortcuts",
+      "readme": "Shortcuts/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/Shortcuts/README.md",
+      "params": [
+        {
+          "name": "Shortcutname",
+          "type": "string",
+          "page": "Shortcuts"
+        },
+        {
+          "name": "Inputtext",
+          "type": "string",
+          "page": "Shortcuts"
+        },
+        {
+          "name": "Run",
+          "type": "pulse",
+          "page": "Shortcuts"
+        },
+        {
+          "name": "Listshortcuts",
+          "type": "pulse",
+          "page": "Shortcuts"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "runs",
+        "running"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/Shortcuts",
+      "source": "Shortcuts/ShortcutsDAT.mm"
+    },
+    "SoundclassCHOP": {
+      "create": "SoundclassCHOP",
+      "opType": "Soundclass",
+      "label": "Sound Class",
+      "family": "CHOP",
+      "icon": "SND",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "SoundClass",
+      "readme": "SoundClass/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/SoundClass/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Sound Class",
+          "default": "1"
+        },
+        {
+          "name": "Classes",
+          "type": "string",
+          "page": "Sound Class",
+          "default": "applause cheering laughter music speech"
+        },
+        {
+          "name": "Model",
+          "type": "file",
+          "page": "Sound Class"
+        },
+        {
+          "name": "Windowsec",
+          "type": "float",
+          "page": "Sound Class",
+          "default": "1.0"
+        },
+        {
+          "name": "Overlap",
+          "type": "float",
+          "page": "Sound Class",
+          "default": "0.5"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "results",
+        "samplerate"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/SoundClass",
+      "source": "SoundClass/SoundClassCHOP.mm"
+    },
+    "SoundfeaturesCHOP": {
+      "create": "SoundfeaturesCHOP",
+      "opType": "Soundfeatures",
+      "label": "Sound Features",
+      "family": "CHOP",
+      "icon": "SFT",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "SoundFeatures",
+      "readme": "SoundFeatures/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/SoundFeatures/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Sound Features",
+          "default": "1"
+        },
+        {
+          "name": "Fftsize",
+          "type": "int",
+          "page": "Sound Features",
+          "default": "11"
+        },
+        {
+          "name": "Onsetthreshold",
+          "type": "float",
+          "page": "Sound Features",
+          "default": "0.12"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "analyzes",
+        "analyze_ms",
+        "samplerate",
+        "fft_size"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/SoundFeatures",
+      "source": "SoundFeatures/SoundFeaturesCHOP.mm"
+    },
+    "SpatialvideoDAT": {
+      "create": "SpatialvideoDAT",
+      "opType": "Spatialvideo",
+      "label": "Spatial Video",
+      "family": "DAT",
+      "icon": "SPV",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "SpatialVideo",
+      "readme": "SpatialVideo/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/SpatialVideo/README.md",
+      "params": [
+        {
+          "name": "File",
+          "type": "file",
+          "page": "Spatial Video"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "is_spatial",
+        "width",
+        "height",
+        "baseline_mm"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/SpatialVideo",
+      "source": "SpatialVideo/SpatialVideoDAT.mm"
+    },
+    "SpatialvideoTOP": {
+      "create": "SpatialvideoTOP",
+      "opType": "Spatialvideo",
+      "label": "Spatial Video",
+      "family": "TOP",
+      "icon": "SPV",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "SpatialVideo",
+      "readme": "SpatialVideo/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/SpatialVideo/README.md",
+      "params": [
+        {
+          "name": "File",
+          "type": "file"
+        },
+        {
+          "name": "Eye",
+          "type": "menu",
+          "default": "left",
+          "menu": [
+            "left",
+            "right",
+            "sbs"
+          ]
+        },
+        {
+          "name": "Time",
+          "type": "float",
+          "default": "0.0"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "decodes",
+        "is_spatial"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/SpatialVideo",
+      "source": "SpatialVideo/SpatialVideoTOP.mm"
+    },
+    "SpeechactivityCHOP": {
+      "create": "SpeechactivityCHOP",
+      "opType": "Speechactivity",
+      "label": "Speech Activity",
+      "family": "CHOP",
+      "icon": "SAC",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "SpeechActivity",
+      "readme": "SpeechActivity/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/SpeechActivity/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Voice Activity",
+          "default": "1"
+        },
+        {
+          "name": "Sensitivity",
+          "type": "menu",
+          "page": "Voice Activity",
+          "default": "medium",
+          "menu": [
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      ],
+      "topParams": [],
+      "infoChop": [],
+      "statusDat": true,
+      "example": "/project1/examples/SpeechActivity",
+      "source": "SpeechActivity/SpeechActivityCHOP.mm"
+    },
+    "SpeechsynthCHOP": {
+      "create": "SpeechsynthCHOP",
+      "opType": "Speechsynth",
+      "label": "Speech Synth",
+      "family": "CHOP",
+      "icon": "SYN",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "SpeechSynth",
+      "readme": "SpeechSynth/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/SpeechSynth/README.md",
+      "params": [
+        {
+          "name": "Text",
+          "type": "string",
+          "page": "Speech Synth",
+          "default": "Hello from TouchDesigner"
+        },
+        {
+          "name": "Voice",
+          "type": "string",
+          "page": "Speech Synth"
+        },
+        {
+          "name": "Speak",
+          "type": "pulse",
+          "page": "Speech Synth"
+        },
+        {
+          "name": "Stop",
+          "type": "pulse",
+          "page": "Speech Synth"
+        },
+        {
+          "name": "Active",
+          "type": "toggle"
+        },
+        {
+          "name": "Rate",
+          "type": "float"
+        },
+        {
+          "name": "Pitch",
+          "type": "float"
+        },
+        {
+          "name": "Volume",
+          "type": "float"
+        },
+        {
+          "name": "Blocksamples",
+          "type": "int"
+        },
+        {
+          "name": "Autotrigger",
+          "type": "toggle"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "utterances",
+        "buffers",
+        "speaking",
+        "queued_samples",
+        "sample_rate"
+      ],
+      "statusDat": true,
+      "example": "/project1/examples/SpeechSynth",
+      "source": "SpeechSynth/SpeechSynthCHOP.mm"
+    },
+    "SpeechtextDAT": {
+      "create": "SpeechtextDAT",
+      "opType": "Speechtext",
+      "label": "Speech Text",
+      "family": "DAT",
+      "icon": "SPT",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "SpeechText",
+      "readme": "SpeechText/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/SpeechText/README.md",
+      "params": [
+        {
+          "name": "Audio",
+          "type": "CHOP",
+          "page": "Speech"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Speech",
+          "default": "1"
+        },
+        {
+          "name": "Locale",
+          "type": "string",
+          "page": "Speech",
+          "default": "ja-JP"
+        },
+        {
+          "name": "Backend",
+          "type": "menu",
+          "page": "Speech",
+          "default": "apple",
+          "menu": [
+            "apple",
+            "whisper"
+          ]
+        },
+        {
+          "name": "Whispermodel",
+          "type": "menu",
+          "page": "Speech",
+          "default": "base",
+          "menu": [
+            "tiny",
+            "base",
+            "small",
+            "large-v3"
+          ]
+        },
+        {
+          "name": "Whispertask",
+          "type": "menu",
+          "page": "Speech",
+          "default": "transcribe",
+          "menu": [
+            "transcribe",
+            "translate"
+          ]
+        },
+        {
+          "name": "Maxrows",
+          "type": "int",
+          "page": "Speech",
+          "default": "50"
+        },
+        {
+          "name": "Clear",
+          "type": "pulse",
+          "page": "Speech"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "finalized"
+      ],
+      "statusDat": true,
+      "example": "/project1/examples/SpeechText",
+      "source": "SpeechText/SpeechTextDAT.mm"
+    },
+    "SpotlightDAT": {
+      "create": "SpotlightDAT",
+      "opType": "Spotlight",
+      "label": "Spotlight",
+      "family": "DAT",
+      "icon": "SIX",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "Spotlight",
+      "readme": "Spotlight/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/Spotlight/README.md",
+      "params": [
+        {
+          "name": "Query",
+          "type": "string"
+        },
+        {
+          "name": "Mode",
+          "type": "menu",
+          "default": "Name",
+          "menu": [
+            "Name",
+            "Content",
+            "Raw"
+          ]
+        },
+        {
+          "name": "Maxresults",
+          "type": "int",
+          "default": "100"
+        },
+        {
+          "name": "Search",
+          "type": "pulse"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "results"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/Spotlight",
+      "source": "Spotlight/SpotlightDAT.mm"
+    },
+    "TextanalyzeDAT": {
+      "create": "TextanalyzeDAT",
+      "opType": "Textanalyze",
+      "label": "Text Analyze",
+      "family": "DAT",
+      "icon": "TXA",
+      "minInputs": 0,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "TextAnalyze",
+      "readme": "TextAnalyze/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/TextAnalyze/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Text Analyze",
+          "default": "1"
+        },
+        {
+          "name": "Textsource",
+          "type": "menu",
+          "page": "Text Analyze",
+          "default": "lastrow",
+          "menu": [
+            "lastrow",
+            "allrows"
+          ]
+        },
+        {
+          "name": "Referencetext",
+          "type": "string",
+          "page": "Text Analyze"
+        },
+        {
+          "name": "Output",
+          "type": "menu",
+          "page": "Text Analyze",
+          "default": "summary",
+          "menu": [
+            "summary",
+            "tokens",
+            "embedding"
+          ]
+        },
+        {
+          "name": "Maxtokens",
+          "type": "int",
+          "page": "Text Analyze",
+          "default": "500"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms",
+        "sentiment",
+        "similarity",
+        "entities",
+        "token_count",
+        "embedding_dim"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/TextAnalyze",
+      "source": "TextAnalyze/TextAnalyzeDAT.mm"
+    },
+    "TranslateDAT": {
+      "create": "TranslateDAT",
+      "opType": "Translate",
+      "label": "Translate",
+      "family": "DAT",
+      "icon": "TRN",
+      "minInputs": 0,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "Translate",
+      "readme": "Translate/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/Translate/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Translate",
+          "default": "1"
+        },
+        {
+          "name": "Sourcelang",
+          "type": "menu",
+          "page": "Translate",
+          "default": "ja"
+        },
+        {
+          "name": "Targetlang",
+          "type": "menu",
+          "page": "Translate",
+          "default": "en"
+        },
+        {
+          "name": "Text",
+          "type": "string",
+          "page": "Translate"
+        },
+        {
+          "name": "Clearcache",
+          "type": "pulse",
+          "page": "Translate"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [],
+      "statusDat": true,
+      "example": "/project1/examples/Translate",
+      "source": "Translate/TranslateDAT.mm"
+    },
+    "VisionaestheticsCHOP": {
+      "create": "VisionaestheticsCHOP",
+      "opType": "Visionaesthetics",
+      "label": "Vision Aesthetics",
+      "family": "CHOP",
+      "icon": "VAE",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionAesthetics",
+      "readme": "VisionAesthetics/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionAesthetics/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Aesthetics"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Aesthetics",
+          "default": "1"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Aesthetics",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionAesthetics",
+      "source": "VisionAesthetics/VisionAestheticsCHOP.mm"
+    },
+    "VisionanimalposeCHOP": {
+      "create": "VisionanimalposeCHOP",
+      "opType": "Visionanimalpose",
+      "label": "Vision Animal Pose",
+      "family": "CHOP",
+      "icon": "VAP",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionAnimalPose",
+      "readme": "VisionAnimalPose/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionAnimalPose/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Animal Pose"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Animal Pose",
+          "default": "1"
+        },
+        {
+          "name": "Maxanimals",
+          "type": "int",
+          "page": "Vision Animal Pose",
+          "default": "4"
+        },
+        {
+          "name": "Minconfidence",
+          "type": "float",
+          "page": "Vision Animal Pose",
+          "default": "0.1"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Animal Pose",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms",
+        "animals"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionAnimalPose",
+      "source": "VisionAnimalPose/VisionAnimalPoseCHOP.mm"
+    },
+    "VisionbarcodeDAT": {
+      "create": "VisionbarcodeDAT",
+      "opType": "Visionbarcode",
+      "label": "Vision Barcode",
+      "family": "DAT",
+      "icon": "VBC",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionBarcode",
+      "readme": "VisionBarcode/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionBarcode/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Barcode"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Barcode",
+          "default": "1"
+        },
+        {
+          "name": "Maxcodes",
+          "type": "int",
+          "page": "Vision Barcode",
+          "default": "10"
+        },
+        {
+          "name": "Minconfidence",
+          "type": "float",
+          "page": "Vision Barcode",
+          "default": "0"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Barcode",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms",
+        "codes"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionBarcode",
+      "source": "VisionBarcode/VisionBarcodeDAT.mm"
+    },
+    "VisionclassifyDAT": {
+      "create": "VisionclassifyDAT",
+      "opType": "Visionclassify",
+      "label": "Vision Classify",
+      "family": "DAT",
+      "icon": "VCL",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionClassify",
+      "readme": "VisionClassify/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionClassify/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Classify"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Classify",
+          "default": "1"
+        },
+        {
+          "name": "Topn",
+          "type": "int",
+          "page": "Vision Classify",
+          "default": "10"
+        },
+        {
+          "name": "Minconfidence",
+          "type": "float",
+          "page": "Vision Classify",
+          "default": "0.01"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Classify",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms",
+        "results"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionClassify",
+      "source": "VisionClassify/VisionClassifyDAT.mm"
+    },
+    "VisioncontoursSOP": {
+      "create": "VisioncontoursSOP",
+      "opType": "Visioncontours",
+      "label": "Vision Contours",
+      "family": "SOP",
+      "icon": "VCS",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionContours",
+      "readme": "VisionContours/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionContours/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Contours"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Contours",
+          "default": "1"
+        },
+        {
+          "name": "Maxcontours",
+          "type": "int",
+          "page": "Vision Contours",
+          "default": "100"
+        },
+        {
+          "name": "Minpoints",
+          "type": "int",
+          "page": "Vision Contours",
+          "default": "3"
+        },
+        {
+          "name": "Maxpoints",
+          "type": "int",
+          "page": "Vision Contours",
+          "default": "512"
+        },
+        {
+          "name": "Maxdimension",
+          "type": "int",
+          "page": "Vision Contours",
+          "default": "512"
+        },
+        {
+          "name": "Contrast",
+          "type": "float",
+          "page": "Vision Contours",
+          "default": "2.0"
+        },
+        {
+          "name": "Simplify",
+          "type": "float",
+          "page": "Vision Contours",
+          "default": "0.0"
+        },
+        {
+          "name": "Darkonlight",
+          "type": "toggle",
+          "page": "Vision Contours",
+          "default": "1"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Contours",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms",
+        "detected",
+        "contours",
+        "points"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionContours",
+      "source": "VisionContours/VisionContoursSOP.mm"
+    },
+    "VisiondocumentDAT": {
+      "create": "VisiondocumentDAT",
+      "opType": "Visiondocument",
+      "label": "Vision Document",
+      "family": "DAT",
+      "icon": "VDC",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionDocument",
+      "readme": "VisionDocument/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionDocument/README.md",
+      "params": [
+        {
+          "name": "File",
+          "type": "file"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "paragraphs",
+        "tables",
+        "lists",
+        "cells",
+        "analyzing"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionDocument",
+      "source": "VisionDocument/VisionDocumentDAT.mm"
+    },
+    "VisionfaceCHOP": {
+      "create": "VisionfaceCHOP",
+      "opType": "Visionface",
+      "label": "Vision Face",
+      "family": "CHOP",
+      "icon": "VFC",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionFace",
+      "readme": "VisionFace/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionFace/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Face"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Face",
+          "default": "1"
+        },
+        {
+          "name": "Maxfaces",
+          "type": "int",
+          "page": "Vision Face",
+          "default": "5"
+        },
+        {
+          "name": "Landmarks",
+          "type": "toggle",
+          "page": "Vision Face",
+          "default": "0"
+        },
+        {
+          "name": "Quality",
+          "type": "toggle",
+          "page": "Vision Face",
+          "default": "0"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Face",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionFace",
+      "source": "VisionFace/VisionFaceCHOP.mm"
+    },
+    "VisionflowTOP": {
+      "create": "VisionflowTOP",
+      "opType": "Visionflow",
+      "label": "Vision Flow",
+      "family": "TOP",
+      "icon": "VFL",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionFlow",
+      "readme": "VisionFlow/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionFlow/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Flow",
+          "default": "1"
+        },
+        {
+          "name": "Accuracy",
+          "type": "menu",
+          "page": "Vision Flow",
+          "default": "medium",
+          "menu": [
+            "low",
+            "medium",
+            "high",
+            "veryhigh"
+          ]
+        },
+        {
+          "name": "Output",
+          "type": "menu",
+          "page": "Vision Flow",
+          "default": "visualize",
+          "menu": [
+            "flow",
+            "visualize"
+          ]
+        },
+        {
+          "name": "Units",
+          "type": "menu",
+          "page": "Vision Flow",
+          "default": "uv",
+          "menu": [
+            "uv",
+            "pixels"
+          ]
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Flow",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionFlow",
+      "source": "VisionFlow/VisionFlowTOP.mm"
+    },
+    "VisionhandCHOP": {
+      "create": "VisionhandCHOP",
+      "opType": "Visionhand",
+      "label": "Vision Hand",
+      "family": "CHOP",
+      "icon": "VHD",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionHand",
+      "readme": "VisionHand/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionHand/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Hand"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Hand",
+          "default": "1"
+        },
+        {
+          "name": "Maxhands",
+          "type": "int",
+          "page": "Vision Hand",
+          "default": "4"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Hand",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionHand",
+      "source": "VisionHand/VisionHandCHOP.mm"
+    },
+    "VisionhorizonCHOP": {
+      "create": "VisionhorizonCHOP",
+      "opType": "Visionhorizon",
+      "label": "Vision Horizon",
+      "family": "CHOP",
+      "icon": "VHZ",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionHorizon",
+      "readme": "VisionHorizon/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionHorizon/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Horizon"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Horizon",
+          "default": "1"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Horizon",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms",
+        "valid"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionHorizon",
+      "source": "VisionHorizon/VisionHorizonCHOP.mm"
+    },
+    "Visionpose3dCHOP": {
+      "create": "Visionpose3dCHOP",
+      "opType": "Visionpose3d",
+      "label": "Vision Pose 3D",
+      "family": "CHOP",
+      "icon": "VPD",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionPose3D",
+      "readme": "VisionPose3D/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionPose3D/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Pose 3D"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Pose 3D",
+          "default": "1"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Pose 3D",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionPose3D",
+      "source": "VisionPose3D/VisionPose3DCHOP.mm"
+    },
+    "VisionposeCHOP": {
+      "create": "VisionposeCHOP",
+      "opType": "Visionpose",
+      "label": "Vision Pose",
+      "family": "CHOP",
+      "icon": "VPS",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionPose",
+      "readme": "VisionPose/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionPose/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Pose"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Pose",
+          "default": "1"
+        },
+        {
+          "name": "Maxbodies",
+          "type": "int",
+          "page": "Vision Pose",
+          "default": "8"
+        },
+        {
+          "name": "Rotations",
+          "type": "toggle",
+          "page": "Vision Pose",
+          "default": "0"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Pose",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "last_w",
+        "last_h",
+        "last_bytes"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionPose",
+      "source": "VisionPose/VisionPoseCHOP.mm"
+    },
+    "VisionrectCHOP": {
+      "create": "VisionrectCHOP",
+      "opType": "Visionrect",
+      "label": "Vision Rect",
+      "family": "CHOP",
+      "icon": "VRC",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionRect",
+      "readme": "VisionRect/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionRect/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Rect"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Rect",
+          "default": "1"
+        },
+        {
+          "name": "Maxrects",
+          "type": "int",
+          "page": "Vision Rect",
+          "default": "10"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Rect",
+          "default": "1"
+        },
+        {
+          "name": "Minaspect",
+          "type": "float"
+        },
+        {
+          "name": "Maxaspect",
+          "type": "float"
+        },
+        {
+          "name": "Minsize",
+          "type": "float"
+        },
+        {
+          "name": "Minconfidence",
+          "type": "float"
+        },
+        {
+          "name": "Tolerance",
+          "type": "float"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms",
+        "rects"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionRect",
+      "source": "VisionRect/VisionRectCHOP.mm"
+    },
+    "VisionsaliencyTOP": {
+      "create": "VisionsaliencyTOP",
+      "opType": "Visionsaliency",
+      "label": "Vision Saliency",
+      "family": "TOP",
+      "icon": "VSL",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionSaliency",
+      "readme": "VisionSaliency/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionSaliency/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Saliency",
+          "default": "1"
+        },
+        {
+          "name": "Mode",
+          "type": "menu",
+          "page": "Vision Saliency",
+          "default": "attention",
+          "menu": [
+            "attention",
+            "objectness"
+          ]
+        },
+        {
+          "name": "Padding",
+          "type": "float",
+          "page": "Vision Saliency",
+          "default": "1.2"
+        },
+        {
+          "name": "Aspect",
+          "type": "float",
+          "page": "Vision Saliency",
+          "default": "0.0"
+        },
+        {
+          "name": "Smooth",
+          "type": "float",
+          "page": "Vision Saliency",
+          "default": "0.7"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Saliency",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "u",
+        "v",
+        "width",
+        "height"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionSaliency",
+      "source": "VisionSaliency/VisionSaliencyTOP.mm"
+    },
+    "VisionsegmentTOP": {
+      "create": "VisionsegmentTOP",
+      "opType": "Visionsegment",
+      "label": "Vision Segment",
+      "family": "TOP",
+      "icon": "VSG",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionSegment",
+      "readme": "VisionSegment/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionSegment/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Segment",
+          "default": "1"
+        },
+        {
+          "name": "Mode",
+          "type": "menu",
+          "page": "Vision Segment",
+          "default": "mask",
+          "menu": [
+            "mask",
+            "instance"
+          ]
+        },
+        {
+          "name": "Quality",
+          "type": "menu",
+          "page": "Vision Segment",
+          "default": "balanced",
+          "menu": [
+            "fast",
+            "balanced",
+            "accurate"
+          ]
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Segment",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "mask_w",
+        "mask_h"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionSegment",
+      "source": "VisionSegment/VisionSegmentTOP.mm"
+    },
+    "VisionsimilarityCHOP": {
+      "create": "VisionsimilarityCHOP",
+      "opType": "Visionsimilarity",
+      "label": "Vision Similarity",
+      "family": "CHOP",
+      "icon": "VSM",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionSimilarity",
+      "readme": "VisionSimilarity/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionSimilarity/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Similarity"
+        },
+        {
+          "name": "Reference",
+          "type": "TOP",
+          "page": "Vision Similarity"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Similarity",
+          "default": "1"
+        },
+        {
+          "name": "Threshold",
+          "type": "float",
+          "page": "Vision Similarity",
+          "default": "10"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Similarity",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top",
+        "Reference"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionSimilarity",
+      "source": "VisionSimilarity/VisionSimilarityCHOP.mm"
+    },
+    "VisionsubjectTOP": {
+      "create": "VisionsubjectTOP",
+      "opType": "Visionsubject",
+      "label": "Vision Subject",
+      "family": "TOP",
+      "icon": "VSU",
+      "minInputs": 1,
+      "maxInputs": 1,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionSubject",
+      "readme": "VisionSubject/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionSubject/README.md",
+      "params": [
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Subject",
+          "default": "1"
+        },
+        {
+          "name": "Mode",
+          "type": "menu",
+          "page": "Vision Subject",
+          "default": "mask",
+          "menu": [
+            "mask",
+            "cutout",
+            "instance"
+          ]
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Subject",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "instances",
+        "analyze_ms"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionSubject",
+      "source": "VisionSubject/VisionSubjectTOP.mm"
+    },
+    "VisiontextDAT": {
+      "create": "VisiontextDAT",
+      "opType": "Visiontext",
+      "label": "Vision Text",
+      "family": "DAT",
+      "icon": "VTX",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionText",
+      "readme": "VisionText/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionText/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Text"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Text",
+          "default": "1"
+        },
+        {
+          "name": "Level",
+          "type": "menu",
+          "page": "Vision Text",
+          "default": "accurate",
+          "menu": [
+            "accurate",
+            "fast"
+          ]
+        },
+        {
+          "name": "Languages",
+          "type": "string",
+          "page": "Vision Text",
+          "default": "ja-JP en-US"
+        },
+        {
+          "name": "Correction",
+          "type": "toggle",
+          "page": "Vision Text",
+          "default": "1"
+        },
+        {
+          "name": "Minconfidence",
+          "type": "float",
+          "page": "Vision Text",
+          "default": "0.3"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Text",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "regions",
+        "analyze_ms"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionText",
+      "source": "VisionText/VisionTextDAT.mm"
+    },
+    "VisiontrackCHOP": {
+      "create": "VisiontrackCHOP",
+      "opType": "Visiontrack",
+      "label": "Vision Track",
+      "family": "CHOP",
+      "icon": "VTR",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionTrack",
+      "readme": "VisionTrack/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionTrack/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Track"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Track",
+          "default": "1"
+        },
+        {
+          "name": "Initbbox",
+          "type": "xy",
+          "page": "Vision Track",
+          "default": "0.5"
+        },
+        {
+          "name": "Initbboxsize",
+          "type": "xy",
+          "page": "Vision Track",
+          "default": "0.2"
+        },
+        {
+          "name": "Start",
+          "type": "pulse",
+          "page": "Vision Track"
+        },
+        {
+          "name": "Stop",
+          "type": "pulse",
+          "page": "Vision Track"
+        },
+        {
+          "name": "Trackinglevel",
+          "type": "menu",
+          "page": "Vision Track",
+          "default": "accurate",
+          "menu": [
+            "accurate",
+            "fast"
+          ]
+        },
+        {
+          "name": "Minconfidence",
+          "type": "float",
+          "page": "Vision Track",
+          "default": "0.3"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Track",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms",
+        "seeds",
+        "losses"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionTrack",
+      "source": "VisionTrack/VisionTrackCHOP.mm"
+    },
+    "VisiontrajectoryCHOP": {
+      "create": "VisiontrajectoryCHOP",
+      "opType": "Visiontrajectory",
+      "label": "Vision Trajectory",
+      "family": "CHOP",
+      "icon": "VTJ",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "VisionTrajectory",
+      "readme": "VisionTrajectory/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/VisionTrajectory/README.md",
+      "params": [
+        {
+          "name": "Top",
+          "type": "TOP",
+          "page": "Vision Trajectory"
+        },
+        {
+          "name": "Active",
+          "type": "toggle",
+          "page": "Vision Trajectory",
+          "default": "1"
+        },
+        {
+          "name": "Maxtrajectories",
+          "type": "int",
+          "page": "Vision Trajectory",
+          "default": "4"
+        },
+        {
+          "name": "Length",
+          "type": "int",
+          "page": "Vision Trajectory",
+          "default": "5"
+        },
+        {
+          "name": "Minradius",
+          "type": "float",
+          "page": "Vision Trajectory",
+          "default": ".005"
+        },
+        {
+          "name": "Maxradius",
+          "type": "float",
+          "page": "Vision Trajectory",
+          "default": ".1"
+        },
+        {
+          "name": "Targetfps",
+          "type": "float",
+          "page": "Vision Trajectory",
+          "default": "60"
+        },
+        {
+          "name": "Reset",
+          "type": "pulse",
+          "page": "Vision Trajectory"
+        },
+        {
+          "name": "Flip",
+          "type": "toggle",
+          "page": "Vision Trajectory",
+          "default": "1"
+        }
+      ],
+      "topParams": [
+        "Top"
+      ],
+      "infoChop": [
+        "executes",
+        "submits",
+        "analyzes",
+        "analyze_ms",
+        "trajectories",
+        "frames",
+        "resets"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/VisionTrajectory",
+      "source": "VisionTrajectory/VisionTrajectoryCHOP.mm"
+    }
+  }
+}
