@@ -397,13 +397,17 @@ static bool renderText(const Style& st, Result& out, std::string& warn)
 
     CTFontRef font = makeFont(st);
     if (!font) { CGContextRelease(ctx); return false; }
-    // 要求フォントと解決フォントの食い違い警告(フォールバック検知)
+    // 要求フォントと解決フォントの食い違い警告(フォールバック検知)。
+    // 指定はファミリー名でもPostScript名でもありうるので、両方と比較してから警告する
     if (!st.fontName.empty() && st.fontName != "system" && st.fontFile.empty()) {
         CFStringRef fam = CTFontCopyFamilyName(font);
         char buf[256] = {0};
         if (fam) { CFStringGetCString(fam, buf, sizeof buf, kCFStringEncodingUTF8); CFRelease(fam); }
         out.font = buf;
-        if (st.fontName != buf && st.fontName.find(buf) == std::string::npos)
+        CFStringRef psn = CTFontCopyPostScriptName(font);
+        char psbuf[256] = {0};
+        if (psn) { CFStringGetCString(psn, psbuf, sizeof psbuf, kCFStringEncodingUTF8); CFRelease(psn); }
+        if (st.fontName != buf && st.fontName != psbuf && st.fontName.find(buf) == std::string::npos)
             warn = "Font '" + st.fontName + "' resolved to '" + std::string(buf) + "'";
     } else {
         out.font = "(system)";
@@ -547,9 +551,8 @@ public:
         const char* P = "CoreText";
         { OP_StringParameter p("Text"); p.label = "Text"; p.page = P; p.defaultValue = "CoreText"; m->appendString(p); }
         { OP_StringParameter p("Textdat"); p.label = "Text DAT (overrides Text)"; p.page = P; m->appendDAT(p); }
-        { OP_StringParameter p("Font"); p.label = "Font"; p.page = P;
-          p.defaultValue = "system";   // 動的メニューは非空の既定値が必須(既知の罠)
-          m->appendDynamicStringMenu(p); }
+        // Font はフォントパネルで選んだ結果の表示欄(PostScript名・手入力も可。空=SFシステムフォント)
+        { OP_StringParameter p("Font"); p.label = "Font (from Font Panel)"; p.page = P; m->appendString(p); }
         { OP_StringParameter p("Fontfile"); p.label = "Font File (.ttf/.otf, overrides Font)"; p.page = P; m->appendFile(p); }
         { OP_NumericParameter p("Fontpanel"); p.label = "Choose Font (macOS Font Panel)"; p.page = P; m->appendPulse(p); }
         { OP_NumericParameter p("Fontsize"); p.label = "Font Size (px)"; p.page = P; p.defaultValues[0] = 72; p.minSliders[0] = 8; p.maxSliders[0] = 400; p.minValues[0] = 1; p.clampMins[0] = true; m->appendFloat(p); }
@@ -587,41 +590,6 @@ public:
         { OP_NumericParameter p("Shadowy"); p.label = "Shadow Offset Y"; p.page = S; p.defaultValues[0] = -6; p.minSliders[0] = -50; p.maxSliders[0] = 50; m->appendFloat(p); }
         { OP_NumericParameter p("Shadowblur"); p.label = "Shadow Blur"; p.page = S; p.defaultValues[0] = 8; p.minSliders[0] = 0; p.maxSliders[0] = 50; p.minValues[0] = 0; p.clampMins[0] = true; m->appendFloat(p); }
 
-    }
-
-    // Font プルダウン: インストール済みフォントファミリーを列挙(初回のみ取得・ソート済みキャッシュ)
-    void buildDynamicMenu(const OP_Inputs*, OP_BuildDynamicMenuInfo* info, void*) override {
-        if (strcmp(info->name, "Font") != 0) return;
-        static std::vector<std::string> families;
-        static std::once_flag once;
-        std::call_once(once, []{
-            CFArrayRef arr = CTFontManagerCopyAvailableFontFamilyNames();
-            if (!arr) return;
-            for (CFIndex i = 0; i < CFArrayGetCount(arr); i++) {
-                CFStringRef nm = (CFStringRef)CFArrayGetValueAtIndex(arr, i);
-                char buf[256] = {0};
-                if (CFStringGetCString(nm, buf, sizeof buf, kCFStringEncodingUTF8) && buf[0] != '.')
-                    families.push_back(buf);   // 先頭'.'は隠しシステムフォントなので除外
-            }
-            CFRelease(arr);
-            std::sort(families.begin(), families.end());
-        });
-        info->addMenuEntry("system", "System Font (SF)");
-        for (auto& f : families) info->addMenuEntry(f.c_str(), f.c_str());
-    }
-
-    // macOS標準フォントパネルを開く。選択は changeFont: → Font/Fontsize パラメータへ反映
-    void pulsePressed(const char* name, void*) override {
-        if (strcmp(name, "Fontpanel") != 0) return;
-        const OP_NodeInfo* node = myNodeInfo;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            { std::lock_guard<std::mutex> l(gPanelMx); gPanelNode = node; }
-            if (!gPanelBridge) gPanelBridge = [CTFontPanelBridge new];
-            NSFontManager* fm = [NSFontManager sharedFontManager];
-            fm.target = gPanelBridge;
-            if (gPanelFont) [fm setSelectedFont:gPanelFont isMultiple:NO];
-            [fm orderFrontFontPanel:nil];
-        });
     }
 
     void getWarningString(OP_String* s, void*) override {

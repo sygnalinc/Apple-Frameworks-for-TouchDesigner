@@ -5,8 +5,8 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 
 ## Text TOP との違い(できること)
 
-- **フォントはプルダウン選択**(インストール済み全ファミリーを列挙・M2実測252件)、
-  または **フォントファイル(.ttf/.otf/.ttc)を直接指定**(未インストールでも使える)。
+- **フォントは macOS標準フォントパネルで選択**(`Choose Font` パルス→パネルで選ぶと
+  Font 欄に結果が表示される)。**フォントファイル(.ttf/.otf/.ttc)の直接指定**も可(未インストールでも使える)。
   既定はSFシステムフォント。`Weight` 100〜900 を**無段階**指定(可変フォントの `wght` 軸。
   無い場合は600以上でBold近似)
 - **プロポーショナルメトリクス(palt)**: OpenType `'palt'` で自動文字詰め
@@ -28,7 +28,7 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | ページ | パラメータ | 説明 |
 |---|---|---|
 | CoreText | Text / Text DAT | 描画テキスト。DAT指定時はDAT優先(複数行向け) |
-| | Font | インストール済みフォントのプルダウン(既定 System Font (SF)) |
+| | Font | フォントパネルで選んだ結果の表示欄(PostScript名・手入力も可。空=SF) |
 | | Font File | .ttf/.otf/.ttc の直接指定(Fontより優先・未インストール可) |
 | | Choose Font (macOS Font Panel) | **macOS標準フォントパネル**を開く。選択すると Font/Font Size に自動反映 |
 | | Proportional Metrics (palt) | OpenType 'palt' 自動文字詰め(対応フォントのみ効く) |
