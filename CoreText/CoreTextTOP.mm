@@ -592,6 +592,20 @@ public:
 
     }
 
+    // macOS標準フォントパネルを開く。選択は changeFont: → cook経由で Font/Fontsize へ反映
+    void pulsePressed(const char* name, void*) override {
+        if (strcmp(name, "Fontpanel") != 0) return;
+        const OP_NodeInfo* node = myNodeInfo;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            { std::lock_guard<std::mutex> l(gPanelMx); gPanelNode = node; }
+            if (!gPanelBridge) gPanelBridge = [CTFontPanelBridge new];
+            NSFontManager* fm = [NSFontManager sharedFontManager];
+            fm.target = gPanelBridge;
+            if (gPanelFont) [fm setSelectedFont:gPanelFont isMultiple:NO];
+            [fm orderFrontFontPanel:nil];
+        });
+    }
+
     void getWarningString(OP_String* s, void*) override {
         std::lock_guard<std::mutex> l(myMutex);
         if (!myWarn.empty()) s->setString(myWarn.c_str());
