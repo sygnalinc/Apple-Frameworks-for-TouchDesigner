@@ -24,6 +24,24 @@
 各フォルダで `./build.sh` → `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/` へ
 コピー → TD再起動。
 
+## SwiftUIButton.tox
+
+**TD の Button COMP の "ネイティブUI版"**。Button COMP の基本機能(クリックで `state` を出力・
+既定 Momentary)はそのままに、**ボタンの見た目が本物のネイティブ macOS ボタン**になっている。
+
+- **COMP に露出したパラメータ**: `Label`(ボタン文字)/ `Show Window` / `Window Title`
+- **`out`**(null CHOP)に `state` チャンネル: **クリックした瞬間だけ 1**(モーメンタリ)。
+  Button COMP の出力と同じ感覚で配線できる(Panel Execute の代わりに CHOP 監視 / Trigger 等)
+- 中身は `UI Widget DAT(button)→ SwiftUI Panel CHOP → out`
+
+> **重要(できる/できない)**: TD標準 Button COMP の**UI描画そのものをSwiftUIに差し替えることは不可**
+> (TDにフックが無い)。これは「Button COMP と同じ出力仕様を持つ、UIがネイティブSwiftUIな**別COMP**」。
+> Toggle 動作は現状フラつく(モーメンタリ信号のCount取りこぼし)ため v1 は Momentary のみ。将来
+> ヘルパ側で toggle ボタンを堅牢化予定。
+
+**実測**: ネイティブ「Button」ウインドウを表示 → クリック → `out` の `state` が1フレームだけ 1
+(次フレーム 0)を実操作で確認。
+
 ## Palette への登録
 
 `NativePanel.tox` を TD のユーザーpaletteフォルダへ置く:

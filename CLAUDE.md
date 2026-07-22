@@ -2377,3 +2377,19 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **踏んだ罠**: `appendToggle/appendStr` の label は**キーワード引数**(位置引数だと "Single name
   argument expected" エラー)。COMPカスタムpar露出は `comp.appendCustomPage(name)` → `pg.appendToggle`
 - palette/README.md 作成(必要プラグイン・登録手順・実測)。ルートREADMEは対象外(paletteは補助)
+
+### 2026-07-22 SwiftUIButton.tox(Button COMPのネイティブUI版)を palette に追加
+
+- ユーザー「Button COMPを元に拡張したSwiftUI Button。元のボタン機能そのまま、UIがSwiftNative」
+- **前提(確認済み・再掲)**: TD標準Button COMPのUI描画をSwiftUIに差し替えるのは不可(フック無し)。
+  作れるのは「Button COMPと同じ出力仕様(クリック→state)を持つ、UIがネイティブSwiftUIな別COMP」
+- **SwiftUIButton.tox**: base COMP。中身 `UI Widget DAT(button)→ SwiftUI Panel CHOP → out`。
+  COMPに Label/Show/Title を露出、`out` に `state`(クリックした瞬間だけ1=モーメンタリ・Button COMP既定と同じ)
+- **Toggle の判断**: Count CHOP(output=loop/limitmax=2)でトグル化を試みたが、**モーメンタリ信号
+  (1フレーム)を連続cook時以外は取りこぼす**ためフラつく。Button COMP既定もMomentaryなので v1 は
+  Momentaryのみに確定。Toggleは将来ヘルパ側でtoggleボタン(押下でmodel値をflip・保持)として堅牢化
+- **実測(実操作)**: ネイティブ「Button」ウインドウ→クリック→`state` 1フレームだけ1(次0)を確認。
+  palette/sygnal + リポジトリ palette/ に保存、paletteData.json に登録(tox 1.0KB)
+- **踏んだ罠**: Count CHOPのラップは `output` パラメータ(off/loop/min/lc/cl)+ limitmin/limitmax。
+  モーメンタリ→カウントのトグルは cook 連続性に依存し不安定(単発cook検証では edge を逃す)
+- palette/README.md 更新(SwiftUIButton節・できる/できない明記)
