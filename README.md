@@ -160,6 +160,7 @@ grouped by category.
 | [AppleScript](AppleScript/) | DAT | **Run AppleScript / JavaScript (JXA) from TD** (osascript). Control other apps (Music/Finder/…), get system info, automate workflows — **returns the result text too**. App control needs Automation permission |
 | [GameplayKit Agents](GameplayKitAgents/) | CHOP | **Crowd / flocking simulation** (GameplayKit GKAgent) — seek / separate / align / cohere / avoid / wander |
 | [GameplayKit Path](GameplayKitPath/) | SOP | **Obstacle-avoiding shortest path** (GameplayKit GKObstacleGraph) → polyline |
+| [CoreText](CoreText/) | TOP | **Apple text rendering** — SF/variable-font weight, color emoji, Japanese vertical text, gradient / outline / shadow; freer & prettier than the stock Text TOP |
 | [PDFKit](PDFKit/) | TOP | **PDFKit** — render a page to a texture; structure (metadata / outline / text / annotations) on its **Info DAT** |
 | [CoreWLAN](CoreWLAN/) | CHOP | **Live Wi-Fi metrics** (CoreWLAN) — RSSI / noise / SNR / TX rate / channel |
 | [CoreWLAN Scan](CoreWLANScan/) | CHOP | **Scan nearby Wi-Fi → per-channel congestion / AP count / max RSSI** and the least-congested channel (2.4/5GHz). Optional **SSID names via a bundled Location-authorized helper app** (Info DAT) |

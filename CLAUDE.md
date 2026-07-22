@@ -2558,3 +2558,22 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - xcodebuild(automatic signing・team設定済み)→ `xcrun devicectl device install app` で
   **ワイヤレス接続の実機iPhone(iPhone18,1)へインストール成功**(bundleID tokyo.sygnal.tdsensor)
 - 教訓: GENERATE_INFOPLIST_FILE=NO で独自plistを使う場合、権限キーだけでなく標準キー一式が必須
+
+### 2026-07-23 CoreText TOP 実装(Appleテキストレンダリング・標準Text TOPより自由で美しい文字)
+
+- ユーザー「Appleのテキストレンダリングを使った、標準Text TOPよりも自由で美しいTOP」→
+  **CoreText TOP**(opType `Coretext`・icon CTX・CPUMem TOP・純ObjC++)を新規実装
+- **機能**: SFシステムフォント/任意フォント名・**可変ウェイト100〜900**(wght軸・Bold近似フォールバック)・
+  Italic・トラッキング・行送り・リガチャ・左右中央/両端揃え・上中下・**日本語縦書き**(右→左段組・
+  縦用約物対応)・**カラー絵文字**・グラデーション塗り(2色+角度)・**縁取り**・ドロップシャドウ・
+  Text DAT参照(複数行)・任意解像度。非同期ワーカー+シグネチャ検知の家族の型
+- **実測(M2・TD実機で視認検証)**: SF W750グラデ+シャドウ+縁取り、ヒラギノ明朝縦書き(約物正置)、
+  カラー絵文字+縁取り、Helvetica指定、すべて正しくレンダ。エラー/警告なし
+- **踏んだ実バグ(pitfalls反映)**: ①**SFフォントのアウトラインがTDプロセス内で汚染**
+  (kCGTextStroke再描画もCTFontCreatePathForGlyphも特定グリフにバー/矢印状ゴミ。単体プロセスでは
+  再現せず=切り分けharnessで確定)→ 縁取りは**CIMorphologyMaximumのマスク膨張方式**で解決。
+  ②属性ストロークで別文字列を2回レイアウトするのも不整合の元→CTFrame 1つを全パスで使い回す。
+  ③CGBitmapContextはゼロ初期化を当てにせずClearRect
+- ビルド・署名・常設インストール済み。README(新規+ルート英日一覧)更新
+- 次にやること: sample.toe への利用例追加、テキストのアニメーション連携(CHOPでWeight/Trackingを
+  駆動するデモ)、text-on-path(パス沿い文字)は将来候補

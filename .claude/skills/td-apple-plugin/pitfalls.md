@@ -381,3 +381,21 @@
   - `d.expose = False` → **「×」チップ**になる(TD標準の閉じ方と見た目が違う)。通常は使わない
   ドック後は nodeX/nodeY 無効(位置はホスト追従)。ドック解除は `d.dock = None`。
   注意: ホスト(通常op)の showDocked は既定 True で別意味(自分の docked を表示するか)
+
+## Core Text(テキストレンダリング)
+
+- **システムUIフォント(SF)のグリフ「アウトライン」は TD プロセス内では信用できない**(実測)。
+  `kCGTextStroke` での再描画も `CTFontCreatePathForGlyph` のパス抽出も、特定グリフ(e/k/A/B等)に
+  バー/矢印状のゴミ輪郭が混入する(単体プロセスでは同コードで再現せず・Helvetica等は正常)。
+  **縁取りはアウトラインに依存しない「アルファマスク膨張」方式にする**: テキストを透明BGRAに描いて
+  アルファ=カバレッジを取り、`CIMorphologyMaximum`(半径=縁幅)で膨張 → `CGImageMaskCreate`
+  (mask値は 255-alpha・0=塗る)でクリップして縁色を塗り、その上に本文フィルを重ねる。
+  CIFilter は `@synchronized([CIFilter class])` で直列化(既知のTDクラッシュ対策)
+- 属性 `kCTStrokeWidthAttributeName` で「別の属性文字列」を作って2回レイアウトするのも
+  グリフ不整合の元。**フィル用の CTFrame を1つ作って全パス(フィル/グラデマスク/縁)で使い回す**
+- 可変フォントのウェイトは `kCTFontVariationAttribute` に `{'wght': 100..900}` →
+  `CTFontCreateCopyWithAttributes`。SF は空文字列名でなく `CTFontCreateUIFontForLanguage` で作る
+- 縦書きは 文字列属性 `kCTVerticalFormsAttributeName=true` + フレーム属性
+  `kCTFrameProgressionAttributeName=RightToLeft` の両方が必要(縦用約物も自動で正しくなる)
+- `CGBitmapContextCreate(NULL,...)` のバッファはゼロ初期化を当てにせず、透明背景でも
+  `CGContextClearRect` してから描く
