@@ -407,7 +407,7 @@ private:
         py += PythonCallbacksDATStubs;
         py += "'''\n";
         py += "\t\t\t\td.dock = n\n";        // GLSLのシェーダDATと同じくホストノードへドック
-        py += "\t\t\t\td.expose = False\n";  // 既定は閉じて非表示(ノード下部の▸で開閉できる)
+        py += "\t\t\t\td.expose = True\n";   // GLSL既定と同じチップ表示(ノード下の小チップ・開閉可)
         py += "\t\t\tn.par.callbacks = nm\n";
         py += "\t\t__cwlan_ok = bool(n.par.callbacks.eval())\n";
         py += "except Exception:\n";
