@@ -9,7 +9,7 @@ build_one() {
   local NAME="$1" SRC="$2" SDK="$3" SUFFIX="$4"
   local OUT="build/$NAME.plugin/Contents"
   mkdir -p "$OUT/MacOS"
-  clang++ -std=c++17 -fobjc-arc -O2 -bundle -I "$SDK" \
+  clang++ -std=c++17 -fobjc-arc -O2 -bundle -I "$SDK" -I "/Applications/TouchDesigner.app/Contents/Frameworks/Python.framework/Versions/3.11/include/python3.11" -undefined dynamic_lookup \
     "$SRC" \
     -framework Foundation -framework AVFoundation -framework CoreMedia \
     -framework CoreVideo -framework VideoToolbox -framework CoreFoundation \

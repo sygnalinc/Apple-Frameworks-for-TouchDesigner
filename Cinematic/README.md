@@ -7,6 +7,13 @@ Apple の `Cinematic` framework(macOS 26+)を使う。
 - **メタデータ出力**: フォーカス深度・被写体スロットを **Info CHOP チャンネル**で出す
   (旧 **Cinematic Data CHOP** を統合。Info CHOP をこのノードに向けるだけで同じデータが得られる)
 
+## Info DAT の自動生成(操作不要)
+
+**OPを配置するだけ**で雛形入りの Callbacks DAT(`<node名>_callbacks`)が自動生成され、
+GLSL TOP のシェーダDATと同じ**閉じた↓チップ**としてノードにドックされる。
+**`Info DAT` トグルを ON にした瞬間、隣に Info DAT(`<node名>_info`)が自動生成**される
+(既にあれば何もしない=二重生成ガード)。生成位置や名前はチップ内の `onInfoDAT` を編集して変えられる。
+
 ## 映像出力(Mode)
 
 | Mode | 出力 | 内容 |

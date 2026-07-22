@@ -2532,3 +2532,18 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   `~/.claude/skills/td-apple-plugin` → リポジトリ実体 のシンボリックリンクを作成。
   単一ソースのまま、他プロジェクトのセッションからも同スキルが利用可能になる
 - スキル更新はリポジトリ側を編集すれば即座に全セッションへ反映(コミットで履歴も残る)
+
+### 2026-07-23 Info DAT 自動生成を Cinematic Video / Spatial Video / PDFKit へ横展開
+
+- ユーザー「Cinematic VideoとSpatial VideoのinfoDATも同じ仕組みでTOP opから出せるように。PDFKitも」
+- CoreWLANScan で実証した仕組みを **共有ヘッダ `common/PyCallbacksBootstrap.h`(namespace tdpycb)** に
+  切り出し、3 TOP に組み込み: 配置(初回cook)で雛形入り Callbacks DAT を自動生成・ドック接続
+  (閉じた↓チップ)→ 新設の **`Info DAT` トグル** off→on で隣に `<node名>_info`(Info DAT・
+  Operator=本体)を自動生成(二重生成ガード付き)
+- ヘッダの罠: TOP SDK は namespace TD → 引数は `TD::OP_NodeInfo*` で修飾(素の OP_NodeInfo だと
+  コンパイルエラー)。各 build.sh に Python include + `-undefined dynamic_lookup` を追加
+- **実測(M2・TD実機・MCP HTTP直送で検証)**: 3 TOP とも配置→ `_callbacks` がドック接続
+  (dock=host/expose=True/viewer=True/showDocked=False)、Infodat ON→ `_info` 生成・
+  Operator=本体、off→on 繰り返しでも1個のまま、エラーなし
+- 検証ノード(cvtest/svtest/pdftest)は TD 上に残置(ユーザーのチップ見た目確認用。確認後削除可)
+- 今後同じ仕組みを組み込む時は `common/PyCallbacksBootstrap.h` を使う(使い方はヘッダ冒頭コメント)

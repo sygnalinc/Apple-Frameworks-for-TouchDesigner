@@ -24,7 +24,29 @@
 #include <vector>
 #include "TOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
+#include "../common/PyCallbacksBootstrap.h"
 using namespace TD;
+
+// Callbacks DAT 雛形(配置時に自動生成・ドックチップ接続)。
+// Info DAT トグル ON で隣にメタデータの Info DAT を自動生成する(二重生成ガード付き)。
+static const char* PythonCallbacksDATStubs =
+"# Spatial Video TOP callbacks\n"
+"#\n"
+"# onInfoDAT: 'Info DAT' トグルを on にした瞬間に呼ばれる。\n"
+"# 隣にメタデータ表示用の Info DAT を自動生成する(既にあれば何もしない)。\n"
+"def onInfoDAT(op, enabled):\n"
+"\tif not enabled:\n"
+"\t\treturn\n"
+"\tp = op.parent()\n"
+"\tname = op.name + '_info'\n"
+"\tif p.op(name):\n"
+"\t\treturn\n"
+"\td = p.create(infoDAT, name)\n"
+"\td.par.op = op.name\n"
+"\td.nodeX = op.nodeX + 200\n"
+"\td.nodeY = op.nodeY\n"
+"\td.viewer = True\n"
+"\treturn\n";
 
 namespace {
 
@@ -47,7 +69,7 @@ static std::string fourcc(uint32_t c)
 class SpatialVideoTOP final : public TOP_CPlusPlusBase
 {
 public:
-    SpatialVideoTOP(const OP_NodeInfo*, TOP_Context* c) : myContext(c)
+    SpatialVideoTOP(const OP_NodeInfo* ni, TOP_Context* c) : myNode(ni), myContext(c)
     {
         myThread = std::thread([this] { worker(); });
     }
@@ -70,6 +92,15 @@ public:
     void execute(TOP_Output* out, const OP_Inputs* in, void*) override
     {
         myExec++;
+        // 配置後の cook で雛形入り Callbacks DAT を自動生成・ドック接続(成功するまでリトライ)
+        if (!myBootstrapped) myBootstrapped = tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);
+        // Info DAT トグル off→on で隣に Info DAT を自動生成
+        bool infoDat = in->getParInt("Infodat") != 0;
+        if (infoDat && !myPrevInfoDat) {
+            tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);   // 消されていたら再生成
+            tdpycb::firePythonCallback(myNode, "onInfoDAT", true);
+        }
+        myPrevInfoDat = infoDat;
         std::string path = in->getParFilePath("File") ? in->getParFilePath("File") : "";
         std::string eye = in->getParString("Eye") ? in->getParString("Eye") : "left";
         double t = in->getParDouble("Time");
@@ -136,6 +167,13 @@ public:
             p.minSliders[0] = 0;
             p.maxSliders[0] = 1;
             m->appendFloat(p);
+        }
+        {
+            OP_NumericParameter p("Infodat");
+            p.label = "Info DAT";
+            p.page = P;
+            p.defaultValues[0] = 0;
+            m->appendToggle(p);
         }
     }
 
@@ -464,6 +502,8 @@ private:
         }
     }
 
+    const OP_NodeInfo* myNode = nullptr;   // Python コールバック用
+    bool myBootstrapped = false, myPrevInfoDat = false;
     TOP_Context* myContext = nullptr;
     std::thread myThread;
     std::mutex myMutex;
@@ -497,6 +537,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* info)
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
+    info->customOPInfo.pythonCallbacksDAT = PythonCallbacksDATStubs;
 }
 DLLEXPORT TOP_CPlusPlusBase* CreateTOPInstance(const OP_NodeInfo* i, TOP_Context* c)
 {

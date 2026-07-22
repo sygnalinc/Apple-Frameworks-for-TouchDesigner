@@ -1,0 +1,85 @@
+// TD Custom OP 用: Callbacks DAT の自動生成(GLSL風ドックチップ)+ Pythonコールバック発火ヘルパ。
+// 元実装・検証は CoreWLANScan/CoreWLANScanCHOP.mm(2026-07-22)。同じ仕組みを他OPへ横展開する時はこれを使う。
+//
+// 使い方:
+//   1. Fill*PluginInfo で i->customOPInfo.pythonCallbacksDAT = <stub文字列>;
+//   2. execute で成功するまで毎cook: if (!myBootstrapped) myBootstrapped = tdpycb::bootstrapCallbacksDAT(myNode, <stub>);
+//      (生成直後の cook はカスタムパラメータ未生成で必ず失敗するため、リトライが必須)
+//   3. トグルの off→on 遷移などで tdpycb::firePythonCallback(myNode, "onXxx", true);
+//
+// 必要ビルドフラグ(build.sh):
+//   -I /Applications/TouchDesigner.app/Contents/Frameworks/Python.framework/Versions/3.11/include/python3.11
+//   -undefined dynamic_lookup   (Py_* シンボルは実行時に TD 本体から解決)
+//
+// 実機で踏んだ罠(詳細は skill pitfalls.md「Python コールバック」節):
+//   - OP_NodeInfo::opPath は空のことがある → createArgumentsTuple の args[0](自ノードPyObject)で参照
+//   - PyRun の __main__ に op/textDAT は無い → import td で明示
+//   - チップの↑開/↓閉の実体は showDocked(expose=False は「×」チップになるので使わない)
+#pragma once
+#include <Python.h>
+#include <string>
+#include "CPlusPlus_Common.h"
+
+namespace tdpycb {
+
+// Callbacks DAT が未接続なら、雛形入り Text DAT を生成してホストへドック接続(閉じた↓チップ)。
+// 戻り値: callbacks が接続済みなら true(以後呼ばなくてよい)
+inline bool bootstrapCallbacksDAT(const TD::OP_NodeInfo* node, const char* stubs)
+{
+    if (!node || !node->context) return false;
+    PyGILState_STATE g = PyGILState_Ensure();
+    std::string py;
+    py += "__tdcb_ok = False\n";
+    py += "try:\n";
+    py += "\timport td\n";
+    py += "\tn = __tdcb_node\n";
+    py += "\tif n and hasattr(n.par, 'callbacks'):\n";
+    py += "\t\tif not n.par.callbacks.eval():\n";
+    py += "\t\t\tp = n.parent()\n";
+    py += "\t\t\tnm = n.name + '_callbacks'\n";
+    py += "\t\t\td = p.op(nm)\n";
+    py += "\t\t\tif not d:\n";
+    py += "\t\t\t\td = p.create(td.textDAT, nm)\n";
+    py += "\t\t\t\td.text = '''";
+    py += stubs;
+    py += "'''\n";
+    py += "\t\t\t\td.dock = n\n";           // ホストへドック(GLSLのシェーダDATと同型)
+    py += "\t\t\t\td.expose = True\n";      // チップ表示(Falseだと×チップ)
+    py += "\t\t\t\td.viewer = True\n";      // 開いた時にテキストが見える
+    py += "\t\t\t\td.showDocked = False\n"; // 既定は閉じた↓チップ(開閉の実体はこのフラグ)
+    py += "\t\t\tn.par.callbacks = nm\n";
+    py += "\t\t__tdcb_ok = bool(n.par.callbacks.eval())\n";
+    py += "except Exception:\n";
+    py += "\timport traceback as __tdcb_tb\n";
+    py += "\t__tdcb_err = __tdcb_tb.format_exc()\n";   // textport から調査できるよう残す
+    bool ok = false;
+    PyObject* main = PyImport_AddModule("__main__");                // borrowed
+    PyObject* dict = main ? PyModule_GetDict(main) : nullptr;      // borrowed
+    PyObject* args = node->context->createArgumentsTuple(0, nullptr); // [0]=op
+    if (dict && args) {
+        PyDict_SetItemString(dict, "__tdcb_node", PyTuple_GET_ITEM(args, 0));
+        PyObject* r = PyRun_String(py.c_str(), Py_file_input, dict, dict);
+        if (r) Py_DECREF(r); else PyErr_Clear();
+        PyObject* v = PyDict_GetItemString(dict, "__tdcb_ok");     // borrowed
+        ok = v && PyObject_IsTrue(v) == 1;
+        PyDict_DelItemString(dict, "__tdcb_node");
+    }
+    if (args) Py_DECREF(args);
+    PyGILState_Release(g);
+    return ok;
+}
+
+// bool 1引数のコールバックを発火する(例: onInfoDAT(op, enabled))。
+// Callbacks DAT 未接続・関数未定義なら何も起きない(安全)。cook(メインスレッド)から呼ぶこと。
+inline void firePythonCallback(const TD::OP_NodeInfo* node, const char* fn, bool enabled)
+{
+    if (!node || !node->context) return;
+    PyObject* args = node->context->createArgumentsTuple(1, nullptr); // [0]=op
+    if (!args) return;
+    PyTuple_SET_ITEM(args, 1, PyBool_FromLong(enabled ? 1 : 0));
+    PyObject* r = node->context->callPythonCallback(fn, args, nullptr, nullptr);
+    Py_DECREF(args);
+    if (r) Py_DECREF(r);
+}
+
+} // namespace tdpycb

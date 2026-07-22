@@ -17,19 +17,51 @@
 #include <vector>
 #include "TOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
+#include "../common/PyCallbacksBootstrap.h"
 using namespace TD;
+
+// Callbacks DAT 雛形(配置時に自動生成・ドックチップ接続)。
+// Info DAT トグル ON で隣に文書構造の Info DAT を自動生成する(二重生成ガード付き)。
+static const char* PythonCallbacksDATStubs =
+"# PDFKit TOP callbacks\n"
+"#\n"
+"# onInfoDAT: 'Info DAT' トグルを on にした瞬間に呼ばれる。\n"
+"# 隣に文書構造表示用の Info DAT を自動生成する(既にあれば何もしない)。\n"
+"# 表示内容は本体の 'Info DAT Mode'(Info/Outline/Text/Annotations)で切り替える。\n"
+"def onInfoDAT(op, enabled):\n"
+"\tif not enabled:\n"
+"\t\treturn\n"
+"\tp = op.parent()\n"
+"\tname = op.name + '_info'\n"
+"\tif p.op(name):\n"
+"\t\treturn\n"
+"\td = p.create(infoDAT, name)\n"
+"\td.par.op = op.name\n"
+"\td.nodeX = op.nodeX + 200\n"
+"\td.nodeY = op.nodeY\n"
+"\td.viewer = True\n"
+"\treturn\n";
 
 namespace {
 struct Result { std::vector<uint8_t> bgra; uint32_t w=0,h=0; uint64_t serial=0; bool ok=false; };
 
 class PDFKitTOP final : public TOP_CPlusPlusBase {
 public:
-    PDFKitTOP(const OP_NodeInfo*, TOP_Context* c) : myContext(c) { myThread=std::thread([this]{ worker(); }); }
+    PDFKitTOP(const OP_NodeInfo* ni, TOP_Context* c) : myNode(ni), myContext(c) { myThread=std::thread([this]{ worker(); }); }
     ~PDFKitTOP() override { { std::lock_guard<std::mutex> l(myMutex); myQuit=true; } myCond.notify_all(); if(myThread.joinable()) myThread.join(); }
     void getGeneralInfo(TOP_GeneralInfo* g, const OP_Inputs*, void*) override { g->cookEveryFrameIfAsked=true; }
 
     void execute(TOP_Output* out, const OP_Inputs* in, void*) override {
         myExec++;
+        // 配置後の cook で雛形入り Callbacks DAT を自動生成・ドック接続(成功するまでリトライ)
+        if (!myBootstrapped) myBootstrapped = tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);
+        // Info DAT トグル off→on で隣に Info DAT を自動生成
+        bool infoDat = in->getParInt("Infodat") != 0;
+        if (infoDat && !myPrevInfoDat) {
+            tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);   // 消されていたら再生成
+            tdpycb::firePythonCallback(myNode, "onInfoDAT", true);
+        }
+        myPrevInfoDat = infoDat;
         std::string file=in->getParFilePath("File")?in->getParFilePath("File"):"";
         int page=(int)in->getParInt("Page"); float dpi=(float)in->getParDouble("Dpi");
         std::string imode=in->getParString("Infomode")?in->getParString("Infomode"):"Info";
@@ -50,6 +82,7 @@ public:
         { OP_StringParameter p("Infomode"); p.label="Info DAT Mode"; p.page=P; p.defaultValue="Info";
           const char* n[]={"Info","Outline","Text","Annotations"}; const char* l[]={"Info / Metadata","Outline (bookmarks)","Page Text","Page Annotations"};
           m->appendMenu(p,4,n,l); }
+        { OP_NumericParameter p("Infodat"); p.label="Info DAT"; p.page=P; p.defaultValues[0]=0; m->appendToggle(p); }
     }
 
     int32_t getNumInfoCHOPChans(void*) override { return 4; }
@@ -176,6 +209,8 @@ private:
         }
     }
 
+    const OP_NodeInfo* myNode = nullptr;   // Python コールバック用
+    bool myBootstrapped = false, myPrevInfoDat = false;
     TOP_Context* myContext=nullptr; std::thread myThread; std::mutex myMutex; std::condition_variable myCond;
     bool myPending=false,myBusy=false,myQuit=false;
     std::string myFile,mySig,myWarn,myInfoMode="Info"; int myPage=0; float myDpi=150; int myOutW=0,myOutH=0;
@@ -195,6 +230,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/PDFKit/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=0;
+    i->customOPInfo.pythonCallbacksDAT = PythonCallbacksDATStubs;
 }
 DLLEXPORT TOP_CPlusPlusBase* CreateTOPInstance(const OP_NodeInfo* i, TOP_Context* c) { return new PDFKitTOP(i,c); }
 DLLEXPORT void DestroyTOPInstance(TOP_CPlusPlusBase* i, TOP_Context*) { delete static_cast<PDFKitTOP*>(i); }

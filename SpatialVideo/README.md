@@ -4,6 +4,13 @@
 **左右眼のフレーム**を映像出力し、メタデータ(基線・視野角など)は **Info CHOP / Info DAT** で出す
 (旧 **Spatial Video DAT** を統合)。純ObjC++・Swiftヘルパ無し。macOS 14+。
 
+## Info DAT の自動生成(操作不要)
+
+**OPを配置するだけ**で雛形入りの Callbacks DAT(`<node名>_callbacks`)が自動生成され、
+GLSL TOP のシェーダDATと同じ**閉じた↓チップ**としてノードにドックされる。
+**`Info DAT` トグルを ON にした瞬間、隣に Info DAT(`<node名>_info`)が自動生成**される
+(既にあれば何もしない=二重生成ガード)。生成位置や名前はチップ内の `onInfoDAT` を編集して変えられる。
+
 ## 映像出力(左右眼デコード)
 
 `AVAssetReader` + `AVAssetReaderTrackOutput` に MV-HEVC の**両レイヤー(VideoLayerID 0/1)**を

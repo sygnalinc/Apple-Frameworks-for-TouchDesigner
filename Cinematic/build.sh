@@ -16,7 +16,9 @@ build_one() {
     CinematicHelper.swift -framework AVFoundation -framework Cinematic -framework Metal -framework Accelerate \
     -Xlinker -install_name -Xlinker "@rpath/$DYLIB" \
     -o "$OUT/Frameworks/$DYLIB"
-  clang++ -std=c++17 -fobjc-arc -O2 -bundle -I "$SDK" \
+  # Python.h: Callbacks DAT 自動生成用(シンボルは実行時にTD本体から解決)
+  local PYINC="/Applications/TouchDesigner.app/Contents/Frameworks/Python.framework/Versions/3.11/include/python3.11"
+  clang++ -std=c++17 -fobjc-arc -O2 -bundle -I "$SDK" -I "$PYINC" -undefined dynamic_lookup \
     "$SRC" -framework Foundation \
     "$OUT/Frameworks/$DYLIB" -Xlinker -rpath -Xlinker @loader_path/../Frameworks \
     -o "$OUT/MacOS/$NAME"

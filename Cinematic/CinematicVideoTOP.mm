@@ -15,7 +15,29 @@
 #include <vector>
 #include "TOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
+#include "../common/PyCallbacksBootstrap.h"
 using namespace TD;
+
+// Callbacks DAT 雛形(配置時に自動生成・ドックチップ接続)。
+// Info DAT トグル ON で隣にメタデータの Info DAT を自動生成する(二重生成ガード付き)。
+static const char* PythonCallbacksDATStubs =
+"# Cinematic Video TOP callbacks\n"
+"#\n"
+"# onInfoDAT: 'Info DAT' トグルを on にした瞬間に呼ばれる。\n"
+"# 隣にメタデータ表示用の Info DAT を自動生成する(既にあれば何もしない)。\n"
+"def onInfoDAT(op, enabled):\n"
+"\tif not enabled:\n"
+"\t\treturn\n"
+"\tp = op.parent()\n"
+"\tname = op.name + '_info'\n"
+"\tif p.op(name):\n"
+"\t\treturn\n"
+"\td = p.create(infoDAT, name)\n"
+"\td.par.op = op.name\n"
+"\td.nodeX = op.nodeX + 200\n"
+"\td.nodeY = op.nodeY\n"
+"\td.viewer = True\n"
+"\treturn\n";
 
 extern "C" {
     void* cn_create(void); void cn_destroy(void*);
@@ -55,13 +77,22 @@ struct Meta {
 
 class CinematicVideoTOP final : public TOP_CPlusPlusBase {
 public:
-    CinematicVideoTOP(const OP_NodeInfo*, TOP_Context* c) : myContext(c) { myState = cn_create(); myThread = std::thread([this]{ worker(); }); }
+    CinematicVideoTOP(const OP_NodeInfo* ni, TOP_Context* c) : myNode(ni), myContext(c) { myState = cn_create(); myThread = std::thread([this]{ worker(); }); }
     ~CinematicVideoTOP() override { { std::lock_guard<std::mutex> l(myMutex); myQuit = true; } myCond.notify_all(); if (myThread.joinable()) myThread.join(); if (myState) cn_destroy(myState); }
 
     void getGeneralInfo(TOP_GeneralInfo* g, const OP_Inputs*, void*) override { g->cookEveryFrameIfAsked = true; }
 
     void execute(TOP_Output* out, const OP_Inputs* in, void*) override {
         myExec++;
+        // 配置後の cook で雛形入り Callbacks DAT を自動生成・ドック接続(成功するまでリトライ)
+        if (!myBootstrapped) myBootstrapped = tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);
+        // Info DAT トグル off→on で隣に Info DAT を自動生成
+        bool infoDat = in->getParInt("Infodat") != 0;
+        if (infoDat && !myPrevInfoDat) {
+            tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);   // 消されていたら再生成
+            tdpycb::firePythonCallback(myNode, "onInfoDAT", true);
+        }
+        myPrevInfoDat = infoDat;
         if (!myState) return;
         Job j;
         j.file = in->getParFilePath("File") ? in->getParFilePath("File") : "";
@@ -127,6 +158,7 @@ public:
         { OP_NumericParameter p("Normalize"); p.label="Normalize Depth (0..1)"; p.page=PAGE; p.defaultValues[0]=1; m->appendToggle(p); }
         { OP_NumericParameter p("Flip"); p.label="Flip Vertically"; p.page=PAGE; p.defaultValues[0]=1; m->appendToggle(p); }
         { OP_NumericParameter p("Maxsubjects"); p.label="Max Subjects (Info CHOP)"; p.page=PAGE; p.defaultValues[0]=10; p.minSliders[0]=1; p.maxSliders[0]=20; p.minValues[0]=1; p.maxValues[0]=kMaxSub; p.clampMins[0]=p.clampMaxes[0]=true; m->appendInt(p); }
+        { OP_NumericParameter p("Infodat"); p.label="Info DAT"; p.page=PAGE; p.defaultValues[0]=0; m->appendToggle(p); }
     }
 
     // Info CHOP: 診断 + 旧 Cinematic Data CHOP のメタデータチャンネル
@@ -193,6 +225,8 @@ private:
         myMeta = meta;
     }
 
+    const OP_NodeInfo* myNode = nullptr;   // Python コールバック用
+    bool myBootstrapped = false, myPrevInfoDat = false;
     TOP_Context* myContext; void* myState = nullptr;
     std::thread myThread; std::condition_variable myCond; std::mutex myMutex;
     bool myQuit=false, myPending=false, myBusy=false;
@@ -213,6 +247,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/Cinematic/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs = 0; i->customOPInfo.maxInputs = 0;
+    i->customOPInfo.pythonCallbacksDAT = PythonCallbacksDATStubs;
 }
 DLLEXPORT TOP_CPlusPlusBase* CreateTOPInstance(const OP_NodeInfo* i, TOP_Context* c) { return new CinematicVideoTOP(i, c); }
 DLLEXPORT void DestroyTOPInstance(TOP_CPlusPlusBase* i, TOP_Context*) { delete static_cast<CinematicVideoTOP*>(i); }
