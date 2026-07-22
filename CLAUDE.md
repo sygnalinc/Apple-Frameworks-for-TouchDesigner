@@ -2358,3 +2358,22 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - sample.toe `/project1/uikit_demo`(UI Widget×4 + Merge + Panel、Show=0既定=起動時は窓を出さない)。
   README(UIWidget新規・Panel更新・ルート英日)更新。opカタログ 32/21/24/4
 - 未対応: 画像/動画widget(TOP参照をPanelに表示)、値の書き戻し、NSTextField。将来候補
+
+### 2026-07-22 SwiftUI Panel構成を palette用 .tox 化(NativePanel.tox)
+
+- ユーザー「SwiftUI Panel構成を.tox化してpaletteに」。**.plugin(エンジン)+ .tox(テンプレート)の
+  二層**方針。ネイティブUIレンダは.pluginが担い、.toxは配線済み・パラメータ露出済みの再利用テンプレ
+  (.tox単体では動かない=プラグイン必須)
+- **NativePanel.tox**: `UI Widget DAT ×4 → Merge(widgets) → SwiftUI Panel CHOP → out` を1つのbaseCOMPに。
+  COMPに**カスタムパラメータ Show/Title を appendCustomPage で露出**し `panel.par.Show/Title` を
+  `parent().par.X` 式でバインド。out(null CHOP)にウインドウ操作値(level/enable/trigger)
+- **TD標準の質問への答え(確認済み)**: ①TD標準Slider/Buttonを.tox化してpaletteに=TD標準だけで可能
+  ②TD標準Widgetの見た目をSwiftUIに差し替え=不可(TDにフック無し)③SwiftUI Panel構成を.tox化=可能
+  (.plugin別途要)④.tox単体でネイティブUI=不可(ネイティブコード必須)。今回は③を実装
+- **保存先**: TDユーザーpalette `~/Library/.../palette/sygnal/NativePanel.tox` + リポジトリ `palette/`。
+  `paletteData.json` の sygnal コレクションに登録(TD再起動 or palette更新で Palette Browser に出る)
+- **実測**: `loadTox` でフレッシュロード→Show/Titleカスタムpar・全部品・out 3ch復元、Show=1で
+  「TD Native Panel」ウインドウ表示を確認。tox 1.2KB(軽量・配線のみ、pluginは参照)
+- **踏んだ罠**: `appendToggle/appendStr` の label は**キーワード引数**(位置引数だと "Single name
+  argument expected" エラー)。COMPカスタムpar露出は `comp.appendCustomPage(name)` → `pg.appendToggle`
+- palette/README.md 作成(必要プラグイン・登録手順・実測)。ルートREADMEは対象外(paletteは補助)
