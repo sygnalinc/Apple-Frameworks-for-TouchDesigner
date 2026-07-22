@@ -10,6 +10,8 @@
 #import <CoreText/CoreText.h>
 #import <CoreGraphics/CoreGraphics.h>
 #import <CoreImage/CoreImage.h>
+#import <AppKit/AppKit.h>
+#include <Python.h>
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
@@ -21,6 +23,63 @@
 #include "TOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
 using namespace TD;
+
+// ---- macOS標準フォントパネル(NSFontPanel)ブリッジ ----
+// パネルの選択(changeFont:)を受けて、要求元ノードの Font / Fontsize パラメータへ
+// Python 経由で書き戻す。main thread 専用(AppKit + TD Python)。
+// changeFont:(AppKit) からは TD オブジェクトに一切触れない(THREAD CONFLICT になる・実測)。
+// 選択はグローバルに保存し、cook(TDコンテキスト)内の PyRun でパラメータへ書き戻す。
+static std::mutex gPanelMx;
+static const TD::OP_NodeInfo* gPanelNode = nullptr;   // パネルを開いたノード(破棄時にクリア)
+static NSFont* gPanelFont = nil;                      // 現在の選択(convertFontの基準)
+static std::string gPanelPendingName;                 // 未適用の選択(PostScript名)
+static double gPanelPendingSize = 0;
+static uint64_t gPanelSerial = 0;                     // 選択のたびに増える
+
+// cook(TDコンテキスト)から呼ぶ: 自ノードの Font / Fontsize へ書き戻す
+static void applyPanelFontToNode(const TD::OP_NodeInfo* node, const std::string& psName, double size)
+{
+    if (!node || !node->context) return;
+    PyGILState_STATE g = PyGILState_Ensure();
+    std::string py;
+    py += "try:\n";
+    py += "\tn = __ct_node\n";
+    py += "\tn.par.Font = '"; py += psName; py += "'\n";
+    char sz[64]; snprintf(sz, sizeof sz, "\tn.par.Fontsize = %.2f\n", size);
+    py += sz;
+    py += "except Exception:\n";
+    py += "\timport traceback as __ct_tb\n";
+    py += "\t__ct_err = __ct_tb.format_exc()\n";
+    PyObject* main = PyImport_AddModule("__main__");
+    PyObject* dict = main ? PyModule_GetDict(main) : nullptr;
+    PyObject* args = node->context->createArgumentsTuple(0, nullptr);
+    if (dict && args) {
+        PyDict_SetItemString(dict, "__ct_node", PyTuple_GET_ITEM(args, 0));
+        PyObject* r = PyRun_String(py.c_str(), Py_file_input, dict, dict);
+        if (r) Py_DECREF(r); else PyErr_Clear();
+        PyDict_DelItemString(dict, "__ct_node");
+    }
+    if (args) Py_DECREF(args);
+    PyGILState_Release(g);
+}
+
+@interface CTFontPanelBridge : NSObject
+@end
+@implementation CTFontPanelBridge
+- (void)changeFont:(id)sender {
+    NSFontManager* fm = (NSFontManager*)sender;
+    NSFont* base = gPanelFont ?: [NSFont systemFontOfSize:72];
+    NSFont* f = [fm convertFont:base];
+    if (!f) return;
+    gPanelFont = f;
+    // ここではTDに一切触らない。選択を保存し、cook側が拾って書き戻す
+    std::lock_guard<std::mutex> l(gPanelMx);
+    gPanelPendingName = f.fontName.UTF8String ?: "";
+    gPanelPendingSize = (double)f.pointSize;
+    gPanelSerial++;
+}
+@end
+static CTFontPanelBridge* gPanelBridge = nil;
 
 namespace {
 
@@ -386,12 +445,27 @@ static bool renderText(const Style& st, Result& out, std::string& warn)
 
 class CoreTextTOP final : public TOP_CPlusPlusBase {
 public:
-    CoreTextTOP(const OP_NodeInfo*, TOP_Context* c) : myContext(c) { myThread = std::thread([this]{ worker(); }); }
-    ~CoreTextTOP() override { { std::lock_guard<std::mutex> l(myMutex); myQuit = true; } myCond.notify_all(); if (myThread.joinable()) myThread.join(); }
+    CoreTextTOP(const OP_NodeInfo* ni, TOP_Context* c) : myNodeInfo(ni), myContext(c) { myThread = std::thread([this]{ worker(); }); }
+    ~CoreTextTOP() override {
+        { std::lock_guard<std::mutex> l(gPanelMx); if (gPanelNode == myNodeInfo) gPanelNode = nullptr; }
+        { std::lock_guard<std::mutex> l(myMutex); myQuit = true; } myCond.notify_all(); if (myThread.joinable()) myThread.join();
+    }
     void getGeneralInfo(TOP_GeneralInfo* g, const OP_Inputs*, void*) override { g->cookEveryFrameIfAsked = true; }
 
     void execute(TOP_Output* out, const OP_Inputs* in, void*) override {
         myExec++;
+        // フォントパネルの未適用選択を TD コンテキスト(cook)内で書き戻す
+        {
+            std::string ps; double sz = 0; bool apply = false;
+            {
+                std::lock_guard<std::mutex> l(gPanelMx);
+                if (gPanelNode == myNodeInfo && gPanelSerial != myPanelApplied && !gPanelPendingName.empty()) {
+                    myPanelApplied = gPanelSerial;
+                    ps = gPanelPendingName; sz = gPanelPendingSize; apply = true;
+                }
+            }
+            if (apply) applyPanelFontToNode(myNodeInfo, ps, sz);
+        }
         Style st;
         st.text = in->getParString("Text") ? in->getParString("Text") : "";
         // Text DAT があれば優先(セルを行/タブで連結)
@@ -477,6 +551,7 @@ public:
           p.defaultValue = "system";   // 動的メニューは非空の既定値が必須(既知の罠)
           m->appendDynamicStringMenu(p); }
         { OP_StringParameter p("Fontfile"); p.label = "Font File (.ttf/.otf, overrides Font)"; p.page = P; m->appendFile(p); }
+        { OP_NumericParameter p("Fontpanel"); p.label = "Choose Font (macOS Font Panel)"; p.page = P; m->appendPulse(p); }
         { OP_NumericParameter p("Fontsize"); p.label = "Font Size (px)"; p.page = P; p.defaultValues[0] = 72; p.minSliders[0] = 8; p.maxSliders[0] = 400; p.minValues[0] = 1; p.clampMins[0] = true; m->appendFloat(p); }
         { OP_NumericParameter p("Weight"); p.label = "Weight (100-900, variable font)"; p.page = P; p.defaultValues[0] = 400; p.minSliders[0] = 100; p.maxSliders[0] = 900; p.minValues[0] = 100; p.maxValues[0] = 900; p.clampMins[0] = p.clampMaxes[0] = true; m->appendFloat(p); }
         { OP_NumericParameter p("Italic"); p.label = "Italic"; p.page = P; m->appendToggle(p); }
@@ -535,6 +610,20 @@ public:
         for (auto& f : families) info->addMenuEntry(f.c_str(), f.c_str());
     }
 
+    // macOS標準フォントパネルを開く。選択は changeFont: → Font/Fontsize パラメータへ反映
+    void pulsePressed(const char* name, void*) override {
+        if (strcmp(name, "Fontpanel") != 0) return;
+        const OP_NodeInfo* node = myNodeInfo;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            { std::lock_guard<std::mutex> l(gPanelMx); gPanelNode = node; }
+            if (!gPanelBridge) gPanelBridge = [CTFontPanelBridge new];
+            NSFontManager* fm = [NSFontManager sharedFontManager];
+            fm.target = gPanelBridge;
+            if (gPanelFont) [fm setSelectedFont:gPanelFont isMultiple:NO];
+            [fm orderFrontFontPanel:nil];
+        });
+    }
+
     void getWarningString(OP_String* s, void*) override {
         std::lock_guard<std::mutex> l(myMutex);
         if (!myWarn.empty()) s->setString(myWarn.c_str());
@@ -574,6 +663,8 @@ private:
         }
     }
 
+    const OP_NodeInfo* myNodeInfo = nullptr;   // フォントパネルからのパラメータ書き戻し用
+    uint64_t myPanelApplied = 0;               // 適用済みのパネル選択シリアル
     TOP_Context* myContext = nullptr;
     std::thread myThread; std::mutex myMutex; std::condition_variable myCond;
     bool myQuit = false, myPending = false, myBusy = false;

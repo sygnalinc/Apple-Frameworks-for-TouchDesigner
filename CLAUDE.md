@@ -2597,3 +2597,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 罠: 入力を持たないTOPで既定 "Use Input" は **127×127** になる → builtin par
   `outputresolution` を `getParString` で読み(builtin parも読める・警告なし)、useinput時は
   1280×720 を既定に。実測: 既定1280×720 / custom 1920×1080反映 / 戻しも正常
+
+### 2026-07-23 CoreText TOP: macOS標準フォントパネル(NSFontPanel)からフォント選択
+
+- ユーザー「font選択をmac標準のfontリストAPIから選択したい」→ `Choose Font (macOS Font Panel)`
+  パルスを追加。NSFontManager + NSFontPanel を開き、選択(changeFont:)を Font(PostScript名)/
+  Font Size パラメータへ自動反映
+- **踏んだ罠(pitfalls反映)**: AppKitコールバックから TD オブジェクトに触ると main thread でも
+  **THREAD CONFLICT ダイアログ**(createArgumentsTuple も par 代入も不可)。→ changeFont: は
+  C++グローバル(名前/サイズ/シリアル)への保存だけにし、**cook 内で保留選択を検知して PyRun で
+  par へ書き戻す**2段構えで解決
+- **実測(M2・TD実機・E2E)**: パルス→パネル表示→「American Typewriter」クリック→
+  Font='AmericanTypewriter' に自動反映→タイプライタ書体でレンダを確認
+- ユーザー提案の「FontBook op」(フォント一覧・選択の専用op)は、Font プルダウン+フォントパネルで
+  選択経路が揃ったため保留(必要なら一覧DATとして追加可能)

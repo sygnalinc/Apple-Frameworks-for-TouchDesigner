@@ -399,3 +399,8 @@
   `kCTFrameProgressionAttributeName=RightToLeft` の両方が必要(縦用約物も自動で正しくなる)
 - `CGBitmapContextCreate(NULL,...)` のバッファはゼロ初期化を当てにせず、透明背景でも
   `CGContextClearRect` してから描く
+- **AppKitコールバック(NSFontPanelのchangeFont:等)からTDオブジェクトに触るな**。main thread でも
+  TDの「THREAD CONFLICT」ダイアログが出る(TDのスレッドガードは自前のメインループ文脈を要求)。
+  `createArgumentsTuple` も par 代入も全部NG。**コールバックでは C++ グローバルに値を保存するだけ**にし、
+  cook(TDコンテキスト)内で PyRun によるパラメータ書き戻しを行う(CoreText TOP のフォントパネルで実証)。
+  なお cook 内からの直接 par 代入は問題ない

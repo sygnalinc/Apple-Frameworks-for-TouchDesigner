@@ -30,6 +30,7 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | CoreText | Text / Text DAT | 描画テキスト。DAT指定時はDAT優先(複数行向け) |
 | | Font | インストール済みフォントのプルダウン(既定 System Font (SF)) |
 | | Font File | .ttf/.otf/.ttc の直接指定(Fontより優先・未インストール可) |
+| | Choose Font (macOS Font Panel) | **macOS標準フォントパネル**を開く。選択すると Font/Font Size に自動反映 |
 | | Proportional Metrics (palt) | OpenType 'palt' 自動文字詰め(対応フォントのみ効く) |
 | | Font Size / Weight / Italic | サイズ(px)/ ウェイト100〜900(可変フォント)/ 斜体 |
 | | Tracking / Line Height / Ligatures | 字間(pt)/ 行送り倍率 / リガチャ |
