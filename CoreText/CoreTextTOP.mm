@@ -10,6 +10,7 @@
 #import <CoreText/CoreText.h>
 #import <CoreGraphics/CoreGraphics.h>
 #import <CoreImage/CoreImage.h>
+#include <algorithm>
 #include <atomic>
 #include <condition_variable>
 #include <cstring>
@@ -24,7 +25,8 @@ using namespace TD;
 namespace {
 
 struct Style {
-    std::string text, fontName;
+    std::string text, fontName, fontFile;
+    bool palt = false;                 // プロポーショナルメトリクス(OpenType 'palt'。自動文字詰め)
     float fontSize = 72, weight = 400, tracking = 0, lineHeight = 1.0f;
     int ligatures = 1;                 // 0=none 1=standard 2=all
     int alignH = 1, alignV = 1;        // 0=left/top 1=center/middle 2=right/bottom 3=justified(Hのみ)
@@ -50,7 +52,7 @@ struct Style {
                  strokeWidth, strokeRGBA[0],strokeRGBA[1],strokeRGBA[2],strokeRGBA[3],
                  shadow, shadowRGBA[0],shadowRGBA[1],shadowRGBA[2],shadowRGBA[3],
                  shadowX, shadowY, shadowBlur, w, h);
-        return text + "\x1f" + b;
+        return text + "\x1f" + fontFile + "\x1f" + (palt ? "P" : "p") + "\x1f" + b;
     }
 };
 
@@ -70,14 +72,43 @@ static void readRGBA(const OP_Inputs* in, const char* name, float out[4])
 static CTFontRef makeFont(const Style& st)
 {
     CTFontRef base = nullptr;
-    if (st.fontName.empty()) {
-        base = CTFontCreateUIFontForLanguage(kCTFontUIFontSystem, st.fontSize, nullptr);
-    } else {
-        CFStringRef nm = CFStringCreateWithCString(nullptr, st.fontName.c_str(), kCFStringEncodingUTF8);
-        base = CTFontCreateWithName(nm, st.fontSize, nullptr);
-        CFRelease(nm);
+    if (!st.fontFile.empty()) {
+        // フォントファイル(.ttf/.otf/.ttc)直接指定が最優先
+        CGDataProviderRef prov = CGDataProviderCreateWithFilename(st.fontFile.c_str());
+        if (prov) {
+            CGFontRef cg = CGFontCreateWithDataProvider(prov);
+            CGDataProviderRelease(prov);
+            if (cg) { base = CTFontCreateWithGraphicsFont(cg, st.fontSize, nullptr, nullptr); CGFontRelease(cg); }
+        }
+    }
+    if (!base) {
+        if (st.fontName.empty() || st.fontName == "system") {
+            base = CTFontCreateUIFontForLanguage(kCTFontUIFontSystem, st.fontSize, nullptr);
+        } else {
+            CFStringRef nm = CFStringCreateWithCString(nullptr, st.fontName.c_str(), kCFStringEncodingUTF8);
+            base = CTFontCreateWithName(nm, st.fontSize, nullptr);
+            CFRelease(nm);
+        }
     }
     if (!base) return nullptr;
+    // OpenType 'palt'(プロポーショナルメトリクス=自動文字詰め。CSSの font-feature-settings: 'palt')
+    if (st.palt) {
+        CFStringRef tag = CFSTR("palt");
+        int one = 1;
+        CFNumberRef val = CFNumberCreate(nullptr, kCFNumberIntType, &one);
+        const void* fk[] = { kCTFontOpenTypeFeatureTag, kCTFontOpenTypeFeatureValue };
+        const void* fv[] = { tag, val };
+        CFDictionaryRef feature = CFDictionaryCreate(nullptr, fk, fv, 2,
+                                                     &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        CFArrayRef features = CFArrayCreate(nullptr, (const void**)&feature, 1, &kCFTypeArrayCallBacks);
+        CFDictionaryRef attrs = CFDictionaryCreate(nullptr, (const void**)&kCTFontFeatureSettingsAttribute,
+                                                   (const void**)&features, 1,
+                                                   &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        CTFontDescriptorRef desc = CTFontDescriptorCreateWithAttributes(attrs);
+        CTFontRef withPalt = CTFontCreateCopyWithAttributes(base, st.fontSize, nullptr, desc);
+        CFRelease(desc); CFRelease(attrs); CFRelease(features); CFRelease(feature); CFRelease(val);
+        if (withPalt) { CFRelease(base); base = withPalt; }
+    }
     // 可変フォントの weight 軸(存在すれば)
     if (st.weight != 400) {
         const uint32_t kWght = 0x77676874;   // 'wght'
@@ -308,7 +339,7 @@ static bool renderText(const Style& st, Result& out, std::string& warn)
     CTFontRef font = makeFont(st);
     if (!font) { CGContextRelease(ctx); return false; }
     // 要求フォントと解決フォントの食い違い警告(フォールバック検知)
-    if (!st.fontName.empty()) {
+    if (!st.fontName.empty() && st.fontName != "system" && st.fontFile.empty()) {
         CFStringRef fam = CTFontCopyFamilyName(font);
         char buf[256] = {0};
         if (fam) { CFStringGetCString(fam, buf, sizeof buf, kCFStringEncodingUTF8); CFRelease(fam); }
@@ -377,6 +408,8 @@ public:
             st.text = t;
         }
         st.fontName  = in->getParString("Font") ? in->getParString("Font") : "";
+        st.fontFile  = in->getParFilePath("Fontfile") ? in->getParFilePath("Fontfile") : "";
+        st.palt      = in->getParInt("Palt") != 0;
         st.fontSize  = (float)in->getParDouble("Fontsize");
         st.weight    = (float)in->getParDouble("Weight");
         st.italic    = in->getParInt("Italic") != 0;
@@ -430,10 +463,14 @@ public:
         const char* P = "CoreText";
         { OP_StringParameter p("Text"); p.label = "Text"; p.page = P; p.defaultValue = "CoreText"; m->appendString(p); }
         { OP_StringParameter p("Textdat"); p.label = "Text DAT (overrides Text)"; p.page = P; m->appendDAT(p); }
-        { OP_StringParameter p("Font"); p.label = "Font (empty = SF system)"; p.page = P; m->appendString(p); }
+        { OP_StringParameter p("Font"); p.label = "Font"; p.page = P;
+          p.defaultValue = "system";   // 動的メニューは非空の既定値が必須(既知の罠)
+          m->appendDynamicStringMenu(p); }
+        { OP_StringParameter p("Fontfile"); p.label = "Font File (.ttf/.otf, overrides Font)"; p.page = P; m->appendFile(p); }
         { OP_NumericParameter p("Fontsize"); p.label = "Font Size (px)"; p.page = P; p.defaultValues[0] = 72; p.minSliders[0] = 8; p.maxSliders[0] = 400; p.minValues[0] = 1; p.clampMins[0] = true; m->appendFloat(p); }
         { OP_NumericParameter p("Weight"); p.label = "Weight (100-900, variable font)"; p.page = P; p.defaultValues[0] = 400; p.minSliders[0] = 100; p.maxSliders[0] = 900; p.minValues[0] = 100; p.maxValues[0] = 900; p.clampMins[0] = p.clampMaxes[0] = true; m->appendFloat(p); }
         { OP_NumericParameter p("Italic"); p.label = "Italic"; p.page = P; m->appendToggle(p); }
+        { OP_NumericParameter p("Palt"); p.label = "Proportional Metrics (palt)"; p.page = P; m->appendToggle(p); }
         { OP_NumericParameter p("Tracking"); p.label = "Tracking (pt)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = -5; p.maxSliders[0] = 50; m->appendFloat(p); }
         { OP_NumericParameter p("Lineheight"); p.label = "Line Height (multiple)"; p.page = P; p.defaultValues[0] = 1.0; p.minSliders[0] = 0.5; p.maxSliders[0] = 3; m->appendFloat(p); }
         { OP_StringParameter p("Ligatures"); p.label = "Ligatures"; p.page = P; p.defaultValue = "standard";
@@ -468,6 +505,27 @@ public:
         const char* O = "Output";
         { OP_NumericParameter p("Outputw"); p.label = "Width"; p.page = O; p.defaultValues[0] = 1280; p.minSliders[0] = 8; p.maxSliders[0] = 4096; p.minValues[0] = 4; p.clampMins[0] = true; m->appendInt(p); }
         { OP_NumericParameter p("Outputh"); p.label = "Height"; p.page = O; p.defaultValues[0] = 720; p.minSliders[0] = 8; p.maxSliders[0] = 4096; p.minValues[0] = 4; p.clampMins[0] = true; m->appendInt(p); }
+    }
+
+    // Font プルダウン: インストール済みフォントファミリーを列挙(初回のみ取得・ソート済みキャッシュ)
+    void buildDynamicMenu(const OP_Inputs*, OP_BuildDynamicMenuInfo* info, void*) override {
+        if (strcmp(info->name, "Font") != 0) return;
+        static std::vector<std::string> families;
+        static std::once_flag once;
+        std::call_once(once, []{
+            CFArrayRef arr = CTFontManagerCopyAvailableFontFamilyNames();
+            if (!arr) return;
+            for (CFIndex i = 0; i < CFArrayGetCount(arr); i++) {
+                CFStringRef nm = (CFStringRef)CFArrayGetValueAtIndex(arr, i);
+                char buf[256] = {0};
+                if (CFStringGetCString(nm, buf, sizeof buf, kCFStringEncodingUTF8) && buf[0] != '.')
+                    families.push_back(buf);   // 先頭'.'は隠しシステムフォントなので除外
+            }
+            CFRelease(arr);
+            std::sort(families.begin(), families.end());
+        });
+        info->addMenuEntry("system", "System Font (SF)");
+        for (auto& f : families) info->addMenuEntry(f.c_str(), f.c_str());
     }
 
     void getWarningString(OP_String* s, void*) override {

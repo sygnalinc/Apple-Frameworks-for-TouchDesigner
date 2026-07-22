@@ -2577,3 +2577,15 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - ビルド・署名・常設インストール済み。README(新規+ルート英日一覧)更新
 - 次にやること: sample.toe への利用例追加、テキストのアニメーション連携(CHOPでWeight/Trackingを
   駆動するデモ)、text-on-path(パス沿い文字)は将来候補
+
+### 2026-07-23 CoreText TOP: フォントプルダウン/ファイル直接指定/palt(自動文字詰め)追加
+
+- ユーザー要望3点を実装: ①**Font を動的プルダウン**(CTFontManagerCopyAvailableFontFamilyNames・
+  先頭'.'の隠しフォント除外・ソート済み・M2実測252ファミリー。既定 "system"=SF。動的メニューは
+  非空既定値必須の既知の罠に対応)②**Font File パラメータ**(.ttf/.otf/.ttc を CGDataProvider→
+  CGFontCreateWithDataProvider→CTFontCreateWithGraphicsFont で直接ロード・未インストール可・Fontより優先)
+  ③**Palt トグル** = OpenType 'palt'(kCTFontOpenTypeFeatureTag/Value + kCTFontFeatureSettingsAttribute
+  → CTFontCreateCopyWithAttributes。CSSの font-feature-settings:'palt' 相当)
+- **実測(M2・TD実機)**: メニュー252件(モリサワ A-OTF Gothic MB101 Pr6N 等のユーザーフォント含む)、
+  Futura.ttc の直接ロード視認、palt ON でヒラギノ角ゴの「」・句読点のアキが詰まることを比較画像で確認
+- リビルド・インストール・README更新済み

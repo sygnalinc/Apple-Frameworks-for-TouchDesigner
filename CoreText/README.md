@@ -5,8 +5,13 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 
 ## Text TOP との違い(できること)
 
-- **システムフォント(SF)/ 可変フォント**: Font 空欄で SF システムフォント。
-  `Weight` 100〜900 を**無段階**指定(可変フォントの `wght` 軸。無い場合は600以上でBold近似)
+- **フォントはプルダウン選択**(インストール済み全ファミリーを列挙・M2実測252件)、
+  または **フォントファイル(.ttf/.otf/.ttc)を直接指定**(未インストールでも使える)。
+  既定はSFシステムフォント。`Weight` 100〜900 を**無段階**指定(可変フォントの `wght` 軸。
+  無い場合は600以上でBold近似)
+- **プロポーショナルメトリクス(palt)**: OpenType `'palt'` で自動文字詰め
+  (CSSの `font-feature-settings: 'palt'` 相当)。「」や句読点のアキが詰まり、
+  見出し向けのプロポーショナル詰め組みになる(対応フォント: ヒラギノ等)
 - **カラー絵文字** 😀🎉(Apple Color Emoji をそのまま描画)
 - **日本語縦書き**(Vertical Text): 右→左の段組・縦用約物(。、の位置)も正しい
 - **高品質AA**: サブピクセル位置指定・リガチャ(none/standard/all)・トラッキング・行送り・両端揃え
@@ -23,7 +28,9 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | ページ | パラメータ | 説明 |
 |---|---|---|
 | CoreText | Text / Text DAT | 描画テキスト。DAT指定時はDAT優先(複数行向け) |
-| | Font | フォント名(空欄=SFシステムフォント)。例 `Hiragino Mincho ProN` |
+| | Font | インストール済みフォントのプルダウン(既定 System Font (SF)) |
+| | Font File | .ttf/.otf/.ttc の直接指定(Fontより優先・未インストール可) |
+| | Proportional Metrics (palt) | OpenType 'palt' 自動文字詰め(対応フォントのみ効く) |
 | | Font Size / Weight / Italic | サイズ(px)/ ウェイト100〜900(可変フォント)/ 斜体 |
 | | Tracking / Line Height / Ligatures | 字間(pt)/ 行送り倍率 / リガチャ |
 | | Horizontal/Vertical Align | 左/中/右/両端揃え・上/中/下 |
