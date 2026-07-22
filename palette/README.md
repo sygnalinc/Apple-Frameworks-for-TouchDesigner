@@ -47,8 +47,10 @@
 **CoreWLAN Scan CHOP + SSID Info DAT を配線済み**にした Component。
 「Get SSID を ON にしたら SSID表(Info DAT)を手で作らずに見たい」に応える。
 
-> **なぜ .tox か**: Custom OP は**自分の隣に別ノードを自動生成できない**(SDKに設置時フックが無い。
-> GLSL TOP のドックDATはTD内部専用)。そこで CHOP + Info DAT を配線済みにした Component として配布する。
+> **補足**: CoreWLAN Scan CHOP 本体にも **Callbacks DAT 経由の自動生成**が入った
+> (Custom ページで `Add` → Get SSID ON で隣に Info DAT が自動生成。CHOP の README 参照)。
+> この .tox は「Add すら押さずに1ドロップで完結」させたい場合用。設置時に無条件で自動生成する
+> フックは SDK に無いため、コールバック(要 Callbacks DAT)か .tox の二択になる。
 
 - 中身: `scan`(CoreWLAN Scan CHOP)/ `congestion`(null CHOP・混雑度)/ `ssid`(Info DAT・SSID一覧)
 - **COMP に露出したパラメータ**: `Get SSID Names`(既定On)/ `Scan Interval` / `Rescan Now`

@@ -30,8 +30,11 @@ build_td_plugin() {
     rm -rf build
     mkdir -p "$out/MacOS"
 
+    # 任意の追加フラグ（Python.h を使う CHOP 等）。既定は空で他プラグインに影響しない。
+    local extra_flags=(${=TD_EXTRA_CFLAGS})
     clang++ -std=c++17 -fobjc-arc -O2 -bundle \
         -I "$TD_SDK" \
+        "${extra_flags[@]}" \
         "${sources[@]}" \
         "${fw_flags[@]}" \
         -o "$out/MacOS/$name"

@@ -346,3 +346,19 @@
   と null ガードして安全に設定する
 - codesign の署名者名は証明書のCommon Name依存。Apple Development証明書は個人名が出る。
   会社名(SYGNAL Inc.)で署名するには Developer ID(法人アカウント)証明書が必要
+
+## Python コールバック (pythonCallbacksDAT) — Custom OP からノード自動生成
+
+- **`customOPInfo.pythonCallbacksDAT` に stub 文字列をセット**すると、ノードの **Custom ページ**に
+  「Callbacks DAT」パラメータ(par名 `callbacks`)+ `Add` ボタンが付く。**Add を押すと stub が
+  事前入力された Text DAT(`<node名>_callbacks`)が自動生成・接続**される(TD 2025系実測)
+- C++ 側からの発火は `myNodeInfo->context->createArgumentsTuple(N, nullptr)`(index0=op済み・
+  1以降を自分で埋める)→ `callPythonCallback("関数名", args, nullptr, nullptr)`。
+  args と戻り値は Py_DECREF する。**Callbacks DAT が未接続 or 関数未定義なら Py_None が返るだけ**
+  (エラーにならない)。cook スレッド(メインスレッド)から呼ぶこと
+- **コールバック内の Python は何でもできる**= `parent().create(infoDAT, name)` 等で
+  **Custom OP が自分の隣にノードを自動生成できる**(設置時無条件フックは無いが、パラメータ変化を
+  トリガにすれば実用上同等)。二重生成ガード(`if p.op(name): return`)を stub に入れる
+- ビルドは **`#include <Python.h>`(TD同梱 `Frameworks/Python.framework/Versions/3.11/include/python3.11`)
+  + `-undefined dynamic_lookup`**。Py_* シンボルは実行時に TD 本体から解決される(nm -u で
+  _PyBool_FromLong 等が U になっていればOK)。実例: CoreWLANScan(Get SSID ON → SSID Info DAT自動生成)

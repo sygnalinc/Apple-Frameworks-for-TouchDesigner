@@ -2430,3 +2430,24 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **踏んだ罠**: Parameter Execute DAT のパルス監視は `onpulse`(pulseではない)+ `pars='Rescan'` で
   対象par限定。appendFloat の範囲は normMin/normMax。COMP par → 内部op は expr で bind
 - palette/README.md 更新(WifiScanner節)
+
+### 2026-07-22 CoreWLAN Scan: Get SSID ON で Info DAT を自動生成(pythonCallbacksDAT)
+
+- ユーザー要望「GetSSIDをONにすると自動でinfoDATが出てくる仕様に」→ SDKの
+  `customOPInfo.pythonCallbacksDAT` を初採用して実装(リポジトリ初の Python コールバック付き Custom OP)
+- **仕組み**: stub 文字列をセットすると Custom ページに「Callbacks DAT」par + `Add` ボタンが付く。
+  Add で **onGetSSID 雛形が事前入力された Text DAT が自動生成・接続**される(TD標準機能・実測)。
+  C++ 側は execute で Getssid の **off→on 遷移**を検出し、`context->createArgumentsTuple` +
+  `callPythonCallback("onGetSSID", ...)` で発火。Python 側が `parent().create(infoDAT, op.name+'_ssid')`
+  で隣に Info DAT を生成(`d.par.op` を自ノードに設定・**二重生成ガード** `if p.op(name): return`)
+- **ビルド**: `#include <Python.h>`(TD同梱 Python 3.11 ヘッダ)+ `-undefined dynamic_lookup`
+  (Py_* は実行時にTD本体から解決)。common/build_plugin.sh に任意の `TD_EXTRA_CFLAGS` を追加
+  (既定空=他プラグイン無影響)
+- **実測(M2・TD実機)**: Add → callbacks DAT 生成(雛形入り)→ Get SSID ON → `cwtest_ssid`
+  (Info DAT)が隣に自動生成され **19 SSID**(Uro_5030336/Buffalo-5G-BAE0等・bssid/rssi/channel/band)
+  を自動表示。off→on を繰り返しても1個のまま(ガード動作)。混雑度126chも従来どおり。エラーなし
+- Callbacks DAT 未接続なら何も起きない(Py_None が返るだけ・安全)。README(CoreWLANScan/palette)
+  更新、pitfalls.md に pythonCallbacksDAT の作法を追加
+- sample.toe は未保存のまま(検証ノードは削除済み。今セッション中に `button1` がメモリ上から
+  消えた事象があったが原因不明・ディスクの sample.toe は無傷なので保存せず温存)
+- 次にやること: 他の「セットで使う」OPへの横展開候補(SwiftUI Panel の Widgets DAT 自動生成等)

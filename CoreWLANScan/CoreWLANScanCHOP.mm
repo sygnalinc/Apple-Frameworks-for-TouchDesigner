@@ -22,6 +22,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <Python.h>
 #include "CHOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
 using namespace TD;
@@ -56,7 +57,7 @@ struct Snapshot {
 
 class CoreWLANScanCHOP final : public CHOP_CPlusPlusBase {
 public:
-    CoreWLANScanCHOP(const OP_NodeInfo*) { myThread = std::thread([this] { worker(); }); }
+    CoreWLANScanCHOP(const OP_NodeInfo* ni) : myNode(ni) { myThread = std::thread([this] { worker(); }); }
     ~CoreWLANScanCHOP() override
     {
         { std::lock_guard<std::mutex> l(myMx); myQuit = true; }
@@ -78,6 +79,18 @@ public:
         myExec++;
         double interval = in->getParDouble("Scaninterval");
         bool getSsid = in->getParInt("Getssid") != 0;
+        // Get SSID が off→on になった瞬間に、隣に SSID 一覧 Info DAT を自動生成する
+        // (Callbacks DAT の onGetSSID を発火。二重生成ガードは Python 側)
+        if (getSsid && !myPrevGetSsid && myNode && myNode->context) {
+            PyObject* args = myNode->context->createArgumentsTuple(1, nullptr); // [0]=op
+            if (args) {
+                PyTuple_SET_ITEM(args, 1, PyBool_FromLong(getSsid ? 1 : 0));
+                PyObject* r = myNode->context->callPythonCallback("onGetSSID", args, nullptr, nullptr);
+                Py_DECREF(args);
+                if (r) Py_DECREF(r);
+            }
+        }
+        myPrevGetSsid = getSsid;
         // 設定を worker へ渡す + 起動トリガ判定
         {
             std::lock_guard<std::mutex> l(myMx);
@@ -339,6 +352,8 @@ private:
         bestCong = mx > 0 ? (float)(raw[bi] / mx) : 0.f;
     }
 
+    const OP_NodeInfo* myNode = nullptr;   // Python コールバック用(context)
+    bool myPrevGetSsid = false;            // Getssid の off→on 遷移検出
     std::thread myThread; std::mutex myMx; std::condition_variable myCv;
     bool myQuit = false, myPending = false, myRescan = false, myGetSsid = false;
     double myInterval = 10;
@@ -349,6 +364,27 @@ private:
 };
 } // namespace
 
+// Callbacks DAT の雛形。Get SSID Names を on にすると onGetSSID が呼ばれ、
+// 隣に SSID 一覧を映す Info DAT を自動生成する（二重生成ガード付き）。
+static const char* PythonCallbacksDATStubs =
+"# CoreWLAN Scan CHOP callbacks\n"
+"#\n"
+"# onGetSSID: 'Get SSID Names' を on にした瞬間に呼ばれる。\n"
+"# 隣に SSID 一覧を表示する Info DAT を自動生成する（既にあれば何もしない）。\n"
+"def onGetSSID(op, enabled):\n"
+"\tif not enabled:\n"
+"\t\treturn\n"
+"\tp = op.parent()\n"
+"\tname = op.name + '_ssid'\n"
+"\tif p.op(name):\n"
+"\t\treturn\n"
+"\td = p.create(infoDAT, name)\n"
+"\td.par.op = op.name\n"
+"\td.nodeX = op.nodeX + 160\n"
+"\td.nodeY = op.nodeY\n"
+"\td.viewer = True\n"
+"\treturn\n";
+
 extern "C" {
 DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     if (!i->setAPIVersion(CHOPCPlusPlusAPIVersion)) return;
@@ -358,6 +394,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/CoreWLANScan/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.minInputs = 0; i->customOPInfo.maxInputs = 0;
+    i->customOPInfo.pythonCallbacksDAT = PythonCallbacksDATStubs;
 }
 DLLEXPORT CHOP_CPlusPlusBase* CreateCHOPInstance(const OP_NodeInfo* i) { return new CoreWLANScanCHOP(i); }
 DLLEXPORT void DestroyCHOPInstance(CHOP_CPlusPlusBase* i) { delete static_cast<CoreWLANScanCHOP*>(i); }
