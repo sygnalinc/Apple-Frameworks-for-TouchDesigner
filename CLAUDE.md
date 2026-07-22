@@ -2408,8 +2408,10 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **CoreWLAN Scan CHOP**: `Get SSID Names` トグル追加。worker が doScan(混雑度・権限不要)後に
   ヘルパー起動+前回JSON読取→**Info DAT(ssid/bssid/rssi/channel/band)**。ヘルパーパスは dladdr で
   `Contents/Resources/Helpers/wifiscan-helper.app`。混雑度チャンネルは従来どおり(内蔵scan・権限不要)
-- **実測**: ヘルパー単体で18 SSID取得を確認。TD内での最終確認はユーザーが別プロジェクト作業中の
-  ため保留(次回sample.toe再起動時)。ビルド・インストール・署名は完了
+- **実測**: ヘルパー単体で18 SSID取得を確認。**TD実機でも検証完了**: CoreWLAN Scan の
+  `Get SSID Names` オンで Info DAT に SSID+BSSID+RSSI+channel+band が18件(SCC_JBFES/SYGNAL/
+  SYGNAL_GUEST/Buffalo-5G-BAE0等)。混雑度チャンネル(権限不要)も同時に動作(28net・best 2.4=ch14)。
+  許可済みのため2回目以降はダイアログ無しで即取得
 - **踏んだ罠**: ①バイナリ直接実行(open非経由)は責任プロセス=Terminalでアプリ識別が無く SSID空。
   **必ず `open` で.appとして起動**(自前のLocation identity で許可・取得できる)。②ヘルパーは
   scanForNetworksがブロックするので独立プロセスが好適。③初回だけ許可ダイアログ(ヘルパーapp宛)
