@@ -2547,3 +2547,14 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   Operator=本体、off→on 繰り返しでも1個のまま、エラーなし
 - 検証ノード(cvtest/svtest/pdftest)は TD 上に残置(ユーザーのチップ見た目確認用。確認後削除可)
 - 今後同じ仕組みを組み込む時は `common/PyCallbacksBootstrap.h` を使う(使い方はヘッダ冒頭コメント)
+
+### 2026-07-23 TDSensor(Multipeer iOSアプリ)の実機インストール失敗を修正
+
+- ユーザーのXcode実機Runが「not a valid bundle / CFBundleIdentifier無し」(CoreDeviceError 3002/3000)で失敗
+- **原因**: project.yml(XcodeGen)が `GENERATE_INFOPLIST_FILE=NO` + 同梱 `Info.plist` を使う設定なのに、
+  同梱plistが権限キー(LocalNetwork/Bonjour/Motion)のみで **CFBundleIdentifier 等の標準キーが皆無**だった
+- **修正**: Info.plist に標準キーを `$(PRODUCT_BUNDLE_IDENTIFIER)` 等のビルド設定プレースホルダで追加
+  (CFBundleIdentifier/Executable/Name/PackageType/Version/ShortVersion/UILaunchScreen 等)
+- xcodebuild(automatic signing・team設定済み)→ `xcrun devicectl device install app` で
+  **ワイヤレス接続の実機iPhone(iPhone18,1)へインストール成功**(bundleID tokyo.sygnal.tdsensor)
+- 教訓: GENERATE_INFOPLIST_FILE=NO で独自plistを使う場合、権限キーだけでなく標準キー一式が必須
