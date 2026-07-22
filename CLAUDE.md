@@ -2393,3 +2393,24 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **踏んだ罠**: Count CHOPのラップは `output` パラメータ(off/loop/min/lc/cl)+ limitmin/limitmax。
   モーメンタリ→カウントのトグルは cook 連続性に依存し不安定(単発cook検証では edge を逃す)
 - palette/README.md 更新(SwiftUIButton節・できる/できない明記)
+
+### 2026-07-22 CoreWLAN Scan に SSID取得を追加(位置情報ヘルパー.app方式)+ 過去の誤り訂正
+
+- ユーザーが記事(techblog.kayac.com/wifi-analyzer-on-mac)を提示。**SSID取得の再検証**を実施
+- **過去の結論「macOS 26では位置情報許可でもSSIDはnil」は誤りだった**。正規Info.plist(NSLocation
+  用途文字列)を持つ.appで CLLocationManager 許可→authorizedAlways にすると、**scanForNetworks の
+  SSID も接続中SSIDも返る**ことを実測(SYGNAL/SYGNAL_GUEST/SCC_JBFES等18件)。以前の検証は
+  authorized に到達できていなかった(プロンプトが出ない=Info.plist用途文字列が無いバイナリ)
+- **TDプラグイン固有の壁**: 責任プロセス=TouchDesigner本体のInfo.plistに位置情報用途文字列が無く、
+  プラグインから許可要求してもプロンプトが出ない(=SSID nil)。**回避策=独自Info.plist(用途文字列
+  +LSUIElement)を持つヘルパー.appを同梱**し、`open -g -j helper.app --args <json>` で起動。ヘルパーが
+  Location許可→scanForNetworks→JSONをキャッシュに書き、CHOPが読む(記事のNode.js→python別プロセスと同型)
+- **CoreWLAN Scan CHOP**: `Get SSID Names` トグル追加。worker が doScan(混雑度・権限不要)後に
+  ヘルパー起動+前回JSON読取→**Info DAT(ssid/bssid/rssi/channel/band)**。ヘルパーパスは dladdr で
+  `Contents/Resources/Helpers/wifiscan-helper.app`。混雑度チャンネルは従来どおり(内蔵scan・権限不要)
+- **実測**: ヘルパー単体で18 SSID取得を確認。TD内での最終確認はユーザーが別プロジェクト作業中の
+  ため保留(次回sample.toe再起動時)。ビルド・インストール・署名は完了
+- **踏んだ罠**: ①バイナリ直接実行(open非経由)は責任プロセス=Terminalでアプリ識別が無く SSID空。
+  **必ず `open` で.appとして起動**(自前のLocation identity で許可・取得できる)。②ヘルパーは
+  scanForNetworksがブロックするので独立プロセスが好適。③初回だけ許可ダイアログ(ヘルパーapp宛)
+- README(CoreWLANScan・ルート英日)の「SSID取得不可」記述を訂正。pitfalls追記予定

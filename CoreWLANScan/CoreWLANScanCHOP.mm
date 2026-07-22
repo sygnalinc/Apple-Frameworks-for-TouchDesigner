@@ -13,6 +13,7 @@
 //   集計スナップショットを読むだけ(非ブロック)。Scan Interval 秒ごと、または Rescan パルスで実行。
 #import <Foundation/Foundation.h>
 #import <CoreWLAN/CoreWLAN.h>
+#include <dlfcn.h>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -76,10 +77,12 @@ public:
     {
         myExec++;
         double interval = in->getParDouble("Scaninterval");
+        bool getSsid = in->getParInt("Getssid") != 0;
         // 設定を worker へ渡す + 起動トリガ判定
         {
             std::lock_guard<std::mutex> l(myMx);
             myInterval = interval;
+            myGetSsid = getSsid;
             if (myRescan) { myRescan = false; myPending = true; myCv.notify_all(); }
         }
 
@@ -115,9 +118,35 @@ public:
           p.defaultValues[0] = 10; p.minSliders[0] = 0; p.maxSliders[0] = 60; p.minValues[0] = 0;
           p.clampMins[0] = true; m->appendFloat(p); }
         { OP_NumericParameter p("Rescan"); p.label = "Rescan Now"; p.page = P; m->appendPulse(p); }
+        { OP_NumericParameter p("Getssid"); p.label = "Get SSID Names (Location)"; p.page = P;
+          p.defaultValues[0] = 0; m->appendToggle(p); }
     }
     void pulsePressed(const char* name, void*) override
     { if (strcmp(name, "Rescan") == 0) { std::lock_guard<std::mutex> l(myMx); myRescan = true; } }
+
+    // SSID一覧を Info DAT で出す(ヘルパー経由・Location許可時のみ中身が入る)
+    bool getInfoDATSize(OP_InfoDATSize* s, void*) override
+    {
+        std::lock_guard<std::mutex> l(myMx);
+        s->rows = (int32_t)mySsidRows.size() + 1;   // +ヘッダ
+        s->cols = 5;
+        s->byColumn = false;
+        return true;
+    }
+    void getInfoDATEntries(int32_t index, int32_t nEntries, OP_InfoDATEntries* e, void*) override
+    {
+        if (nEntries < 5) return;
+        if (index == 0) {
+            const char* h[] = {"ssid", "bssid", "rssi", "channel", "band"};
+            for (int c = 0; c < 5; c++) e->values[c]->setString(h[c]);
+            return;
+        }
+        std::lock_guard<std::mutex> l(myMx);
+        int i = index - 1;
+        if (i < 0 || i >= (int)mySsidRows.size()) return;
+        for (int c = 0; c < 5; c++)
+            e->values[c]->setString(c < (int)mySsidRows[i].size() ? mySsidRows[i][c].c_str() : "");
+    }
 
     void getWarningString(OP_String* s, void*) override
     {
@@ -176,10 +205,67 @@ private:
             }
             myScanning = true;
             Snapshot s = doScan();
+            bool getSsid; { std::lock_guard<std::mutex> l(myMx); getSsid = myGetSsid; }
+            if (getSsid) runSsidHelper();   // ヘルパーを起動して前回結果を読む(Location許可時のみ中身)
             lastScan = std::chrono::steady_clock::now();
             { std::lock_guard<std::mutex> l(myMx); mySnap = s; }
             myScanning = false;
             myScans++;
+        }
+    }
+
+    // 同梱ヘルパー.appのパス(Contents/Resources/Helpers/wifiscan-helper.app)を dladdr で求める
+    static std::string helperAppPath()
+    {
+        Dl_info info;
+        if (dladdr((const void*)&helperAppPath, &info) && info.dli_fname) {
+            std::string exe = info.dli_fname;   // .../Contents/MacOS/CoreWLANScanCHOP
+            size_t pos = exe.rfind("/MacOS/");
+            if (pos != std::string::npos)
+                return exe.substr(0, pos) + "/Resources/Helpers/wifiscan-helper.app";
+        }
+        return "";
+    }
+    static std::string cachePath()
+    {
+        return std::string(NSHomeDirectory().UTF8String) + "/Library/Caches/TDAppleML/wifiscan.json";
+    }
+
+    // ヘルパーapp(独自Info.plist・Location用途文字列あり)を open で起動し、前回のJSON結果を読む。
+    // 初回は Location 許可ダイアログが出る(ヘルパーapp宛)。許可後はSSIDが入る。
+    void runSsidHelper()
+    {
+        @autoreleasepool {
+            std::string app = helperAppPath();
+            std::string cache = cachePath();
+            if (app.empty()) return;
+            // 起動(-g:前面に出さない -j:非表示。--args で出力先を渡す)
+            NSTask* task = [[NSTask alloc] init];
+            task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/open"];
+            task.arguments = @[ @"-g", @"-j", [NSString stringWithUTF8String:app.c_str()],
+                                @"--args", [NSString stringWithUTF8String:cache.c_str()] ];
+            @try { [task launchAndReturnError:nil]; } @catch (NSException*) {}
+            // 前回の結果を読む(今起動したものは数秒後に書く。次のcookで反映)
+            NSData* d = [NSData dataWithContentsOfFile:[NSString stringWithUTF8String:cache.c_str()]];
+            if (!d) return;
+            NSDictionary* o = [NSJSONSerialization JSONObjectWithData:d options:0 error:nil];
+            if (![o isKindOfClass:[NSDictionary class]]) return;
+            std::vector<std::vector<std::string>> rows;
+            NSArray* nets = o[@"networks"];
+            if ([nets isKindOfClass:[NSArray class]]) {
+                for (NSDictionary* n in nets) {
+                    if (![n isKindOfClass:[NSDictionary class]]) continue;
+                    std::string ssid = n[@"ssid"] ? [[n[@"ssid"] description] UTF8String] : "";
+                    if (ssid.empty()) continue;   // 名前が取れないものは出さない
+                    std::string bssid = n[@"bssid"] ? [[n[@"bssid"] description] UTF8String] : "";
+                    char rb[16]; snprintf(rb, sizeof rb, "%d", [n[@"rssi"] intValue]);
+                    char cb[16]; snprintf(cb, sizeof cb, "%d", [n[@"channel"] intValue]);
+                    std::string band = n[@"band"] ? [[n[@"band"] description] UTF8String] : "";
+                    rows.push_back({ssid, bssid, rb, cb, band});
+                }
+            }
+            std::lock_guard<std::mutex> l(myMx);
+            mySsidRows = std::move(rows);
         }
     }
 
@@ -254,9 +340,10 @@ private:
     }
 
     std::thread myThread; std::mutex myMx; std::condition_variable myCv;
-    bool myQuit = false, myPending = false, myRescan = false;
+    bool myQuit = false, myPending = false, myRescan = false, myGetSsid = false;
     double myInterval = 10;
     Snapshot mySnap;
+    std::vector<std::vector<std::string>> mySsidRows;   // myMx 保護(SSID一覧)
     std::atomic<uint64_t> myExec{0}, myScans{0};
     std::atomic<bool> myScanning{false};
 };

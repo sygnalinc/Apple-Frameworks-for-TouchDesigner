@@ -4,9 +4,32 @@
 「電波が混んでいる/空いているチャンネルはどこか」を可視化する**電波環境ツール**。
 チャンネル選定(空き帯域探し)・展示会場の電波混雑モニタ・混雑度をリアクティブ入力に、等。
 
-`CWInterface.scanForNetworks` を使う。**SSID名/BSSIDは macOS 14+ のprivacyで伏せられ取得不可**
-(→ [CoreWLAN](../CoreWLAN/) の README 参照)。**ネットワーク名は出ないが**、各APの
-RSSI・帯域(2.4/5GHz)・チャンネル幅は取れるので、混雑分析には十分。
+`CWInterface.scanForNetworks` を使う。RSSI・帯域(2.4/5GHz)・チャンネル幅は権限なしで取れる。
+**SSID名/BSSID は位置情報の許可があれば取得できる**(`Get SSID Names` トグル・下記)。
+
+## SSID名の取得(Get SSID Names)
+
+macOS 14.4+ では **scanForNetworks の SSID は「位置情報の許可(Location)」でゲート**されている。
+許可があれば SSID/BSSID が返る(実測で確認)。ただし **TouchDesigner 本体は Info.plist に位置情報の
+用途文字列を持たない**ため、プラグインから直接は許可を要求できない。
+
+そこで **独自 Info.plist(位置情報の用途文字列)を持つ小さなヘルパー .app を同梱**し、
+`Get SSID Names` をオンにすると CHOP がそのヘルパーを起動する:
+
+```
+CoreWLAN Scan CHOP → (open) → wifiscan-helper.app → Location許可 + scanForNetworks
+                                     → JSON(~/Library/Caches/TDAppleML/wifiscan.json)→ CHOPが読む
+```
+
+- **初回だけ「wifiscan-helper が位置情報を使おうとしています」の許可ダイアログ**が出る → 許可
+- 許可後は SSID/BSSID/RSSI/channel/band が **Info DAT** に出る(`ssid / bssid / rssi / channel / band`)
+- 混雑度チャンネル(下記)は権限なしでも従来どおり動く(こちらは内蔵scan)
+
+**実測(M2・macOS 26.5.1)**: ヘルパーが 18件のSSID(`SYGNAL` / `SYGNAL_GUEST` / `SCC_JBFES` /
+`Buffalo-G-D32E` 等)を RSSI/チャンネル付きで取得。
+
+> 補足: 以前このREADMEは「SSIDは取得不可」としていたが**誤り**だった(位置情報の許可で取れる)。
+> 訂正済み。責任プロセス(TD本体)に用途文字列が無い問題は、上記のヘルパー .app 方式で回避している。
 
 ## 混雑度モデル
 
@@ -27,12 +50,15 @@ RSSI・帯域(2.4/5GHz)・チャンネル幅は取れるので、混雑分析に
 
 Info CHOP: `executes / scans / networks`
 
+**Info DAT**(`Get SSID Names` オン時): `ssid / bssid / rssi / channel / band` の周辺SSID一覧
+
 ## パラメータ
 
 | パラメータ | 説明 |
 |---|---|
 | Scan Interval (s) | 自動スキャン間隔(既定10s。0=手動のみ) |
 | Rescan Now | 今すぐスキャン(パルス) |
+| Get SSID Names (Location) | SSID名取得(既定Off)。ヘルパー.app経由・初回に位置情報許可ダイアログ |
 
 ## 実測(M2・macOS 26.5.1)
 
@@ -45,12 +71,16 @@ Info CHOP: `executes / scans / networks`
 - **scanForNetworks はブロックする(数秒)**ため**ワーカースレッドで実行**し、cook は最新の集計
   スナップショットを読むだけ(非ブロック)。アクティブスキャンは接続を一瞬乱すので Scan Interval は
   短くしすぎない(既定10s)
-- **SSID名は取れない**(macOS privacy)。名前が要るなら手動確認するしかない
+- **SSID名は `Get SSID Names` で取れる**(位置情報許可が要る・ヘルパー.app経由)。混雑度は権限不要
 - スキャンは接続中のインターフェース(en0等)で行う。Wi-Fiオフ時は networks=0 で Warning
 - 5GHzのDFSチャンネル等、環境・地域・ドライバによって検出されるchは変わる
+- SSIDヘルパーは `~/Library/Caches/TDAppleML/wifiscan.json` を介す。結果は1スキャンぶん遅れて反映
 
 ## ビルド
 
 ```
-cd CoreWLANScan && ./build.sh   # → build/CoreWLANScanCHOP.plugin
+cd CoreWLANScan && ./build.sh   # → build/CoreWLANScanCHOP.plugin(wifiscan-helper.app 同梱)
 ```
+
+ヘルパー .app は Swift(CoreWLAN + CoreLocation)。build.sh が
+`Contents/Resources/Helpers/wifiscan-helper.app` に同梱・署名する。
