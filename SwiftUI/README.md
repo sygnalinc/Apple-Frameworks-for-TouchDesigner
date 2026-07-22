@@ -15,7 +15,25 @@ SwiftUI のレンダは Swift ヘルパ(`SwiftUIHelper`・C ABI `su_`)が **メ�
 | **Text** | システムフォント(rounded/semibold)のテキスト |
 | **SF Symbol** | Apple の SF Symbols(`star.fill` / `waveform.circle.fill` / `bolt.fill` …) |
 | **Gauge (circular)** | 円形ゲージ(`accessoryCircular`)。Value 0..1 |
-| **Progress (bar)** | 横向きプログレスバー。Value 0..1 |
+| **Progress (bar)** | 横向きバー。**塗り=Foreground色 / トラック=薄いForeground**。Value 0..1(図形描画で確実にレンダ) |
+
+### バーの色
+progress バーの**塗り色は Foreground**(トラックはその薄色)。Gauge も Foreground が反映される。
+色は RGBA。TD の Python から設定するときは**成分ごと**(`Textcolorr/g/b/a`)に。
+
+### SF Symbols とは
+Apple の**アイコン集(約5000+のシンボル)**。文字ではなくベクターアイコンで、`star.fill` /
+`heart.fill` / `bolt.fill` / `wifi` / `waveform` / `play.fill` / `music.note` / `camera.fill` /
+`sun.max.fill` / `gearshape.fill` など。正確な名前は **SF Symbols.app**(Apple 公式・無料)で検索。
+`symbol` モードで名前を入れると、そのアイコンがシステム色/サイズで描かれる。
+
+### マウス操作(値をUIで動かす)
+TOP はテクスチャなので **TD からマウスイベントは渡らない**(レンダされたバーを直接クリックは不可)。
+値をマウスで動かすには、TD 側のUIを `Value` に配線する:
+- **Value パラメータのスライダーをドラッグ**(0..1・そのまま操作可)
+- **Slider COMP を配線**: `Value` の式に `op('slider1').panel.u` → スライダーをドラッグでバーが動く
+  (sample.toe の `/project1/swiftui_demo` がこの構成。実測でスライダー値にバーが追従)
+- **Mouse In CHOP** や他のCHOPでも同様に駆動できる
 
 ## 実測(M2・macOS 26.5.1)
 

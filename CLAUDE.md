@@ -2284,3 +2284,20 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **調査で分かった代替**: 通知/ファイル選択/アラート/基本色選択は既に AppleScript DAT で叩ける。
   ネイティブでないと無理な候補は SwiftUI TOP(実装)/ MenuBar(NSStatusItem)/ ColorSampler(画面
   スポイト)/ Native Panel(浮遊NSWindow)/ Native Text Input(IME)
+
+### 2026-07-22 SwiftUI TOP: progressバー修正(色対応)+ SF Symbols/マウス操作の整理
+
+- ユーザー「progress/barをマウス操作したい・バーの色も変えたい・SF Symbolの中身は?」
+- **progressバーの描画バグ修正**: `ProgressView(value:)` は **ImageRenderer で正しく描けない**
+  (黄色い全幅バー+🚫アイコンに化ける)。**カスタム図形(Capsule×2: トラック+塗り)**に置換。
+  塗り=Foreground色、トラック=Foreground薄色、幅=value。実測で緑バー65%を視認、色制御OK
+- **バーの色 = Foreground**(Gaugeも同様)。TD PythonのRGBA設定は成分ごと(`Textcolorr/g/b/a`)
+- **マウス操作**: TOPはテクスチャで**TDからマウスイベントが来ない**(レンダ画像を直接クリック不可)。
+  値をUIで動かすには TD側UIを `Value` に配線: ①Valueパラメータのスライダー ②Slider COMP を
+  `Value.expr="op('slider1').panel.u"` ③Mouse In CHOP。実測: Slider COMP値0.2/0.8/0.5にバーが追従。
+  sample.toe `/project1/swiftui_demo` を slider1→swiftui1(progress) の構成に更新
+- **SF Symbols**: Appleのアイコン集(約5000+)。文字でなくベクターアイコン。名前は SF Symbols.app で確認
+  (star.fill/bolt.fill/wifi/waveform 等)。symbolモードで名前指定→システム色/サイズで描画
+- **踏んだ罠**: SwiftUIの一部コントロール(ProgressView等)は ImageRenderer で正しく描けない
+  → 図形(Shape)ベースで自前描画すると確実。GeometryReaderは使わず既知のw/hから寸法計算
+- README更新(バー色・SF Symbols・マウス操作の節を追加)

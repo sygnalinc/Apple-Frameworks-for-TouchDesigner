@@ -43,11 +43,21 @@ struct SUView: View {
                 .tint(fg)
                 .scaleEffect(fontSize / 30.0)
                 .foregroundStyle(fg)
-            case 3:   // ProgressView(横バー)
-                ProgressView(value: value.isFinite ? min(max(value, 0), 1) : 0) {
-                    Text(text).foregroundStyle(fg)
+            case 3:   // 横バー(カスタム図形・ImageRendererで確実に描画、塗り色=Foreground)
+                VStack(alignment: .leading, spacing: max(6, fontSize * 0.18)) {
+                    if !text.isEmpty {
+                        Text(text)
+                            .font(.system(size: fontSize * 0.45, weight: .semibold, design: .rounded))
+                            .foregroundStyle(fg)
+                    }
+                    let v = value.isFinite ? min(max(value, 0), 1) : 0
+                    let barW = max(1.0, w - 48)
+                    let barH = max(10.0, fontSize * 0.4)
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(fg.opacity(0.22)).frame(width: barW, height: barH)   // トラック
+                        Capsule().fill(fg).frame(width: barW * v, height: barH)             // 塗り
+                    }
                 }
-                .tint(fg)
                 .padding(.horizontal, 24)
             default:  // Text
                 Text(text)
