@@ -106,7 +106,7 @@ grouped by category.
 | [CoreML](CoreMLCHOP/) | CHOP | **Vector output** of any Core ML model into channels (embeddings, keypoints…) |
 | [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img** with an **external Core ML model** (Stable Diffusion / SDXL / SD Turbo) |
 | [ImagePlayground](ImagePlayground/) | TOP | **text→image via Apple Image Playground** (`ImageCreator`, macOS 15.4+). No external model; Animation / Illustration / Sketch. Wire a face image into input 0 to generate people |
-| [SwiftUI](SwiftUI/) | TOP | **Render SwiftUI views into a texture** — SF Symbols / system fonts / Gauge / ProgressView as native-looking TD video. Values are driven from TD params (one-way) |
+| [SwiftUI](SwiftUI/) | TOP | **Render SwiftUI / native-macOS UI into a texture** — text / SF Symbols / gauge / **a whole macOS-style window described in JSON** (title bar, button, toggle, slider, card…). Values driven from TD (one-way) |
 | [CoreImage Code](CoreImageCode/) | TOP | **Generate** QR / Aztec / PDF417 / Code128 (no external library) |
 | [CreateML](CreateML/) | DAT | **Unified on-device trainer** — one `Task` menu for Image / Hand Pose / Action (body) / Hand Action / Sound / Activity (CHOP series) / Tabular classifier & regressor → `.mlmodel`. Output models are read by CoreML TOP / CoreML Motion CHOP / SoundClass etc. |
 | [CreateML Training Recorder](CreateMLTrainingRecorder/) | CHOP | **Record a CHOP time-series → CreateML dataset CSV** (recording / label / feature columns). Capture VisionPose/Hand takes in TD, label them, feed straight to CreateML (Activity) |

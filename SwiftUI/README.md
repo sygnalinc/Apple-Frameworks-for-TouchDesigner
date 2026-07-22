@@ -16,6 +16,50 @@ SwiftUI のレンダは Swift ヘルパ(`SwiftUIHelper`・C ABI `su_`)が **メ�
 | **SF Symbol** | Apple の SF Symbols(`star.fill` / `waveform.circle.fill` / `bolt.fill` …) |
 | **Gauge (circular)** | 円形ゲージ(`accessoryCircular`)。Value 0..1 |
 | **Progress (bar)** | 横向きバー。**塗り=Foreground色 / トラック=薄いForeground**。Value 0..1(図形描画で確実にレンダ) |
+| **Window (JSON UI)** | **JSON で macOS 風ウインドウ丸ごとをレンダ**(UIツール群)。下記参照 |
+
+## Window モード(JSON で macOS 風UIを組む)
+
+`Layout JSON (window mode)` パラメータ(またはその式に Text DAT を参照 `op('json1').text`)に
+**JSON でUIを記述**すると、トラフィックライト付きのタイトルバー + 各コントロールを**ネイティブ風に
+レンダ**する。ショー制御パネル・ステータス表示・オーバーレイHUD などに。
+
+```json
+{
+  "title": "Show Control", "traffic": true, "bg": [0.12,0.12,0.14,1],
+  "body": [
+    {"type":"text","text":"Scene Controls","size":22,"weight":"bold","color":[1,1,1,1]},
+    {"type":"button","label":"Start Show","style":"prominent","color":[0.2,0.6,1,1]},
+    {"type":"toggle","label":"Auto Mode","on":true},
+    {"type":"slider","label":"Brightness","value":0.7,"color":[0.3,0.8,1,1]},
+    {"type":"progress","label":"Render 62%","value":0.62,"color":[0.2,0.9,0.5,1]},
+    {"type":"divider"},
+    {"type":"card","title":"Now Playing","subtitle":"track 04","symbol":"music.note","color":[1,0.6,0.2,1]},
+    {"type":"row","items":[{"type":"symbol","name":"star.fill","size":18,"color":[1,0.8,0]},{"type":"text","text":"4.5"}]}
+  ]
+}
+```
+
+### 対応コントロール(`type`)
+
+| type | フィールド | 備考 |
+|---|---|---|
+| `text` | text / size / weight(regular/semibold/bold) / color | |
+| `symbol` | name(SF Symbol) / size / color | |
+| `button` | label / style(prominent/bordered) / color | **自前描画**(ネイティブButtonはTD内ImageRendererで描けない) |
+| `toggle` | label / on / color | **自前描画**の macOS スイッチ |
+| `slider` | label / value(0..1) / color | **自前描画**の track+knob |
+| `progress` | label / value(0..1) / color | 自前バー |
+| `card` | title / subtitle / symbol / color | 角丸ボックス |
+| `divider` / `spacer` | — | |
+| `row` / `col` | items(配列) / spacing | 横/縦スタック(入れ子可) |
+
+トップの `title` / `traffic`(トラフィックライト)/ `bg`(背景RGBA)/ `spacing`。
+
+### なぜ一部は「自前描画」か
+`ImageRenderer` は **NSButton/NSSwitch/NSSlider 系のネイティブコントロールをオフスクリーンで
+ラスタライズできない**(黄色い箱+🚫 になる)。そのため button/toggle/slider は**同じ見た目を
+SwiftUIの図形で再現**している。text / SF Symbol / タイトルバー / Material はネイティブで描ける。
 
 ### バーの色
 progress バーの**塗り色は Foreground**(トラックはその薄色)。Gauge も Foreground が反映される。

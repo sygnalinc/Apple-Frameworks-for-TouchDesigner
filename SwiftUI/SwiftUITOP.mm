@@ -17,6 +17,7 @@ extern "C" {
                     double fr, double fg, double fb, double fa,
                     double br, double bg, double bb, double ba,
                     int32_t w, int32_t h);
+    void  su_submit_json(void*, const char* json, int32_t w, int32_t h);
     int   su_latest_info(void*, int32_t* w, int32_t* h, unsigned long long* serial);
     void  su_copy(void*, void* dst);
 }
@@ -44,16 +45,25 @@ public:
         in->getParDouble4("Bgcolor", br, bg, bb, ba);
         int w = std::max(1, (int)in->getParInt("Resw"));
         int h = std::max(1, (int)in->getParInt("Resh"));
+        std::string json = in->getParString("Layout") ? in->getParString("Layout") : "";
 
-        // 変化検知して再レンダ依頼(su_submit は内部で main.async・即return)
-        char sig[512];
-        snprintf(sig, sizeof sig, "%d|%s|%s|%.4f|%.2f|%.3f,%.3f,%.3f,%.3f|%.3f,%.3f,%.3f,%.3f|%d,%d",
-                 mode, text.c_str(), symbol.c_str(), value, fontSize, fr, fg, fb, fa, br, bg, bb, ba, w, h);
-        if (mySig != sig) {
-            mySig = sig;
-            su_submit(myState, mode, text.c_str(), symbol.c_str(), value, fontSize,
-                      fr, fg, fb, fa, br, bg, bb, ba, w, h);
-            mySubmit++;
+        if (mode == 4) {   // window (JSON駆動のUIツール群)
+            std::string sig = "win|" + std::to_string(w) + "x" + std::to_string(h) + "|" + json;
+            if (mySig != sig) {
+                mySig = sig;
+                su_submit_json(myState, json.c_str(), w, h);
+                mySubmit++;
+            }
+        } else {
+            char sig[512];
+            snprintf(sig, sizeof sig, "%d|%s|%s|%.4f|%.2f|%.3f,%.3f,%.3f,%.3f|%.3f,%.3f,%.3f,%.3f|%d,%d",
+                     mode, text.c_str(), symbol.c_str(), value, fontSize, fr, fg, fb, fa, br, bg, bb, ba, w, h);
+            if (mySig != sig) {
+                mySig = sig;
+                su_submit(myState, mode, text.c_str(), symbol.c_str(), value, fontSize,
+                          fr, fg, fb, fa, br, bg, bb, ba, w, h);
+                mySubmit++;
+            }
         }
 
         // 最新テクスチャをアップロード
@@ -74,9 +84,12 @@ public:
     {
         const char* P = "SwiftUI";
         { OP_StringParameter p("Mode"); p.label = "Mode"; p.page = P; p.defaultValue = "text";
-          const char* n[] = {"text","symbol","gauge","progress"};
-          const char* l[] = {"Text","SF Symbol","Gauge (circular)","Progress (bar)"};
-          m->appendMenu(p, 4, n, l); }
+          const char* n[] = {"text","symbol","gauge","progress","window"};
+          const char* l[] = {"Text","SF Symbol","Gauge (circular)","Progress (bar)","Window (JSON UI)"};
+          m->appendMenu(p, 5, n, l); }
+        { OP_StringParameter p("Layout"); p.label = "Layout JSON (window mode)"; p.page = P;
+          p.defaultValue = "{\"title\":\"Panel\",\"body\":[{\"type\":\"text\",\"text\":\"Hello\",\"size\":20,\"weight\":\"bold\"}]}";
+          m->appendString(p); }
         { OP_StringParameter p("Text"); p.label = "Text"; p.page = P; p.defaultValue = "Hello TD"; m->appendString(p); }
         { OP_StringParameter p("Symbol"); p.label = "SF Symbol"; p.page = P; p.defaultValue = "star.fill"; m->appendString(p); }
         { OP_NumericParameter p("Value"); p.label = "Value (0..1)"; p.page = P; p.defaultValues[0]=0.5; p.minSliders[0]=0; p.maxSliders[0]=1; p.minValues[0]=0; p.maxValues[0]=1; p.clampMins[0]=p.clampMaxes[0]=true; m->appendFloat(p); }

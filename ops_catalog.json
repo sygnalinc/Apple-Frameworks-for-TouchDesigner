@@ -3487,8 +3487,14 @@
             "text",
             "symbol",
             "gauge",
-            "progress"
+            "progress",
+            "window"
           ]
+        },
+        {
+          "name": "Layout",
+          "type": "string",
+          "default": "{\\"
         },
         {
           "name": "Text",

@@ -2301,3 +2301,21 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **踏んだ罠**: SwiftUIの一部コントロール(ProgressView等)は ImageRenderer で正しく描けない
   → 図形(Shape)ベースで自前描画すると確実。GeometryReaderは使わず既知のw/hから寸法計算
 - README更新(バー色・SF Symbols・マウス操作の節を追加)
+
+### 2026-07-22 SwiftUI TOP に window(JSON UIツール群)モード追加
+
+- ユーザー「window自体をMac標準パーツでレンダできるUIツール群にしたい」→ SwiftUI TOPに
+  **window モード**を追加。**JSONでUIを記述**するとトラフィックライト付きタイトルバー+各コントロールを
+  ネイティブ風にレンダ(ショー制御パネル/HUD向け)
+- **JSON→SwiftUIビルダー**(`UIWindow`/`UINode`・再帰)。対応type: text/symbol/button/toggle/slider/
+  progress/card/divider/spacer/row/col。トップに title/traffic/bg/spacing。色は[r,g,b,a]配列
+- **ImageRenderer検証で判明**: NSButton/NSSwitch(Toggle)/NSSlider などネイティブコントロールは
+  **オフスクリーンでラスタライズできない**(黄色い箱+🚫)。**スタンドアロンではButtonが描けたが
+  TD埋め込みでは描けなかった**(AppKit活性コンテキストの差)。→ button/toggle/slider は**SwiftUI図形で
+  同じ見た目を自前描画**。text/SF Symbol/タイトルバー/Material はネイティブでOK
+- JSONは Layout パラメータ(式で Text DAT 参照 `op('json1').text` 可)。mode==4 で su_submit_json
+- **実測**: スタンドアロン+TD実機でウインドウUI(タイトルバー/Start Showボタン/Auto Modeトグル/
+  Brightnessスライダー/Render62%バー/Now Playingカード/★4.5)を視認。全パーツ正立でレンダ
+- sample.toe `/project1/swiftui_demo` に window1(JSON→window mode)+ window_json(Text DAT)を追加
+- 踏んだ罠(pitfalls): SwiftUIのネイティブコントロール(Button/Toggle/Slider/ProgressView)は
+  ImageRendererで描けない→図形(Shape)で自前描画。GeometryReaderは避け既知w/hで寸法計算
