@@ -33,6 +33,7 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Choose Font (macOS Font Panel) | **macOS標準フォントパネル**を開く。選択すると Font/Font Size に自動反映 |
 | | Proportional Metrics (palt) | OpenType 'palt' 自動文字詰め(対応フォントのみ効く) |
 | | Font Size / Weight / Italic | サイズ(px)/ ウェイト100〜900(可変フォント)/ 斜体 |
+| | Auto Fit Font Size | **描画領域に収まるまで自動縮小**(Font Sizeが上限)。Word Wrap Onなら折り返して収まるサイズ、Offなら1行のまま収まるサイズ。実サイズはInfo CHOP `fitted_size` |
 | | Tracking / Line Height / Ligatures | 字間(pt)/ 行送り倍率 / リガチャ |
 | | Horizontal/Vertical Align | 左/中/右/両端揃え・上/中/下 |
 | | Vertical Text | 縦書き(右→左の段組) |
@@ -43,7 +44,7 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Drop Shadow / Color / Offset / Blur | ドロップシャドウ |
 | Common | Output Resolution | **他のTOPと同じくCommonページで解像度指定**(Custom等)。Use Input時は1280×720 |
 
-Info CHOP: `executes / renders / width / height / lines`。Info DAT: `resolved_font / lines`。
+Info CHOP: `executes / renders / width / height / lines / fitted_size`。Info DAT: `resolved_font / lines`。
 フォント名が解決できずフォールバックした場合は Warning に表示。
 
 ## 注意・制約

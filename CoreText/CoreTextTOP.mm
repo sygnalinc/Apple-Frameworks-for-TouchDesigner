@@ -89,7 +89,7 @@ struct Style {
     float fontSize = 72, weight = 400, tracking = 0, lineHeight = 1.0f;
     int ligatures = 1;                 // 0=none 1=standard 2=all
     int alignH = 1, alignV = 1;        // 0=left/top 1=center/middle 2=right/bottom 3=justified(Hのみ)
-    bool italic = false, vertical = false, wrap = true;
+    bool italic = false, vertical = false, wrap = true, autofit = false;
     float padding = 20;
     float fontRGBA[4] = {1,1,1,1};
     float bgRGBA[4] = {0,0,0,0};
@@ -111,11 +111,11 @@ struct Style {
                  strokeWidth, strokeRGBA[0],strokeRGBA[1],strokeRGBA[2],strokeRGBA[3],
                  shadow, shadowRGBA[0],shadowRGBA[1],shadowRGBA[2],shadowRGBA[3],
                  shadowX, shadowY, shadowBlur, w, h);
-        return text + "\x1f" + fontFile + "\x1f" + (palt ? "P" : "p") + "\x1f" + b;
+        return text + "\x1f" + fontFile + "\x1f" + (palt ? "P" : "p") + (autofit ? "F" : "f") + "\x1f" + b;
     }
 };
 
-struct Result { std::vector<uint8_t> bgra; int w=0,h=0; uint64_t serial=0; int lines=0; std::string font; };
+struct Result { std::vector<uint8_t> bgra; int w=0,h=0; uint64_t serial=0; int lines=0; float fitted=0; std::string font; };
 
 static CGColorRef makeColor(const float c[4]) { return CGColorCreateGenericRGB(c[0], c[1], c[2], c[3]); }
 
@@ -278,6 +278,46 @@ static CTFrameRef makeFrame(CFAttributedStringRef str, const Style& st, int* out
     return frame;
 }
 
+// オートフィット: 描画領域(解像度-余白)に収まる最大フォントサイズを二分探索で求める。
+// Word Wrap On なら折り返した全体が収まるサイズ、Off なら行がそのまま収まるサイズ。
+// 縦書きは幅(段数)と高さを入れ替えて判定する。
+static float fitFontSize(const Style& stIn)
+{
+    CGFloat availW = stIn.w - stIn.padding * 2, availH = stIn.h - stIn.padding * 2;
+    if (availW <= 4 || availH <= 4 || stIn.text.empty()) return stIn.fontSize;
+    auto fits = [&](float s) -> bool {
+        Style tmp = stIn; tmp.fontSize = s;
+        CTFontRef font = makeFont(tmp);
+        if (!font) return true;
+        CFAttributedStringRef str = makeAttrString(tmp, font, false);
+        CTFramesetterRef fs = CTFramesetterCreateWithAttributedString(str);
+        CFDictionaryRef frameAttrs = nullptr;
+        if (tmp.vertical) {
+            CTFrameProgression prog = kCTFrameProgressionRightToLeft;
+            CFNumberRef pn = CFNumberCreate(nullptr, kCFNumberIntType, &prog);
+            frameAttrs = CFDictionaryCreate(nullptr, (const void**)&kCTFrameProgressionAttributeName,
+                                            (const void**)&pn, 1,
+                                            &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+            CFRelease(pn);
+        }
+        CGSize cons = tmp.vertical
+            ? CGSizeMake(CGFLOAT_MAX, tmp.wrap ? availH : CGFLOAT_MAX)
+            : CGSizeMake(tmp.wrap ? availW : CGFLOAT_MAX, CGFLOAT_MAX);
+        CGSize used = CTFramesetterSuggestFrameSizeWithConstraints(fs, CFRangeMake(0,0), frameAttrs, cons, nullptr);
+        if (frameAttrs) CFRelease(frameAttrs);
+        CFRelease(fs); CFRelease(str); CFRelease(font);
+        return used.width <= availW + 0.5 && used.height <= availH + 0.5;
+    };
+    float hi = stIn.fontSize;
+    if (fits(hi)) return hi;          // 指定サイズのまま収まる(Autofitは縮小のみ)
+    float lo = 4;
+    for (int i = 0; i < 14; i++) {    // 0.01px級まで収束
+        float mid = (lo + hi) * 0.5f;
+        if (fits(mid)) lo = mid; else hi = mid;
+    }
+    return lo;
+}
+
 // ストローク(縁取り): テキストのアルファカバレッジを CIMorphologyMaximum で膨張させ、
 // その差分領域をストローク色で塗る(外側アウトライン)。グリフのアウトラインデータに
 // 依存しないので、システムUIフォント(SF)でも安全(=SFのアウトライン抽出は TD プロセス内で
@@ -369,8 +409,11 @@ static void drawGradientThroughMask(CGContextRef ctx, const Style& st, CTFrameRe
     CGContextRestoreGState(ctx);
 }
 
-static bool renderText(const Style& st, Result& out, std::string& warn)
+static bool renderText(const Style& stIn, Result& out, std::string& warn)
 {
+    Style st = stIn;
+    if (st.autofit) st.fontSize = fitFontSize(st);   // 描画領域に収まるサイズへ自動縮小
+    out.fitted = st.fontSize;
     if (st.w < 4 || st.h < 4) return false;
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
     CGContextRef ctx = CGBitmapContextCreate(nullptr, st.w, st.h, 8, (size_t)st.w*4, cs,
@@ -489,6 +532,7 @@ public:
         st.fontFile  = in->getParFilePath("Fontfile") ? in->getParFilePath("Fontfile") : "";
         st.palt      = in->getParInt("Palt") != 0;
         st.fontSize  = (float)in->getParDouble("Fontsize");
+        st.autofit   = in->getParInt("Autofit") != 0;
         st.weight    = (float)in->getParDouble("Weight");
         st.italic    = in->getParInt("Italic") != 0;
         st.tracking  = (float)in->getParDouble("Tracking");
@@ -537,7 +581,7 @@ public:
         Result r;
         { std::lock_guard<std::mutex> l(myMutex);
           if (myResult.serial == myUploaded || myResult.bgra.empty()) return;
-          r = myResult; myUploaded = r.serial; myLines = r.lines; myFont = r.font; }
+          r = myResult; myUploaded = r.serial; myLines = r.lines; myFitted = r.fitted; myFont = r.font; }
         TOP_UploadInfo ui; ui.textureDesc.texDim = OP_TexDim::e2D;
         ui.textureDesc.width = r.w; ui.textureDesc.height = r.h;
         ui.textureDesc.pixelFormat = OP_PixelFormat::BGRA8Fixed;
@@ -556,6 +600,7 @@ public:
         { OP_StringParameter p("Fontfile"); p.label = "Font File (.ttf/.otf, overrides Font)"; p.page = P; m->appendFile(p); }
         { OP_NumericParameter p("Fontpanel"); p.label = "Choose Font (macOS Font Panel)"; p.page = P; m->appendPulse(p); }
         { OP_NumericParameter p("Fontsize"); p.label = "Font Size (px)"; p.page = P; p.defaultValues[0] = 72; p.minSliders[0] = 8; p.maxSliders[0] = 400; p.minValues[0] = 1; p.clampMins[0] = true; m->appendFloat(p); }
+        { OP_NumericParameter p("Autofit"); p.label = "Auto Fit Font Size (shrink to area)"; p.page = P; p.defaultValues[0] = 0; m->appendToggle(p); }
         { OP_NumericParameter p("Weight"); p.label = "Weight (100-900, variable font)"; p.page = P; p.defaultValues[0] = 400; p.minSliders[0] = 100; p.maxSliders[0] = 900; p.minValues[0] = 100; p.maxValues[0] = 900; p.clampMins[0] = p.clampMaxes[0] = true; m->appendFloat(p); }
         { OP_NumericParameter p("Italic"); p.label = "Italic"; p.page = P; m->appendToggle(p); }
         { OP_NumericParameter p("Palt"); p.label = "Proportional Metrics (palt)"; p.page = P; m->appendToggle(p); }
@@ -610,10 +655,10 @@ public:
         std::lock_guard<std::mutex> l(myMutex);
         if (!myWarn.empty()) s->setString(myWarn.c_str());
     }
-    int32_t getNumInfoCHOPChans(void*) override { return 5; }
+    int32_t getNumInfoCHOPChans(void*) override { return 6; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override {
-        const char* n[] = {"executes","renders","width","height","lines"};
-        float v[] = {(float)myExec.load(), (float)myRenders.load(), (float)myOutW, (float)myOutH, (float)myLines};
+        const char* n[] = {"executes","renders","width","height","lines","fitted_size"};
+        float v[] = {(float)myExec.load(), (float)myRenders.load(), (float)myOutW, (float)myOutH, (float)myLines, myFitted};
         c->name->setString(n[i]); c->value = v[i];
     }
     bool getInfoDATSize(OP_InfoDATSize* s, void*) override { s->rows = 2; s->cols = 2; s->byColumn = false; return true; }
@@ -652,7 +697,7 @@ private:
     bool myQuit = false, myPending = false, myBusy = false;
     Style myStyle; Result myResult; uint64_t mySerial = 0, myUploaded = 0;
     std::string mySig, myWarn, myFont;
-    int myOutW = 0, myOutH = 0, myLines = 0;
+    int myOutW = 0, myOutH = 0, myLines = 0; float myFitted = 0;
     std::atomic<uint64_t> myExec{0}, mySubmit{0}, myRenders{0};
 };
 
