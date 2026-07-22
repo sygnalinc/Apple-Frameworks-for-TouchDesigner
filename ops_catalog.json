@@ -1,6 +1,6 @@
 {
   "_note": "TDAppleOps custom op catalog. Generated from .mm sources (best-effort). Use 'create' with parent().create('<create>', name) or MCP create. Param defaults/menus are source-derived; for exact live schema, introspect op.pars() in TD.",
-  "_count": 80,
+  "_count": 81,
   "ops": {
     "ApplescriptDAT": {
       "create": "ApplescriptDAT",
@@ -3546,6 +3546,64 @@
       "statusDat": false,
       "example": "/project1/examples/SwiftUI",
       "source": "SwiftUI/SwiftUITOP.mm"
+    },
+    "SwiftuipanelCHOP": {
+      "create": "SwiftuipanelCHOP",
+      "opType": "Swiftuipanel",
+      "label": "SwiftUI Panel",
+      "family": "CHOP",
+      "icon": "SUP",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "SwiftUIPanel",
+      "readme": "SwiftUIPanel/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/SwiftUIPanel/README.md",
+      "params": [
+        {
+          "name": "Show",
+          "type": "toggle",
+          "default": "1"
+        },
+        {
+          "name": "Title",
+          "type": "string",
+          "default": "TD Panel"
+        },
+        {
+          "name": "Json",
+          "type": "string",
+          "default": "{\\"
+        },
+        {
+          "name": "Winx",
+          "type": "float",
+          "default": "120"
+        },
+        {
+          "name": "Winy",
+          "type": "float",
+          "default": "400"
+        },
+        {
+          "name": "Winw",
+          "type": "float",
+          "default": "300"
+        },
+        {
+          "name": "Winh",
+          "type": "float",
+          "default": "260"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [
+        "executes",
+        "controls"
+      ],
+      "statusDat": false,
+      "example": "/project1/examples/SwiftUIPanel",
+      "source": "SwiftUIPanel/SwiftUIPanelCHOP.mm"
     },
     "TextanalyzeDAT": {
       "create": "TextanalyzeDAT",

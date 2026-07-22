@@ -2319,3 +2319,22 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - sample.toe `/project1/swiftui_demo` に window1(JSON→window mode)+ window_json(Text DAT)を追加
 - 踏んだ罠(pitfalls): SwiftUIのネイティブコントロール(Button/Toggle/Slider/ProgressView)は
   ImageRendererで描けない→図形(Shape)で自前描画。GeometryReaderは避け既知w/hで寸法計算
+
+### 2026-07-22 SwiftUI Panel CHOP 実装(本物の操作可能なmacOSウインドウ=TDのUI)
+
+- ユーザー「操作可能なwindowにしたい・windowコンテナで表示してTDのUIとして使いたい」→ SwiftUI TOP
+  (テクスチャ・表示専用)とは別に、**実ウインドウ(NSWindow+NSHostingView)にインタラクティブな
+  SwiftUIコントロールを表示し、操作値をCHOPで返す** SwiftUI Panel CHOP を新規実装(#4 Native Panel)
+- **実ウインドウなのでネイティブコントロールがそのまま操作できる**(ImageRendererが描けなかった
+  Slider/Toggleも本物として動く)。JSONでコントロール定義(id付き)→ id がチャンネル名
+- **アーキテクチャ**: Swiftヘルパ `SwiftUIPanelHelper`(C ABI sp_)。`PanelModel`(ObservableObject)が
+  UI値を @Published で持ちつつ、ロック保護の store にも書いてCHOP(cookスレッド)が読む。ボタンは
+  pressed Set を1回消費(モーメンタリ)。ウインドウは `.floating`・DispatchQueue.main.async で表示
+- **実測(computer-useで実操作)**: Brightnessスライダーをドラッグ→brightness 0.48→0.99(ウインドウ
+  表示と一致)、Strobeトグル→strobe=1、Fireボタン→fire が1フレームだけ1(次cookで0)。全て検証
+- **CHOP**: JSONを `NSJSONSerialization` でパースしてコントロール(id,type)を取得、id=チャンネル名。
+  slider/stepper→値、toggle→0/1、button→sp_take_button(モーメンタリ)。getOutputInfoとexecuteで
+  同じparseControlsを呼びチャンネル並びを一致させる
+- opType `Swiftuipanel`・icon SUP・CHOP。sample.toe `/project1/swiftui_panel_demo` に利用例。
+  README(新規+ルート英日)更新。TD再起動は今回ダイアログ無しで正常起動(スクショ権限も復帰)
+- 未対応: 値の書き戻し(TD→ウインドウ)、NSTextField(テキスト入力)。将来候補
