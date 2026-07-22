@@ -2589,3 +2589,11 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **実測(M2・TD実機)**: メニュー252件(モリサワ A-OTF Gothic MB101 Pr6N 等のユーザーフォント含む)、
   Futura.ttc の直接ロード視認、palt ON でヒラギノ角ゴの「」・句読点のアキが詰まることを比較画像で確認
 - リビルド・インストール・README更新済み
+
+### 2026-07-23 CoreText TOP: 解像度をCommonページ(Output Resolution)に統一
+
+- ユーザー「解像度はoutputではなく他のtopと同じくcommonで設定」→ 独自Outputページ(Width/Height)を
+  廃止し、**`TOP_Output::getSuggestedOutputDesc`**(SDK・Commonページの設定を返す)から取得
+- 罠: 入力を持たないTOPで既定 "Use Input" は **127×127** になる → builtin par
+  `outputresolution` を `getParString` で読み(builtin parも読める・警告なし)、useinput時は
+  1280×720 を既定に。実測: 既定1280×720 / custom 1920×1080反映 / 戻しも正常

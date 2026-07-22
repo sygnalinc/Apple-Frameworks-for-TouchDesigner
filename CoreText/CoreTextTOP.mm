@@ -436,7 +436,17 @@ public:
         st.shadowX   = (float)in->getParDouble("Shadowx");
         st.shadowY   = (float)in->getParDouble("Shadowy");
         st.shadowBlur= (float)in->getParDouble("Shadowblur");
-        st.w = (int)in->getParInt("Outputw"); st.h = (int)in->getParInt("Outputh");
+        // 解像度は他のTOPと同じく Common ページ(Output Resolution)から取得。
+        // 本TOPは入力を持たないため既定の "Use Input" は無意味(127x127になる)→ 1280x720 を既定に
+        {
+            const char* om = in->getParString("outputresolution");
+            if (!om || strcmp(om, "useinput") == 0) { st.w = 1280; st.h = 720; }
+            else {
+                OP_TextureDesc sug; out->getSuggestedOutputDesc(&sug, nullptr);
+                st.w = (int)sug.width; st.h = (int)sug.height;
+            }
+            if (st.w < 4) st.w = 4; if (st.h < 4) st.h = 4;
+        }
 
         std::string sig = st.sig();
         if (sig != mySig) {
@@ -502,9 +512,6 @@ public:
         { OP_NumericParameter p("Shadowy"); p.label = "Shadow Offset Y"; p.page = S; p.defaultValues[0] = -6; p.minSliders[0] = -50; p.maxSliders[0] = 50; m->appendFloat(p); }
         { OP_NumericParameter p("Shadowblur"); p.label = "Shadow Blur"; p.page = S; p.defaultValues[0] = 8; p.minSliders[0] = 0; p.maxSliders[0] = 50; p.minValues[0] = 0; p.clampMins[0] = true; m->appendFloat(p); }
 
-        const char* O = "Output";
-        { OP_NumericParameter p("Outputw"); p.label = "Width"; p.page = O; p.defaultValues[0] = 1280; p.minSliders[0] = 8; p.maxSliders[0] = 4096; p.minValues[0] = 4; p.clampMins[0] = true; m->appendInt(p); }
-        { OP_NumericParameter p("Outputh"); p.label = "Height"; p.page = O; p.defaultValues[0] = 720; p.minSliders[0] = 8; p.maxSliders[0] = 4096; p.minValues[0] = 4; p.clampMins[0] = true; m->appendInt(p); }
     }
 
     // Font プルダウン: インストール済みフォントファミリーを列挙(初回のみ取得・ソート済みキャッシュ)

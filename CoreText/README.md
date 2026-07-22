@@ -40,7 +40,7 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Gradient Fill / Color 2 / Angle | グラデーション塗り(Font Color→Color 2・角度0°=上→下) |
 | | Stroke Width / Color | 縁取り(外側アウトライン・px) |
 | | Drop Shadow / Color / Offset / Blur | ドロップシャドウ |
-| Output | Width / Height | 出力解像度(既定1280×720) |
+| Common | Output Resolution | **他のTOPと同じくCommonページで解像度指定**(Custom等)。Use Input時は1280×720 |
 
 Info CHOP: `executes / renders / width / height / lines`。Info DAT: `resolved_font / lines`。
 フォント名が解決できずフォールバックした場合は Warning に表示。
