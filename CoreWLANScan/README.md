@@ -25,21 +25,24 @@ CoreWLAN Scan CHOP → (open) → wifiscan-helper.app → Location許可 + scanF
 - 許可後は SSID/BSSID/RSSI/channel/band が **Info DAT** に出る(`ssid / bssid / rssi / channel / band`)
 - 混雑度チャンネル(下記)は権限なしでも従来どおり動く(こちらは内蔵scan)
 
-### SSID Info DAT の自動生成(Callbacks DAT)
+### SSID Info DAT の自動生成(完全自動・操作不要)
 
-本OPは **Callbacks DAT**(Customページ)を持つ。`Add` を1回押すと **onGetSSID コールバックが
-事前入力された Callbacks DAT** が生成され、以降 **`Get SSID Names` を ON にした瞬間に、隣へ
-SSID 一覧の Info DAT(`<node名>_ssid`)が自動生成**される(既にあれば何もしない=二重生成ガード)。
+**OPを配置するだけ**で、雛形入りの **Callbacks DAT**(`<node名>_callbacks`)が自動生成・接続される
+(初回cook時に本体が生成。生成直後はカスタムパラメータ未生成のため成功するまで自動リトライ)。
+以降 **`Get SSID Names` を ON にした瞬間に、隣へ SSID 一覧の Info DAT(`<node名>_ssid`)が
+自動生成**される(既にあれば何もしない=二重生成ガード)。
 
 ```
-Custom ページ → Callbacks DAT [Add]   ← 1回だけ
-CoreWLAN Scan ページ → Get SSID Names ON → 隣に <node名>_ssid(Info DAT)が出現
+OPを配置 → <node名>_callbacks(雛形入り)が自動で接続される
+Get SSID Names ON → 隣に <node名>_ssid(Info DAT)が出現 → SSID一覧が自動表示
 ```
 
-自動生成の中身は雛形の `onGetSSID(op, enabled)` で自由に編集できる(生成位置・名前・
-viewer 表示など)。**実測**: ON にした瞬間に `cwtest_ssid` が生成され、19 SSID が自動表示された。
-手動で Info DAT を作って Operator に本OPを指定しても同じ(自動生成はその手間を省くもの)。
-配線済み Component が欲しい場合は [palette/WifiScanner.tox](../palette/README.md) も使える。
+- 自動生成の挙動は Callbacks DAT の `onGetSSID(op, enabled)` を編集して変えられる(生成位置・
+  名前・viewer 表示など)。Callbacks DAT を消しても Get SSID ON でもう一度自動生成される
+- **実測**: 配置(初回cook)で `_callbacks` が接続され、Get SSID ON の瞬間に `_ssid` が生成、
+  スキャン完了後 17 SSID(SYGNAL 等)が自動表示。ON/OFFを繰り返しても各1個のまま
+- 手動で Info DAT を作って Operator に本OPを指定しても同じ。配線済み Component が欲しい場合は
+  [palette/WifiScanner.tox](../palette/README.md) も使える
 
 **実測(M2・macOS 26.5.1)**: ヘルパーが 18件のSSID(`SYGNAL` / `SYGNAL_GUEST` / `SCC_JBFES` /
 `Buffalo-G-D32E` 等)を RSSI/チャンネル付きで取得。
@@ -75,7 +78,7 @@ Info CHOP: `executes / scans / networks`
 | Scan Interval (s) | 自動スキャン間隔(既定10s。0=手動のみ) |
 | Rescan Now | 今すぐスキャン(パルス) |
 | Get SSID Names (Location) | SSID名取得(既定Off)。ヘルパー.app経由・初回に位置情報許可ダイアログ |
-| Callbacks DAT (Customページ) | `Add` で onGetSSID 雛形入りDATを生成。Get SSID ON時のInfo DAT自動生成に使う |
+| Callbacks DAT (Customページ) | 配置時に雛形入りDATが自動接続される。Get SSID ON時のInfo DAT自動生成をここで編集できる |
 
 ## 実測(M2・macOS 26.5.1)
 

@@ -2451,3 +2451,21 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - sample.toe は未保存のまま(検証ノードは削除済み。今セッション中に `button1` がメモリ上から
   消えた事象があったが原因不明・ディスクの sample.toe は無傷なので保存せず温存)
 - 次にやること: 他の「セットで使う」OPへの横展開候補(SwiftUI Panel の Widgets DAT 自動生成等)
+
+### 2026-07-22 CoreWLAN Scan: 配置するだけで Callbacks DAT も自動接続(完全自動化)
+
+- ユーザー「opを配置したら自動でCallbacks DATが接続される仕様にできないか」→ 実装完了。
+  **配置(初回cook)で雛形入り Callbacks DAT を自動生成・接続 → Get SSID ON で Info DAT 自動生成**
+  の全ステップが無操作になった
+- **仕組み**: 初回cookで `PyRun_String`(TD組み込みPython直接実行)により textDAT を生成し
+  `par.callbacks` へ接続。成功(=callbacks接続済み)を `__cwlan_ok` グローバルで読み戻し、
+  **成功するまで毎cookリトライ**(生成直後はカスタムパラメータ未生成で必ず1回は失敗するため)
+- **ハマった2点(pitfalls反映)**: ①`OP_NodeInfo::opPath` が**空**(macOS実測)→ パスで自ノードを
+  引けない。`createArgumentsTuple(0)` の args[0](自ノードPyObject)を `__main__` に渡して解決。
+  ②`PyRun_SimpleString`/`PyRun_String` の `__main__` には op/textDAT が無い → `import td` で
+  `td.op`/`td.textDAT` を明示参照。例外は `__cwlan_err` グローバルに traceback を残す設計
+- **実測(M2・TD実機)**: 配置→cookで `cwauto_callbacks` 自動接続、Get SSID ON で `cwauto_ssid`
+  自動生成、スキャン後 **17 SSID**(SYGNAL等)表示。ON/OFF繰り返しでも各1個(ガード動作)。
+  エラーなし・混雑度126chも従来どおり
+- **注意**: TD終了(osascript quit)時に sample.toe が自動保存されることがある(15:09保存を確認)。
+  原因不明の button1 消失(14:53)がディスクに固定された可能性 → ユーザーに報告済み

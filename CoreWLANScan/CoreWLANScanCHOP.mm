@@ -55,6 +55,28 @@ struct Snapshot {
     float bestCong24 = 0, bestCong5 = 0;
 };
 
+// Callbacks DAT の雛形。Get SSID Names を on にすると onGetSSID が呼ばれ、
+// 隣に SSID 一覧を映す Info DAT を自動生成する（二重生成ガード付き）。
+// 初回 cook 時に本体がこの雛形入り Callbacks DAT を自動生成・接続する（配置するだけで使える）。
+static const char* PythonCallbacksDATStubs =
+"# CoreWLAN Scan CHOP callbacks\n"
+"#\n"
+"# onGetSSID: 'Get SSID Names' を on にした瞬間に呼ばれる。\n"
+"# 隣に SSID 一覧を表示する Info DAT を自動生成する（既にあれば何もしない）。\n"
+"def onGetSSID(op, enabled):\n"
+"\tif not enabled:\n"
+"\t\treturn\n"
+"\tp = op.parent()\n"
+"\tname = op.name + '_ssid'\n"
+"\tif p.op(name):\n"
+"\t\treturn\n"
+"\td = p.create(infoDAT, name)\n"
+"\td.par.op = op.name\n"
+"\td.nodeX = op.nodeX + 160\n"
+"\td.nodeY = op.nodeY\n"
+"\td.viewer = True\n"
+"\treturn\n";
+
 class CoreWLANScanCHOP final : public CHOP_CPlusPlusBase {
 public:
     CoreWLANScanCHOP(const OP_NodeInfo* ni) : myNode(ni) { myThread = std::thread([this] { worker(); }); }
@@ -79,9 +101,13 @@ public:
         myExec++;
         double interval = in->getParDouble("Scaninterval");
         bool getSsid = in->getParInt("Getssid") != 0;
+        // 配置後の cook で雛形入り Callbacks DAT を自動生成・接続（配置するだけで使える）。
+        // 生成直後はカスタムパラメータ未生成で失敗するため、成功するまで毎 cook リトライ
+        if (!myBootstrapped) myBootstrapped = bootstrapCallbacksDAT();
         // Get SSID が off→on になった瞬間に、隣に SSID 一覧 Info DAT を自動生成する
         // (Callbacks DAT の onGetSSID を発火。二重生成ガードは Python 側)
         if (getSsid && !myPrevGetSsid && myNode && myNode->context) {
+            bootstrapCallbacksDAT();   // ユーザーが Callbacks DAT を消していたら再生成
             PyObject* args = myNode->context->createArgumentsTuple(1, nullptr); // [0]=op
             if (args) {
                 PyTuple_SET_ITEM(args, 1, PyBool_FromLong(getSsid ? 1 : 0));
@@ -352,8 +378,59 @@ private:
         bestCong = mx > 0 ? (float)(raw[bi] / mx) : 0.f;
     }
 
+    // Callbacks DAT が未接続なら、雛形入り Text DAT を自分の下に生成して接続する。
+    // cook(メインスレッド)から呼ぶ。TD 組み込み Python を直接実行(PyRun_String)。
+    // 生成直後の cook ではカスタムパラメータ(callbacks)がまだ無いことがある(既知のTD挙動)
+    // → 成功(=callbacks 接続済み)を __cwlan_ok で読み戻し、成功するまで毎 cook リトライする。
+    bool bootstrapCallbacksDAT()
+    {
+        if (!myNode || !myNode->context) return false;
+        PyGILState_STATE g = PyGILState_Ensure();
+        // opPath は空のことがある(実測)→ createArgumentsTuple の args[0](=自ノードの
+        // PyObject)を __main__ に渡してパス非依存で自ノードを参照する
+        // __main__ グローバルには op/textDAT が無いことがある → import td で明示参照
+        std::string py;
+        py += "__cwlan_ok = False\n";
+        py += "try:\n";
+        py += "\timport td\n";
+        py += "\tn = __cwlan_node\n";
+        py += "\tif n and hasattr(n.par, 'callbacks'):\n";
+        py += "\t\tif not n.par.callbacks.eval():\n";
+        py += "\t\t\tp = n.parent()\n";
+        py += "\t\t\tnm = n.name + '_callbacks'\n";
+        py += "\t\t\td = p.op(nm)\n";
+        py += "\t\t\tif not d:\n";
+        py += "\t\t\t\td = p.create(td.textDAT, nm)\n";
+        py += "\t\t\t\td.nodeX = n.nodeX\n";
+        py += "\t\t\t\td.nodeY = n.nodeY - 130\n";
+        py += "\t\t\t\td.text = '''";
+        py += PythonCallbacksDATStubs;
+        py += "'''\n";
+        py += "\t\t\tn.par.callbacks = nm\n";
+        py += "\t\t__cwlan_ok = bool(n.par.callbacks.eval())\n";
+        py += "except Exception:\n";
+        py += "\timport traceback as __cwlan_tb\n";
+        py += "\t__cwlan_err = __cwlan_tb.format_exc()\n";
+        bool ok = false;
+        PyObject* main = PyImport_AddModule("__main__");                // borrowed
+        PyObject* dict = main ? PyModule_GetDict(main) : nullptr;      // borrowed
+        PyObject* args = myNode->context->createArgumentsTuple(0, nullptr); // [0]=op
+        if (dict && args) {
+            PyDict_SetItemString(dict, "__cwlan_node", PyTuple_GET_ITEM(args, 0));
+            PyObject* r = PyRun_String(py.c_str(), Py_file_input, dict, dict);
+            if (r) Py_DECREF(r); else PyErr_Clear();
+            PyObject* v = PyDict_GetItemString(dict, "__cwlan_ok");    // borrowed
+            ok = v && PyObject_IsTrue(v) == 1;
+            PyDict_DelItemString(dict, "__cwlan_node");
+        }
+        if (args) Py_DECREF(args);
+        PyGILState_Release(g);
+        return ok;
+    }
+
     const OP_NodeInfo* myNode = nullptr;   // Python コールバック用(context)
     bool myPrevGetSsid = false;            // Getssid の off→on 遷移検出
+    bool myBootstrapped = false;           // 初回 cook の Callbacks DAT 自動生成済み
     std::thread myThread; std::mutex myMx; std::condition_variable myCv;
     bool myQuit = false, myPending = false, myRescan = false, myGetSsid = false;
     double myInterval = 10;
@@ -363,27 +440,6 @@ private:
     std::atomic<bool> myScanning{false};
 };
 } // namespace
-
-// Callbacks DAT の雛形。Get SSID Names を on にすると onGetSSID が呼ばれ、
-// 隣に SSID 一覧を映す Info DAT を自動生成する（二重生成ガード付き）。
-static const char* PythonCallbacksDATStubs =
-"# CoreWLAN Scan CHOP callbacks\n"
-"#\n"
-"# onGetSSID: 'Get SSID Names' を on にした瞬間に呼ばれる。\n"
-"# 隣に SSID 一覧を表示する Info DAT を自動生成する（既にあれば何もしない）。\n"
-"def onGetSSID(op, enabled):\n"
-"\tif not enabled:\n"
-"\t\treturn\n"
-"\tp = op.parent()\n"
-"\tname = op.name + '_ssid'\n"
-"\tif p.op(name):\n"
-"\t\treturn\n"
-"\td = p.create(infoDAT, name)\n"
-"\td.par.op = op.name\n"
-"\td.nodeX = op.nodeX + 160\n"
-"\td.nodeY = op.nodeY\n"
-"\td.viewer = True\n"
-"\treturn\n";
 
 extern "C" {
 DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {

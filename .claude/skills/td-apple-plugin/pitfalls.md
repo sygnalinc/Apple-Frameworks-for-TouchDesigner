@@ -362,3 +362,12 @@
 - ビルドは **`#include <Python.h>`(TD同梱 `Frameworks/Python.framework/Versions/3.11/include/python3.11`)
   + `-undefined dynamic_lookup`**。Py_* シンボルは実行時に TD 本体から解決される(nm -u で
   _PyBool_FromLong 等が U になっていればOK)。実例: CoreWLANScan(Get SSID ON → SSID Info DAT自動生成)
+- **Callbacks DAT 自体も自動生成できる**(=配置するだけで全自動): 初回 cook で
+  `PyRun_String` により雛形入り textDAT を生成して `par.callbacks` に接続する。ただし
+  ①**`OP_NodeInfo::opPath` は空のことがある(macOS実測)** → パスで自ノードを引かず、
+  `createArgumentsTuple(0)` の args[0](自ノードの PyObject)を `PyDict_SetItemString` で
+  `__main__` に渡して参照する。②**生成直後の cook はカスタムパラメータ(callbacks含む)が
+  未生成**で失敗する → 成功(=callbacks 接続済み)を `__cwlan_ok` のようなグローバルで
+  読み戻し、**成功するまで毎 cook リトライ**する。③`PyRun_SimpleString`/`PyRun_String` の
+  `__main__` には `op`/`textDAT` が無い → `import td` して `td.op`/`td.textDAT` を使う。
+  ④例外は `__cwlan_err = traceback.format_exc()` でグローバルに残すと textport から調査できる
