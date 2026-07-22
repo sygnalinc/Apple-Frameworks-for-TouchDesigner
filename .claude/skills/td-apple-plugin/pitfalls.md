@@ -371,3 +371,10 @@
   読み戻し、**成功するまで毎 cook リトライ**する。③`PyRun_SimpleString`/`PyRun_String` の
   `__main__` には `op`/`textDAT` が無い → `import td` して `td.op`/`td.textDAT` を使う。
   ④例外は `__cwlan_err = traceback.format_exc()` でグローバルに残すと textport から調査できる
+- **自動生成した DAT は GLSL 風に「ドックチップ」にできる**(ネットワークを散らかさない)。
+  生成した Python 内で `d.dock = n`(ホストノードへドック)を設定する。表示は2フラグの組合せ:
+  - `d.expose = True` + `d.viewer = False` → **ノード下に閉じた小チップ**(CoreWLANScan の既定。
+    GLSL のシェーダDATと同じ見た目で、チップのビューアフラグから開閉できる)
+  - `d.expose = True` + `d.viewer = True` → チップがビューアを開いた状態
+  - `d.expose = False` → チップごと完全非表示(接続・機能は維持。再表示は expose=True)
+  ドック後は nodeX/nodeY は無効(位置はホスト追従)。ドック解除は `d.dock = None`

@@ -95,6 +95,19 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   → `reinitpulse` をパルスするか1フレーム待つ
 - TDタイムライン停止(`root.time.play=False`)で frame系コールバックは全停止する
 - Info DATの1行目は自作プラグインでは(ヘッダではなく)データ行にもできる。行数指定に注意
+- **Custom OPからのPythonコールバック+ノード自動生成**(実例: CoreWLANScan):
+  `customOPInfo.pythonCallbacksDAT` に stub をセットすると Customページに「Callbacks DAT」+
+  Addボタンが付く。C++からは `context->createArgumentsTuple` + `callPythonCallback` で発火し、
+  コールバック内の Python で隣にノードを自動生成できる(二重生成ガードを入れる)。
+  **Callbacks DAT 自体も初回cookの `PyRun_String` で自動生成・接続できる**(配置だけで全自動)。
+  罠: ①`OP_NodeInfo::opPath` は空のことがある→ `createArgumentsTuple` の args[0](自ノード
+  PyObject)を `__main__` に渡して参照 ②生成直後はカスタムパラメータ未生成で失敗→成功を
+  読み戻して毎cookリトライ ③PyRunの `__main__` に op/textDAT は無い→ `import td` で明示。
+  ビルドは Python.h(TD同梱3.11)+ `-undefined dynamic_lookup`
+- **自動生成DATはGLSL風ドックチップにできる**: `d.dock = n` + `d.expose = True` +
+  `d.viewer = False` で「ノード下の閉じた小チップ」(CoreWLANScanの既定)。
+  `expose=False` ならチップごと非表示(機能維持)。ドック後の nodeX/Y は無効。詳細は
+  skill の pitfalls.md「Python コールバック」節
 
 ### Vision / 画像系
 - **VNTrackObjectRequest は Revision1 を明示せよ**。既定の Revision2 は macOS 26 実測で
@@ -2492,3 +2505,10 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - ユーザー「デフォルトでチップ表示のcallbackDATを閉じておきたい」→ ドック生成時に
   `d.viewer = False` を追加(expose=True のチップ表示は維持、ビューアだけ閉じる)。
   リビルド・インストール・TD再起動済み(ユーザー実機確認待ち)
+
+### 2026-07-22 コールバック/ドックチップの知見を skill と CLAUDE.md 本文へ反映
+
+- ユーザー指示でドキュメント整理。skill pitfalls.md「Python コールバック」節に**ドックチップの
+  作法**(dock + expose/viewer の組合せ3パターン・nodeX/Y無効・dock解除)を追記
+- CLAUDE.md ハマりどころ集「TD本体の挙動」に pythonCallbacksDAT +ノード自動生成+ドックチップの
+  要約を追加(詳細はskill参照の導線)
