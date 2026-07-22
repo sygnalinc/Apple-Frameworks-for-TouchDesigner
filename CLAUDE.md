@@ -2469,3 +2469,14 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   エラーなし・混雑度126chも従来どおり
 - **注意**: TD終了(osascript quit)時に sample.toe が自動保存されることがある(15:09保存を確認)。
   原因不明の button1 消失(14:53)がディスクに固定された可能性 → ユーザーに報告済み
+
+### 2026-07-22 CoreWLAN Scan: Callbacks DAT をホストへドック(既定非表示)
+
+- ユーザー「GLSLの様にcallback DATをノード下部で開閉したい。既定は接続済みだが閉じて非表示が理想」
+- bootstrap の自動生成に `d.dock = n`(ホストへドック)+ `d.expose = False`(既定非表示)を追加。
+  GLSL TOP の docked シェーダDATと同じ機構(TD標準の dock/expose フラグ)
+- MCP実測: 配置→ `_callbacks` が dock=/project1/cwauto・expose=False で生成、ネットワーク上は
+  非表示のまま接続・機能(Get SSID ON→ssid DAT生成)正常。GLSL既定は expose=True(チップ表示)、
+  本OPは要望どおり expose=False(完全非表示)を既定にした
+- ドック展開のUI操作(右クリックメニュー等)の実機確認はユーザーに依頼(以降、TD上の確認操作は
+  ユーザーへ指示する方針に変更・memory反映)
