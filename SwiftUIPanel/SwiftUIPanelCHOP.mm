@@ -62,10 +62,31 @@ public:
     void getGeneralInfo(CHOP_GeneralInfo* g, const OP_Inputs*, void*) override
     { g->cookEveryFrame = false; g->cookEveryFrameIfAsked = true; g->timeslice = false; }
 
+    // Widgets DAT が繋がっていれば各行のcell(r,0)を1コントロールJSONとして集約、なければ Json パラメータ
+    static std::string buildJson(const OP_Inputs* in)
+    {
+        const OP_DATInput* wd = in->getParDAT("Widgets");
+        if (wd && wd->numRows > 0 && wd->numCols > 0) {
+            std::string j = "{\"controls\":[";
+            bool first = true;
+            for (int r = 0; r < wd->numRows; r++) {
+                const char* cell = wd->getCell(r, 0);
+                if (!cell || !*cell) continue;
+                // 空白のみの行はスキップ
+                std::string c = cell; size_t a = c.find_first_not_of(" \t\r\n");
+                if (a == std::string::npos) continue;
+                if (!first) j += ",";
+                j += cell; first = false;
+            }
+            j += "]}";
+            return j;
+        }
+        return in->getParString("Json") ? in->getParString("Json") : "";
+    }
+
     bool getOutputInfo(CHOP_OutputInfo* info, const OP_Inputs* in, void*) override
     {
-        std::string json = in->getParString("Json") ? in->getParString("Json") : "";
-        parseControls(json, myChannels);
+        parseControls(buildJson(in), myChannels);
         info->numChannels = std::max(1, (int)myChannels.size());
         info->numSamples = 1; info->sampleRate = 60;
         return true;
@@ -80,7 +101,7 @@ public:
     {
         myExec++;
         if (!myState) return;
-        std::string json = in->getParString("Json") ? in->getParString("Json") : "";
+        std::string json = buildJson(in);
         std::string title = in->getParString("Title") ? in->getParString("Title") : "Panel";
         bool show = in->getParInt("Show") != 0;
         double x = in->getParDouble("Winx"), y = in->getParDouble("Winy");
@@ -109,7 +130,8 @@ public:
         const char* P = "SwiftUI Panel";
         { OP_NumericParameter p("Show"); p.label = "Show Window"; p.page = P; p.defaultValues[0] = 1; m->appendToggle(p); }
         { OP_StringParameter p("Title"); p.label = "Window Title"; p.page = P; p.defaultValue = "TD Panel"; m->appendString(p); }
-        { OP_StringParameter p("Json"); p.label = "Controls JSON"; p.page = P;
+        { OP_StringParameter p("Widgets"); p.label = "Widgets DAT"; p.page = P; m->appendDAT(p); }
+        { OP_StringParameter p("Json"); p.label = "Controls JSON (if no Widgets DAT)"; p.page = P;
           p.defaultValue = "{\"controls\":[{\"type\":\"header\",\"label\":\"Controls\"},{\"type\":\"slider\",\"id\":\"level\",\"label\":\"Level\",\"value\":0.5},{\"type\":\"toggle\",\"id\":\"enable\",\"label\":\"Enable\",\"on\":true},{\"type\":\"button\",\"id\":\"trigger\",\"label\":\"Trigger\"}]}";
           m->appendString(p); }
         { OP_NumericParameter p("Winx"); p.label = "Window X"; p.page = P; p.defaultValues[0] = 120; p.minSliders[0]=0; p.maxSliders[0]=3000; m->appendFloat(p); }

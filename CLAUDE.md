@@ -2338,3 +2338,23 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - opType `Swiftuipanel`・icon SUP・CHOP。sample.toe `/project1/swiftui_panel_demo` に利用例。
   README(新規+ルート英日)更新。TD再起動は今回ダイアログ無しで正常起動(スクショ権限も復帰)
 - 未対応: 値の書き戻し(TD→ウインドウ)、NSTextField(テキスト入力)。将来候補
+
+### 2026-07-22 UI Widget DAT + Panel の Widgets DAT 対応(COMP風のUI部品合成)
+
+- ユーザー「TD標準のCOMP opみたいに Button/Slider op を Container でまとめたい」
+- **重要な制約(確認済み)**: C++ Custom OP SDK は **TOP/CHOP/DAT/SOP/POP のみで COMP は作れない**
+  (SDKサンプル・FillXXXPluginInfo に COMP 無し)。=「Button COMP を Container COMP に入れる」TD標準
+  そのものはプラグイン化不可(それはTD標準機能で既に可能)。ネイティブUIでやるなら **部品=DAT /
+  コンテナ=Panel(実ウインドウ)** に置換する
+- **UI Widget DAT**(opType `Uiwidget`・icon UIW): Type(slider/toggle/button/stepper/text/header/
+  divider)+ id/label/min/max/value/color を **1行のJSON spec(1x1テーブル cell(0,0))** に出力
+- **SwiftUI Panel CHOP に Widgets DAT パラメータ(appendDAT/getParDAT)を追加**: DATが繋がっていれば
+  各行 cell(r,0) を1コントロールとして `{"controls":[...]}` に集約、無ければ従来の Json パラメータ
+- **フロー**: UI Widget DAT ×N → **Merge DAT** → Panel の Widgets → 1つの実ウインドウに集約。
+  値は Panel 出力の id別チャンネル(Select CHOPで個別取り出し)。TDのWidget→Container→パネルの
+  データフロー版
+- **実測(実操作)**: slider/toggle/button の3部品を Merge→Panel で「Assembled Panel」1窓に集約、
+  Brightnessドラッグ→出力 brightness 0.60→0.95 追従を確認。全chエラーなし
+- sample.toe `/project1/uikit_demo`(UI Widget×4 + Merge + Panel、Show=0既定=起動時は窓を出さない)。
+  README(UIWidget新規・Panel更新・ルート英日)更新。opカタログ 32/21/24/4
+- 未対応: 画像/動画widget(TOP参照をPanelに表示)、値の書き戻し、NSTextField。将来候補

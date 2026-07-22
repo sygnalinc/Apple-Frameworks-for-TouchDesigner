@@ -1,6 +1,6 @@
 {
   "_note": "TDAppleOps custom op catalog. Generated from .mm sources (best-effort). Use 'create' with parent().create('<create>', name) or MCP create. Param defaults/menus are source-derived; for exact live schema, introspect op.pars() in TD.",
-  "_count": 81,
+  "_count": 82,
   "ops": {
     "ApplescriptDAT": {
       "create": "ApplescriptDAT",
@@ -3571,6 +3571,10 @@
           "default": "TD Panel"
         },
         {
+          "name": "Widgets",
+          "type": "DAT"
+        },
+        {
           "name": "Json",
           "type": "string",
           "default": "{\\"
@@ -3720,6 +3724,75 @@
       "statusDat": true,
       "example": "/project1/examples/Translate",
       "source": "Translate/TranslateDAT.mm"
+    },
+    "UiwidgetDAT": {
+      "create": "UiwidgetDAT",
+      "opType": "Uiwidget",
+      "label": "UI Widget",
+      "family": "DAT",
+      "icon": "UIW",
+      "minInputs": 0,
+      "maxInputs": 0,
+      "author": "SYGNAL Inc.",
+      "folder": "UIWidget",
+      "readme": "UIWidget/README.md",
+      "helpURL": "https://github.com/sygnalinc/TDAppleOps/blob/main/UIWidget/README.md",
+      "params": [
+        {
+          "name": "Type",
+          "type": "menu",
+          "default": "slider",
+          "menu": [
+            "slider",
+            "toggle",
+            "button",
+            "stepper",
+            "text",
+            "header",
+            "divider"
+          ]
+        },
+        {
+          "name": "Id",
+          "type": "string",
+          "default": "value"
+        },
+        {
+          "name": "Label",
+          "type": "string",
+          "default": "Value"
+        },
+        {
+          "name": "Value",
+          "type": "float",
+          "default": "0.5"
+        },
+        {
+          "name": "Min",
+          "type": "float",
+          "default": "0"
+        },
+        {
+          "name": "Max",
+          "type": "float",
+          "default": "1"
+        },
+        {
+          "name": "Step",
+          "type": "float",
+          "default": "1"
+        },
+        {
+          "name": "Color",
+          "type": "rgba",
+          "default": "1"
+        }
+      ],
+      "topParams": [],
+      "infoChop": [],
+      "statusDat": false,
+      "example": "/project1/examples/UIWidget",
+      "source": "UIWidget/UIWidgetDAT.mm"
     },
     "VisionaestheticsCHOP": {
       "create": "VisionaestheticsCHOP",

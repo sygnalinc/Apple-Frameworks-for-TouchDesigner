@@ -10,9 +10,15 @@ SwiftUI TOP(テクスチャ・表示専用)と違い、これは**実ウイン�
 
 ## 使い方
 
-1. **Controls JSON** にコントロールを定義(各コントロールに `id`)。`id` が CHOP チャンネル名になる
-2. **Show Window** をオンにするとウインドウが出る(`Window X/Y/W/H` で位置・サイズ)
-3. ウインドウをマウスで操作 → `out` にライブで値が流れる
+コントロールの定義は**2通り**:
+
+- **A. Widgets DAT(推奨・部品を個別opで)**: [UI Widget DAT](../UIWidget/) を複数置いて Merge DAT で
+  まとめ、その Merge を **Widgets** パラメータに指定。TD の Button/Slider COMP を Container に
+  入れる感覚(部品=DAT、コンテナ=このPanel)
+- **B. Controls JSON**: Widgets DAT を繋がない場合、**Controls JSON** パラメータに直接記述
+
+いずれも各コントロールの `id` が CHOP チャンネル名になる。**Show Window** で表示、
+`Window X/Y/W/H` で位置・サイズ。ウインドウをマウスで操作 → `out` にライブで値が流れる。
 
 ```json
 {"controls":[
