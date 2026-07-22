@@ -406,9 +406,10 @@ private:
         py += "\t\t\t\td.text = '''";
         py += PythonCallbacksDATStubs;
         py += "'''\n";
-        py += "\t\t\t\td.dock = n\n";        // GLSLのシェーダDATと同じくホストノードへドック
-        py += "\t\t\t\td.expose = True\n";   // GLSL既定と同じチップ表示(ノード下の小チップ・開閉可)
-        py += "\t\t\t\td.viewer = False\n";  // チップは既定で閉じる(ビューアを開かない)
+        py += "\t\t\t\td.dock = n\n";           // GLSLのシェーダDATと同じくホストノードへドック
+        py += "\t\t\t\td.expose = True\n";      // ホスト下部にチップを表示(Falseだと×チップ)
+        py += "\t\t\t\td.viewer = True\n";      // 開いた時はGLSL同様にテキストが見える
+        py += "\t\t\t\td.showDocked = False\n"; // 既定は閉じる(↓チップ。↑/↓開閉の実体はこのフラグ)
         py += "\t\t\tn.par.callbacks = nm\n";
         py += "\t\t__cwlan_ok = bool(n.par.callbacks.eval())\n";
         py += "except Exception:\n";

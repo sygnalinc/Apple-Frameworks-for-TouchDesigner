@@ -105,9 +105,10 @@ Swift専用API。**ObjC++から直接呼べないので、helper/ の Swift を 
   読み戻して毎cookリトライ ③PyRunの `__main__` に op/textDAT は無い→ `import td` で明示。
   ビルドは Python.h(TD同梱3.11)+ `-undefined dynamic_lookup`
 - **自動生成DATはGLSL風ドックチップにできる**: `d.dock = n` + `d.expose = True` +
-  `d.viewer = False` で「ノード下の閉じた小チップ」(CoreWLANScanの既定)。
-  `expose=False` ならチップごと非表示(機能維持)。ドック後の nodeX/Y は無効。詳細は
-  skill の pitfalls.md「Python コールバック」節
+  `d.viewer = True` + **`d.showDocked = False`** で「閉じた↓チップ」(CoreWLANScanの既定)。
+  **チップの↑開/↓閉の実体は showDocked**(expose/viewer は無関係・実機の全プロパティ差分で特定)。
+  `expose=False` は見た目が「×」チップになるので通常使わない。ドック後の nodeX/Y は無効。
+  詳細は skill の pitfalls.md「Python コールバック」節
 
 ### Vision / 画像系
 - **VNTrackObjectRequest は Revision1 を明示せよ**。既定の Revision2 は macOS 26 実測で
@@ -2512,3 +2513,14 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   作法**(dock + expose/viewer の組合せ3パターン・nodeX/Y無効・dock解除)を追記
 - CLAUDE.md ハマりどころ集「TD本体の挙動」に pythonCallbacksDAT +ノード自動生成+ドックチップの
   要約を追加(詳細はskill参照の導線)
+
+### 2026-07-22 ドックチップの開閉フラグは showDocked と特定(viewer/exposeではない)
+
+- ユーザー実機確認で「viewer=False では閉じない」「expose=False は×チップになり本来の閉じ方と違う」
+  と判明。ユーザーにフレッシュ配置してもらった glsl1 の**開いてる pixel と閉じてる compute の
+  全プロパティを機械的に差分**し、**開閉の実体は docked側opの `showDocked`**(↑開=True/↓閉=False)
+  と特定。expose/viewer/display は開閉と無関係(全て同値)だった
+- CoreWLANScan の自動生成を `expose=True + viewer=True + showDocked=False` に修正(=GLSLの
+  compute DATと同じ「閉じた↓チップ」が既定)。ライブ適用した cwchk でユーザーが「閉じてます!」を確認。
+  リビルド・インストール済み(次回TD起動から新規配置に適用)
+- pitfalls.md / CLAUDE.md本文 / README の誤った記述(viewer=Falseで閉じる)を訂正

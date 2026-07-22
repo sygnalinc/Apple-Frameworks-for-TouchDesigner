@@ -29,10 +29,9 @@ CoreWLAN Scan CHOP → (open) → wifiscan-helper.app → Location許可 + scanF
 
 **OPを配置するだけ**で、雛形入りの **Callbacks DAT**(`<node名>_callbacks`)が自動生成・接続される
 (初回cook時に本体が生成。生成直後はカスタムパラメータ未生成のため成功するまで自動リトライ)。
-Callbacks DAT は **GLSL TOP のシェーダDATと同様に本体ノードへドックされ、ノード下に小さな
-チップとして表示**される(expose=True)。**チップは既定で閉じている**(viewer=False)。
-開きたいときはチップのビューアフラグをクリック。チップごと非表示にしたい場合は
-`op('<node名>_callbacks').expose = False`。
+Callbacks DAT は **GLSL TOP のシェーダDATと同様に本体ノードへドック**され、ホスト下部の
+**チップは既定で閉じている**(showDocked=False・↓チップ)。チップをクリックすると
+GLSL同様にDATが開いてスクリプトを編集できる。
 以降 **`Get SSID Names` を ON にした瞬間に、隣へ SSID 一覧の Info DAT(`<node名>_ssid`)が
 自動生成**される(既にあれば何もしない=二重生成ガード)。
 

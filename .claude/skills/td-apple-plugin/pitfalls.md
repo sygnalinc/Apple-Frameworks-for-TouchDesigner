@@ -372,9 +372,12 @@
   `__main__` には `op`/`textDAT` が無い → `import td` して `td.op`/`td.textDAT` を使う。
   ④例外は `__cwlan_err = traceback.format_exc()` でグローバルに残すと textport から調査できる
 - **自動生成した DAT は GLSL 風に「ドックチップ」にできる**(ネットワークを散らかさない)。
-  生成した Python 内で `d.dock = n`(ホストノードへドック)を設定する。表示は2フラグの組合せ:
-  - `d.expose = True` + `d.viewer = False` → **ノード下に閉じた小チップ**(CoreWLANScan の既定。
-    GLSL のシェーダDATと同じ見た目で、チップのビューアフラグから開閉できる)
-  - `d.expose = True` + `d.viewer = True` → チップがビューアを開いた状態
-  - `d.expose = False` → チップごと完全非表示(接続・機能は維持。再表示は expose=True)
-  ドック後は nodeX/nodeY は無効(位置はホスト追従)。ドック解除は `d.dock = None`
+  生成した Python 内で `d.dock = n`(ホストノードへドック)。**チップの↑(開)/↓(閉)の実体は
+  `showDocked`**(docked側opのプロパティ。実機で glsl の開pixel/閉compute を全プロパティ差分して
+  特定 — expose/viewer/display は開閉と無関係で全て同値だった):
+  - **`d.expose = True` + `d.viewer = True` + `d.showDocked = False`** → GLSLのcompute DATと同じ
+    **「閉じた↓チップ」**(CoreWLANScan の既定)。ユーザーがチップをクリックすると開いてテキストが見える
+  - `d.showDocked = True` → 開いた状態(DATがホスト下にフルノード表示)
+  - `d.expose = False` → **「×」チップ**になる(TD標準の閉じ方と見た目が違う)。通常は使わない
+  ドック後は nodeX/nodeY 無効(位置はホスト追従)。ドック解除は `d.dock = None`。
+  注意: ホスト(通常op)の showDocked は既定 True で別意味(自分の docked を表示するか)
