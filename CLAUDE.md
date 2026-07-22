@@ -2260,3 +2260,27 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - sample.toe `/project1/applescript_demo`(system info実行+手順note)追加。README(新規+ルート英日)更新
 - **踏んだ罠**: osascript は stdin からスクリプトを読める(`echo '...' | osascript`)。-l で言語指定。
   他アプリ制御は Automation権限(TCC)必須で、責任プロセスはTD本体(初回ダイアログで許可が要る)
+
+### 2026-07-22 SwiftUI TOP 実装(macOS標準UIフレームワークをTDで)
+
+- ユーザー「macOS標準のUIフレームワークをTDで使えるプラグイン」→ 調査提案の結果 **#1 SwiftUI TOP**
+  を実装。SwiftUIビューをテクスチャにレンダしてTDの映像に(SF Symbols/システムフォント/Gauge/
+  ProgressView)。値はTD側パラメータから流し込む一方向
+- **アーキテクチャ**: Swiftヘルパ `SwiftUIHelper`(C ABI su_)が `ImageRenderer`(macOS 13+)で
+  SwiftUIビューをCGImage→BGRA化。**SwiftUIはメインスレッド専用**なので `DispatchQueue.main.async`
+  で回す(TDがメインrunloopをpumpする・RealityKit/Cinematicで実証済みのパターン)。cookは最新
+  テクスチャを非ブロックでupload。Translateプラグインが既にNSHostingView動作の前例
+- **Mode**: text / symbol(SF Symbol) / gauge(円形) / progress(バー)。Foreground/Background(RGBA)、
+  Font/Symbol Size、Value(0..1)、Width/Height
+- **実測(M2・視認)**: 4モードすべて正しくレンダ・向き正立。Text「SwiftUI in TD」(rounded)、
+  `bolt.fill`(黄・色反映)、`waveform.circle.fill`、Gauge 72%(円形+ラベル)、赤背景+白「● LIVE ●」。
+  デモ(sample.toe `/project1/swiftui_demo`)は Value を sin 駆動でゲージがライブで動く
+- **踏んだ罠**: ①`ImageRenderer`/`.cgImage`/`.scale` は `@MainActor` → 呼ぶ関数に `@MainActor` を付け、
+  `DispatchQueue.main.async` 内で呼ぶ。②RGBAパラメータ(appendRGBA)は Python から成分ごと
+  (`Textcolorr/g/b/a`)に設定(タプル代入は効かない)。プラグインは `getParDouble4` で読取。
+  ③SwiftUI/CGは top-down → TD表示に合わせヘルパ側で行反転(bottom-up)して格納
+- **制約**: 一方向(表示専用)。TOPにはマウス/キーが渡らないので双方向操作は不可(双方向は別途
+  NSWindow方式が必要)。macOS 13+必須。README(新規+ルート英日)更新
+- **調査で分かった代替**: 通知/ファイル選択/アラート/基本色選択は既に AppleScript DAT で叩ける。
+  ネイティブでないと無理な候補は SwiftUI TOP(実装)/ MenuBar(NSStatusItem)/ ColorSampler(画面
+  スポイト)/ Native Panel(浮遊NSWindow)/ Native Text Input(IME)
