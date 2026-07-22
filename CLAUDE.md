@@ -2416,3 +2416,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   **必ず `open` で.appとして起動**(自前のLocation identity で許可・取得できる)。②ヘルパーは
   scanForNetworksがブロックするので独立プロセスが好適。③初回だけ許可ダイアログ(ヘルパーapp宛)
 - README(CoreWLANScan・ルート英日)の「SSID取得不可」記述を訂正。pitfalls追記予定
+
+### 2026-07-22 WifiScanner.tox(CoreWLAN Scan + SSID Info DAT配線済み)を palette に追加
+
+- ユーザー「Get SSIDをONにすると自動でInfo DATが出てくる仕様にできないか」
+- **制約(再掲)**: Custom OPは自分の隣に別ノードを自動生成できない(SDK設置時フック無し)。
+  → 手でInfo DATを作って op= する手間をなくすには **.tox で CHOP + Info DAT を配線済み**にするのが確実
+- **WifiScanner.tox**: base COMP。中身 `scan`(CoreWLAN Scan CHOP)+ `congestion`(null CHOP)+
+  `ssid`(Info DAT・op=scan)+ `onpar`(Parameter Execute)。COMPに Get SSID/Scan Interval/Rescan を
+  露出し scan にバインド(Rescanは onPulse コールバックで内部scanへ伝播)
+- **実測**: WifiScanner を置くと ssid Info DAT に周辺SSID 24行が自動表示(SYGNAL/SCC_JBFES等)。
+  palette/sygnal + repo palette/ に保存、paletteData.json 登録
+- **踏んだ罠**: Parameter Execute DAT のパルス監視は `onpulse`(pulseではない)+ `pars='Rescan'` で
+  対象par限定。appendFloat の範囲は normMin/normMax。COMP par → 内部op は expr で bind
+- palette/README.md 更新(WifiScanner節)

@@ -42,6 +42,24 @@
 **実測**: ネイティブ「Button」ウインドウを表示 → クリック → `out` の `state` が1フレームだけ 1
 (次フレーム 0)を実操作で確認。
 
+## WifiScanner.tox
+
+**CoreWLAN Scan CHOP + SSID Info DAT を配線済み**にした Component。
+「Get SSID を ON にしたら SSID表(Info DAT)を手で作らずに見たい」に応える。
+
+> **なぜ .tox か**: Custom OP は**自分の隣に別ノードを自動生成できない**(SDKに設置時フックが無い。
+> GLSL TOP のドックDATはTD内部専用)。そこで CHOP + Info DAT を配線済みにした Component として配布する。
+
+- 中身: `scan`(CoreWLAN Scan CHOP)/ `congestion`(null CHOP・混雑度)/ `ssid`(Info DAT・SSID一覧)
+- **COMP に露出したパラメータ**: `Get SSID Names`(既定On)/ `Scan Interval` / `Rescan Now`
+  (内部 scan にバインド。Rescan は Parameter Execute で伝播)
+- `congestion` はチャンネル別混雑度・空きch(**権限不要**)、`ssid` は周辺SSID一覧
+  (Get SSID On + 位置情報許可で埋まる)
+
+**必要プラグイン**: [CoreWLANScan](../CoreWLANScan/) → `CoreWLANScanCHOP.plugin`(SSIDヘルパー同梱)
+
+**実測**: WifiScanner を置くと `ssid` Info DAT に周辺SSID(24行・SYGNAL/SCC_JBFES等)が自動で出た。
+
 ## Palette への登録
 
 `NativePanel.tox` を TD のユーザーpaletteフォルダへ置く:
