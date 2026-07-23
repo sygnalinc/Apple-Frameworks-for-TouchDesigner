@@ -495,6 +495,19 @@ static CGImageRef makeDilatedMask(const Style& st, CTFrameRef frame, float radiu
             if (y > 0) push(x, y - 1);
             if (y < H - 1) push(x, y + 1);
         }
+        // 外側マップを2px膨張してグリフのAA縁(半透明画素)を含める。
+        // これが無いと元グリフの輪郭に沿って塗りが薄い1pxの継ぎ目(暗い縁)が出る
+        for (int pass = 0; pass < 2; pass++) {
+            std::vector<uint8_t> prev = outside;
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++) {
+                    size_t i = (size_t)y * W + x;
+                    if (prev[i]) continue;
+                    if ((x > 0 && prev[i-1]) || (x < W-1 && prev[i+1]) ||
+                        (y > 0 && prev[i-(size_t)W]) || (y < H-1 && prev[i+(size_t)W]))
+                        outside[i] = 1;
+                }
+        }
     }
     std::vector<uint8_t> maskBytes((size_t)W * H);
     for (size_t i = 0; i < maskBytes.size(); i++) {
