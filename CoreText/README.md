@@ -43,7 +43,7 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Text Wrap | 改行制御(CSS text-wrap相当): **Wrap**=幅で折返し / **No Wrap**=改行なし / **Balance**=各行の長さを均等化 / **Pretty**=最終行の孤立を回避 / **Stable**=Wrapと同じ |
 | | Padding | 余白(px) |
 | Style | Font Color / Background Color | 文字色 / 背景色(既定は透明背景) |
-| | Embolden (px) | **合成ボールド**: マスク膨張でフォントの最大ウェイト以上に太らせる(グラデ/縁取り併用可) |
+| | Embolden (px) | **合成ボールド**: マスク膨張でフォントの最大ウェイト以上に太らせる(グラデ/縁取り併用可)。**閉じた内側(oや口の穴)は保護**され潰れない |
 | | Gradient Fill / Color 2 / Angle | グラデーション塗り(Font Color→Color 2・角度0°=上→下) |
 | | Stroke Width / Color | 縁取り(外側アウトライン・px) |
 | | Drop Shadow / Color / Offset / Blur | ドロップシャドウ |
@@ -54,9 +54,10 @@ Info CHOP: `executes / renders / width / height / lines / fitted_size`。Info DA
 
 ## 注意・制約
 
-- **縁取りはマスク膨張方式(外側アウトライン)**。グリフのアウトラインパスは使わない
+- **縁取り/Emboldenはマスク膨張方式**。グリフのアウトラインパスは使わない
   (システムUIフォントのアウトライン抽出は TD プロセス内でゴミ輪郭が混入する実挙動があるため)。
-  絵文字にも縁が付く
+  絵文字にも縁が付く。膨張は**画像端から到達できる外側の背景のみ**に適用されるため、
+  o・回 などの閉じたカウンターは潰れない(フラッドフィルで保護)
 - **グラデーション時は絵文字もグラデ塗りのシルエット**になる(テキスト全体をマスクにして塗るため)。
   カラー絵文字を出したい場合はグラデーションをOffに
 - 縦書き時の Vertical Align は未適用(全域レイアウト)。両端揃え(Justify)は横書きのみ

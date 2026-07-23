@@ -440,6 +440,12 @@ static CGImageRef makeDilatedMask(const Style& st, CTFrameRef frame, float radiu
     if (!tc) return nullptr;
     CGContextClearRect(tc, CGRectMake(0, 0, st.w, st.h));
     CTFrameDraw(frame, tc);
+    // 元テキストのアルファ(カウンター保護の基準)を先に抜いておく
+    std::vector<uint8_t> base((size_t)st.w * st.h);
+    {
+        const uint8_t* tp = (const uint8_t*)CGBitmapContextGetData(tc);
+        for (size_t i = 0; i < base.size(); i++) base[i] = tp[i*4 + 3];   // BGRA の A
+    }
     CGImageRef textImg = CGBitmapContextCreateImage(tc);
     CGContextRelease(tc);
     if (!textImg) return nullptr;
@@ -468,8 +474,34 @@ static CGImageRef makeDilatedMask(const Style& st, CTFrameRef frame, float radiu
     CGContextDrawImage(ac, CGRectMake(0, 0, st.w, st.h), dilated);
     CGImageRelease(dilated);
     const uint8_t* px = (const uint8_t*)CGBitmapContextGetData(ac);
-    std::vector<uint8_t> maskBytes((size_t)st.w * st.h);
-    for (size_t i = 0; i < maskBytes.size(); i++) maskBytes[i] = (uint8_t)(255 - px[i*4 + 3]);   // BGRA の A
+    // カウンター保護: 画像端から到達できる「外側の背景」をフラッドフィルで求め、
+    // 膨張は外側にだけ許す。閉じた内側(o・口 などの穴)は元の形のまま残る
+    const int W = st.w, H = st.h;
+    std::vector<uint8_t> outside((size_t)W * H, 0);
+    {
+        std::vector<int> stack;
+        stack.reserve(4096);
+        auto push = [&](int x, int y) {
+            int i = y * W + x;
+            if (!outside[(size_t)i] && base[(size_t)i] < 8) { outside[(size_t)i] = 1; stack.push_back(i); }
+        };
+        for (int x = 0; x < W; x++) { push(x, 0); push(x, H - 1); }
+        for (int y = 0; y < H; y++) { push(0, y); push(W - 1, y); }
+        while (!stack.empty()) {
+            int i = stack.back(); stack.pop_back();
+            int x = i % W, y = i / W;
+            if (x > 0) push(x - 1, y);
+            if (x < W - 1) push(x + 1, y);
+            if (y > 0) push(x, y - 1);
+            if (y < H - 1) push(x, y + 1);
+        }
+    }
+    std::vector<uint8_t> maskBytes((size_t)W * H);
+    for (size_t i = 0; i < maskBytes.size(); i++) {
+        uint8_t dil = px[i*4 + 3];                                     // 膨張後アルファ(BGRA の A)
+        uint8_t a = outside[i] ? std::max(base[i], dil) : base[i];     // 外側のみ膨張を反映
+        maskBytes[i] = (uint8_t)(255 - a);
+    }
     CGContextRelease(ac);
     NSData* data = [NSData dataWithBytes:maskBytes.data() length:maskBytes.size()];   // provider が保持
     CGDataProviderRef prov = CGDataProviderCreateWithCFData((CFDataRef)data);
