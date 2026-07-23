@@ -2647,3 +2647,12 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **TD再起動の罠(再確認)**: quit直後に即openすると同一プロセスが継続して旧バイナリのまま
   パラメータが古い、という事象を踏んだ。**quitはプロセス消滅を確認してからopen**する
 - 実測(M2・TD実機): 4モードの比較レンダで挙動確認・エラーなし
+
+### 2026-07-23 CoreText TOP: Line Height変更で1行目まで動く問題を修正
+
+- ユーザー指摘「lineheightを変更すると一番上のlineも移動してしまう」。原因は
+  `kCTParagraphStyleSpecifierLineHeightMultiple` が**1行目のベースライン位置にも掛かる**ため
+- 修正: 1.0以上は **LineSpacingAdjustment**(行間への加算=1行目不動)、1.0未満は
+  MaximumLineHeight で行高自体を詰める方式に変更。natural line height は
+  CTFontGetAscent+Descent+Leading から算出
+- 実測(M2・TD実機): lh 1.0→1.8 で1行目の位置が完全一致・行間のみ拡大

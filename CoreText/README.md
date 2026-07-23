@@ -36,7 +36,7 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Proportional Metrics (palt) | OpenType 'palt' 自動文字詰め(対応フォントのみ効く) |
 | | Font Size / Weight / Italic | サイズ(px)/ ウェイト100〜900(可変フォント)/ 斜体 |
 | | Auto Fit Font Size | **描画領域に収まるまで自動縮小**(Font Sizeが上限)。Word Wrap Onなら折り返して収まるサイズ、Offなら1行のまま収まるサイズ。実サイズはInfo CHOP `fitted_size` |
-| | Tracking / Line Height / Ligatures | 字間(pt)/ 行送り倍率 / リガチャ |
+| | Tracking / Line Height / Ligatures | 字間(pt)/ 行送り倍率(**1行目は固定**・行間のみ変化。1.0未満は行高を詰める)/ リガチャ |
 | | Horizontal/Vertical Align | 左/中/右/両端揃え・上/中/下 |
 | | Vertical Text | 縦書き(右→左の段組) |
 | | Text Wrap | 改行制御(CSS text-wrap相当): **Wrap**=幅で折返し / **No Wrap**=改行なし / **Balance**=各行の長さを均等化 / **Pretty**=最終行の孤立を回避 / **Stable**=Wrapと同じ |
