@@ -137,6 +137,7 @@ struct Style {
     float bgRGBA[4] = {0,0,0,0};
     bool gradient = false; float gradRGBA[4] = {0.2f,0.5f,1,1}; float gradAngle = 0;
     float strokeWidth = 0; float strokeRGBA[4] = {0,0,0,1};
+    float embolden = 0;                // 合成ボールド(px)。フォントの最大ウェイト以上に太らせる
     bool shadow = false; float shadowRGBA[4] = {0,0,0,0.75f}; float shadowX = 0, shadowY = -6, shadowBlur = 8;
     int w = 1280, h = 720;
 
@@ -152,7 +153,7 @@ struct Style {
                  gradient, gradRGBA[0],gradRGBA[1],gradRGBA[2],gradRGBA[3], gradAngle,
                  strokeWidth, strokeRGBA[0],strokeRGBA[1],strokeRGBA[2],strokeRGBA[3],
                  shadow, shadowRGBA[0],shadowRGBA[1],shadowRGBA[2],shadowRGBA[3],
-                 shadowX, shadowY, shadowBlur, w, h);
+                 shadowX, shadowY, shadowBlur + embolden * 1000.0f, w, h);
         return text + "\x1f" + fontFile + "\x1f" + (palt ? "P" : "p") + (autofit ? "F" : "f") + "\x1f" + b;
     }
 };
@@ -265,7 +266,7 @@ static CFAttributedStringRef makeAttrString(const Style& st, CTFontRef font, boo
     if (delta >= 0) {
         ps[nps++] = { kCTParagraphStyleSpecifierLineSpacingAdjustment, sizeof(spacing), &spacing };
     } else {
-        maxLH = natural + delta;
+        maxLH = std::max<CGFloat>(natural + delta, 1);   // 0以下は不正なので1pxで下限ガード
         ps[nps++] = { kCTParagraphStyleSpecifierMaximumLineHeight, sizeof(maxLH), &maxLH };
     }
     CTParagraphStyleRef para = CTParagraphStyleCreate(ps, nps);
@@ -425,44 +426,43 @@ static float fitFontSize(const Style& stIn)
     return lo;
 }
 
-// ストローク(縁取り): テキストのアルファカバレッジを CIMorphologyMaximum で膨張させ、
-// その差分領域をストローク色で塗る(外側アウトライン)。グリフのアウトラインデータに
-// 依存しないので、システムUIフォント(SF)でも安全(=SFのアウトライン抽出は TD プロセス内で
-// ゴミ輪郭が混入する実バグを踏んだため、パス方式は使わない)。絵文字にも縁が付く。
-static void strokeByDilation(CGContextRef ctx, const Style& st, CTFrameRef frame)
+// テキストのアルファカバレッジを CIMorphologyMaximum で radius 分膨張させ、
+// CGImageMask(0=塗る/255=塗らない)を作る。グリフのアウトラインデータに依存しないので
+// システムUIフォント(SF)でも安全(=SFのアウトライン抽出は TD プロセス内でゴミ輪郭が混入する
+// 実バグを踏んだため、パス方式は使わない)。絵文字にも効く。縁取り/合成ボールドの共通基盤。
+static CGImageRef makeDilatedMask(const Style& st, CTFrameRef frame, float radius)
 {
-    // 1) テキストを透明背景のBGRAに描き、アルファ=カバレッジを得る
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
     CGContextRef tc = CGBitmapContextCreate(nullptr, st.w, st.h, 8, (size_t)st.w*4, cs,
                                             kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
     CGColorSpaceRelease(cs);
-    if (!tc) return;
+    if (!tc) return nullptr;
     CGContextClearRect(tc, CGRectMake(0, 0, st.w, st.h));
     CTFrameDraw(frame, tc);
     CGImageRef textImg = CGBitmapContextCreateImage(tc);
     CGContextRelease(tc);
-    if (!textImg) return;
+    if (!textImg) return nullptr;
 
-    // 2) CIで半径=ストローク幅ぶん膨張(CIFilterはプロセス横断で直列化: 既知のTDクラッシュ対策)
+    // CIで膨張(CIFilterはプロセス横断で直列化: 既知のTDクラッシュ対策)
     CGImageRef dilated = nullptr;
     @synchronized([CIFilter class]) {
         CIImage* ci = [CIImage imageWithCGImage:textImg];
         CIFilter* f = [CIFilter filterWithName:@"CIMorphologyMaximum"];
         [f setValue:ci forKey:kCIInputImageKey];
-        [f setValue:@(st.strokeWidth) forKey:kCIInputRadiusKey];
+        [f setValue:@(radius) forKey:kCIInputRadiusKey];
         CIImage* outCI = [f.outputImage imageByCroppingToRect:CGRectMake(0, 0, st.w, st.h)];
         CIContext* cictx = [CIContext contextWithOptions:@{kCIContextUseSoftwareRenderer: @YES}];
         if (outCI) dilated = [cictx createCGImage:outCI fromRect:CGRectMake(0, 0, st.w, st.h)];
     }
     CGImageRelease(textImg);
-    if (!dilated) return;
+    if (!dilated) return nullptr;
 
-    // 3) 膨張後アルファを取り出して CGImageMask(0=塗る/255=塗らない)を作る
+    // 膨張後アルファ → CGImageMask
     CGColorSpaceRef cs2 = CGColorSpaceCreateDeviceRGB();
     CGContextRef ac = CGBitmapContextCreate(nullptr, st.w, st.h, 8, (size_t)st.w*4, cs2,
                                             kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
     CGColorSpaceRelease(cs2);
-    if (!ac) { CGImageRelease(dilated); return; }
+    if (!ac) { CGImageRelease(dilated); return nullptr; }
     CGContextClearRect(ac, CGRectMake(0, 0, st.w, st.h));
     CGContextDrawImage(ac, CGRectMake(0, 0, st.w, st.h), dilated);
     CGImageRelease(dilated);
@@ -470,35 +470,16 @@ static void strokeByDilation(CGContextRef ctx, const Style& st, CTFrameRef frame
     std::vector<uint8_t> maskBytes((size_t)st.w * st.h);
     for (size_t i = 0; i < maskBytes.size(); i++) maskBytes[i] = (uint8_t)(255 - px[i*4 + 3]);   // BGRA の A
     CGContextRelease(ac);
-    CGDataProviderRef prov = CGDataProviderCreateWithData(nullptr, maskBytes.data(), maskBytes.size(), nullptr);
+    NSData* data = [NSData dataWithBytes:maskBytes.data() length:maskBytes.size()];   // provider が保持
+    CGDataProviderRef prov = CGDataProviderCreateWithCFData((CFDataRef)data);
     CGImageRef mask = CGImageMaskCreate(st.w, st.h, 8, 8, st.w, prov, nullptr, false);
     CGDataProviderRelease(prov);
-    if (!mask) return;
-
-    // 4) マスクでクリップしてストローク色を塗る(この上に本文フィルを重ねる)
-    CGContextSaveGState(ctx);
-    CGContextClipToMask(ctx, CGRectMake(0, 0, st.w, st.h), mask);
-    CGColorRef sc = makeColor(st.strokeRGBA);
-    CGContextSetFillColorWithColor(ctx, sc); CGColorRelease(sc);
-    CGContextFillRect(ctx, CGRectMake(0, 0, st.w, st.h));
-    CGContextRestoreGState(ctx);
-    CGImageRelease(mask);
+    return mask;
 }
 
-static void drawGradientThroughMask(CGContextRef ctx, const Style& st, CTFrameRef frame)
+// クリップ済み領域(または全面)へグラデーションを塗る(Font Color → Gradient Color 2・角度)
+static void drawGradientFill(CGContextRef ctx, const Style& st)
 {
-    // テキストのアルファマスクを作り、クリップしてグラデーションを塗る
-    CGContextRef mask = CGBitmapContextCreate(nullptr, st.w, st.h, 8, st.w, nullptr, kCGImageAlphaOnly);
-    if (!mask) return;
-    CTFrameDraw(frame, mask);
-    CGImageRef maskImg = CGBitmapContextCreateImage(mask);
-    CGContextRelease(mask);
-    if (!maskImg) return;
-
-    CGContextSaveGState(ctx);
-    CGContextClipToMask(ctx, CGRectMake(0, 0, st.w, st.h), maskImg);
-    CGImageRelease(maskImg);
-
     CGColorRef c0 = makeColor(st.fontRGBA), c1 = makeColor(st.gradRGBA);
     const void* colors[] = { c0, c1 };
     CFArrayRef arr = CFArrayCreate(nullptr, colors, 2, &kCFTypeArrayCallBacks);
@@ -513,6 +494,40 @@ static void drawGradientThroughMask(CGContextRef ctx, const Style& st, CTFrameRe
     CGContextDrawLinearGradient(ctx, grad, p0, p1, 0);
     CGGradientRelease(grad); CGColorSpaceRelease(cs); CFRelease(arr);
     CGColorRelease(c0); CGColorRelease(c1);
+}
+
+// 膨張マスクでクリップして単色 or グラデーションを塗る
+static void fillThroughDilatedMask(CGContextRef ctx, const Style& st, CTFrameRef frame,
+                                   float radius, const float rgba[4], bool gradient)
+{
+    CGImageRef mask = makeDilatedMask(st, frame, radius);
+    if (!mask) return;
+    CGContextSaveGState(ctx);
+    CGContextClipToMask(ctx, CGRectMake(0, 0, st.w, st.h), mask);
+    if (gradient) {
+        drawGradientFill(ctx, st);
+    } else {
+        CGColorRef c = makeColor(rgba);
+        CGContextSetFillColorWithColor(ctx, c); CGColorRelease(c);
+        CGContextFillRect(ctx, CGRectMake(0, 0, st.w, st.h));
+    }
+    CGContextRestoreGState(ctx);
+    CGImageRelease(mask);
+}
+
+static void drawGradientThroughMask(CGContextRef ctx, const Style& st, CTFrameRef frame)
+{
+    // テキストのアルファマスクを作り、クリップしてグラデーションを塗る
+    CGContextRef mask = CGBitmapContextCreate(nullptr, st.w, st.h, 8, st.w, nullptr, kCGImageAlphaOnly);
+    if (!mask) return;
+    CTFrameDraw(frame, mask);
+    CGImageRef maskImg = CGBitmapContextCreateImage(mask);
+    CGContextRelease(mask);
+    if (!maskImg) return;
+    CGContextSaveGState(ctx);
+    CGContextClipToMask(ctx, CGRectMake(0, 0, st.w, st.h), maskImg);
+    CGImageRelease(maskImg);
+    drawGradientFill(ctx, st);
     CGContextRestoreGState(ctx);
 }
 
@@ -575,8 +590,11 @@ static bool renderText(const Style& stIn, Result& out, std::string& warn)
 
     int lines = 0;
     CTFrameRef frame = makeFrame(fillStr, st, &lines);
-    // 縁取り(外側アウトライン)を先に敷き、その上に本文フィルを重ねる
-    if (st.strokeWidth > 0) strokeByDilation(ctx, st, frame);
+    // 描画順: 縁取り(最外周) → 合成ボールド(太らせた本体) → 本文テキスト
+    if (st.strokeWidth > 0)
+        fillThroughDilatedMask(ctx, st, frame, st.embolden + st.strokeWidth, st.strokeRGBA, false);
+    if (st.embolden > 0)
+        fillThroughDilatedMask(ctx, st, frame, st.embolden, st.fontRGBA, st.gradient);
     if (st.gradient) drawGradientThroughMask(ctx, st, frame);
     else             CTFrameDraw(frame, ctx);
     CFRelease(frame);
@@ -665,6 +683,7 @@ public:
         readRGBA(in, "Gradcolor", st.gradRGBA);
         st.gradAngle = (float)in->getParDouble("Gradangle");
         st.strokeWidth = (float)in->getParDouble("Strokewidth");
+        st.embolden  = (float)in->getParDouble("Embolden");
         readRGBA(in, "Strokecolor", st.strokeRGBA);
         st.shadow    = in->getParInt("Shadowon") != 0;
         readRGBA(in, "Shadowcolor", st.shadowRGBA);
@@ -718,8 +737,8 @@ public:
         { OP_NumericParameter p("Weight"); p.label = "Weight (100-900, variable font)"; p.page = P; p.defaultValues[0] = 400; p.minSliders[0] = 100; p.maxSliders[0] = 900; p.minValues[0] = 100; p.maxValues[0] = 900; p.clampMins[0] = p.clampMaxes[0] = true; m->appendFloat(p); }
         { OP_NumericParameter p("Italic"); p.label = "Italic"; p.page = P; m->appendToggle(p); }
         { OP_NumericParameter p("Palt"); p.label = "Proportional Metrics (palt)"; p.page = P; m->appendToggle(p); }
-        { OP_NumericParameter p("Tracking"); p.label = "Tracking (pt)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = -5; p.maxSliders[0] = 50; m->appendFloat(p); }
-        { OP_NumericParameter p("Lineheight"); p.label = "Line Height (multiple)"; p.page = P; p.defaultValues[0] = 1.0; p.minSliders[0] = 0.5; p.maxSliders[0] = 3; m->appendFloat(p); }
+        { OP_NumericParameter p("Tracking"); p.label = "Tracking (pt)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = -100; p.maxSliders[0] = 100; m->appendFloat(p); }
+        { OP_NumericParameter p("Lineheight"); p.label = "Line Height (multiple)"; p.page = P; p.defaultValues[0] = 1.0; p.minSliders[0] = 0; p.maxSliders[0] = 3; m->appendFloat(p); }
         { OP_StringParameter p("Ligatures"); p.label = "Ligatures"; p.page = P; p.defaultValue = "standard";
           const char* n[] = {"none","standard","all"}; const char* l[] = {"None","Standard","All"}; m->appendMenu(p, 3, n, l); }
         { OP_StringParameter p("Alignh"); p.label = "Horizontal Align"; p.page = P; p.defaultValue = "center";
@@ -738,6 +757,7 @@ public:
           p.defaultValues[0]=1; p.defaultValues[1]=1; p.defaultValues[2]=1; p.defaultValues[3]=1; m->appendRGBA(p); }
         { OP_NumericParameter p("Bgcolor"); p.label = "Background Color"; p.page = S;
           p.defaultValues[0]=0; p.defaultValues[1]=0; p.defaultValues[2]=0; p.defaultValues[3]=0; m->appendRGBA(p); }
+        { OP_NumericParameter p("Embolden"); p.label = "Embolden (px, beyond max weight)"; p.page = S; p.defaultValues[0] = 0; p.minSliders[0] = 0; p.maxSliders[0] = 20; p.minValues[0] = 0; p.clampMins[0] = true; m->appendFloat(p); }
         { OP_NumericParameter p("Gradienton"); p.label = "Gradient Fill"; p.page = S; m->appendToggle(p); }
         { OP_NumericParameter p("Gradcolor"); p.label = "Gradient Color 2"; p.page = S;
           p.defaultValues[0]=0.2; p.defaultValues[1]=0.5; p.defaultValues[2]=1; p.defaultValues[3]=1; m->appendRGBA(p); }

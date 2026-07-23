@@ -37,12 +37,13 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Proportional Metrics (palt) | OpenType 'palt' 自動文字詰め(対応フォントのみ効く) |
 | | Font Size / Weight / Italic | サイズ(px)/ ウェイト100〜900(可変フォント)/ 斜体 |
 | | Auto Fit Font Size | **描画領域に収まるまで自動縮小**(Font Sizeが上限)。Word Wrap Onなら折り返して収まるサイズ、Offなら1行のまま収まるサイズ。実サイズはInfo CHOP `fitted_size` |
-| | Tracking / Line Height / Ligatures | 字間(pt)/ 行送り倍率(**1行目は固定**・行間のみ変化。1.0未満は行高を詰める)/ リガチャ |
+| | Tracking / Line Height / Ligatures | 字間(pt・-100〜100で重なりも可)/ 行送り倍率(0〜・**1行目は固定**。1.0未満は行高を詰める)/ リガチャ |
 | | Horizontal/Vertical Align | 左/中/右/両端揃え・上/中/下 |
 | | Vertical Text | 縦書き(右→左の段組) |
 | | Text Wrap | 改行制御(CSS text-wrap相当): **Wrap**=幅で折返し / **No Wrap**=改行なし / **Balance**=各行の長さを均等化 / **Pretty**=最終行の孤立を回避 / **Stable**=Wrapと同じ |
 | | Padding | 余白(px) |
 | Style | Font Color / Background Color | 文字色 / 背景色(既定は透明背景) |
+| | Embolden (px) | **合成ボールド**: マスク膨張でフォントの最大ウェイト以上に太らせる(グラデ/縁取り併用可) |
 | | Gradient Fill / Color 2 / Angle | グラデーション塗り(Font Color→Color 2・角度0°=上→下) |
 | | Stroke Width / Color | 縁取り(外側アウトライン・px) |
 | | Drop Shadow / Color / Offset / Blur | ドロップシャドウ |

@@ -2666,3 +2666,13 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   **開いたドックチップ**として自動生成し Textdat パラメータへ接続(cook文脈のPyRun・二重生成ガード)。
   DATへの入力は1文字ごとにシグネチャ検知→再レンダ
 - 実測(M2・TD実機): パルス→DAT生成・接続、1文字ずつの追記が全て即レンダ反映
+
+### 2026-07-23 CoreText TOP: Embolden(合成ボールド)+ Tracking/Line Height 下限拡大
+
+- ユーザー要望2点: ①Tracking スライダー -5→**-100**(重なる詰めも可)・Line Height 0.5→**0**
+  (行高1px下限ガード付き)②**Embolden(px)**: 縁取りで実証済みのマスク膨張
+  (CIMorphologyMaximum)を使い、**フォントの最大ウェイト以上に太らせる**合成ボールド
+- 実装: makeDilatedMask / drawGradientFill / fillThroughDilatedMask に共通化。描画順は
+  縁取り(embolden+stroke幅で膨張)→ 合成ボールド(embolden幅・単色/グラデ対応)→ 本文。
+  マスクのバッキングは NSData 保持(CGDataProviderの生存問題を回避)
+- 実測(M2): SF Weight900 + Embolden 6px でウェイト上限超えの極太を視認、Tracking -40 の重なり詰めOK
