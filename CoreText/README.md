@@ -15,6 +15,8 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 - **カラー絵文字** 😀🎉(Apple Color Emoji をそのまま描画)
 - **日本語縦書き**(Vertical Text): 右→左の段組・縦用約物(。、の位置)も正しい
 - **高品質AA**: サブピクセル位置指定・リガチャ(none/standard/all)・トラッキング・行送り・両端揃え
+- **改行制御(Text Wrap)**: CSSの `text-wrap` 相当。**Balance**(各行の文字数を均等に)・
+  **Pretty**(最終行に一文字/一単語だけ残る孤立を回避)を含む5モード
 - **グラデーション塗り**(2色・角度)/ **縁取り**(外側アウトライン)/ **ドロップシャドウ**
 - 複数行は **Text DAT 参照**(`Text DAT` パラメータ。セルを行/タブで連結)
 
@@ -37,7 +39,8 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Tracking / Line Height / Ligatures | 字間(pt)/ 行送り倍率 / リガチャ |
 | | Horizontal/Vertical Align | 左/中/右/両端揃え・上/中/下 |
 | | Vertical Text | 縦書き(右→左の段組) |
-| | Word Wrap / Padding | 折り返し / 余白(px) |
+| | Text Wrap | 改行制御(CSS text-wrap相当): **Wrap**=幅で折返し / **No Wrap**=改行なし / **Balance**=各行の長さを均等化 / **Pretty**=最終行の孤立を回避 / **Stable**=Wrapと同じ |
+| | Padding | 余白(px) |
 | Style | Font Color / Background Color | 文字色 / 背景色(既定は透明背景) |
 | | Gradient Fill / Color 2 / Angle | グラデーション塗り(Font Color→Color 2・角度0°=上→下) |
 | | Stroke Width / Color | 縁取り(外側アウトライン・px) |

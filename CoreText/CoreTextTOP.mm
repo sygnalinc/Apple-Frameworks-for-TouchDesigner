@@ -89,7 +89,8 @@ struct Style {
     float fontSize = 72, weight = 400, tracking = 0, lineHeight = 1.0f;
     int ligatures = 1;                 // 0=none 1=standard 2=all
     int alignH = 1, alignV = 1;        // 0=left/top 1=center/middle 2=right/bottom 3=justified(Hのみ)
-    bool italic = false, vertical = false, wrap = true, autofit = false;
+    bool italic = false, vertical = false, autofit = false;
+    int wrapMode = 0;                  // 0=wrap 1=nowrap 2=balance 3=pretty 4=stable(=wrap)
     float padding = 20;
     float fontRGBA[4] = {1,1,1,1};
     float bgRGBA[4] = {0,0,0,0};
@@ -104,7 +105,7 @@ struct Style {
                  "%.3f%.3f%.3f%.3f|%.3f%.3f%.3f%.3f|%d|%.3f%.3f%.3f%.3f|%.1f|"
                  "%.2f|%.3f%.3f%.3f%.3f|%d|%.3f%.3f%.3f%.3f|%.1f|%.1f|%.1f|%dx%d",
                  fontName.c_str(), fontSize, weight, tracking, lineHeight, ligatures,
-                 alignH, alignV, italic, vertical, wrap, padding,
+                 alignH, alignV, italic, vertical, wrapMode, padding,
                  fontRGBA[0],fontRGBA[1],fontRGBA[2],fontRGBA[3],
                  bgRGBA[0],bgRGBA[1],bgRGBA[2],bgRGBA[3],
                  gradient, gradRGBA[0],gradRGBA[1],gradRGBA[2],gradRGBA[3], gradAngle,
@@ -209,7 +210,7 @@ static CFAttributedStringRef makeAttrString(const Style& st, CTFontRef font, boo
     if (st.alignH == 0) al = kCTTextAlignmentLeft;
     else if (st.alignH == 2) al = kCTTextAlignmentRight;
     else if (st.alignH == 3) al = kCTTextAlignmentJustified;
-    CTLineBreakMode lb = st.wrap ? kCTLineBreakByWordWrapping : kCTLineBreakByClipping;
+    CTLineBreakMode lb = (st.wrapMode == 1) ? kCTLineBreakByClipping : kCTLineBreakByWordWrapping;
     CGFloat lh = st.lineHeight;
     CTParagraphStyleSetting ps[] = {
         { kCTParagraphStyleSpecifierAlignment, sizeof(al), &al },
@@ -241,6 +242,53 @@ static CFAttributedStringRef makeAttrString(const Style& st, CTFontRef font, boo
     return s;
 }
 
+// 折り返し計測: 幅 w で組んだときの行数・最終行幅・最大行幅
+struct WrapInfo { int lines = 0; double lastW = 0, maxW = 0; };
+static WrapInfo measureWrap(CFAttributedStringRef str, CGFloat w)
+{
+    WrapInfo out;
+    CTFramesetterRef fs = CTFramesetterCreateWithAttributedString(str);
+    CGPathRef path = CGPathCreateWithRect(CGRectMake(0, 0, w, 1e6), nullptr);
+    CTFrameRef fr = CTFramesetterCreateFrame(fs, CFRangeMake(0,0), path, nullptr);
+    CFArrayRef lines = CTFrameGetLines(fr);
+    out.lines = (int)CFArrayGetCount(lines);
+    for (CFIndex i = 0; i < out.lines; i++) {
+        CTLineRef ln = (CTLineRef)CFArrayGetValueAtIndex(lines, i);
+        double lw = CTLineGetTypographicBounds(ln, nullptr, nullptr, nullptr);
+        out.maxW = std::max(out.maxW, lw);
+        if (i == out.lines - 1) out.lastW = lw;
+    }
+    CFRelease(fr); CGPathRelease(path); CFRelease(fs);
+    return out;
+}
+
+// balance / pretty 用の実効折り返し幅(横書きのみ)。
+// balance: 行数を availW と同じに保ったまま折り返し幅を最小化 → 各行の長さが揃う
+// pretty : 最終行が極端に短い(最大行の30%未満)とき、行数を変えずに幅を少し詰めて調整
+static CGFloat effectiveWrapWidth(CFAttributedStringRef str, const Style& st, CGFloat availW)
+{
+    if (st.vertical || (st.wrapMode != 2 && st.wrapMode != 3)) return availW;
+    WrapInfo base = measureWrap(str, availW);
+    if (base.lines <= 1) return availW;
+    if (st.wrapMode == 2) {   // balance: 二分探索で行数キープの最小幅
+        CGFloat lo = availW * 0.2f, hi = availW;
+        for (int i = 0; i < 16; i++) {
+            CGFloat mid = (lo + hi) * 0.5f;
+            if (measureWrap(str, mid).lines <= base.lines) hi = mid; else lo = mid;
+        }
+        return hi;
+    }
+    // pretty: 最終行の孤立(短すぎ)を検出したら 2% 刻みで幅を詰める(行数は維持)
+    if (base.lastW >= base.maxW * 0.3) return availW;
+    for (int i = 1; i <= 10; i++) {
+        CGFloat w = availW * (1.0f - 0.02f * i);
+        WrapInfo m = measureWrap(str, w);
+        if (m.lines != base.lines) break;               // 行数が変わったら諦めて元の幅
+        if (m.lastW >= m.maxW * 0.3) return w;          // 孤立解消
+    }
+    return availW;
+}
+
 // フレーム作成(縦書きは progression RightToLeft)+ 縦位置合わせ
 static CTFrameRef makeFrame(CFAttributedStringRef str, const Style& st, int* outLines)
 {
@@ -255,17 +303,24 @@ static CTFrameRef makeFrame(CFAttributedStringRef str, const Style& st, int* out
         CFRelease(p);
     }
     CGFloat availW = st.w - st.padding * 2, availH = st.h - st.padding * 2;
-    CGRect rect = CGRectMake(st.padding, st.padding, availW, availH);
+    // balance / pretty は実効折り返し幅を狭め、Horizontal Align に従って領域内に配置する
+    CGFloat effW = effectiveWrapWidth(str, st, availW);
+    CGFloat x = st.padding;
+    if (effW < availW) {
+        if (st.alignH == 2) x = st.padding + (availW - effW);            // right
+        else if (st.alignH != 0) x = st.padding + (availW - effW) / 2;   // center / justify
+    }
+    CGRect rect = CGRectMake(x, st.padding, effW, availH);
     if (!st.vertical && st.alignV != 0) {
         // 使用高さを測って top/middle/bottom を実現(CTFrame は常に上詰めのため)
         CGSize used = CTFramesetterSuggestFrameSizeWithConstraints(fs, CFRangeMake(0,0), frameAttrs,
-                                                                   CGSizeMake(availW, CGFLOAT_MAX), nullptr);
+                                                                   CGSizeMake(effW, CGFLOAT_MAX), nullptr);
         CGFloat off = availH - used.height;
         if (off > 0) {
-            if (st.alignV == 1) rect = CGRectMake(st.padding, st.padding + off/2, availW, used.height + 2);
-            else                rect = CGRectMake(st.padding, st.padding, availW, used.height + 2);   // bottom(CG座標は下原点)
+            if (st.alignV == 1) rect = CGRectMake(x, st.padding + off/2, effW, used.height + 2);
+            else                rect = CGRectMake(x, st.padding, effW, used.height + 2);   // bottom(CG座標は下原点)
         }
-        if (st.alignV == 0 && off > 0) rect = CGRectMake(st.padding, st.padding + off, availW, used.height + 2); // top
+        if (st.alignV == 0 && off > 0) rect = CGRectMake(x, st.padding + off, effW, used.height + 2); // top
     } else if (!st.vertical && st.alignV == 0) {
         // top は既定(上詰め)
     }
@@ -300,9 +355,10 @@ static float fitFontSize(const Style& stIn)
                                             &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
             CFRelease(pn);
         }
+        bool wraps = tmp.wrapMode != 1;   // nowrap 以外は折り返す前提でフィット
         CGSize cons = tmp.vertical
-            ? CGSizeMake(CGFLOAT_MAX, tmp.wrap ? availH : CGFLOAT_MAX)
-            : CGSizeMake(tmp.wrap ? availW : CGFLOAT_MAX, CGFLOAT_MAX);
+            ? CGSizeMake(CGFLOAT_MAX, wraps ? availH : CGFLOAT_MAX)
+            : CGSizeMake(wraps ? availW : CGFLOAT_MAX, CGFLOAT_MAX);
         CGSize used = CTFramesetterSuggestFrameSizeWithConstraints(fs, CFRangeMake(0,0), frameAttrs, cons, nullptr);
         if (frameAttrs) CFRelease(frameAttrs);
         CFRelease(fs); CFRelease(str); CFRelease(font);
@@ -544,7 +600,8 @@ public:
         { std::string s = in->getParString("Alignv") ? in->getParString("Alignv") : "middle";
           st.alignV = (s == "top") ? 0 : (s == "bottom") ? 2 : 1; }
         st.vertical  = in->getParInt("Vertical") != 0;
-        st.wrap      = in->getParInt("Wordwrap") != 0;
+        { std::string s = in->getParString("Textwrap") ? in->getParString("Textwrap") : "wrap";
+          st.wrapMode = (s == "nowrap") ? 1 : (s == "balance") ? 2 : (s == "pretty") ? 3 : (s == "stable") ? 4 : 0; }
         st.padding   = (float)in->getParDouble("Padding");
         readRGBA(in, "Fontcolor", st.fontRGBA);
         readRGBA(in, "Bgcolor", st.bgRGBA);
@@ -613,7 +670,10 @@ public:
         { OP_StringParameter p("Alignv"); p.label = "Vertical Align"; p.page = P; p.defaultValue = "middle";
           const char* n[] = {"top","middle","bottom"}; const char* l[] = {"Top","Middle","Bottom"}; m->appendMenu(p, 3, n, l); }
         { OP_NumericParameter p("Vertical"); p.label = "Vertical Text (tategaki)"; p.page = P; m->appendToggle(p); }
-        { OP_NumericParameter p("Wordwrap"); p.label = "Word Wrap"; p.page = P; p.defaultValues[0] = 1; m->appendToggle(p); }
+        { OP_StringParameter p("Textwrap"); p.label = "Text Wrap"; p.page = P; p.defaultValue = "wrap";
+          const char* n[] = {"wrap","nowrap","balance","pretty","stable"};
+          const char* l[] = {"Wrap (fit to width)","No Wrap","Balance (even lines)","Pretty (no orphans)","Stable (= Wrap)"};
+          m->appendMenu(p, 5, n, l); }
         { OP_NumericParameter p("Padding"); p.label = "Padding (px)"; p.page = P; p.defaultValues[0] = 20; p.minSliders[0] = 0; p.maxSliders[0] = 200; p.minValues[0] = 0; p.clampMins[0] = true; m->appendFloat(p); }
 
         const char* S = "Style";
