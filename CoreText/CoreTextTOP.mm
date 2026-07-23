@@ -73,17 +73,18 @@ static void createLiveTextDAT(const TD::OP_NodeInfo* node, const char* currentTe
     py += "try:\n";
     py += "\timport td\n";
     py += "\tn = __ct_node\n";
-    py += "\tp = n.parent()\n";
-    py += "\tnm = n.name + '_text'\n";
-    py += "\td = p.op(nm)\n";
-    py += "\tif not d:\n";
-    py += "\t\td = p.create(td.textDAT, nm)\n";
-    py += "\t\td.text = __ct_text\n";
-    py += "\t\td.dock = n\n";
-    py += "\t\td.expose = True\n";
-    py += "\t\td.viewer = True\n";
-    py += "\t\td.showDocked = True\n";   // 開いたチップ=すぐ編集できる
-    py += "\tn.par.Textdat = nm\n";
+    py += "\tif not n.par.Textdat.eval():\n";        // 既に接続済みなら何もしない(上書きしない)
+    py += "\t\tp = n.parent()\n";
+    py += "\t\tnm = n.name + '_text'\n";
+    py += "\t\td = p.op(nm)\n";
+    py += "\t\tif not d:\n";
+    py += "\t\t\td = p.create(td.textDAT, nm)\n";
+    py += "\t\t\td.text = __ct_text\n";
+    py += "\t\t\td.dock = n\n";
+    py += "\t\t\td.expose = True\n";
+    py += "\t\t\td.viewer = True\n";
+    py += "\t\t\td.showDocked = True\n";   // 開いたチップ=すぐ編集できる
+    py += "\t\tn.par.Textdat = nm\n";
     py += "except Exception:\n";
     py += "\timport traceback as __ct_tb\n";
     py += "\t__ct_err = __ct_tb.format_exc()\n";

@@ -2676,3 +2676,9 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   縁取り(embolden+stroke幅で膨張)→ 合成ボールド(embolden幅・単色/グラデ対応)→ 本文。
   マスクのバッキングは NSData 保持(CGDataProviderの生存問題を回避)
 - 実測(M2): SF Weight900 + Embolden 6px でウェイト上限超えの極太を視認、Tracking -40 の重なり詰めOK
+
+### 2026-07-23 CoreText TOP: Edit Text が既存の Text DAT 接続を上書きする問題を修正
+
+- ユーザー「EditTextを押すと coretext1_text に強制的に繋がっちゃう」→ 生成スニペットを
+  **Textdat パラメータが空のときだけ生成・接続**するよう修正(接続済みなら何もしない)
+- 実測: 自前DAT接続中にパルス→接続維持・_text未生成 / 空でパルス→従来どおり自動生成・接続
