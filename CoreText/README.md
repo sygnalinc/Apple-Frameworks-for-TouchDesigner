@@ -30,6 +30,7 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | ページ | パラメータ | 説明 |
 |---|---|---|
 | CoreText | Text / Text DAT | 描画テキスト。DAT指定時はDAT優先(複数行向け) |
+| | Edit Text (live Text DAT) | **リアルタイム入力用**。押すと編集用Text DATがドックチップとして自動生成・接続され、**タイプごとに即レンダ反映**(Text欄はEnter確定のため) |
 | | Font | フォントパネルで選んだ結果の表示欄(PostScript名・手入力も可。空=SF) |
 | | Font File | .ttf/.otf/.ttc の直接指定(Fontより優先・未インストール可) |
 | | Choose Font (macOS Font Panel) | **macOS標準フォントパネル**を開く。選択すると Font/Font Size に自動反映 |

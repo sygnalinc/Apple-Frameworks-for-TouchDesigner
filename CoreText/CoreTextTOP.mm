@@ -63,6 +63,47 @@ static void applyPanelFontToNode(const TD::OP_NodeInfo* node, const std::string&
     PyGILState_Release(g);
 }
 
+// cook(TDコンテキスト)から呼ぶ: ライブ編集用の Text DAT を自動生成し、
+// 開いたドックチップとして接続する(タイプごとに反映される。パラメータ欄はEnter確定のため)
+static void createLiveTextDAT(const TD::OP_NodeInfo* node, const char* currentText)
+{
+    if (!node || !node->context) return;
+    PyGILState_STATE g = PyGILState_Ensure();
+    std::string py;
+    py += "try:\n";
+    py += "\timport td\n";
+    py += "\tn = __ct_node\n";
+    py += "\tp = n.parent()\n";
+    py += "\tnm = n.name + '_text'\n";
+    py += "\td = p.op(nm)\n";
+    py += "\tif not d:\n";
+    py += "\t\td = p.create(td.textDAT, nm)\n";
+    py += "\t\td.text = __ct_text\n";
+    py += "\t\td.dock = n\n";
+    py += "\t\td.expose = True\n";
+    py += "\t\td.viewer = True\n";
+    py += "\t\td.showDocked = True\n";   // 開いたチップ=すぐ編集できる
+    py += "\tn.par.Textdat = nm\n";
+    py += "except Exception:\n";
+    py += "\timport traceback as __ct_tb\n";
+    py += "\t__ct_err = __ct_tb.format_exc()\n";
+    PyObject* main = PyImport_AddModule("__main__");
+    PyObject* dict = main ? PyModule_GetDict(main) : nullptr;
+    PyObject* args = node->context->createArgumentsTuple(0, nullptr);
+    PyObject* txt = PyUnicode_FromString(currentText ? currentText : "");
+    if (dict && args && txt) {
+        PyDict_SetItemString(dict, "__ct_node", PyTuple_GET_ITEM(args, 0));
+        PyDict_SetItemString(dict, "__ct_text", txt);
+        PyObject* r = PyRun_String(py.c_str(), Py_file_input, dict, dict);
+        if (r) Py_DECREF(r); else PyErr_Clear();
+        PyDict_DelItemString(dict, "__ct_node");
+        PyDict_DelItemString(dict, "__ct_text");
+    }
+    if (txt) Py_DECREF(txt);
+    if (args) Py_DECREF(args);
+    PyGILState_Release(g);
+}
+
 @interface CTFontPanelBridge : NSObject
 @end
 @implementation CTFontPanelBridge
@@ -581,6 +622,11 @@ public:
         }
         Style st;
         st.text = in->getParString("Text") ? in->getParString("Text") : "";
+        // Edit Text: ライブ編集用の Text DAT を生成・接続(cook文脈で実行)
+        if (myEditTextPending) {
+            myEditTextPending = false;
+            createLiveTextDAT(myNodeInfo, st.text.c_str());
+        }
         // Text DAT があれば優先(セルを行/タブで連結)
         if (const OP_DATInput* d = in->getParDAT("Textdat")) {
             std::string t;
@@ -662,6 +708,7 @@ public:
         const char* P = "CoreText";
         { OP_StringParameter p("Text"); p.label = "Text"; p.page = P; p.defaultValue = "CoreText"; m->appendString(p); }
         { OP_StringParameter p("Textdat"); p.label = "Text DAT (overrides Text)"; p.page = P; m->appendDAT(p); }
+        { OP_NumericParameter p("Edittext"); p.label = "Edit Text (live Text DAT)"; p.page = P; m->appendPulse(p); }
         // Font はフォントパネルで選んだ結果の表示欄(PostScript名・手入力も可。空=SFシステムフォント)
         { OP_StringParameter p("Font"); p.label = "Font (from Font Panel)"; p.page = P; m->appendString(p); }
         { OP_StringParameter p("Fontfile"); p.label = "Font File (.ttf/.otf, overrides Font)"; p.page = P; m->appendFile(p); }
@@ -709,6 +756,7 @@ public:
 
     // macOS標準フォントパネルを開く。選択は changeFont: → cook経由で Font/Fontsize へ反映
     void pulsePressed(const char* name, void*) override {
+        if (strcmp(name, "Edittext") == 0) { myEditTextPending = true; return; }
         if (strcmp(name, "Fontpanel") != 0) return;
         const OP_NodeInfo* node = myNodeInfo;
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -762,6 +810,7 @@ private:
 
     const OP_NodeInfo* myNodeInfo = nullptr;   // フォントパネルからのパラメータ書き戻し用
     uint64_t myPanelApplied = 0;               // 適用済みのパネル選択シリアル
+    bool myEditTextPending = false;            // Edit Text パルスの保留
     TOP_Context* myContext = nullptr;
     std::thread myThread; std::mutex myMutex; std::condition_variable myCond;
     bool myQuit = false, myPending = false, myBusy = false;

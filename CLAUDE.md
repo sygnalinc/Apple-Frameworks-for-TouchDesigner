@@ -2656,3 +2656,13 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   MaximumLineHeight で行高自体を詰める方式に変更。natural line height は
   CTFontGetAscent+Descent+Leading から算出
 - 実測(M2・TD実機): lh 1.0→1.8 で1行目の位置が完全一致・行間のみ拡大
+
+### 2026-07-23 CoreText TOP: リアルタイムテキスト入力(Edit Text→ライブText DAT)
+
+- ユーザー「Text Fieldに入力したらリアルタイムに反映されて欲しい」。TDの文字列パラメータ欄は
+  **Enter/フォーカスアウトで確定**のため、パラメータ入力自体のライブ化は不可(TD仕様)。
+  代わりに **Text DAT はタイプごとに内容が反映される**(GLSLシェーダのライブ編集と同じ)ことを利用
+- `Edit Text (live Text DAT)` パルスを追加: 現在の Text 内容入りの `<node名>_text`(Text DAT)を
+  **開いたドックチップ**として自動生成し Textdat パラメータへ接続(cook文脈のPyRun・二重生成ガード)。
+  DATへの入力は1文字ごとにシグネチャ検知→再レンダ
+- 実測(M2・TD実機): パルス→DAT生成・接続、1文字ずつの追記が全て即レンダ反映
