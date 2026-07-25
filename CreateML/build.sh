@@ -3,6 +3,7 @@
 # dylib は epoch 名(TD/dyld の install name キャッシュ対策)
 set -e
 cd "$(dirname "$0")"
+source ../common/version.sh
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
 NAME=CreateMLDAT
 OUT="build/$NAME.plugin/Contents"
@@ -37,3 +38,4 @@ PLIST
 
 codesign --force --deep -s - "build/$NAME.plugin"
 echo "built: $(pwd)/build/$NAME.plugin ($DYLIB)"
+td_stamp_all

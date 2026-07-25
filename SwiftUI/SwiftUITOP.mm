@@ -126,6 +126,8 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     i->customOPInfo.opIcon->setString("SUI");
     if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/SwiftUI/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
+    i->customOPInfo.majorVersion = 0;
+    i->customOPInfo.minorVersion = 9;
     i->customOPInfo.minInputs = 0; i->customOPInfo.maxInputs = 0;
 }
 DLLEXPORT TOP_CPlusPlusBase* CreateTOPInstance(const OP_NodeInfo* i, TOP_Context* c) { return new SwiftUITOP(i, c); }

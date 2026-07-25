@@ -89,3 +89,22 @@ cp -R <Name>/build/<Name>.plugin \
 - 5GB級を誤って `git add` するとハングする。中断後は `.git/objects/pack/tmp_pack_*` を掃除
 - コミットメッセージは日本語で「何を・なぜ」。実測値があれば入れる。**このリポジトリは
   ブランチを切らず main へ直接コミット**
+
+## バージョン付け(0.9.0 以降の規約)
+
+バージョンは**3層**あり、意味が違う。単一ソースは**リポジトリ直下の `VERSION` ファイル**。
+
+| 層 | 値 | 上げ方 |
+|---|---|---|
+| リポジトリ(gitタグ) | `VERSION`(例 `0.9.0`)→ `git tag v0.9.0` | op追加=minor / 修正=patch / opType変更=破壊的 |
+| バンドル(Info.plist) | `CFBundleShortVersionString`=VERSION、`CFBundleVersion`=`git rev-list --count HEAD` | ビルド時に自動 |
+| オペレータ(`customOPInfo`) | `majorVersion` / `minorVersion` | **opごとに独立** |
+
+- ビルドスクリプトは `source ../common/version.sh` して、**.plugin 生成後に `td_stamp_all`** を呼ぶ
+  (`common/build_plugin.sh` 経由なら自動。独自plistのbuild.shは末尾で呼ぶ)。
+  **Info.plist を書き換えると署名が壊れる**ので、`td_stamp_version` は書き込み後に必ず再署名する
+- **`majorVersion` を一斉に上げてはいけない**。TDは `.toe` に保存された major と
+  インストール済みプラグインの major が**一致すること**を期待するため、無関係なopまで上げると
+  既存プロジェクトが軒並み非互換扱いになる。**後方互換でない変更をしたそのopだけ +1** する
+- `minorVersion` はリリースの minor に合わせる(TDは「.toe保存時 ≦ インストール版」を期待)
+- 新規プラグインを追加したら `authorName` の直後に major/minor の2行を必ず入れる

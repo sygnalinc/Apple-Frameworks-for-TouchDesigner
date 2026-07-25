@@ -134,6 +134,8 @@ DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* i) {
     i->customOPInfo.opIcon->setString("SIX");
     if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/Spotlight/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
+    i->customOPInfo.majorVersion = 0;
+    i->customOPInfo.minorVersion = 9;
     i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=0;
 }
 DLLEXPORT DAT_CPlusPlusBase* CreateDATInstance(const OP_NodeInfo* i) { return new SpotlightDAT(i); }

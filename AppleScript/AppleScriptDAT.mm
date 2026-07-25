@@ -234,6 +234,8 @@ DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* info)
     info->customOPInfo.opType->setString("Applescript");
     info->customOPInfo.opLabel->setString("AppleScript");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
+    info->customOPInfo.majorVersion = 0;
+    info->customOPInfo.minorVersion = 9;
     info->customOPInfo.opIcon->setString("ASC");
     if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/AppleScript/README.md");
     info->customOPInfo.minInputs = 0;

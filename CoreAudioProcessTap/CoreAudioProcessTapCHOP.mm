@@ -147,6 +147,8 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* i) {
     i->customOPInfo.opIcon->setString("PAU");
     if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/CoreAudioProcessTap/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
+    i->customOPInfo.majorVersion = 0;
+    i->customOPInfo.minorVersion = 9;
     i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=0;
 }
 DLLEXPORT CHOP_CPlusPlusBase* CreateCHOPInstance(const OP_NodeInfo* i) { return new CoreAudioTapCHOP(i); }

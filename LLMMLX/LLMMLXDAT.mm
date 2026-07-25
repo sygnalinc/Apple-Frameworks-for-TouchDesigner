@@ -648,6 +648,8 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     info->customOPInfo.opType->setString("Llmmlx");
     info->customOPInfo.opLabel->setString("LLM MLX");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
+    info->customOPInfo.majorVersion = 0;
+    info->customOPInfo.minorVersion = 9;
     info->customOPInfo.opIcon->setString("MLX");
     if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/LLMMLX/README.md");
     info->customOPInfo.minInputs = 0;

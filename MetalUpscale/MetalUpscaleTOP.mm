@@ -783,6 +783,8 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->customOPInfo.opType->setString("Metalupscale");
     info->customOPInfo.opLabel->setString("Metal Upscale");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
+    info->customOPInfo.majorVersion = 0;
+    info->customOPInfo.minorVersion = 9;
     info->customOPInfo.opIcon->setString("MUP");
     if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/MetalUpscale/README.md");
     info->customOPInfo.minInputs = 1;

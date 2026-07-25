@@ -602,6 +602,8 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     info->customOPInfo.opType->setString("Textanalyze");
     info->customOPInfo.opLabel->setString("Text Analyze");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
+    info->customOPInfo.majorVersion = 0;
+    info->customOPInfo.minorVersion = 9;
     info->customOPInfo.opIcon->setString("TXA");
     if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/TextAnalyze/README.md");
     info->customOPInfo.minInputs = 0;

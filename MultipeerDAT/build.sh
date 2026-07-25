@@ -3,6 +3,7 @@
 set -e
 cd "$(dirname "$0")"
 
+source ../common/version.sh
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
 rm -rf build
 
@@ -34,3 +35,4 @@ PLIST
 
 build_one MultipeerInDAT  MultipeerInDAT.mm  multipeerin-dat
 build_one MultipeerOutDAT MultipeerOutDAT.mm multipeerout-dat
+td_stamp_all

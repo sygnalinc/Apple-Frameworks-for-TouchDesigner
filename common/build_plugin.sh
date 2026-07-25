@@ -11,6 +11,8 @@
 # 前提: Xcode（clang++）と TouchDesigner.app（C++ SDK ヘッダを流用）
 set -e
 
+source "$(dirname "${(%):-%N}")/version.sh"
+
 TD_SDK="${TD_SDK:-/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP}"
 
 build_td_plugin() {
@@ -53,6 +55,7 @@ build_td_plugin() {
 </plist>
 PLIST
 
+    td_stamp_version "build/$name.plugin"   # バージョンを焼いてから署名
     codesign --force -s - "build/$name.plugin"
     echo "built: $(pwd)/build/$name.plugin"
 }

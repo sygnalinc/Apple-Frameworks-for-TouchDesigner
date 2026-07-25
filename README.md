@@ -25,6 +25,7 @@ grouped by category.
 - [As a macOS alternative to NVIDIA-only OPs](#as-a-macos-alternative-to-nvidia-only-ops)
 - [Plugin catalog](#plugin-catalog)
 - [Getting started](#getting-started)
+- [Versioning](#versioning)
 - [Requirements](#requirements)
 - [Writing your own plugin](#writing-your-own-plugin)
 - [License](#license)
@@ -187,6 +188,28 @@ TouchDesigner 2023 or later.
 
 Model-based plugins (CoreML / CoreML SAM2 / CoreML ImageGen…) need an Apple Core ML model
 placed in `models/` (gitignored) — see each plugin's README for the download link.
+
+## Versioning
+
+Current release: **0.9.0** (see [`VERSION`](VERSION))
+
+| Layer | Value | Rule |
+|---|---|---|
+| Repository (git tag) | `v0.9.0` | Adding operators / features bumps **minor**, fixes bump **patch**. Renaming or removing an `opType` is a **breaking** change and is called out in the release notes. |
+| Bundle (`Info.plist`) | `CFBundleShortVersionString` = repo version, `CFBundleVersion` = git commit count | Stamped automatically by `common/version.sh` at build time. |
+| Operator (`customOPInfo`) | `majorVersion = 0`, `minorVersion = 9` | **Per operator.** TouchDesigner compares these with the values saved in a `.toe`. Bump `majorVersion` **only** for that one operator when a change is not backwards compatible (parameter removed / semantics changed). |
+
+**Why 0.x:** operator names (`opType`) are the public API here, and several were renamed,
+merged or removed during early development — each of which breaks `.toe` files that
+referenced them. The API is not frozen yet.
+
+**Road to 1.0.0**
+
+1. Freeze operator naming (`opType` / `opLabel`)
+2. Verify the remaining hardware / material dependent operators on real data
+   (Image Capture, CoreLocation Beacon, AudioToolbox Mix with 4-ch FOA …)
+3. Ship a **Developer ID signed + notarized** release archive (builds are ad-hoc signed today)
+4. Keep `sample.toe` usage examples working against the frozen names
 
 ## Requirements
 

@@ -2,6 +2,7 @@
 # Spatial Video TOP(旧 Spatial Video DAT のメタデータは Info CHOP / Info DAT に統合済み)。
 set -e
 cd "$(dirname "$0")"
+source ../common/version.sh
 SDK_TOP="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP"
 rm -rf build
 
@@ -33,3 +34,4 @@ PLIST
 
 build_one SpatialVideoTOP SpatialVideoTOP.mm "$SDK_TOP" spatialvideo-top
 echo "done"
+td_stamp_all

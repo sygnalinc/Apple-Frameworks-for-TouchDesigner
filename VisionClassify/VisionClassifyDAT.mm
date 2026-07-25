@@ -127,6 +127,8 @@ extern "C" {
 DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* i) { if(!i->setAPIVersion(DATCPlusPlusAPIVersion))return;
  i->customOPInfo.opType->setString("Visionclassify"); i->customOPInfo.opLabel->setString("Vision Classify");
  i->customOPInfo.opIcon->setString("VCL"); i->customOPInfo.authorName->setString("SYGNAL Inc.");
+ i->customOPInfo.majorVersion = 0;
+ i->customOPInfo.minorVersion = 9;
  if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/VisionClassify/README.md");
  i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=0; }
 DLLEXPORT DAT_CPlusPlusBase* CreateDATInstance(const OP_NodeInfo* i){return new VisionClassifyDAT(i);}

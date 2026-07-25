@@ -398,6 +398,8 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     info->customOPInfo.opType->setString("Soundclass");
     info->customOPInfo.opLabel->setString("Sound Class");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
+    info->customOPInfo.majorVersion = 0;
+    info->customOPInfo.minorVersion = 9;
     info->customOPInfo.opIcon->setString("SND");
     if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/SoundClass/README.md");
     info->customOPInfo.minInputs = 1;

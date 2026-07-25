@@ -97,6 +97,8 @@ DLLEXPORT void FillSOPPluginInfo(SOP_PluginInfo* i) {
     i->customOPInfo.opIcon->setString("GPP");
     if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/GameplayKitPath/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
+    i->customOPInfo.majorVersion = 0;
+    i->customOPInfo.minorVersion = 9;
     i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=1;
 }
 DLLEXPORT SOP_CPlusPlusBase* CreateSOPInstance(const OP_NodeInfo* i) { return new GameplayKitPathSOP(i); }

@@ -4,6 +4,7 @@
 set -e
 cd "$(dirname "$0")"
 
+source ../common/version.sh
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
 NAME=LLMAFMDAT
 DYLIB="libFMHelper_$(date +%s).dylib"
@@ -44,3 +45,4 @@ PLIST
 
 codesign --force --deep -s - "build/$NAME.plugin"
 echo "built: $(pwd)/build/$NAME.plugin"
+td_stamp_all

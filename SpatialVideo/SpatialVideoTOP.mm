@@ -535,6 +535,8 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* info)
     info->customOPInfo.opIcon->setString("SPV");
     if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/SpatialVideo/README.md");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
+    info->customOPInfo.majorVersion = 0;
+    info->customOPInfo.minorVersion = 9;
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
     info->customOPInfo.pythonCallbacksDAT = PythonCallbacksDATStubs;

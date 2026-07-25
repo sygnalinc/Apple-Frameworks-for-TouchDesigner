@@ -3,6 +3,7 @@
 # dylib は epoch 名(TD/dyld の install name キャッシュ対策)。
 set -e
 cd "$(dirname "$0")"
+source ../common/version.sh
 SDK_TOP="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP"
 EPOCH=$(date +%s)
 rm -rf build
@@ -36,3 +37,4 @@ cat > "$OUT/Info.plist" <<PLIST
 PLIST
 codesign --force --deep -s - "build/$NAME.plugin"
 echo "built: $(pwd)/build/$NAME.plugin ($EPOCH)"
+td_stamp_all

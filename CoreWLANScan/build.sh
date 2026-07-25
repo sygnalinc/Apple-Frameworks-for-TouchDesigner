@@ -35,3 +35,4 @@ codesign --force -s - "$APP"
 # プラグイン全体を再署名(ヘルパー同梱後)
 codesign --force --deep -s - "build/CoreWLANScanCHOP.plugin"
 echo "bundled wifiscan-helper.app"
+td_stamp_all

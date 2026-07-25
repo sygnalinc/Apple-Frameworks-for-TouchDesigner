@@ -323,6 +323,8 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     info->customOPInfo.opType->setString("Visionpose3d");
     info->customOPInfo.opLabel->setString("Vision Pose 3D");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
+    info->customOPInfo.majorVersion = 0;
+    info->customOPInfo.minorVersion = 9;
     info->customOPInfo.opIcon->setString("VPD");if(info->customOPInfo.opHelpURL)info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/VisionPose3D/README.md");   // アイコンは英字のみ(数字はTD起動時の検証で弾かれる)
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;

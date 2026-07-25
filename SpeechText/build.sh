@@ -5,6 +5,7 @@
 set -e
 cd "$(dirname "$0")"
 
+source ../common/version.sh
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
 NAME=SpeechTextDAT
 OUT="build/$NAME.plugin/Contents"
@@ -53,3 +54,4 @@ PLIST
 
 codesign --force --deep -s - "build/$NAME.plugin"
 echo "built: $(pwd)/build/$NAME.plugin ($SPDYLIB / $WKDYLIB)"
+td_stamp_all

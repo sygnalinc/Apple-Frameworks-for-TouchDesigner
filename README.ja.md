@@ -23,6 +23,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 - [Nvidia専用OPの macOS 代替として](#nvidia専用opの-macos-代替として)
 - [プラグイン一覧](#プラグイン一覧)
 - [使い方](#使い方)
+- [バージョン](#バージョン)
 - [必要環境](#必要環境)
 - [プラグインを自作する人へ](#プラグインを自作する人へ)
 - [ライセンス](#ライセンス)
@@ -184,6 +185,27 @@ cd VisionPose && ./build.sh      # → VisionPose/build/VisionPoseCHOP.plugin
 
 モデルを使うプラグイン(CoreML / CoreML SAM2 / CoreML ImageGen 等)は、各 README のリンク先から
 Apple公式の Core ML モデルを `models/`(gitignore)へ置いてください。
+
+## バージョン
+
+現在のリリース: **0.9.0**([`VERSION`](VERSION))
+
+| 層 | 値 | ルール |
+|---|---|---|
+| リポジトリ(gitタグ) | `v0.9.0` | op追加・機能追加で **minor**、修正で **patch**。`opType` のリネーム/削除は**破壊的変更**としてリリースノートに明記 |
+| バンドル(`Info.plist`) | `CFBundleShortVersionString` = リポジトリ版 / `CFBundleVersion` = gitコミット数 | ビルド時に `common/version.sh` が自動で焼き込む |
+| オペレータ(`customOPInfo`) | `majorVersion = 0` / `minorVersion = 9` | **opごと**。TDが `.toe` 保存値と比較する。後方互換でない変更(パラメータ削除・意味変更)をした**そのopだけ** `majorVersion` を +1 する |
+
+**0.x である理由**: このリポジトリでは opType がユーザーから見た公開APIであり、開発初期に
+リネーム・統合・削除を何度も行った(そのたびに参照していた `.toe` が壊れる)。まだAPIを凍結していない。
+
+**1.0.0 の条件**
+
+1. op命名(`opType` / `opLabel`)の凍結
+2. ハード/素材依存で未検証のopを実データで検証(Image Capture、CoreLocation Beacon、
+   AudioToolbox Mix の4ch FOA など)
+3. **Developer ID 署名 + notarize** 済みの配布アーカイブを用意(現在は ad-hoc 署名)
+4. 凍結後の名前で `sample.toe` の利用例が動作すること
 
 ## 必要環境
 

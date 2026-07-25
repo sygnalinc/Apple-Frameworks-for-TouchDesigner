@@ -1,6 +1,7 @@
 #!/bin/zsh
 set -e
 cd "$(dirname "$0")"
+source ../common/version.sh
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
 NAME=SpeechActivityCHOP
 OUT="build/$NAME.plugin/Contents"
@@ -13,3 +14,4 @@ plutil -create xml1 "$OUT/Info.plist"
 /usr/libexec/PlistBuddy -c 'Add :CFBundleExecutable string SpeechActivityCHOP' -c 'Add :CFBundleIdentifier string tokyo.sygnal.speechactivity-chop' -c 'Add :CFBundleName string SpeechActivityCHOP' -c 'Add :CFBundlePackageType string BNDL' -c 'Add :CFBundleVersion string 0.1.0' "$OUT/Info.plist"
 codesign --force --deep -s - "build/$NAME.plugin"
 echo "built: $(pwd)/build/$NAME.plugin"
+td_stamp_all

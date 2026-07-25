@@ -2,6 +2,7 @@
 # PDFKit TOP(旧 PDFKit DAT の構造テーブルは Info DAT に統合済み)。
 set -e
 cd "$(dirname "$0")"
+source ../common/version.sh
 SDK_TOP="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP"
 rm -rf build
 build_one() {
@@ -24,3 +25,4 @@ PLIST
   echo "built: $(pwd)/build/$NAME.plugin"
 }
 build_one PDFKitTOP PDFKitTOP.mm "$SDK_TOP" pdfkit-top
+td_stamp_all

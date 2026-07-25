@@ -4,6 +4,7 @@
 set -e
 cd "$(dirname "$0")"
 
+source ../common/version.sh
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
 rm -rf build
 
@@ -35,3 +36,4 @@ PLIST
 
 build_one MultipeerInCHOP  MultipeerInCHOP.mm  multipeerin-chop
 build_one MultipeerOutCHOP MultipeerOutCHOP.mm multipeerout-chop
+td_stamp_all

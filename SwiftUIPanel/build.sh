@@ -2,6 +2,7 @@
 # SwiftUI Panel CHOP のビルド → build/SwiftUIPanelCHOP.plugin(Swiftヘルパ同梱)
 set -e
 cd "$(dirname "$0")"
+source ../common/version.sh
 SDK_CHOP="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
 EPOCH=$(date +%s)
 rm -rf build
@@ -35,3 +36,4 @@ cat > "$OUT/Info.plist" <<PLIST
 PLIST
 codesign --force --deep -s - "build/$NAME.plugin"
 echo "built: $(pwd)/build/$NAME.plugin ($EPOCH)"
+td_stamp_all

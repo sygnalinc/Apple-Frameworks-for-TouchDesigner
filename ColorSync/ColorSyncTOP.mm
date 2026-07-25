@@ -127,6 +127,8 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     i->customOPInfo.opIcon->setString("CSY");
     if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/ColorSync/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
+    i->customOPInfo.majorVersion = 0;
+    i->customOPInfo.minorVersion = 9;
     i->customOPInfo.minInputs=1; i->customOPInfo.maxInputs=1;
 }
 DLLEXPORT TOP_CPlusPlusBase* CreateTOPInstance(const OP_NodeInfo* i, TOP_Context* c) { return new ColorSyncTOP(i,c); }
