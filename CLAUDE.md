@@ -2741,3 +2741,23 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **パラメータの「値」は非ASCIIでも正常**(Text欄の日本語、Ellipsis既定値の `…` は表示・描画とも問題なし)。
   化けるのは**ラベル**(表示名・メニュー項目名)のみ
 - skill naming.md に「UIラベルはASCIIのみ(記号含む)」+ 検出用grepを追記
+
+### 2026-07-23 CoreText TOP: リッチテキスト / ルビ / シェイプ組版を追加(要望 1-2-5)
+
+- ユーザー選択の3機能を実装。全てM2実機で視認検証済み
+- **① リッチテキスト(Style DAT)**: 1行=1範囲スタイルのテーブル。範囲は `text`(部分文字列の
+  全出現)または `start`/`length`(**合成文字単位**なので絵文字も1文字)。列は
+  `r g b a / size / weight / italic / font / tracking / underline / ruby / rubysize / upright`。
+  実装は `CFAttributedStringCreateMutableCopy` に範囲ごとの属性を上書き
+  (フォントは Style をコピーして `makeFont` を再利用)。実測: 「夜景」だけ赤・150px・W900、
+  「Neon」だけ青・下線 を1ノードで描画
+- **② ルビ(振り仮名)**: `CTRubyAnnotationCreateWithAttributes` + `kCTRubyAnnotationAttributeName`。
+  `kCTRubyAnnotationSizeFactorAttributeName` で相対サイズ。実測: 横書き=上、縦書き=右に正しく配置
+- **縦中横は非対応と判明**: Core Text に TCY のAPIが無い。`kCTVerticalFormsAttributeName` を
+  false にすると期待と逆(数字が90°回転)だったため、列名を `tcy` → **`upright`**(1=縦組み形で
+  正立 / 0=横組み形で回転)に改めて意味を正確化。READMEにも非対応と明記
+- **③ シェイプ組版**: `CTFramesetterCreateFrame` は**矩形以外の任意 CGPath を受け付ける**。
+  `Layout Shape`(rect/ellipse/rounded/polygon/path)+ Path DAT(uv点列)を追加。
+  実測: 楕円・六角形・星形で行長が形に追従。矩形以外では Vertical Align の矩形縮小をスキップ
+- **TD再起動を避ける検証テク**: 新バイナリを `/tmp/.../ctv2/` にコピーし、素の `cplusplusTOP` の
+  Plugin Path で読ませると**再起動なしで新パラメータを検証できる**(同一パスはTDがキャッシュするため)

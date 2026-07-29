@@ -125,6 +125,20 @@ static CTFontPanelBridge* gPanelBridge = nil;
 
 namespace {
 
+// Style DAT の1行 = 範囲スタイル。リッチテキスト(範囲ごとの色/サイズ/フォント)+ ルビ + 縦中横
+struct StyleRun {
+    std::string match;                 // text列: この部分文字列の全出現に適用
+    int start = -1, length = -1;       // start/length列: 文字インデックス(合成文字単位)
+    std::string font;                  // 空=継承
+    float size = 0, weight = 0;        // 0=継承
+    int italic = -1, underline = -1;   // -1=継承
+    bool hasColor = false; float rgba[4] = {1,1,1,1};
+    bool hasTracking = false; float tracking = 0;
+    std::string ruby;                  // ルビ(振り仮名)
+    float rubySize = 0.5f;             // ルビの相対サイズ
+    int upright = -1;                  // 縦書き時のグリフ形: 1=縦組み形(正立) 0=横組み形(90°回転)
+};
+
 struct Style {
     std::string text, fontName, fontFile;
     bool palt = false;                 // プロポーショナルメトリクス(OpenType 'palt'。自動文字詰め)
@@ -133,6 +147,11 @@ struct Style {
     int alignH = 1, alignV = 1;        // 0=left/top 1=center/middle 2=right/bottom 3=justified(Hのみ)
     bool italic = false, vertical = false, autofit = false;
     int truncate = 0;                  // 0=off 1=tail 2=head 3=middle(領域に収まらない時の省略)
+    std::vector<StyleRun> runs;        // リッチテキスト/ルビ/縦中横(Style DAT)
+    std::string runsSig;               // runs の変更検知用
+    int shape = 0;                     // 0=rect 1=ellipse 2=rounded 3=polygon 4=path DAT
+    int shapeSides = 6; float shapeRound = 0.25f, shapeRotate = 0;
+    std::vector<std::pair<float,float>> shapePath;   // shape=4 のuv点列
     std::string ellipsis = "…";       // 省略記号
     int wrapMode = 0;                  // 0=wrap 1=nowrap 2=balance 3=pretty 4=stable(=wrap)
     float padding = 20;
@@ -157,7 +176,9 @@ struct Style {
                  strokeWidth, strokeRGBA[0],strokeRGBA[1],strokeRGBA[2],strokeRGBA[3],
                  shadow, shadowRGBA[0],shadowRGBA[1],shadowRGBA[2],shadowRGBA[3],
                  shadowX, shadowY, shadowBlur + embolden * 1000.0f, w, h);
-        return text + "\x1f" + fontFile + "\x1f" + ellipsis + "\x1f"
+        char sh[128];
+        snprintf(sh, sizeof sh, "|s%d|%d|%.3f|%.1f|%zu", shape, shapeSides, shapeRound, shapeRotate, shapePath.size());
+        return text + "\x1f" + fontFile + "\x1f" + ellipsis + "\x1f" + runsSig + "\x1f" + sh + "\x1f"
              + (palt ? "P" : "p") + (autofit ? "F" : "f") + std::to_string(truncate) + "\x1f" + b;
     }
 };
@@ -293,9 +314,107 @@ static CFAttributedStringRef makeAttrStringFrom(const Style& st, CTFontRef font,
     CGColorRef fill = makeColor(st.fontRGBA);
     CFDictionarySetValue(a, kCTForegroundColorAttributeName, fill); CGColorRelease(fill);
 
-    CFAttributedStringRef s = CFAttributedStringCreate(nullptr, text, a);
-    CFRelease(a); CFRelease(para); CFRelease(text);
-    return s;
+    CFAttributedStringRef base = CFAttributedStringCreate(nullptr, text, a);
+    CFRelease(a); CFRelease(para);
+    if (st.runs.empty()) { CFRelease(text); return base; }
+
+    // --- リッチテキスト / ルビ / 縦中横: Style DAT の各行を範囲へ適用 ---
+    CFMutableAttributedStringRef m = CFAttributedStringCreateMutableCopy(nullptr, 0, base);
+    CFRelease(base);
+    CFAttributedStringBeginEditing(m);
+    const CFIndex len = CFStringGetLength(text);
+
+    // 文字インデックス(合成文字単位)→ UTF-16 オフセット
+    auto charToUTF16 = [&](int charIdx) -> CFIndex {
+        if (charIdx <= 0) return 0;
+        CFIndex i = 0; int n = 0;
+        while (i < len && n < charIdx) {
+            CFRange r = CFStringGetRangeOfComposedCharactersAtIndex(text, i);
+            i = r.location + r.length; n++;
+        }
+        return i;
+    };
+
+    for (const StyleRun& run : st.runs) {
+        // 適用範囲の決定(text列は全出現・start/length列は文字インデックス)
+        std::vector<CFRange> ranges;
+        if (!run.match.empty()) {
+            CFStringRef needle = CFStringCreateWithCString(nullptr, run.match.c_str(), kCFStringEncodingUTF8);
+            if (needle && CFStringGetLength(needle) > 0) {
+                CFIndex from = 0;
+                while (from < len) {
+                    CFRange found;
+                    if (!CFStringFindWithOptions(text, needle, CFRangeMake(from, len - from), 0, &found)) break;
+                    ranges.push_back(found);
+                    from = found.location + (found.length > 0 ? found.length : 1);
+                }
+            }
+            if (needle) CFRelease(needle);
+        } else if (run.start >= 0) {
+            CFIndex s0 = charToUTF16(run.start);
+            CFIndex s1 = (run.length >= 0) ? charToUTF16(run.start + run.length) : len;
+            if (s1 > len) s1 = len;
+            if (s0 < s1) ranges.push_back(CFRangeMake(s0, s1 - s0));
+        }
+        if (ranges.empty()) continue;
+
+        // この行のフォント(継承しつつ上書き)
+        CTFontRef runFont = nullptr;
+        if (!run.font.empty() || run.size > 0 || run.weight > 0 || run.italic >= 0) {
+            Style rs = st;
+            rs.runs.clear();
+            if (!run.font.empty()) { rs.fontName = run.font; rs.fontFile.clear(); }
+            if (run.size > 0) rs.fontSize = run.size;
+            if (run.weight > 0) rs.weight = run.weight;
+            if (run.italic >= 0) rs.italic = (run.italic != 0);
+            runFont = makeFont(rs);
+        }
+
+        for (const CFRange& r : ranges) {
+            if (runFont) CFAttributedStringSetAttribute(m, r, kCTFontAttributeName, runFont);
+            if (run.hasColor) {
+                CGColorRef c = makeColor(run.rgba);
+                CFAttributedStringSetAttribute(m, r, kCTForegroundColorAttributeName, c);
+                CGColorRelease(c);
+            }
+            if (run.hasTracking) {
+                CGFloat tr = run.tracking;
+                CFNumberRef n = CFNumberCreate(nullptr, kCFNumberCGFloatType, &tr);
+                CFAttributedStringSetAttribute(m, r, kCTTrackingAttributeName, n); CFRelease(n);
+            }
+            if (run.underline >= 0) {
+                int32_t u = run.underline ? kCTUnderlineStyleSingle : kCTUnderlineStyleNone;
+                CFNumberRef n = CFNumberCreate(nullptr, kCFNumberSInt32Type, &u);
+                CFAttributedStringSetAttribute(m, r, kCTUnderlineStyleAttributeName, n); CFRelease(n);
+            }
+            // 縦書き時のグリフの向き。1=縦組み形(正立)/ 0=横組み形(縦書き中では90°回転)
+            if (run.upright >= 0)
+                CFAttributedStringSetAttribute(m, r, kCTVerticalFormsAttributeName,
+                                               run.upright ? kCFBooleanTrue : kCFBooleanFalse);
+            // ルビ(振り仮名)
+            if (!run.ruby.empty()) {
+                CFStringRef rb = CFStringCreateWithCString(nullptr, run.ruby.c_str(), kCFStringEncodingUTF8);
+                if (rb) {
+                    CGFloat sf = run.rubySize > 0 ? run.rubySize : 0.5;
+                    CFNumberRef sfn = CFNumberCreate(nullptr, kCFNumberCGFloatType, &sf);
+                    CFDictionaryRef attrs = CFDictionaryCreate(nullptr,
+                        (const void**)&kCTRubyAnnotationSizeFactorAttributeName, (const void**)&sfn, 1,
+                        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+                    CTRubyAnnotationRef ruby = CTRubyAnnotationCreateWithAttributes(
+                        kCTRubyAlignmentAuto, kCTRubyOverhangAuto, kCTRubyPositionBefore, rb, attrs);
+                    if (ruby) {
+                        CFAttributedStringSetAttribute(m, r, kCTRubyAnnotationAttributeName, ruby);
+                        CFRelease(ruby);
+                    }
+                    CFRelease(attrs); CFRelease(sfn); CFRelease(rb);
+                }
+            }
+        }
+        if (runFont) CFRelease(runFont);
+    }
+    CFAttributedStringEndEditing(m);
+    CFRelease(text);
+    return m;
 }
 
 static CFAttributedStringRef makeAttrString(const Style& st, CTFontRef font, bool strokeOnly)
@@ -351,6 +470,49 @@ static CGFloat effectiveWrapWidth(CFAttributedStringRef str, const Style& st, CG
     return availW;
 }
 
+// 組版領域の形。CTFramesetterCreateFrame は矩形以外の任意 CGPath を受け付けるので、
+// 円・角丸・多角形・任意点列(Path DAT)にテキストを流し込める
+static CGPathRef makeShapePath(const Style& st, CGRect rect)
+{
+    switch (st.shape) {
+        case 1:   // ellipse
+            return CGPathCreateWithEllipseInRect(rect, nullptr);
+        case 2: { // rounded rect
+            CGFloat r = std::min(rect.size.width, rect.size.height) * 0.5f * st.shapeRound;
+            return CGPathCreateWithRoundedRect(rect, r, r, nullptr);
+        }
+        case 3: { // polygon(矩形に内接)
+            int n = std::max(3, std::min(st.shapeSides, 64));
+            CGMutablePathRef p = CGPathCreateMutable();
+            CGFloat cx = CGRectGetMidX(rect), cy = CGRectGetMidY(rect);
+            CGFloat rx = rect.size.width * 0.5f, ry = rect.size.height * 0.5f;
+            double rot = st.shapeRotate * M_PI / 180.0 + M_PI_2;   // 既定で頂点が上
+            for (int i = 0; i < n; i++) {
+                double a = rot + 2.0 * M_PI * i / n;
+                CGFloat x = cx + rx * (CGFloat)cos(a), y = cy + ry * (CGFloat)sin(a);
+                if (i == 0) CGPathMoveToPoint(p, nullptr, x, y);
+                else        CGPathAddLineToPoint(p, nullptr, x, y);
+            }
+            CGPathCloseSubpath(p);
+            return p;
+        }
+        case 4: { // Path DAT の uv 点列(0..1 を rect にマップ)
+            if (st.shapePath.size() < 3) break;
+            CGMutablePathRef p = CGPathCreateMutable();
+            for (size_t i = 0; i < st.shapePath.size(); i++) {
+                CGFloat x = rect.origin.x + st.shapePath[i].first  * rect.size.width;
+                CGFloat y = rect.origin.y + st.shapePath[i].second * rect.size.height;
+                if (i == 0) CGPathMoveToPoint(p, nullptr, x, y);
+                else        CGPathAddLineToPoint(p, nullptr, x, y);
+            }
+            CGPathCloseSubpath(p);
+            return p;
+        }
+        default: break;
+    }
+    return CGPathCreateWithRect(rect, nullptr);
+}
+
 // フレーム作成(縦書きは progression RightToLeft)+ 縦位置合わせ
 static CTFrameRef makeFrame(CFAttributedStringRef str, const Style& st, int* outLines)
 {
@@ -386,7 +548,9 @@ static CTFrameRef makeFrame(CFAttributedStringRef str, const Style& st, int* out
     } else if (!st.vertical && st.alignV == 0) {
         // top は既定(上詰め)
     }
-    CGPathRef path = CGPathCreateWithRect(rect, nullptr);
+    // 矩形以外の形では縦位置合わせの矩形縮小を行わず、領域全体を形に使う
+    if (st.shape != 0) rect = CGRectMake(st.padding, st.padding, availW, availH);
+    CGPathRef path = makeShapePath(st, rect);
     CTFrameRef frame = CTFramesetterCreateFrame(fs, CFRangeMake(0,0), path, frameAttrs);
     if (outLines) *outLines = (int)CFArrayGetCount(CTFrameGetLines(frame));
     CGPathRelease(path);
@@ -812,6 +976,75 @@ public:
             }
             st.text = t;
         }
+        // --- Style DAT: リッチテキスト / ルビ / 縦中横(ヘッダ行で列名を指定)---
+        if (const OP_DATInput* sd = in->getParDAT("Styledat")) {
+            auto col = [&](const char* name) -> int {
+                for (int c = 0; c < sd->numCols; c++) {
+                    const char* h = sd->getCell(0, c);
+                    if (h && strcmp(h, name) == 0) return c;
+                }
+                return -1;
+            };
+            const int cMatch = col("text"), cStart = col("start"), cLen = col("length");
+            const int cFont = col("font"), cSize = col("size"), cWeight = col("weight");
+            const int cItalic = col("italic"), cUnder = col("underline"), cTrack = col("tracking");
+            const int cR = col("r"), cG = col("g"), cB = col("b"), cA = col("a");
+            const int cRuby = col("ruby"), cRubySize = col("rubysize"), cUpright = col("upright");
+            auto cell = [&](int r, int c) -> const char* {
+                if (c < 0 || r >= sd->numRows) return nullptr;
+                const char* v = sd->getCell(r, c);
+                return (v && *v) ? v : nullptr;
+            };
+            for (int r = 1; r < sd->numRows; r++) {
+                StyleRun run;
+                if (const char* v = cell(r, cMatch))  run.match = v;
+                if (const char* v = cell(r, cStart))  run.start = atoi(v);
+                if (const char* v = cell(r, cLen))    run.length = atoi(v);
+                if (const char* v = cell(r, cFont))   run.font = v;
+                if (const char* v = cell(r, cSize))   run.size = (float)atof(v);
+                if (const char* v = cell(r, cWeight)) run.weight = (float)atof(v);
+                if (const char* v = cell(r, cItalic)) run.italic = atoi(v);
+                if (const char* v = cell(r, cUnder))  run.underline = atoi(v);
+                if (const char* v = cell(r, cTrack))  { run.hasTracking = true; run.tracking = (float)atof(v); }
+                if (const char* v = cell(r, cRuby))   run.ruby = v;
+                if (const char* v = cell(r, cRubySize)) run.rubySize = (float)atof(v);
+                if (const char* v = cell(r, cUpright)) run.upright = atoi(v);
+                if (cR >= 0 || cG >= 0 || cB >= 0) {
+                    run.hasColor = true;
+                    run.rgba[0] = cell(r,cR) ? (float)atof(cell(r,cR)) : 1.0f;
+                    run.rgba[1] = cell(r,cG) ? (float)atof(cell(r,cG)) : 1.0f;
+                    run.rgba[2] = cell(r,cB) ? (float)atof(cell(r,cB)) : 1.0f;
+                    run.rgba[3] = cell(r,cA) ? (float)atof(cell(r,cA)) : 1.0f;
+                }
+                if (run.match.empty() && run.start < 0) continue;   // 範囲指定が無い行は無視
+                st.runs.push_back(run);
+                // 変更検知用シグネチャ
+                char b[256];
+                snprintf(b, sizeof b, "|%d,%d,%.1f,%.0f,%d,%d,%.2f,%d%d%d%d,%.2f,%.2f,%.2f,%.2f,%.2f",
+                         run.start, run.length, run.size, run.weight, run.italic, run.underline,
+                         run.tracking, run.hasColor, run.hasTracking, run.upright, (int)run.ruby.size(),
+                         run.rgba[0], run.rgba[1], run.rgba[2], run.rgba[3], run.rubySize);
+                st.runsSig += run.match + run.font + run.ruby + b;
+            }
+        }
+        // --- Shape: 組版領域の形 ---
+        { std::string s = in->getParString("Shape") ? in->getParString("Shape") : "rect";
+          st.shape = (s == "ellipse") ? 1 : (s == "rounded") ? 2 : (s == "polygon") ? 3 : (s == "path") ? 4 : 0; }
+        st.shapeSides  = (int)in->getParInt("Shapesides");
+        st.shapeRound  = (float)in->getParDouble("Shaperound");
+        st.shapeRotate = (float)in->getParDouble("Shaperotate");
+        if (st.shape == 4) {
+            if (const OP_DATInput* pd = in->getParDAT("Shapedat")) {
+                for (int r = 0; r < pd->numRows; r++) {
+                    const char* xs = pd->getCell(r, 0);
+                    const char* ys = pd->numCols > 1 ? pd->getCell(r, 1) : nullptr;
+                    if (!xs || !ys) continue;
+                    if (r == 0 && (strcmp(xs, "x") == 0 || strcmp(xs, "u") == 0)) continue;   // ヘッダ行
+                    st.shapePath.emplace_back((float)atof(xs), (float)atof(ys));
+                }
+                char b[64]; snprintf(b, sizeof b, "|p%zu", st.shapePath.size()); st.runsSig += b;
+            }
+        }
         st.fontName  = in->getParString("Font") ? in->getParString("Font") : "";
         st.fontFile  = in->getParFilePath("Fontfile") ? in->getParFilePath("Fontfile") : "";
         st.palt      = in->getParInt("Palt") != 0;
@@ -887,6 +1120,7 @@ public:
         { OP_StringParameter p("Text"); p.label = "Text"; p.page = P; p.defaultValue = "CoreText"; m->appendString(p); }
         { OP_StringParameter p("Textdat"); p.label = "Text DAT (overrides Text)"; p.page = P; m->appendDAT(p); }
         { OP_NumericParameter p("Edittext"); p.label = "Edit Text (live Text DAT)"; p.page = P; m->appendPulse(p); }
+        { OP_StringParameter p("Styledat"); p.label = "Style DAT (rich text / ruby)"; p.page = P; m->appendDAT(p); }
         // Font はフォントパネルで選んだ結果の表示欄(PostScript名・手入力も可。空=SFシステムフォント)
         { OP_StringParameter p("Font"); p.label = "Font (from Font Panel)"; p.page = P; m->appendString(p); }
         { OP_StringParameter p("Fontfile"); p.label = "Font File (.ttf/.otf, overrides Font)"; p.page = P; m->appendFile(p); }
@@ -915,6 +1149,14 @@ public:
           const char* l[] = {"Off (overflow / clip)","Tail (abc...)","Head (...xyz)","Middle (ab...yz)"};
           m->appendMenu(p, 4, n, l); }
         { OP_StringParameter p("Ellipsis"); p.label = "Ellipsis"; p.page = P; p.defaultValue = "…"; m->appendString(p); }
+        { OP_StringParameter p("Shape"); p.label = "Layout Shape"; p.page = P; p.defaultValue = "rect";
+          const char* n[] = {"rect","ellipse","rounded","polygon","path"};
+          const char* l[] = {"Rectangle","Ellipse","Rounded Rect","Polygon","Path DAT (uv points)"};
+          m->appendMenu(p, 5, n, l); }
+        { OP_NumericParameter p("Shapesides"); p.label = "Polygon Sides"; p.page = P; p.defaultValues[0] = 6; p.minSliders[0] = 3; p.maxSliders[0] = 16; p.minValues[0] = 3; p.clampMins[0] = true; m->appendInt(p); }
+        { OP_NumericParameter p("Shaperound"); p.label = "Corner Round (0-1)"; p.page = P; p.defaultValues[0] = 0.25; p.minSliders[0] = 0; p.maxSliders[0] = 1; m->appendFloat(p); }
+        { OP_NumericParameter p("Shaperotate"); p.label = "Polygon Rotate (deg)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = 0; p.maxSliders[0] = 360; m->appendFloat(p); }
+        { OP_StringParameter p("Shapedat"); p.label = "Path DAT (u v columns)"; p.page = P; m->appendDAT(p); }
         { OP_NumericParameter p("Padding"); p.label = "Padding (px)"; p.page = P; p.defaultValues[0] = 20; p.minSliders[0] = 0; p.maxSliders[0] = 200; p.minValues[0] = 0; p.clampMins[0] = true; m->appendFloat(p); }
 
         const char* S = "Style";
