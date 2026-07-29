@@ -60,7 +60,8 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Polygon Sides / Corner Round / Polygon Rotate | 多角形の辺数 / 角丸(0-1)/ 多角形の回転(度) |
 | | Path DAT (u v / SOP to DAT) | Shape=Path 用の点列。`u v`(0〜1)のほか **SOP to DAT の `P(0)` `P(1)` 列を自動認識**(ヘッダ行は自動判定) |
 | | Normalize Path to Area | 点群のバウンディングボックスを領域に自動フィット(既定On)。**SOPの単位のまま渡せる** |
-| | Padding | 余白(px) |
+| | Padding | 余白(px・4辺共通) |
+| | Padding Left / Right / Top / Bottom | **各辺への追加量**(px)。実効余白 = `Padding` + その辺の追加量。負値で共通値より狭くもできる |
 | Style | Font Color / Background Color | 文字色 / 背景色(既定は透明背景) |
 | | Embolden (px) | **合成ボールド**: マスク膨張でフォントの最大ウェイト以上に太らせる(グラデ/縁取り併用可)。**閉じた内側(oや口の穴)は保護**され潰れない |
 | | Gradient Fill / Color 2 / Angle | グラデーション塗り(Font Color→Color 2・角度0°=上→下) |
@@ -138,6 +139,8 @@ circle SOP → SOP to DAT (extract = points) → CoreText の Path DAT
   Truncate は発動しない。「サイズは固定で入り切らない分は …」なら Auto Fit Off + Truncate を使う
 - 省略は**収まる最大量を二分探索**して求める(合成文字境界にスナップするので絵文字を割らない)。
   実際に省略されたかは Info CHOP `truncated`(0/1)で分かる
+- 余白は **`Padding`(4辺共通)+ 各辺の追加量**の合算。`Padding` だけを使う従来の指定はそのまま動く。
+  余白を変えると**折り返し位置・オートフィット・シェイプの領域も追従**する
 - レンダはワーカースレッド(パラメータ変更のシグネチャ検知)。cook 非ブロック・1〜2フレーム遅延
 
 ## 利用例

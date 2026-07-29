@@ -156,7 +156,8 @@ struct Style {
     std::vector<std::pair<float,float>> shapePath;   // shape=4 のuv点列
     std::string ellipsis = "…";       // 省略記号
     int wrapMode = 0;                  // 0=wrap 1=nowrap 2=balance 3=pretty 4=stable(=wrap)
-    float padding = 20;
+    float padding = 20;                // 共通の余白(4辺)
+    float padL = 20, padR = 20, padT = 20, padB = 20;   // 実効余白(共通 + 各辺の追加量)
     float fontRGBA[4] = {1,1,1,1};
     float bgRGBA[4] = {0,0,0,0};
     bool gradient = false; float gradRGBA[4] = {0.2f,0.5f,1,1}; float gradAngle = 0;
@@ -171,7 +172,7 @@ struct Style {
                  "%.3f%.3f%.3f%.3f|%.3f%.3f%.3f%.3f|%d|%.3f%.3f%.3f%.3f|%.1f|"
                  "%.2f|%.3f%.3f%.3f%.3f|%d|%.3f%.3f%.3f%.3f|%.1f|%.1f|%.1f|%dx%d",
                  fontName.c_str(), fontSize, weight, tracking, lineHeight, ligatures,
-                 alignH, alignV, italic, vertical, wrapMode, padding,
+                 alignH, alignV, italic, vertical, wrapMode, padL + padR * 3 + padT * 7 + padB * 13,
                  fontRGBA[0],fontRGBA[1],fontRGBA[2],fontRGBA[3],
                  bgRGBA[0],bgRGBA[1],bgRGBA[2],bgRGBA[3],
                  gradient, gradRGBA[0],gradRGBA[1],gradRGBA[2],gradRGBA[3], gradAngle,
@@ -549,30 +550,33 @@ static CTFrameRef makeFrame(CFAttributedStringRef str, const Style& st, int* out
                                         &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
         CFRelease(p);
     }
-    CGFloat availW = st.w - st.padding * 2, availH = st.h - st.padding * 2;
+    // CG座標は下原点なので、下辺の余白が rect の原点 y になる
+    CGFloat availW = st.w - st.padL - st.padR, availH = st.h - st.padT - st.padB;
+    if (availW < 1) availW = 1;
+    if (availH < 1) availH = 1;
     // balance / pretty は実効折り返し幅を狭め、Horizontal Align に従って領域内に配置する
     CGFloat effW = effectiveWrapWidth(str, st, availW);
-    CGFloat x = st.padding;
+    CGFloat x = st.padL;
     if (effW < availW) {
-        if (st.alignH == 2) x = st.padding + (availW - effW);            // right
-        else if (st.alignH != 0) x = st.padding + (availW - effW) / 2;   // center / justify
+        if (st.alignH == 2) x = st.padL + (availW - effW);            // right
+        else if (st.alignH != 0) x = st.padL + (availW - effW) / 2;   // center / justify
     }
-    CGRect rect = CGRectMake(x, st.padding, effW, availH);
+    CGRect rect = CGRectMake(x, st.padB, effW, availH);
     if (!st.vertical && st.alignV != 0) {
         // 使用高さを測って top/middle/bottom を実現(CTFrame は常に上詰めのため)
         CGSize used = CTFramesetterSuggestFrameSizeWithConstraints(fs, CFRangeMake(0,0), frameAttrs,
                                                                    CGSizeMake(effW, CGFLOAT_MAX), nullptr);
         CGFloat off = availH - used.height;
         if (off > 0) {
-            if (st.alignV == 1) rect = CGRectMake(x, st.padding + off/2, effW, used.height + 2);
-            else                rect = CGRectMake(x, st.padding, effW, used.height + 2);   // bottom(CG座標は下原点)
+            if (st.alignV == 1) rect = CGRectMake(x, st.padB + off/2, effW, used.height + 2);
+            else                rect = CGRectMake(x, st.padB, effW, used.height + 2);   // bottom(CG座標は下原点)
         }
-        if (st.alignV == 0 && off > 0) rect = CGRectMake(x, st.padding + off, effW, used.height + 2); // top
+        if (st.alignV == 0 && off > 0) rect = CGRectMake(x, st.padB + off, effW, used.height + 2); // top
     } else if (!st.vertical && st.alignV == 0) {
         // top は既定(上詰め)
     }
     // 矩形以外の形では縦位置合わせの矩形縮小を行わず、領域全体を形に使う
-    if (st.shape != 0) rect = CGRectMake(st.padding, st.padding, availW, availH);
+    if (st.shape != 0) rect = CGRectMake(st.padL, st.padB, availW, availH);
     CGPathRef path = makeShapePath(st, rect);
     CTFrameRef frame = CTFramesetterCreateFrame(fs, CFRangeMake(0,0), path, frameAttrs);
     if (outLines) *outLines = (int)CFArrayGetCount(CTFrameGetLines(frame));
@@ -585,7 +589,7 @@ static CTFrameRef makeFrame(CFAttributedStringRef str, const Style& st, int* out
 // 指定文字列が描画領域(解像度-余白)に収まるか。縦書きは幅/高さを入れ替えて判定する
 static bool textFitsInArea(const Style& st, CTFontRef font, CFStringRef text)
 {
-    CGFloat availW = st.w - st.padding * 2, availH = st.h - st.padding * 2;
+    CGFloat availW = st.w - st.padL - st.padR, availH = st.h - st.padT - st.padB;
     if (availW <= 4 || availH <= 4) return true;
     CFAttributedStringRef str = makeAttrStringFrom(st, font, text);
     CTFramesetterRef fs = CTFramesetterCreateWithAttributedString(str);
@@ -680,7 +684,7 @@ static bool applyTruncation(Style& st, CTFontRef font)
 // 縦書きは幅(段数)と高さを入れ替えて判定する。
 static float fitFontSize(const Style& stIn)
 {
-    CGFloat availW = stIn.w - stIn.padding * 2, availH = stIn.h - stIn.padding * 2;
+    CGFloat availW = stIn.w - stIn.padL - stIn.padR, availH = stIn.h - stIn.padT - stIn.padB;
     if (availW <= 4 || availH <= 4 || stIn.text.empty()) return stIn.fontSize;
     auto fits = [&](float s) -> bool {
         Style tmp = stIn; tmp.fontSize = s;
@@ -1133,6 +1137,11 @@ public:
         { std::string s = in->getParString("Textwrap") ? in->getParString("Textwrap") : "wrap";
           st.wrapMode = (s == "nowrap") ? 1 : (s == "balance") ? 2 : (s == "pretty") ? 3 : (s == "stable") ? 4 : 0; }
         st.padding   = (float)in->getParDouble("Padding");
+        // 実効余白 = 共通 Padding + 各辺の追加量(既存の Padding だけの使い方はそのまま動く)
+        st.padL = st.padding + (float)in->getParDouble("Padl");
+        st.padR = st.padding + (float)in->getParDouble("Padr");
+        st.padT = st.padding + (float)in->getParDouble("Padt");
+        st.padB = st.padding + (float)in->getParDouble("Padb");
         readRGBA(in, "Fontcolor", st.fontRGBA);
         readRGBA(in, "Bgcolor", st.bgRGBA);
         st.gradient  = in->getParInt("Gradienton") != 0;
@@ -1226,7 +1235,11 @@ public:
         { OP_NumericParameter p("Shaperotate"); p.label = "Polygon Rotate (deg)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = 0; p.maxSliders[0] = 360; m->appendFloat(p); }
         { OP_StringParameter p("Shapedat"); p.label = "Path DAT (u v / SOP to DAT)"; p.page = P; m->appendDAT(p); }
         { OP_NumericParameter p("Pathnormalize"); p.label = "Normalize Path to Area"; p.page = P; p.defaultValues[0] = 1; m->appendToggle(p); }
-        { OP_NumericParameter p("Padding"); p.label = "Padding (px)"; p.page = P; p.defaultValues[0] = 20; p.minSliders[0] = 0; p.maxSliders[0] = 200; p.minValues[0] = 0; p.clampMins[0] = true; m->appendFloat(p); }
+        { OP_NumericParameter p("Padl"); p.label = "Padding Left (extra px)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = -100; p.maxSliders[0] = 400; m->appendFloat(p); }
+        { OP_NumericParameter p("Padr"); p.label = "Padding Right (extra px)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = -100; p.maxSliders[0] = 400; m->appendFloat(p); }
+        { OP_NumericParameter p("Padt"); p.label = "Padding Top (extra px)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = -100; p.maxSliders[0] = 400; m->appendFloat(p); }
+        { OP_NumericParameter p("Padb"); p.label = "Padding Bottom (extra px)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = -100; p.maxSliders[0] = 400; m->appendFloat(p); }
+        { OP_NumericParameter p("Padding"); p.label = "Padding (px, all sides)"; p.page = P; p.defaultValues[0] = 20; p.minSliders[0] = 0; p.maxSliders[0] = 200; p.minValues[0] = 0; p.clampMins[0] = true; m->appendFloat(p); }
 
         const char* S = "Style";
         { OP_NumericParameter p("Fontcolor"); p.label = "Font Color"; p.page = S;

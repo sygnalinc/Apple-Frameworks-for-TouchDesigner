@@ -2795,3 +2795,13 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   =見た目に変化なしを実測確認(誤解を避けるためREADMEに明記)
 - 実測(M2): Shear X +15/-15、Shear Y +10 で日本語含め正しく傾斜。Shear 18°+縁取り5px+
   Embolden 4px+グラデでも全て追従することを視認
+
+### 2026-07-23 CoreText TOP: 4辺個別の余白(Padding Left/Right/Top/Bottom)を追加
+
+- ユーザー「Paddingは4辺別々に指定できる?」→ 当時は共通1値のみ。**既存 `.toe` を壊さない加算方式**で実装:
+  実効余白 = `Padding`(共通)+ `Padl/Padr/Padt/Padb`(各辺の追加量・既定0)
+- Style に `padL/padR/padT/padB` を持たせ、`makeFrame` / `textFitsInArea` / `fitFontSize` の
+  利用可能領域計算を全て4辺基準に置換(`st.padding * 2` の残存参照ゼロを grep で確認)。
+  **CG座標は下原点**なので rect の原点yは `padB`、alignV の各分岐も padB 基準に修正
+- 実測(M2): 共通20のみ(従来どおり)/ 左+200・上+120 / 右+300(折り返しが早まる)/
+  下+200かつ Alignv=bottom(テキスト下端が画像下端から220px上)を全て視認確認
