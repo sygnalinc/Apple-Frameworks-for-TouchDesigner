@@ -2716,3 +2716,18 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 逐次ビルドは1プラグイン約75秒×81件=100分かかったため、**xargs -P 6 で並列化**して短縮
 - README(英日)に「Versioning / バージョン」節(3層の表 + 0.xの理由 + 1.0.0の条件4項)を追加。
   skill build.md にも規約を追記
+
+### 2026-07-23 CoreText TOP: Truncate(領域に収まらない場合の … 省略)追加
+
+- ユーザー「領域に収まらなかった場合、文字の最後を…にして終わらす事はできますか?」→
+  **Truncate メニュー**(off / tail / head / middle)+ **Ellipsis**(省略記号・既定「…」)を追加。
+  CSS `text-overflow: ellipsis` 相当
+- **実装方針**: CTLine の truncation API ではなく、**収まる最大量を二分探索して st.text を差し替える**
+  方式。これで縁取り/グラデ/Embolden/縦書きなど**既存の全描画パスがそのまま整合**する
+  (全パスが同じ CTFrame を使う設計のため)。判定は `textFitsInArea`(SuggestFrameSize・
+  縦書きは軸入替・nowrapは幅のみ)
+- **絵文字/結合文字を割らない**: UTF-16 の切り出し位置を
+  `CFStringGetRangeOfComposedCharactersAtIndex` で合成文字境界にスナップ
+- Info CHOP に `truncated`(0/1)を追加。実測: 3モードとも領域内に収まり、nowrap 1行・
+  カスタム省略記号・絵文字連続でも正しく省略
+- **Auto Fit との使い分け**をREADMEに明記(Auto Fit=縮小して全文 / Truncate=サイズ固定で省略)

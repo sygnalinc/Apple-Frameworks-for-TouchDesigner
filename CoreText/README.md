@@ -17,6 +17,8 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 - **高品質AA**: サブピクセル位置指定・リガチャ(none/standard/all)・トラッキング・行送り・両端揃え
 - **改行制御(Text Wrap)**: CSSの `text-wrap` 相当。**Balance**(各行の文字数を均等に)・
   **Pretty**(最終行に一文字/一単語だけ残る孤立を回避)を含む5モード
+- **省略(Truncate)**: 領域に収まらないとき **末尾/先頭/中央を `…` で切り詰め**る
+  (CSS `text-overflow: ellipsis` 相当)。絵文字・結合文字を割らない
 - **グラデーション塗り**(2色・角度)/ **縁取り**(外側アウトライン)/ **ドロップシャドウ**
 - 複数行は **Text DAT 参照**(`Text DAT` パラメータ。セルを行/タブで連結)
 
@@ -41,6 +43,8 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Horizontal/Vertical Align | 左/中/右/両端揃え・上/中/下 |
 | | Vertical Text | 縦書き(右→左の段組) |
 | | Text Wrap | 改行制御(CSS text-wrap相当): **Wrap**=幅で折返し / **No Wrap**=改行なし / **Balance**=各行の長さを均等化 / **Pretty**=最終行の孤立を回避 / **Stable**=Wrapと同じ |
+| | Truncate (overflow) | **領域に収まらない場合の省略**(CSS `text-overflow: ellipsis` 相当): Off(クリップ)/ Tail `abc…` / Head `…xyz` / Middle `ab…yz` |
+| | Ellipsis | 省略記号(既定 `…`。`...` や ` ▶` など任意) |
 | | Padding | 余白(px) |
 | Style | Font Color / Background Color | 文字色 / 背景色(既定は透明背景) |
 | | Embolden (px) | **合成ボールド**: マスク膨張でフォントの最大ウェイト以上に太らせる(グラデ/縁取り併用可)。**閉じた内側(oや口の穴)は保護**され潰れない |
@@ -49,7 +53,7 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Drop Shadow / Color / Offset / Blur | ドロップシャドウ |
 | Common | Output Resolution | **他のTOPと同じくCommonページで解像度指定**(Custom等)。Use Input時は1280×720 |
 
-Info CHOP: `executes / renders / width / height / lines / fitted_size`。Info DAT: `resolved_font / lines`。
+Info CHOP: `executes / renders / width / height / lines / fitted_size / truncated`。Info DAT: `resolved_font / lines`。
 フォント名が解決できずフォールバックした場合は Warning に表示。
 
 ## 注意・制約
@@ -62,6 +66,10 @@ Info CHOP: `executes / renders / width / height / lines / fitted_size`。Info DA
   カラー絵文字を出したい場合はグラデーションをOffに
 - 縦書き時の Vertical Align は未適用(全域レイアウト)。両端揃え(Justify)は横書きのみ
 - 1文字も描けないフォント名を指定するとフォールバック(Warning参照)
+- **Truncate と Auto Fit は別戦略**。Auto Fit(縮小して全文を見せる)がOnだとほぼ収まるので
+  Truncate は発動しない。「サイズは固定で入り切らない分は …」なら Auto Fit Off + Truncate を使う
+- 省略は**収まる最大量を二分探索**して求める(合成文字境界にスナップするので絵文字を割らない)。
+  実際に省略されたかは Info CHOP `truncated`(0/1)で分かる
 - レンダはワーカースレッド(パラメータ変更のシグネチャ検知)。cook 非ブロック・1〜2フレーム遅延
 
 ## ビルド

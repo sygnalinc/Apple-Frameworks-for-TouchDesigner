@@ -132,6 +132,8 @@ struct Style {
     int ligatures = 1;                 // 0=none 1=standard 2=all
     int alignH = 1, alignV = 1;        // 0=left/top 1=center/middle 2=right/bottom 3=justified(Hのみ)
     bool italic = false, vertical = false, autofit = false;
+    int truncate = 0;                  // 0=off 1=tail 2=head 3=middle(領域に収まらない時の省略)
+    std::string ellipsis = "…";       // 省略記号
     int wrapMode = 0;                  // 0=wrap 1=nowrap 2=balance 3=pretty 4=stable(=wrap)
     float padding = 20;
     float fontRGBA[4] = {1,1,1,1};
@@ -155,11 +157,12 @@ struct Style {
                  strokeWidth, strokeRGBA[0],strokeRGBA[1],strokeRGBA[2],strokeRGBA[3],
                  shadow, shadowRGBA[0],shadowRGBA[1],shadowRGBA[2],shadowRGBA[3],
                  shadowX, shadowY, shadowBlur + embolden * 1000.0f, w, h);
-        return text + "\x1f" + fontFile + "\x1f" + (palt ? "P" : "p") + (autofit ? "F" : "f") + "\x1f" + b;
+        return text + "\x1f" + fontFile + "\x1f" + ellipsis + "\x1f"
+             + (palt ? "P" : "p") + (autofit ? "F" : "f") + std::to_string(truncate) + "\x1f" + b;
     }
 };
 
-struct Result { std::vector<uint8_t> bgra; int w=0,h=0; uint64_t serial=0; int lines=0; float fitted=0; std::string font; };
+struct Result { std::vector<uint8_t> bgra; int w=0,h=0; uint64_t serial=0; int lines=0; float fitted=0; bool truncated=false; std::string font; };
 
 static CGColorRef makeColor(const float c[4]) { return CGColorCreateGenericRGB(c[0], c[1], c[2], c[3]); }
 
@@ -244,10 +247,11 @@ static CTFontRef makeFont(const Style& st)
 
 // 属性付き文字列(塗り)。ストロークは同一フレームを kCGTextStroke で再描画する
 // (別属性文字列で2回レイアウトするとグリフがズレる実バグを踏んだため)
-static CFAttributedStringRef makeAttrString(const Style& st, CTFontRef font, bool strokeOnly)
+static CFAttributedStringRef makeAttrStringFrom(const Style& st, CTFontRef font, CFStringRef srcText)
 {
-    CFStringRef text = CFStringCreateWithCString(nullptr, st.text.c_str(), kCFStringEncodingUTF8);
-    if (!text) text = CFSTR("");
+    CFStringRef text = srcText ? (CFStringRef)CFRetain(srcText)
+                               : CFStringCreateWithCString(nullptr, st.text.c_str(), kCFStringEncodingUTF8);
+    if (!text) text = (CFStringRef)CFRetain(CFSTR(""));
 
     CTTextAlignment al = kCTTextAlignmentCenter;
     if (st.alignH == 0) al = kCTTextAlignmentLeft;
@@ -288,11 +292,16 @@ static CFAttributedStringRef makeAttrString(const Style& st, CTFontRef font, boo
 
     CGColorRef fill = makeColor(st.fontRGBA);
     CFDictionarySetValue(a, kCTForegroundColorAttributeName, fill); CGColorRelease(fill);
-    (void)strokeOnly;
 
     CFAttributedStringRef s = CFAttributedStringCreate(nullptr, text, a);
     CFRelease(a); CFRelease(para); CFRelease(text);
     return s;
+}
+
+static CFAttributedStringRef makeAttrString(const Style& st, CTFontRef font, bool strokeOnly)
+{
+    (void)strokeOnly;
+    return makeAttrStringFrom(st, font, nullptr);
 }
 
 // 折り返し計測: 幅 w で組んだときの行数・最終行幅・最大行幅
@@ -384,6 +393,99 @@ static CTFrameRef makeFrame(CFAttributedStringRef str, const Style& st, int* out
     if (frameAttrs) CFRelease(frameAttrs);
     CFRelease(fs);
     return frame;
+}
+
+// 指定文字列が描画領域(解像度-余白)に収まるか。縦書きは幅/高さを入れ替えて判定する
+static bool textFitsInArea(const Style& st, CTFontRef font, CFStringRef text)
+{
+    CGFloat availW = st.w - st.padding * 2, availH = st.h - st.padding * 2;
+    if (availW <= 4 || availH <= 4) return true;
+    CFAttributedStringRef str = makeAttrStringFrom(st, font, text);
+    CTFramesetterRef fs = CTFramesetterCreateWithAttributedString(str);
+    CFDictionaryRef frameAttrs = nullptr;
+    if (st.vertical) {
+        CTFrameProgression prog = kCTFrameProgressionRightToLeft;
+        CFNumberRef pn = CFNumberCreate(nullptr, kCFNumberIntType, &prog);
+        frameAttrs = CFDictionaryCreate(nullptr, (const void**)&kCTFrameProgressionAttributeName,
+                                        (const void**)&pn, 1,
+                                        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        CFRelease(pn);
+    }
+    bool wraps = st.wrapMode != 1;   // nowrap は折り返さず1行で幅を見る
+    CGSize cons = st.vertical
+        ? CGSizeMake(CGFLOAT_MAX, wraps ? availH : CGFLOAT_MAX)
+        : CGSizeMake(wraps ? availW : CGFLOAT_MAX, CGFLOAT_MAX);
+    CGSize used = CTFramesetterSuggestFrameSizeWithConstraints(fs, CFRangeMake(0,0), frameAttrs, cons, nullptr);
+    if (frameAttrs) CFRelease(frameAttrs);
+    CFRelease(fs); CFRelease(str);
+    return used.width <= availW + 0.5 && used.height <= availH + 0.5;
+}
+
+// 領域に収まらないとき、末尾/先頭/中央を省略記号(…)に置き換えて収まる最大量を二分探索する。
+// UTF-16 の合成文字境界にスナップするので絵文字・結合文字を割らない。
+// st.text を書き換える(以後の描画パスは全てこの文字列を使うので、縁取り/グラデ等とも整合する)
+static bool applyTruncation(Style& st, CTFontRef font)
+{
+    if (st.truncate == 0 || st.text.empty()) return false;
+    CFStringRef full = CFStringCreateWithCString(nullptr, st.text.c_str(), kCFStringEncodingUTF8);
+    if (!full) return false;
+    if (textFitsInArea(st, font, full)) { CFRelease(full); return false; }   // 収まるなら何もしない
+
+    CFStringRef ell = CFStringCreateWithCString(nullptr, st.ellipsis.c_str(), kCFStringEncodingUTF8);
+    if (!ell) ell = (CFStringRef)CFRetain(CFSTR("…"));
+    const CFIndex len = CFStringGetLength(full);
+
+    // 合成文字境界へスナップ(サロゲートペア・結合文字を割らない)
+    auto snap = [&](CFIndex i) -> CFIndex {
+        if (i <= 0) return 0;
+        if (i >= len) return len;
+        CFRange r = CFStringGetRangeOfComposedCharactersAtIndex(full, i);
+        return (r.location < i) ? r.location : i;
+    };
+    // 残す文字数 keep(UTF-16単位)から候補文字列を作る
+    auto candidate = [&](CFIndex keep) -> CFStringRef {
+        CFMutableStringRef s = CFStringCreateMutable(nullptr, 0);
+        if (st.truncate == 1) {                       // tail: 先頭を残して末尾を省略
+            CFIndex k = snap(keep);
+            CFStringRef head = CFStringCreateWithSubstring(nullptr, full, CFRangeMake(0, k));
+            CFStringAppend(s, head); CFStringAppend(s, ell); CFRelease(head);
+        } else if (st.truncate == 2) {                // head: 末尾を残して先頭を省略
+            CFIndex start = snap(len - keep);
+            CFStringRef tail = CFStringCreateWithSubstring(nullptr, full, CFRangeMake(start, len - start));
+            CFStringAppend(s, ell); CFStringAppend(s, tail); CFRelease(tail);
+        } else {                                      // middle: 前後を残して中央を省略
+            CFIndex h = snap(keep / 2);
+            CFIndex start = snap(len - (keep - h));
+            if (start < h) start = h;
+            CFStringRef head = CFStringCreateWithSubstring(nullptr, full, CFRangeMake(0, h));
+            CFStringRef tail = CFStringCreateWithSubstring(nullptr, full, CFRangeMake(start, len - start));
+            CFStringAppend(s, head); CFStringAppend(s, ell); CFStringAppend(s, tail);
+            CFRelease(head); CFRelease(tail);
+        }
+        return s;
+    };
+
+    // 二分探索: 収まる最大の keep を求める
+    CFIndex lo = 0, hi = len;
+    CFStringRef best = nullptr;
+    for (int i = 0; i < 18 && lo <= hi; i++) {
+        CFIndex mid = (lo + hi) / 2;
+        CFStringRef c = candidate(mid);
+        if (textFitsInArea(st, font, c)) {
+            if (best) CFRelease(best);
+            best = c; lo = mid + 1;
+        } else {
+            CFRelease(c); if (mid == 0) break; hi = mid - 1;
+        }
+    }
+    if (!best) best = candidate(0);   // 省略記号すら入らない場合も記号だけは出す
+
+    // UTF-8 へ戻して st.text を差し替え
+    CFIndex maxBytes = CFStringGetMaximumSizeForEncoding(CFStringGetLength(best), kCFStringEncodingUTF8) + 1;
+    std::vector<char> buf((size_t)maxBytes, 0);
+    if (CFStringGetCString(best, buf.data(), maxBytes, kCFStringEncodingUTF8)) st.text = buf.data();
+    CFRelease(best); CFRelease(ell); CFRelease(full);
+    return true;
 }
 
 // オートフィット: 描画領域(解像度-余白)に収まる最大フォントサイズを二分探索で求める。
@@ -583,6 +685,12 @@ static bool renderText(const Style& stIn, Result& out, std::string& warn)
     if (st.autofit) st.fontSize = fitFontSize(st);   // 描画領域に収まるサイズへ自動縮小
     out.fitted = st.fontSize;
     if (st.w < 4 || st.h < 4) return false;
+    // 省略(…): 収まらない場合のみ st.text を差し替える。フォントは実サイズで作る必要があるので
+    // ここで一度だけ生成して使い回す
+    if (st.truncate != 0) {
+        CTFontRef probe = makeFont(st);
+        if (probe) { out.truncated = applyTruncation(st, probe); CFRelease(probe); }
+    }
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
     CGContextRef ctx = CGBitmapContextCreate(nullptr, st.w, st.h, 8, (size_t)st.w*4, cs,
                                              kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);   // BGRA
@@ -720,6 +828,10 @@ public:
         { std::string s = in->getParString("Alignv") ? in->getParString("Alignv") : "middle";
           st.alignV = (s == "top") ? 0 : (s == "bottom") ? 2 : 1; }
         st.vertical  = in->getParInt("Vertical") != 0;
+        { std::string s = in->getParString("Truncate") ? in->getParString("Truncate") : "off";
+          st.truncate = (s == "tail") ? 1 : (s == "head") ? 2 : (s == "middle") ? 3 : 0; }
+        st.ellipsis  = in->getParString("Ellipsis") ? in->getParString("Ellipsis") : "…";
+        if (st.ellipsis.empty()) st.ellipsis = "…";
         { std::string s = in->getParString("Textwrap") ? in->getParString("Textwrap") : "wrap";
           st.wrapMode = (s == "nowrap") ? 1 : (s == "balance") ? 2 : (s == "pretty") ? 3 : (s == "stable") ? 4 : 0; }
         st.padding   = (float)in->getParDouble("Padding");
@@ -759,7 +871,8 @@ public:
         Result r;
         { std::lock_guard<std::mutex> l(myMutex);
           if (myResult.serial == myUploaded || myResult.bgra.empty()) return;
-          r = myResult; myUploaded = r.serial; myLines = r.lines; myFitted = r.fitted; myFont = r.font; }
+          r = myResult; myUploaded = r.serial; myLines = r.lines; myFitted = r.fitted;
+          myTruncated = r.truncated; myFont = r.font; }
         TOP_UploadInfo ui; ui.textureDesc.texDim = OP_TexDim::e2D;
         ui.textureDesc.width = r.w; ui.textureDesc.height = r.h;
         ui.textureDesc.pixelFormat = OP_PixelFormat::BGRA8Fixed;
@@ -796,6 +909,11 @@ public:
           const char* n[] = {"wrap","nowrap","balance","pretty","stable"};
           const char* l[] = {"Wrap (fit to width)","No Wrap","Balance (even lines)","Pretty (no orphans)","Stable (= Wrap)"};
           m->appendMenu(p, 5, n, l); }
+        { OP_StringParameter p("Truncate"); p.label = "Truncate (overflow)"; p.page = P; p.defaultValue = "off";
+          const char* n[] = {"off","tail","head","middle"};
+          const char* l[] = {"Off (overflow / clip)","Tail (abc…)","Head (…xyz)","Middle (ab…yz)"};
+          m->appendMenu(p, 4, n, l); }
+        { OP_StringParameter p("Ellipsis"); p.label = "Ellipsis"; p.page = P; p.defaultValue = "…"; m->appendString(p); }
         { OP_NumericParameter p("Padding"); p.label = "Padding (px)"; p.page = P; p.defaultValues[0] = 20; p.minSliders[0] = 0; p.maxSliders[0] = 200; p.minValues[0] = 0; p.clampMins[0] = true; m->appendFloat(p); }
 
         const char* S = "Style";
@@ -839,10 +957,11 @@ public:
         std::lock_guard<std::mutex> l(myMutex);
         if (!myWarn.empty()) s->setString(myWarn.c_str());
     }
-    int32_t getNumInfoCHOPChans(void*) override { return 6; }
+    int32_t getNumInfoCHOPChans(void*) override { return 7; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override {
-        const char* n[] = {"executes","renders","width","height","lines","fitted_size"};
-        float v[] = {(float)myExec.load(), (float)myRenders.load(), (float)myOutW, (float)myOutH, (float)myLines, myFitted};
+        const char* n[] = {"executes","renders","width","height","lines","fitted_size","truncated"};
+        float v[] = {(float)myExec.load(), (float)myRenders.load(), (float)myOutW, (float)myOutH, (float)myLines, myFitted,
+                     myTruncated ? 1.0f : 0.0f};
         c->name->setString(n[i]); c->value = v[i];
     }
     bool getInfoDATSize(OP_InfoDATSize* s, void*) override { s->rows = 2; s->cols = 2; s->byColumn = false; return true; }
@@ -882,7 +1001,7 @@ private:
     bool myQuit = false, myPending = false, myBusy = false;
     Style myStyle; Result myResult; uint64_t mySerial = 0, myUploaded = 0;
     std::string mySig, myWarn, myFont;
-    int myOutW = 0, myOutH = 0, myLines = 0; float myFitted = 0;
+    int myOutW = 0, myOutH = 0, myLines = 0; float myFitted = 0; bool myTruncated = false;
     std::atomic<uint64_t> myExec{0}, mySubmit{0}, myRenders{0};
 };
 
