@@ -158,6 +158,14 @@ struct Style {
     int wrapMode = 0;                  // 0=wrap 1=nowrap 2=balance 3=pretty 4=stable(=wrap)
     float padding = 20;                // 共通の余白(4辺)
     float padL = 20, padR = 20, padT = 20, padB = 20;   // 実効余白(共通 + 各辺の追加量)
+    // 入力画像を各行の下に敷く(下線・マーカー等)
+    bool lineImg = false;      // 有効
+    int  lineApply = 0;        // 0=全行 1=最初の行 2=最後の行
+    int  lineWidthMode = 0;    // 0=行の文字幅 1=描画領域の幅
+    float lineOffset = 6;      // ベースラインから下へのオフセット(px)
+    float lineThick = 0;       // 高さ(px)。0=入力画像のアスペクト比を維持
+    float lineExtend = 0;      // 両端の延長(px)
+    bool lineFront = false;    // true=文字の上に描く
     float fontRGBA[4] = {1,1,1,1};
     float bgRGBA[4] = {0,0,0,0};
     bool gradient = false; float gradRGBA[4] = {0.2f,0.5f,1,1}; float gradAngle = 0;
@@ -180,14 +188,19 @@ struct Style {
                  shadow, shadowRGBA[0],shadowRGBA[1],shadowRGBA[2],shadowRGBA[3],
                  shadowX, shadowY, shadowBlur + embolden * 1000.0f, w, h);
         char sh[128];
-        snprintf(sh, sizeof sh, "|s%d|%d|%.3f|%.1f|%zu|sh%.2f,%.2f,%.2f",
-                 shape, shapeSides, shapeRound, shapeRotate, shapePath.size(), shearX, shearY, slant);
+        snprintf(sh, sizeof sh, "|s%d|%d|%.3f|%.1f|%zu|sh%.2f,%.2f,%.2f|li%d%d%d%d|%.2f|%.2f|%.2f",
+                 shape, shapeSides, shapeRound, shapeRotate, shapePath.size(), shearX, shearY, slant,
+                 lineImg, lineApply, lineWidthMode, lineFront, lineOffset, lineThick, lineExtend);
         return text + "\x1f" + fontFile + "\x1f" + ellipsis + "\x1f" + runsSig + "\x1f" + sh + "\x1f"
              + (palt ? "P" : "p") + (autofit ? "F" : "f") + std::to_string(truncate) + "\x1f" + b;
     }
 };
 
-struct Result { std::vector<uint8_t> bgra; int w=0,h=0; uint64_t serial=0; int lines=0; float fitted=0; bool truncated=false; std::string font; };
+// 1行ぶんの位置と大きさ(TDのuv・0〜1・左下原点)。行の下に画像を敷く/TD側で装飾するのに使う
+struct LineMetric { float u=0, v=0, w=0, h=0, baseline=0; };
+
+struct Result { std::vector<uint8_t> bgra; int w=0,h=0; uint64_t serial=0; int lines=0; float fitted=0; bool truncated=false;
+                std::vector<LineMetric> metrics; std::string font; };
 
 static CGColorRef makeColor(const float c[4]) { return CGColorCreateGenericRGB(c[0], c[1], c[2], c[3]); }
 
@@ -870,7 +883,57 @@ static void drawGradientThroughMask(CGContextRef ctx, const Style& st, CTFrameRe
     CGContextRestoreGState(ctx);
 }
 
-static bool renderText(const Style& stIn, Result& out, std::string& warn)
+// フレームから行ごとの位置と大きさを取り出す(TDのuv・0〜1・左下原点)。
+// CGは下原点で出力もその向きを保つので、uv へは単純な除算でマップできる。
+// 縦書きでは1行=1段(縦方向に伸びる)になる
+static void collectLineMetrics(CTFrameRef frame, const Style& st, std::vector<LineMetric>& out)
+{
+    out.clear();
+    CFArrayRef lines = CTFrameGetLines(frame);
+    CFIndex n = CFArrayGetCount(lines);
+    if (n <= 0) return;
+    std::vector<CGPoint> origins((size_t)n);
+    CTFrameGetLineOrigins(frame, CFRangeMake(0,0), origins.data());
+    CGRect fr = CGPathGetBoundingBox(CTFrameGetPath(frame));
+    for (CFIndex i = 0; i < n; i++) {
+        CTLineRef line = (CTLineRef)CFArrayGetValueAtIndex(lines, i);
+        CGFloat asc = 0, desc = 0, lead = 0;
+        double lw = CTLineGetTypographicBounds(line, &asc, &desc, &lead);
+        CGFloat x = fr.origin.x + origins[(size_t)i].x;
+        CGFloat base = fr.origin.y + origins[(size_t)i].y;
+        LineMetric m;
+        m.u = (float)(x / st.w);
+        m.v = (float)((base - desc) / st.h);          // 行の下端(ディセンダ含む)
+        m.w = (float)(lw / st.w);
+        m.h = (float)((asc + desc) / st.h);
+        m.baseline = (float)(base / st.h);
+        out.push_back(m);
+    }
+}
+
+// 各行の下に入力画像を敷く(下線・マーカー等)。行の実位置に合わせて幅を伸ばす
+static void drawLineImages(CGContextRef ctx, const Style& st, CGImageRef img,
+                           const std::vector<LineMetric>& mets)
+{
+    if (!img || mets.empty()) return;
+    const CGFloat iw = (CGFloat)CGImageGetWidth(img), ih = (CGFloat)CGImageGetHeight(img);
+    if (iw < 1 || ih < 1) return;
+    const CGFloat availW = st.w - st.padL - st.padR;
+    for (size_t i = 0; i < mets.size(); i++) {
+        if (st.lineApply == 1 && i != 0) continue;                    // 最初の行のみ
+        if (st.lineApply == 2 && i != mets.size() - 1) continue;      // 最後の行のみ
+        const LineMetric& m = mets[i];
+        CGFloat x = (st.lineWidthMode == 1) ? st.padL : m.u * st.w;
+        CGFloat w = (st.lineWidthMode == 1) ? availW  : m.w * st.w;
+        x -= st.lineExtend; w += st.lineExtend * 2;
+        if (w < 1) continue;
+        CGFloat h = (st.lineThick > 0) ? st.lineThick : w * (ih / iw);   // 0=入力のアスペクト維持
+        CGFloat y = m.baseline * st.h - st.lineOffset - h;               // ベースラインから下へ
+        CGContextDrawImage(ctx, CGRectMake(x, y, w, h), img);
+    }
+}
+
+static bool renderText(const Style& stIn, CGImageRef lineImg, Result& out, std::string& warn)
 {
     Style st = stIn;
     if (st.autofit) st.fontSize = fitFontSize(st);   // 描画領域に収まるサイズへ自動縮小
@@ -935,6 +998,9 @@ static bool renderText(const Style& stIn, Result& out, std::string& warn)
 
     int lines = 0;
     CTFrameRef frame = makeFrame(fillStr, st, &lines);
+    collectLineMetrics(frame, st, out.metrics);
+    // 入力画像を各行の下に敷く(既定は文字の下=先に描く)
+    if (st.lineImg && !st.lineFront) drawLineImages(ctx, st, lineImg, out.metrics);
     // 描画順: 縁取り(最外周) → 合成ボールド(太らせた本体) → 本文テキスト
     if (st.strokeWidth > 0)
         fillThroughDilatedMask(ctx, st, frame, st.embolden + st.strokeWidth, st.strokeRGBA, false);
@@ -942,6 +1008,7 @@ static bool renderText(const Style& stIn, Result& out, std::string& warn)
         fillThroughDilatedMask(ctx, st, frame, st.embolden, st.fontRGBA, st.gradient);
     if (st.gradient) drawGradientThroughMask(ctx, st, frame);
     else             CTFrameDraw(frame, ctx);
+    if (st.lineImg && st.lineFront) drawLineImages(ctx, st, lineImg, out.metrics);
     CFRelease(frame);
 
     if (st.shadow) CGContextEndTransparencyLayer(ctx);
@@ -1167,11 +1234,41 @@ public:
             if (st.w < 4) st.w = 4; if (st.h < 4) st.h = 4;
         }
 
+        // 入力画像(各行の下に敷く)の設定
+        st.lineImg      = in->getParInt("Lineimage") != 0;
+        { std::string s = in->getParString("Lineapply") ? in->getParString("Lineapply") : "all";
+          st.lineApply = (s == "first") ? 1 : (s == "last") ? 2 : 0; }
+        { std::string s = in->getParString("Linewidthmode") ? in->getParString("Linewidthmode") : "line";
+          st.lineWidthMode = (s == "area") ? 1 : 0; }
+        st.lineOffset   = (float)in->getParDouble("Lineoffset");
+        st.lineThick    = (float)in->getParDouble("Linethick");
+        st.lineExtend   = (float)in->getParDouble("Lineextend");
+        st.lineFront    = in->getParInt("Linefront") != 0;
+
+        // 入力TOP(ライン素材)が動画などで更新されたら再レンダ
+        if (st.lineImg) {
+            if (const OP_TOPInput* ti = in->getInputTOP(0)) {
+                if ((int64_t)ti->totalCooks != myLastInputCook) { myLastInputCook = ti->totalCooks; mySig.clear(); }
+            }
+        }
         std::string sig = st.sig();
         if (sig != mySig) {
             mySig = sig;
             std::unique_lock<std::mutex> l(myMutex, std::try_to_lock);
-            if (l.owns_lock() && !myPending && !myBusy) { myStyle = st; myPending = true; mySubmit++; l.unlock(); myCond.notify_one(); }
+            if (l.owns_lock() && !myPending && !myBusy) {
+                myStyle = st;
+                // 入力TOPは execute 中しか触れないので、ここでダウンロードだけ済ませて渡す
+                myLineImage.release();
+                if (st.lineImg) {
+                    if (const OP_TOPInput* ti = in->getInputTOP(0)) {
+                        OP_TOPInputDownloadOptions o;
+                        o.pixelFormat = OP_PixelFormat::BGRA8Fixed;
+                        o.verticalFlip = true;   // CGImage は上端が先頭
+                        myLineImage = ti->downloadTexture(o, nullptr);
+                    }
+                }
+                myPending = true; mySubmit++; l.unlock(); myCond.notify_one();
+            }
             else mySig.clear();   // 取りこぼしたら次cookで再投入
         }
 
@@ -1179,7 +1276,7 @@ public:
         { std::lock_guard<std::mutex> l(myMutex);
           if (myResult.serial == myUploaded || myResult.bgra.empty()) return;
           r = myResult; myUploaded = r.serial; myLines = r.lines; myFitted = r.fitted;
-          myTruncated = r.truncated; myFont = r.font; }
+          myTruncated = r.truncated; myFont = r.font; myMetrics = r.metrics; }
         TOP_UploadInfo ui; ui.textureDesc.texDim = OP_TexDim::e2D;
         ui.textureDesc.width = r.w; ui.textureDesc.height = r.h;
         ui.textureDesc.pixelFormat = OP_PixelFormat::BGRA8Fixed;
@@ -1240,6 +1337,17 @@ public:
         { OP_NumericParameter p("Padt"); p.label = "Padding Top (extra px)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = -100; p.maxSliders[0] = 400; m->appendFloat(p); }
         { OP_NumericParameter p("Padb"); p.label = "Padding Bottom (extra px)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = -100; p.maxSliders[0] = 400; m->appendFloat(p); }
         { OP_NumericParameter p("Padding"); p.label = "Padding (px, all sides)"; p.page = P; p.defaultValues[0] = 20; p.minSliders[0] = 0; p.maxSliders[0] = 200; p.minValues[0] = 0; p.clampMins[0] = true; m->appendFloat(p); }
+        // Line Image ページ: 入力0の画像を各行の下に敷く(下線・マーカー等)
+        const char* LP = "Line Image";
+        { OP_NumericParameter p("Lineimage"); p.label = "Enable Line Image (input 0)"; p.page = LP; m->appendToggle(p); }
+        { OP_StringParameter p("Lineapply"); p.label = "Apply To"; p.page = LP; p.defaultValue = "all";
+          const char* n[] = {"all","first","last"}; const char* l[] = {"All Lines","First Line","Last Line"}; m->appendMenu(p, 3, n, l); }
+        { OP_StringParameter p("Linewidthmode"); p.label = "Width"; p.page = LP; p.defaultValue = "line";
+          const char* n[] = {"line","area"}; const char* l[] = {"Text Width (per line)","Full Area Width"}; m->appendMenu(p, 2, n, l); }
+        { OP_NumericParameter p("Lineoffset"); p.label = "Offset Below Baseline (px)"; p.page = LP; p.defaultValues[0] = 6; p.minSliders[0] = -100; p.maxSliders[0] = 200; m->appendFloat(p); }
+        { OP_NumericParameter p("Linethick"); p.label = "Thickness (px, 0 = image aspect)"; p.page = LP; p.defaultValues[0] = 8; p.minSliders[0] = 0; p.maxSliders[0] = 200; p.minValues[0] = 0; p.clampMins[0] = true; m->appendFloat(p); }
+        { OP_NumericParameter p("Lineextend"); p.label = "Extend Ends (px)"; p.page = LP; p.defaultValues[0] = 0; p.minSliders[0] = -50; p.maxSliders[0] = 200; m->appendFloat(p); }
+        { OP_NumericParameter p("Linefront"); p.label = "Draw Over Text"; p.page = LP; m->appendToggle(p); }
 
         const char* S = "Style";
         { OP_NumericParameter p("Fontcolor"); p.label = "Font Color"; p.page = S;
@@ -1282,33 +1390,99 @@ public:
         std::lock_guard<std::mutex> l(myMutex);
         if (!myWarn.empty()) s->setString(myWarn.c_str());
     }
-    int32_t getNumInfoCHOPChans(void*) override { return 7; }
+    // 行メトリクス(TDのuv・左下原点)を Info CHOP へ。line{i}/u,v,w,h,baseline。
+    // チャンネル数が行数で変わると下流が組みにくいので、スロット数は固定(kMaxLineChans)
+    static constexpr int kMaxLineChans = 32;
+    int32_t getNumInfoCHOPChans(void*) override { return 7 + kMaxLineChans * 5; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override {
-        const char* n[] = {"executes","renders","width","height","lines","fitted_size","truncated"};
-        float v[] = {(float)myExec.load(), (float)myRenders.load(), (float)myOutW, (float)myOutH, (float)myLines, myFitted,
-                     myTruncated ? 1.0f : 0.0f};
-        c->name->setString(n[i]); c->value = v[i];
+        if (i < 7) {
+            const char* n[] = {"executes","renders","width","height","lines","fitted_size","truncated"};
+            float v[] = {(float)myExec.load(), (float)myRenders.load(), (float)myOutW, (float)myOutH, (float)myLines, myFitted,
+                         myTruncated ? 1.0f : 0.0f};
+            c->name->setString(n[i]); c->value = v[i];
+            return;
+        }
+        int li = (i - 7) / 5, f = (i - 7) % 5;
+        const char* fn[] = {"u","v","w","h","baseline"};
+        char nm[32]; snprintf(nm, sizeof nm, "line%d/%s", li + 1, fn[f]);
+        c->name->setString(nm);
+        float val = 0;
+        { std::lock_guard<std::mutex> l(myMutex);
+          if (li < (int)myMetrics.size()) {
+              const LineMetric& m = myMetrics[(size_t)li];
+              const float vv[] = {m.u, m.v, m.w, m.h, m.baseline};
+              val = vv[f];
+          } }
+        c->value = val;
     }
-    bool getInfoDATSize(OP_InfoDATSize* s, void*) override { s->rows = 2; s->cols = 2; s->byColumn = false; return true; }
+    // Info DAT: 1行=1テキスト行(px値)。先頭に resolved_font / lines
+    bool getInfoDATSize(OP_InfoDATSize* s, void*) override {
+        std::lock_guard<std::mutex> l(myMutex);
+        s->rows = 3 + (int32_t)myMetrics.size(); s->cols = 6; s->byColumn = false; return true;
+    }
     void getInfoDATEntries(int32_t index, int32_t nEntries, OP_InfoDATEntries* e, void*) override {
-        if (nEntries < 2) return;
-        if (index == 0) { e->values[0]->setString("resolved_font"); std::lock_guard<std::mutex> l(myMutex); e->values[1]->setString(myFont.c_str()); }
-        else { e->values[0]->setString("lines"); e->values[1]->setString(std::to_string(myLines).c_str()); }
+        if (nEntries < 6) return;
+        auto set = [&](int i, const std::string& v){ e->values[i]->setString(v.c_str()); };
+        std::lock_guard<std::mutex> l(myMutex);
+        if (index == 0) { set(0,"resolved_font"); set(1,myFont); set(2,""); set(3,""); set(4,""); set(5,""); return; }
+        if (index == 1) { set(0,"lines"); set(1,std::to_string(myLines)); set(2,""); set(3,""); set(4,""); set(5,""); return; }
+        if (index == 2) { set(0,"line"); set(1,"x_px"); set(2,"y_px"); set(3,"w_px"); set(4,"h_px"); set(5,"baseline_px"); return; }
+        int li = index - 3;
+        if (li < 0 || li >= (int)myMetrics.size()) return;
+        const LineMetric& m = myMetrics[(size_t)li];
+        char b[32];
+        set(0, std::to_string(li + 1));
+        snprintf(b,sizeof b,"%.1f",m.u*myOutW); set(1,b);
+        snprintf(b,sizeof b,"%.1f",m.v*myOutH); set(2,b);
+        snprintf(b,sizeof b,"%.1f",m.w*myOutW); set(3,b);
+        snprintf(b,sizeof b,"%.1f",m.h*myOutH); set(4,b);
+        snprintf(b,sizeof b,"%.1f",m.baseline*myOutH); set(5,b);
     }
 
 private:
+    // 入力TOP(BGRA8・上下反転済み)を CGImage にする。CGは事前乗算アルファ前提なので
+    // TD の非事前乗算データをここで乗算しておく(縁が暗くならないように)
+    static CGImageRef makeLineImage(OP_SmartRef<OP_TOPDownloadResult>& d) {
+        if (!d) return nullptr;
+        void* p = d->getData();
+        uint32_t w = d->textureDesc.width, h = d->textureDesc.height;
+        if (!p || !w || !h) return nullptr;
+        NSMutableData* buf = [NSMutableData dataWithBytes:p length:(size_t)w * h * 4];
+        uint8_t* px = (uint8_t*)buf.mutableBytes;
+        for (size_t i = 0, n = (size_t)w * h; i < n; i++) {
+            uint32_t a = px[i*4 + 3];
+            px[i*4+0] = (uint8_t)(px[i*4+0] * a / 255);
+            px[i*4+1] = (uint8_t)(px[i*4+1] * a / 255);
+            px[i*4+2] = (uint8_t)(px[i*4+2] * a / 255);
+        }
+        CGDataProviderRef prov = CGDataProviderCreateWithCFData((CFDataRef)buf);
+        CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+        CGImageRef img = CGImageCreate(w, h, 8, 32, (size_t)w * 4, cs,
+                                       kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little,
+                                       prov, nullptr, false, kCGRenderingIntentDefault);
+        CGColorSpaceRelease(cs); CGDataProviderRelease(prov);
+        return img;
+    }
+
     void worker() {
         while (true) {
             Style st;
+            OP_SmartRef<OP_TOPDownloadResult> img;
             {
                 std::unique_lock<std::mutex> l(myMutex);
                 myCond.wait(l, [this]{ return myQuit || myPending; });
                 if (myQuit) return;
                 myPending = false; myBusy = true; st = myStyle;
+                img = std::move(myLineImage);
             }
             Result r; std::string warn;
             bool ok = false;
-            @autoreleasepool { ok = renderText(st, r, warn); }
+            @autoreleasepool {
+                // 入力TOP → CGImage(getData() はブロックするのでワーカー側で呼ぶ)
+                CGImageRef cg = makeLineImage(img);
+                ok = renderText(st, cg, r, warn);
+                if (cg) CGImageRelease(cg);
+            }
             {
                 std::lock_guard<std::mutex> l(myMutex);
                 myWarn = warn;
@@ -1327,6 +1501,9 @@ private:
     Style myStyle; Result myResult; uint64_t mySerial = 0, myUploaded = 0;
     std::string mySig, myWarn, myFont;
     int myOutW = 0, myOutH = 0, myLines = 0; float myFitted = 0; bool myTruncated = false;
+    std::vector<LineMetric> myMetrics;
+    OP_SmartRef<OP_TOPDownloadResult> myLineImage;
+    int64_t myLastInputCook = -1;
     std::atomic<uint64_t> myExec{0}, mySubmit{0}, myRenders{0};
 };
 
@@ -1343,7 +1520,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.majorVersion = 0;
     i->customOPInfo.minorVersion = 9;
-    i->customOPInfo.minInputs = 0; i->customOPInfo.maxInputs = 0;
+    i->customOPInfo.minInputs = 0; i->customOPInfo.maxInputs = 1;   // 入力0 = 各行の下に敷くライン画像(任意)
 }
 DLLEXPORT TOP_CPlusPlusBase* CreateTOPInstance(const OP_NodeInfo* i, TOP_Context* c) { return new CoreTextTOP(i, c); }
 DLLEXPORT void DestroyTOPInstance(TOP_CPlusPlusBase* i, TOP_Context*) { delete static_cast<CoreTextTOP*>(i); }

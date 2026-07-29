@@ -28,6 +28,9 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 - **省略(Truncate)**: 領域に収まらないとき **末尾/先頭/中央を `…` で切り詰め**る
   (CSS `text-overflow: ellipsis` 相当)。絵文字・結合文字を割らない
 - **グラデーション塗り**(2色・角度)/ **縁取り**(外側アウトライン)/ **ドロップシャドウ**
+- **ライン画像(入力0)**: 入力TOPの画像を**各行の実位置・実幅に合わせて自動で敷く**
+  (画像による下線・蛍光マーカー・帯)。行メトリクスは Info CHOP / Info DAT にも出るので
+  TD側で自由な装飾も組める
 - 複数行は **Text DAT 参照**(`Text DAT` パラメータ。セルを行/タブで連結)
 
 ## 実測(M2)
@@ -62,6 +65,13 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Normalize Path to Area | 点群のバウンディングボックスを領域に自動フィット(既定On)。**SOPの単位のまま渡せる** |
 | | Padding | 余白(px・4辺共通) |
 | | Padding Left / Right / Top / Bottom | **各辺への追加量**(px)。実効余白 = `Padding` + その辺の追加量。負値で共通値より狭くもできる |
+| Line Image | Enable Line Image (input 0) | **入力0の画像を各行の下に敷く**(下線・マーカー・帯)。行の実位置・実幅に自動追従 |
+| | Apply To | All Lines / First Line / Last Line |
+| | Width | Text Width(行の文字幅ぴったり)/ Full Area Width(描画領域の幅) |
+| | Offset Below Baseline (px) | ベースラインから下へのオフセット。**負値で文字に重ねる**(マーカー風) |
+| | Thickness (px) | ラインの高さ。**0=入力画像のアスペクト比を維持** |
+| | Extend Ends (px) | 両端の延長(負値で短縮) |
+| | Draw Over Text | On=文字の上に描く(既定は文字の下) |
 | Style | Font Color / Background Color | 文字色 / 背景色(既定は透明背景) |
 | | Embolden (px) | **合成ボールド**: マスク膨張でフォントの最大ウェイト以上に太らせる(グラデ/縁取り併用可)。**閉じた内側(oや口の穴)は保護**され潰れない |
 | | Gradient Fill / Color 2 / Angle | グラデーション塗り(Font Color→Color 2・角度0°=上→下) |
@@ -69,8 +79,13 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Drop Shadow / Color / Offset / Blur | ドロップシャドウ |
 | Common | Output Resolution | **他のTOPと同じくCommonページで解像度指定**(Custom等)。Use Input時は1280×720 |
 
-Info CHOP: `executes / renders / width / height / lines / fitted_size / truncated`。Info DAT: `resolved_font / lines`。
-フォント名が解決できずフォールバックした場合は Warning に表示。
+Info CHOP: `executes / renders / width / height / lines / fitted_size / truncated` +
+**行メトリクス** `line{i}/u v w h baseline`(TDのuv・0〜1・左下原点。`v`=行の下端・`baseline`=ベースライン。
+スロットは32行ぶん固定)。Info DAT: `resolved_font / lines` + **1行=1テキスト行の px 値テーブル**
+(`x_px y_px w_px h_px baseline_px`)。フォント名が解決できずフォールバックした場合は Warning に表示。
+
+行メトリクスを使うと、ライン画像に限らず **行単位の装飾をTD側で自由に組める**
+(Transform TOP を式で駆動して行ボックス・行アニメーション等)。
 
 ## Style DAT(リッチテキスト / ルビ)
 
@@ -141,6 +156,10 @@ circle SOP → SOP to DAT (extract = points) → CoreText の Path DAT
   実際に省略されたかは Info CHOP `truncated`(0/1)で分かる
 - 余白は **`Padding`(4辺共通)+ 各辺の追加量**の合算。`Padding` だけを使う従来の指定はそのまま動く。
   余白を変えると**折り返し位置・オートフィット・シェイプの領域も追従**する
+- ライン画像は**テキストと同じレンダパスで合成**される(透明背景のまま下流に渡せる)。
+  入力TOPが動画なら毎フレーム再レンダになる(静止画・定数はパラメータ変更時のみ)
+- 縦書き・矩形以外の Layout Shape でも行メトリクスは出るが、ライン画像の敷き方は横書き基準
+  (縦書きの段に沿った縦ラインは未対応)
 - レンダはワーカースレッド(パラメータ変更のシグネチャ検知)。cook 非ブロック・1〜2フレーム遅延
 
 ## 利用例

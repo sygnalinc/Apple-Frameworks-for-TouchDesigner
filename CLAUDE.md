@@ -2805,3 +2805,25 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   **CG座標は下原点**なので rect の原点yは `padB`、alignV の各分岐も padB 基準に修正
 - 実測(M2): 共通20のみ(従来どおり)/ 左+200・上+120 / 右+300(折り返しが早まる)/
   下+200かつ Alignv=bottom(テキスト下端が画像下端から220px上)を全て視認確認
+
+### 2026-07-29 CoreText TOP: 行メトリクス出力 + ライン画像(入力0を各行の下に自動で敷く)
+
+- ユーザー「文字のある位置の下に特定の画像を使ったラインを引きたい」→ A(行メトリクス出力)と
+  B(入力画像の自動下敷き)の両方を実装
+- **A: 行メトリクス**: `CTFrameGetLines`+`CTFrameGetLineOrigins`+`CTLineGetTypographicBounds` で
+  行ごとの u/v/w/h/baseline(TDのuv・左下原点)を取得。Info CHOP に `line{i}/u v w h baseline`
+  (32行スロット固定・行数変動でch構成が変わらないように)、Info DAT に px 値テーブル
+  (`x_px y_px w_px h_px baseline_px`)
+- **B: ライン画像**: maxInputs 0→1。入力0のTOPを execute で downloadTexture(BGRA8・verticalFlip=true)
+  →ワーカーで CGImage 化→各行の実位置・実幅に合わせて CGContextDrawImage。パラメータは
+  Enable / Apply To(all/first/last)/ Width(行幅/領域幅)/ Offset(負値で文字に重ねるマーカー風)/
+  Thickness(0=画像アスペクト維持)/ Extend Ends / Draw Over Text。入力TOPの totalCooks 変化で
+  再レンダ(動画ライン素材に追従)
+- **実測(M2・TD実機・MCP HTTP直送)**: 2行テキストで各行の実幅に追従した下線、マーカー風
+  (負オフセット+延長・文字の後ろ)、最終行のみ+領域幅、Info CHOP(line1/u=0.0222≒余白20/900・
+  line2/w=0.409)、Info DAT px表 を全て視認/数値確認。エラー・警告なし
+- **実装メモ**: TDのBGRAは非事前乗算なので CGImage 化の前に**アルファを事前乗算**する
+  (kCGImageAlphaPremultipliedFirst で縁が暗くならないように)。入力ダウンロードは execute 中のみ
+  可能なので SmartRef をワーカーへ move で渡し、getData()(ブロック)はワーカー側で呼ぶ
+- 本セッションから touchdesigner MCP ツールが未登録 → [[td-mcp-http-direct]] の HTTP 直送
+  (port 9988・run ツール)で検証した
