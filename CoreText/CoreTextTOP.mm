@@ -163,6 +163,7 @@ struct Style {
     int  lineApply = 0;        // 0=全行 1=最初の行 2=最後の行
     int  lineWidthMode = 0;    // 0=行の文字幅 1=描画領域の幅
     float lineOffset = 6;      // ベースラインから下へのオフセット(px)
+    float lineOffsetX = 0;     // 水平オフセット(px・正=右)
     float lineThick = 0;       // 高さ(px)。0=入力画像のアスペクト比を維持
     float lineExtend = 0;      // 両端の延長(px)
     bool lineFront = false;    // true=文字の上に描く
@@ -188,9 +189,9 @@ struct Style {
                  shadow, shadowRGBA[0],shadowRGBA[1],shadowRGBA[2],shadowRGBA[3],
                  shadowX, shadowY, shadowBlur + embolden * 1000.0f, w, h);
         char sh[128];
-        snprintf(sh, sizeof sh, "|s%d|%d|%.3f|%.1f|%zu|sh%.2f,%.2f,%.2f|li%d%d%d%d|%.2f|%.2f|%.2f",
+        snprintf(sh, sizeof sh, "|s%d|%d|%.3f|%.1f|%zu|sh%.2f,%.2f,%.2f|li%d%d%d%d|%.2f|%.2f|%.2f|%.2f",
                  shape, shapeSides, shapeRound, shapeRotate, shapePath.size(), shearX, shearY, slant,
-                 lineImg, lineApply, lineWidthMode, lineFront, lineOffset, lineThick, lineExtend);
+                 lineImg, lineApply, lineWidthMode, lineFront, lineOffset, lineThick, lineExtend, lineOffsetX);
         return text + "\x1f" + fontFile + "\x1f" + ellipsis + "\x1f" + runsSig + "\x1f" + sh + "\x1f"
              + (palt ? "P" : "p") + (autofit ? "F" : "f") + std::to_string(truncate) + "\x1f" + b;
     }
@@ -926,6 +927,7 @@ static void drawLineImages(CGContextRef ctx, const Style& st, CGImageRef img,
         CGFloat x = (st.lineWidthMode == 1) ? st.padL : m.u * st.w;
         CGFloat w = (st.lineWidthMode == 1) ? availW  : m.w * st.w;
         x -= st.lineExtend; w += st.lineExtend * 2;
+        x += st.lineOffsetX;                                             // 水平オフセット(正=右)
         if (w < 1) continue;
         CGFloat h = (st.lineThick > 0) ? st.lineThick : w * (ih / iw);   // 0=入力のアスペクト維持
         CGFloat y = m.baseline * st.h - st.lineOffset - h;               // ベースラインから下へ
@@ -1241,6 +1243,7 @@ public:
         { std::string s = in->getParString("Linewidthmode") ? in->getParString("Linewidthmode") : "line";
           st.lineWidthMode = (s == "area") ? 1 : 0; }
         st.lineOffset   = (float)in->getParDouble("Lineoffset");
+        st.lineOffsetX  = (float)in->getParDouble("Lineoffsetx");
         st.lineThick    = (float)in->getParDouble("Linethick");
         st.lineExtend   = (float)in->getParDouble("Lineextend");
         st.lineFront    = in->getParInt("Linefront") != 0;
@@ -1345,6 +1348,7 @@ public:
         { OP_StringParameter p("Linewidthmode"); p.label = "Width"; p.page = LP; p.defaultValue = "line";
           const char* n[] = {"line","area"}; const char* l[] = {"Text Width (per line)","Full Area Width"}; m->appendMenu(p, 2, n, l); }
         { OP_NumericParameter p("Lineoffset"); p.label = "Offset Below Baseline (px)"; p.page = LP; p.defaultValues[0] = 6; p.minSliders[0] = -100; p.maxSliders[0] = 200; m->appendFloat(p); }
+        { OP_NumericParameter p("Lineoffsetx"); p.label = "Offset X (px)"; p.page = LP; p.defaultValues[0] = 0; p.minSliders[0] = -200; p.maxSliders[0] = 200; m->appendFloat(p); }
         { OP_NumericParameter p("Linethick"); p.label = "Thickness (px, 0 = image aspect)"; p.page = LP; p.defaultValues[0] = 8; p.minSliders[0] = 0; p.maxSliders[0] = 200; p.minValues[0] = 0; p.clampMins[0] = true; m->appendFloat(p); }
         { OP_NumericParameter p("Lineextend"); p.label = "Extend Ends (px)"; p.page = LP; p.defaultValues[0] = 0; p.minSliders[0] = -50; p.maxSliders[0] = 200; m->appendFloat(p); }
         { OP_NumericParameter p("Linefront"); p.label = "Draw Over Text"; p.page = LP; m->appendToggle(p); }

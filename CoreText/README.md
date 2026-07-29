@@ -69,6 +69,7 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Apply To | All Lines / First Line / Last Line |
 | | Width | Text Width(行の文字幅ぴったり)/ Full Area Width(描画領域の幅) |
 | | Offset Below Baseline (px) | ベースラインから下へのオフセット。**負値で文字に重ねる**(マーカー風) |
+| | Offset X (px) | 水平オフセット(正=右・負=左)。行位置から左右にずらす |
 | | Thickness (px) | ラインの高さ。**0=入力画像のアスペクト比を維持** |
 | | Extend Ends (px) | 両端の延長(負値で短縮) |
 | | Draw Over Text | On=文字の上に描く(既定は文字の下) |

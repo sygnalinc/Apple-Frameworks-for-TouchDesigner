@@ -2827,3 +2827,11 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   可能なので SmartRef をワーカーへ move で渡し、getData()(ブロック)はワーカー側で呼ぶ
 - 本セッションから touchdesigner MCP ツールが未登録 → [[td-mcp-http-direct]] の HTTP 直送
   (port 9988・run ツール)で検証した
+
+### 2026-07-29 CoreText TOP: ライン画像に水平オフセット(Offset X)を追加
+
+- ユーザー「lineImageを左右にオフセットできるようにして」→ Line Image ページに `Offset X (px)`
+  (Lineoffsetx・±200スライダー・正=右/負=左)を追加。Extend Ends 適用後の x に加算するだけの
+  素直な実装(幅は不変・位置のみ移動)
+- 実測(M2・TD実機・MCP HTTP直送): 0/+80/-80 で下線が行位置から左右へ正しくシフト、
+  エラー・警告なし。検証ノード削除済み。常設インストール済み(TD再起動で反映)
