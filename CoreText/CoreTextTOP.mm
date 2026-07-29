@@ -143,6 +143,8 @@ struct Style {
     std::string text, fontName, fontFile;
     bool palt = false;                 // プロポーショナルメトリクス(OpenType 'palt'。自動文字詰め)
     float fontSize = 72, weight = 400, tracking = 0, lineHeight = 1.0f;
+    float shearX = 0, shearY = 0;      // アフィン変換によるシアー(度)。疑似イタリック
+    float slant = 0;                   // 可変フォントの 'slnt' 軸(度・対応書体のみ)
     int ligatures = 1;                 // 0=none 1=standard 2=all
     int alignH = 1, alignV = 1;        // 0=left/top 1=center/middle 2=right/bottom 3=justified(Hのみ)
     bool italic = false, vertical = false, autofit = false;
@@ -177,7 +179,8 @@ struct Style {
                  shadow, shadowRGBA[0],shadowRGBA[1],shadowRGBA[2],shadowRGBA[3],
                  shadowX, shadowY, shadowBlur + embolden * 1000.0f, w, h);
         char sh[128];
-        snprintf(sh, sizeof sh, "|s%d|%d|%.3f|%.1f|%zu", shape, shapeSides, shapeRound, shapeRotate, shapePath.size());
+        snprintf(sh, sizeof sh, "|s%d|%d|%.3f|%.1f|%zu|sh%.2f,%.2f,%.2f",
+                 shape, shapeSides, shapeRound, shapeRotate, shapePath.size(), shearX, shearY, slant);
         return text + "\x1f" + fontFile + "\x1f" + ellipsis + "\x1f" + runsSig + "\x1f" + sh + "\x1f"
              + (palt ? "P" : "p") + (autofit ? "F" : "f") + std::to_string(truncate) + "\x1f" + b;
     }
@@ -236,20 +239,30 @@ static CTFontRef makeFont(const Style& st)
         CFRelease(desc); CFRelease(attrs); CFRelease(features); CFRelease(feature); CFRelease(val);
         if (withPalt) { CFRelease(base); base = withPalt; }
     }
-    // 可変フォントの weight 軸(存在すれば)
-    if (st.weight != 400) {
+    // 可変フォントの軸(weight / slant)。対応書体でのみ効く
+    if (st.weight != 400 || st.slant != 0) {
         const uint32_t kWght = 0x77676874;   // 'wght'
-        CFNumberRef axis = CFNumberCreate(nullptr, kCFNumberSInt32Type, &kWght);
-        float wv = st.weight;
-        CFNumberRef val = CFNumberCreate(nullptr, kCFNumberFloatType, &wv);
-        CFDictionaryRef variation = CFDictionaryCreate(nullptr, (const void**)&axis, (const void**)&val, 1,
-                                                       &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        const uint32_t kSlnt = 0x736c6e74;   // 'slnt'
+        CFMutableDictionaryRef variation = CFDictionaryCreateMutable(nullptr, 0,
+            &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        if (st.weight != 400) {
+            CFNumberRef axis = CFNumberCreate(nullptr, kCFNumberSInt32Type, &kWght);
+            float wv = st.weight;
+            CFNumberRef v = CFNumberCreate(nullptr, kCFNumberFloatType, &wv);
+            CFDictionarySetValue(variation, axis, v); CFRelease(axis); CFRelease(v);
+        }
+        if (st.slant != 0) {
+            CFNumberRef axis = CFNumberCreate(nullptr, kCFNumberSInt32Type, &kSlnt);
+            float sv = st.slant;
+            CFNumberRef v = CFNumberCreate(nullptr, kCFNumberFloatType, &sv);
+            CFDictionarySetValue(variation, axis, v); CFRelease(axis); CFRelease(v);
+        }
         CFDictionaryRef attrs = CFDictionaryCreate(nullptr, (const void**)&kCTFontVariationAttribute,
                                                    (const void**)&variation, 1,
                                                    &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
         CTFontDescriptorRef desc = CTFontDescriptorCreateWithAttributes(attrs);
         CTFontRef varied = CTFontCreateCopyWithAttributes(base, st.fontSize, nullptr, desc);
-        CFRelease(desc); CFRelease(attrs); CFRelease(variation); CFRelease(val); CFRelease(axis);
+        CFRelease(desc); CFRelease(attrs); CFRelease(variation);
         if (varied) { CFRelease(base); base = varied; }
         // 可変軸が無いフォントでも 600 以上なら Bold トレイトで近似
         if (st.weight >= 600) {
@@ -262,6 +275,16 @@ static CTFontRef makeFont(const Style& st)
         CTFontRef it = CTFontCreateCopyWithSymbolicTraits(base, st.fontSize, nullptr,
                                                           kCTFontTraitItalic, kCTFontTraitItalic);
         if (it) { CFRelease(base); base = it; }
+    }
+    // シアー(疑似イタリック): フォント行列にせん断成分を入れる。書体を問わず角度指定でき、
+    // グリフ形状そのものが変形するので縁取り/Embolden/グラデ/シャドウも自動的に追従する
+    if (st.shearX != 0 || st.shearY != 0) {
+        CGAffineTransform mtx = CGAffineTransformMake(
+            1.0, (CGFloat)tan(st.shearY * M_PI / 180.0),      // b: 縦方向のシアー
+            (CGFloat)tan(st.shearX * M_PI / 180.0), 1.0,      // c: 横方向のシアー(右に倒す=正)
+            0, 0);
+        CTFontRef sheared = CTFontCreateCopyWithAttributes(base, st.fontSize, &mtx, nullptr);
+        if (sheared) { CFRelease(base); base = sheared; }
     }
     return base;
 }
@@ -1089,6 +1112,9 @@ public:
         st.palt      = in->getParInt("Palt") != 0;
         st.fontSize  = (float)in->getParDouble("Fontsize");
         st.autofit   = in->getParInt("Autofit") != 0;
+        st.shearX    = (float)in->getParDouble("Shearx");
+        st.shearY    = (float)in->getParDouble("Sheary");
+        st.slant     = (float)in->getParDouble("Slant");
         st.weight    = (float)in->getParDouble("Weight");
         st.italic    = in->getParInt("Italic") != 0;
         st.tracking  = (float)in->getParDouble("Tracking");
@@ -1168,6 +1194,9 @@ public:
         { OP_NumericParameter p("Autofit"); p.label = "Auto Fit Font Size (shrink to area)"; p.page = P; p.defaultValues[0] = 0; m->appendToggle(p); }
         { OP_NumericParameter p("Weight"); p.label = "Weight (100-900, variable font)"; p.page = P; p.defaultValues[0] = 400; p.minSliders[0] = 100; p.maxSliders[0] = 900; p.minValues[0] = 100; p.maxValues[0] = 900; p.clampMins[0] = p.clampMaxes[0] = true; m->appendFloat(p); }
         { OP_NumericParameter p("Italic"); p.label = "Italic"; p.page = P; m->appendToggle(p); }
+        { OP_NumericParameter p("Shearx"); p.label = "Shear X (deg)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = -45; p.maxSliders[0] = 45; m->appendFloat(p); }
+        { OP_NumericParameter p("Sheary"); p.label = "Shear Y (deg)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = -45; p.maxSliders[0] = 45; m->appendFloat(p); }
+        { OP_NumericParameter p("Slant"); p.label = "Slant Axis (deg, variable font)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = -15; p.maxSliders[0] = 15; m->appendFloat(p); }
         { OP_NumericParameter p("Palt"); p.label = "Proportional Metrics (palt)"; p.page = P; m->appendToggle(p); }
         { OP_NumericParameter p("Tracking"); p.label = "Tracking (pt)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = -100; p.maxSliders[0] = 100; m->appendFloat(p); }
         { OP_NumericParameter p("Lineheight"); p.label = "Line Height (multiple)"; p.page = P; p.defaultValues[0] = 1.0; p.minSliders[0] = 0; p.maxSliders[0] = 3; m->appendFloat(p); }

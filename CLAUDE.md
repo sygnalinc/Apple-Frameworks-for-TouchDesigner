@@ -2782,3 +2782,16 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 罠: circleSOP の既定 `type` は `prim`(点を持たない・numPoints=1)。**`poly` にしないと
   SOP to DAT に点が出ない**。SOP to DAT も `extract` を `points` にする必要がある
 - sample.toe の `/project1/coretext_demo` に4つ目の例 `shape_sop`(sop_shape → sop_dat)を追加
+
+### 2026-07-23 CoreText TOP: シアー(疑似イタリック)+ 可変フォント slnt 軸を追加
+
+- ユーザー「テキストのシアー機能はある?」→ 当時は Italic(書体の本物のイタリック)のみだったため実装
+- **Shear X / Shear Y(度)**: `CTFontCreateCopyWithAttributes(font, size, &matrix, nullptr)` の
+  **フォント行列にせん断成分**(c=tan(x), b=tan(y))を入れる方式。**書体を問わず**角度指定でき、
+  和文書体(ヒラギノ等)も傾く。グリフ形状自体が変形するので**縁取り/Embolden/グラデ/シャドウも
+  自動追従**(全描画パスが同じフォントを使う設計のため)
+- **Slant Axis(度)**: 可変フォントの `slnt` 軸。既存の `wght` と同じ variation 辞書に統合
+  (weight と同時指定できるよう CFMutableDictionary 化)。**軸を持つ書体のみ有効**で、SFは非対応
+  =見た目に変化なしを実測確認(誤解を避けるためREADMEに明記)
+- 実測(M2): Shear X +15/-15、Shear Y +10 で日本語含め正しく傾斜。Shear 18°+縁取り5px+
+  Embolden 4px+グラデでも全て追従することを視認

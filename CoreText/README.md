@@ -9,6 +9,8 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
   Font 欄に結果が表示される)。**フォントファイル(.ttf/.otf/.ttc)の直接指定**も可(未インストールでも使える)。
   既定はSFシステムフォント。`Weight` 100〜900 を**無段階**指定(可変フォントの `wght` 軸。
   無い場合は600以上でBold近似)
+- **シアー(疑似イタリック)**: `Shear X / Y` でフォント行列を傾ける。**イタリック体を持たない
+  和文書体でも角度を無段階で指定**でき、縁取り・Embolden・グラデも一緒に変形する
 - **プロポーショナルメトリクス(palt)**: OpenType `'palt'` で自動文字詰め
   (CSSの `font-feature-settings: 'palt'` 相当)。「」や句読点のアキが詰まり、
   見出し向けのプロポーショナル詰め組みになる(対応フォント: ヒラギノ等)
@@ -44,7 +46,9 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Font File | .ttf/.otf/.ttc の直接指定(Fontより優先・未インストール可) |
 | | Choose Font (macOS Font Panel) | **macOS標準フォントパネル**を開く。選択すると Font/Font Size に自動反映 |
 | | Proportional Metrics (palt) | OpenType 'palt' 自動文字詰め(対応フォントのみ効く) |
-| | Font Size / Weight / Italic | サイズ(px)/ ウェイト100〜900(可変フォント)/ 斜体 |
+| | Font Size / Weight / Italic | サイズ(px)/ ウェイト100〜900(可変フォント)/ 斜体(書体が持つ本物のイタリック) |
+| | Shear X / Shear Y (deg) | **シアー(疑似イタリック)**。フォント行列にせん断を入れるので**書体を問わず**角度指定でき、和文書体も傾けられる。縁取り/Embolden/グラデ/シャドウも追従 |
+| | Slant Axis (deg) | 可変フォントの `slnt` 軸(**書体が軸を持つ場合のみ**。書体デザイナー設計の本物の傾き) |
 | | Auto Fit Font Size | **描画領域に収まるまで自動縮小**(Font Sizeが上限)。Word Wrap Onなら折り返して収まるサイズ、Offなら1行のまま収まるサイズ。実サイズはInfo CHOP `fitted_size` |
 | | Tracking / Line Height / Ligatures | 字間(pt・-100〜100で重なりも可)/ 行送り倍率(0〜・**1行目は固定**。1.0未満は行高を詰める)/ リガチャ |
 | | Horizontal/Vertical Align | 左/中/右/両端揃え・上/中/下 |
@@ -126,6 +130,10 @@ circle SOP → SOP to DAT (extract = points) → CoreText の Path DAT
 - Style DAT の `start`/`length` 指定は、Truncate で省略が発生すると範囲がずれる
   (`text` 指定なら省略後の文字列に対して探索されるのでズレない)
 - 1文字も描けないフォント名を指定するとフォールバック(Warning参照)
+- **Shear と Italic / Slant Axis は別物**。Italic=書体の本物のイタリック体に切替(持たない書体では
+  無変化)、Slant Axis=可変フォントの `slnt` 軸(軸を持つ書体のみ。SFは非対応)、
+  Shear=幾何変形なのでどの書体でも効く。シアーは字送り幅を変えないため、深い角度では
+  隣の字と接近する(通常のオブリークと同じ挙動)
 - **Truncate と Auto Fit は別戦略**。Auto Fit(縮小して全文を見せる)がOnだとほぼ収まるので
   Truncate は発動しない。「サイズは固定で入り切らない分は …」なら Auto Fit Off + Truncate を使う
 - 省略は**収まる最大量を二分探索**して求める(合成文字境界にスナップするので絵文字を割らない)。
