@@ -43,7 +43,7 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Horizontal/Vertical Align | 左/中/右/両端揃え・上/中/下 |
 | | Vertical Text | 縦書き(右→左の段組) |
 | | Text Wrap | 改行制御(CSS text-wrap相当): **Wrap**=幅で折返し / **No Wrap**=改行なし / **Balance**=各行の長さを均等化 / **Pretty**=最終行の孤立を回避 / **Stable**=Wrapと同じ |
-| | Truncate (overflow) | **領域に収まらない場合の省略**(CSS `text-overflow: ellipsis` 相当): Off(クリップ)/ Tail `abc…` / Head `…xyz` / Middle `ab…yz` |
+| | Truncate (overflow) | **領域に収まらない場合の省略**(CSS `text-overflow: ellipsis` 相当): Off(クリップ)/ Tail(末尾を省略)/ Head(先頭を省略)/ Middle(中央を省略) |
 | | Ellipsis | 省略記号(既定 `…`。`...` や ` ▶` など任意) |
 | | Padding | 余白(px) |
 | Style | Font Color / Background Color | 文字色 / 背景色(既定は透明背景) |

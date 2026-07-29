@@ -911,7 +911,8 @@ public:
           m->appendMenu(p, 5, n, l); }
         { OP_StringParameter p("Truncate"); p.label = "Truncate (overflow)"; p.page = P; p.defaultValue = "off";
           const char* n[] = {"off","tail","head","middle"};
-          const char* l[] = {"Off (overflow / clip)","Tail (abc…)","Head (…xyz)","Middle (ab…yz)"};
+          // メニューラベルはASCIIのみ(TDのUIは非ASCIIが文字化けする)
+          const char* l[] = {"Off (overflow / clip)","Tail (abc...)","Head (...xyz)","Middle (ab...yz)"};
           m->appendMenu(p, 4, n, l); }
         { OP_StringParameter p("Ellipsis"); p.label = "Ellipsis"; p.page = P; p.defaultValue = "…"; m->appendString(p); }
         { OP_NumericParameter p("Padding"); p.label = "Padding (px)"; p.page = P; p.defaultValues[0] = 20; p.minSliders[0] = 0; p.maxSliders[0] = 200; p.minValues[0] = 0; p.clampMins[0] = true; m->appendFloat(p); }

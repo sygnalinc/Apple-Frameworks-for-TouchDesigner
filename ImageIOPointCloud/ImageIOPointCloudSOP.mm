@@ -117,7 +117,7 @@ public:
         { OP_NumericParameter p("Step"); p.label = "Sample Step (downsample)"; p.page = PAGE; p.defaultValues[0] = 2; p.minSliders[0] = 1; p.maxSliders[0] = 16; p.minValues[0] = 1; p.clampMins[0] = true; m->appendInt(p); }
         { OP_NumericParameter p("Maxpoints"); p.label = "Max Points"; p.page = PAGE; p.defaultValues[0] = 200000; p.minSliders[0] = 1000; p.maxSliders[0] = 500000; m->appendInt(p); }
         { OP_NumericParameter p("Depthscale"); p.label = "Depth Scale"; p.page = PAGE; p.defaultValues[0] = 1.0; p.minSliders[0] = 0.01; p.maxSliders[0] = 10; m->appendFloat(p); }
-        { OP_NumericParameter p("Disptodepth"); p.label = "Disparity → Depth (1/x)"; p.page = PAGE; p.defaultValues[0] = 0; m->appendToggle(p); }
+        { OP_NumericParameter p("Disptodepth"); p.label = "Disparity to Depth (1/x)"; p.page = PAGE; p.defaultValues[0] = 0; m->appendToggle(p); }
         { OP_NumericParameter p("Hfov"); p.label = "Horizontal FOV (deg, if no calibration)"; p.page = PAGE; p.defaultValues[0] = 60; p.minSliders[0] = 20; p.maxSliders[0] = 120; m->appendFloat(p); }
         { OP_NumericParameter p("Color"); p.label = "Sample Color from RGB"; p.page = PAGE; p.defaultValues[0] = 1; m->appendToggle(p); }
         { OP_NumericParameter p("Applyorientation"); p.label = "Apply EXIF Orientation"; p.page = PAGE; p.defaultValues[0] = 1; m->appendToggle(p); }

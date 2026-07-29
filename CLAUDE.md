@@ -2731,3 +2731,13 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - Info CHOP に `truncated`(0/1)を追加。実測: 3モードとも領域内に収まり、nowrap 1行・
   カスタム省略記号・絵文字連続でも正しく省略
 - **Auto Fit との使い分け**をREADMEに明記(Auto Fit=縮小して全文 / Truncate=サイズ固定で省略)
+
+### 2026-07-23 UIラベルの非ASCII文字化けを修正(Truncate メニュー / PointCloud)
+
+- ユーザー「Truncateのメニューの日本語が文字化けしてるので英語のみにして」→ 実体は**日本語ではなく
+  `…`(U+2026)**。TDのUIは**ラベル中の非ASCII記号も化ける**(`…` → `â€¦`・実測)
+- Truncate のメニューラベルを `Tail (abc...)` 等の**ASCIIのみ**に修正。あわせてリポジトリ全体を走査し、
+  ImageIO PointCloud の `Disparity → Depth` も `Disparity to Depth` へ修正(他に混入なし)
+- **パラメータの「値」は非ASCIIでも正常**(Text欄の日本語、Ellipsis既定値の `…` は表示・描画とも問題なし)。
+  化けるのは**ラベル**(表示名・メニュー項目名)のみ
+- skill naming.md に「UIラベルはASCIIのみ(記号含む)」+ 検出用grepを追記
