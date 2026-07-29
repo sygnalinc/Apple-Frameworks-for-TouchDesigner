@@ -1035,14 +1035,53 @@ public:
         st.shapeRotate = (float)in->getParDouble("Shaperotate");
         if (st.shape == 4) {
             if (const OP_DATInput* pd = in->getParDAT("Shapedat")) {
-                for (int r = 0; r < pd->numRows; r++) {
-                    const char* xs = pd->getCell(r, 0);
-                    const char* ys = pd->numCols > 1 ? pd->getCell(r, 1) : nullptr;
-                    if (!xs || !ys) continue;
-                    if (r == 0 && (strcmp(xs, "x") == 0 || strcmp(xs, "u") == 0)) continue;   // ヘッダ行
+                // 数値セルか(ヘッダ行の自動判定に使う)
+                auto isNum = [](const char* s) -> bool {
+                    if (!s || !*s) return false;
+                    char* end = nullptr; strtod(s, &end);
+                    while (end && *end == ' ') end++;
+                    return end && *end == '\0';
+                };
+                // 列の決定: 列名に x/y・u/v・P(0)/P(1) があればそれを使う(SOP to DAT 対応)。
+                // 無ければ先頭2列
+                int cx = 0, cy = 1, startRow = 0;
+                if (pd->numRows > 0) {
+                    bool header = false;
+                    for (int c = 0; c < pd->numCols; c++)
+                        if (!isNum(pd->getCell(0, c))) { header = true; break; }
+                    if (header) {
+                        startRow = 1;
+                        for (int c = 0; c < pd->numCols; c++) {
+                            const char* h = pd->getCell(0, c);
+                            if (!h) continue;
+                            if (!strcmp(h,"x") || !strcmp(h,"u") || !strcmp(h,"P(0)") || !strcmp(h,"tx")) cx = c;
+                            if (!strcmp(h,"y") || !strcmp(h,"v") || !strcmp(h,"P(1)") || !strcmp(h,"ty")) cy = c;
+                        }
+                    }
+                }
+                for (int r = startRow; r < pd->numRows; r++) {
+                    const char* xs = cx < pd->numCols ? pd->getCell(r, cx) : nullptr;
+                    const char* ys = cy < pd->numCols ? pd->getCell(r, cy) : nullptr;
+                    if (!isNum(xs) || !isNum(ys)) continue;
                     st.shapePath.emplace_back((float)atof(xs), (float)atof(ys));
                 }
+                // 正規化: 点群のバウンディングボックスを 0..1 へ収める(SOPの任意単位でもそのまま使える)
+                if (in->getParInt("Pathnormalize") != 0 && st.shapePath.size() >= 3) {
+                    float minx = st.shapePath[0].first, maxx = minx;
+                    float miny = st.shapePath[0].second, maxy = miny;
+                    for (auto& pt : st.shapePath) {
+                        minx = std::min(minx, pt.first);  maxx = std::max(maxx, pt.first);
+                        miny = std::min(miny, pt.second); maxy = std::max(maxy, pt.second);
+                    }
+                    float dx = maxx - minx, dy = maxy - miny;
+                    if (dx > 1e-6f && dy > 1e-6f)
+                        for (auto& pt : st.shapePath) {
+                            pt.first  = (pt.first  - minx) / dx;
+                            pt.second = (pt.second - miny) / dy;
+                        }
+                }
                 char b[64]; snprintf(b, sizeof b, "|p%zu", st.shapePath.size()); st.runsSig += b;
+                for (auto& pt : st.shapePath) { char q[32]; snprintf(q, sizeof q, "%.3f,%.3f;", pt.first, pt.second); st.runsSig += q; }
             }
         }
         st.fontName  = in->getParString("Font") ? in->getParString("Font") : "";
@@ -1156,7 +1195,8 @@ public:
         { OP_NumericParameter p("Shapesides"); p.label = "Polygon Sides"; p.page = P; p.defaultValues[0] = 6; p.minSliders[0] = 3; p.maxSliders[0] = 16; p.minValues[0] = 3; p.clampMins[0] = true; m->appendInt(p); }
         { OP_NumericParameter p("Shaperound"); p.label = "Corner Round (0-1)"; p.page = P; p.defaultValues[0] = 0.25; p.minSliders[0] = 0; p.maxSliders[0] = 1; m->appendFloat(p); }
         { OP_NumericParameter p("Shaperotate"); p.label = "Polygon Rotate (deg)"; p.page = P; p.defaultValues[0] = 0; p.minSliders[0] = 0; p.maxSliders[0] = 360; m->appendFloat(p); }
-        { OP_StringParameter p("Shapedat"); p.label = "Path DAT (u v columns)"; p.page = P; m->appendDAT(p); }
+        { OP_StringParameter p("Shapedat"); p.label = "Path DAT (u v / SOP to DAT)"; p.page = P; m->appendDAT(p); }
+        { OP_NumericParameter p("Pathnormalize"); p.label = "Normalize Path to Area"; p.page = P; p.defaultValues[0] = 1; m->appendToggle(p); }
         { OP_NumericParameter p("Padding"); p.label = "Padding (px)"; p.page = P; p.defaultValues[0] = 20; p.minSliders[0] = 0; p.maxSliders[0] = 200; p.minValues[0] = 0; p.clampMins[0] = true; m->appendFloat(p); }
 
         const char* S = "Style";

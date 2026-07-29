@@ -15,8 +15,9 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 - **リッチテキスト(範囲ごとのスタイル)**: Style DAT で**文字列や範囲を指定して**色・サイズ・
   ウェイト・フォント・字間・下線を個別に変えられる(1ノードで見出し+本文、一語だけ強調 等)
 - **ルビ(振り仮名)**: `CTRubyAnnotation` による**本物のルビ**。横書きは上、縦書きは右に付く
-- **シェイプ組版**: 矩形/円・楕円/角丸/多角形/**任意パス(Path DAT)** にテキストを流し込める
-  (Core Text は矩形以外の CGPath を受け付ける)
+- **シェイプ組版**: 矩形/円・楕円/角丸/多角形/**任意パス** にテキストを流し込める
+  (Core Text は矩形以外の CGPath を受け付ける)。パスは Table DAT の `u v` でも、
+  **SOP → SOP to DAT でも渡せる**(SOPを編集すると組版がリアルタイムに追従)
 - **カラー絵文字** 😀🎉(Apple Color Emoji をそのまま描画)
 - **日本語縦書き**(Vertical Text): 右→左の段組・縦用約物(。、の位置)も正しい
 - **高品質AA**: サブピクセル位置指定・リガチャ(none/standard/all)・トラッキング・行送り・両端揃え
@@ -53,7 +54,8 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Ellipsis | 省略記号(既定 `…`。`...` や ` ▶` など任意) |
 | | Layout Shape | 組版領域の形: Rectangle / Ellipse / Rounded Rect / Polygon / Path DAT |
 | | Polygon Sides / Corner Round / Polygon Rotate | 多角形の辺数 / 角丸(0-1)/ 多角形の回転(度) |
-| | Path DAT (u v columns) | Shape=Path 用の点列(u,v の 0〜1 座標。1行1点・ヘッダ行 `u v` は省略可) |
+| | Path DAT (u v / SOP to DAT) | Shape=Path 用の点列。`u v`(0〜1)のほか **SOP to DAT の `P(0)` `P(1)` 列を自動認識**(ヘッダ行は自動判定) |
+| | Normalize Path to Area | 点群のバウンディングボックスを領域に自動フィット(既定On)。**SOPの単位のまま渡せる** |
 | | Padding | 余白(px) |
 | Style | Font Color / Background Color | 文字色 / 背景色(既定は透明背景) |
 | | Embolden (px) | **合成ボールド**: マスク膨張でフォントの最大ウェイト以上に太らせる(グラデ/縁取り併用可)。**閉じた内側(oや口の穴)は保護**され潰れない |
@@ -97,6 +99,17 @@ text    r    g    b    a   size  weight  ruby
 漢字                                      かんじ
 ```
 
+### SOP の形を使う
+
+TOP は SOP をワイヤ接続できないので、**SOP to DAT** を挟みます:
+
+```
+circle SOP → SOP to DAT (extract = points) → CoreText の Path DAT
+```
+
+`P(0)`(x)と `P(1)`(y)列を自動認識し、`Normalize Path to Area` が点群を描画領域へ自動フィット
+するので、SOPの座標スケールは気にしなくて構いません。SOPを編集すれば組版もリアルタイムに追従します。
+
 ## 注意・制約
 
 - **縁取り/Emboldenはマスク膨張方式**。グリフのアウトラインパスは使わない
@@ -128,6 +141,7 @@ text    r    g    b    a   size  weight  ruby
 | `rich` + `style_rich` | 「夜景」だけ赤・150px・W900、「Neon」だけ青・下線 |
 | `ruby` + `style_ruby` | 縦書き(ヒラギノ明朝)+ 令和/八年/東京にルビ |
 | `shape` + `shape_path` | 星形の Path DAT にテキストを流し込み |
+| `shape_sop` + `sop_shape` → `sop_dat` | **SOPの形**に流し込み(circle SOP → SOP to DAT → Path DAT) |
 
 ## ビルド
 

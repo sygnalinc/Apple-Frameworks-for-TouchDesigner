@@ -2769,3 +2769,16 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **upright は書体依存と判明**: SF+欧文では正立/回転を切り替えられるが、**ヒラギノ等の和文書体は
   数字の縦組み形が横倒しで固定**され `upright` で変わらない。デモは漢数字(令和八年)に変更し、
   READMEにも「縦書きの年号は漢数字が確実」と明記
+
+### 2026-07-23 CoreText: Shape Path を SOP からも使えるように(SOP to DAT 対応)
+
+- ユーザー「ShapePathはSOPも使える?」→ TOPはSOPをワイヤ接続できないため **SOP to DAT 経由**が答え。
+  ただし従来のパーサは `u v` 前提だったので、実用できるよう改良:
+  ① **ヘッダ行の自動判定**(数値でないセルがあればヘッダ)② **列名で x/y を自動選択**
+  (`x/y`・`u/v`・**`P(0)`/`P(1)`**(SOP to DAT)・`tx/ty`)③ **`Normalize Path to Area` トグル**
+  (既定On)で点群のbboxを描画領域へ自動フィット → **SOPの座標スケールのまま渡せる**
+- 実測: circle SOP(poly・divs=3 の三角形 / divs=12 の楕円)→ SOP to DAT(extract=points)→
+  Path DAT で、行長が形に追従することを視認。SOP編集にリアルタイム追従
+- 罠: circleSOP の既定 `type` は `prim`(点を持たない・numPoints=1)。**`poly` にしないと
+  SOP to DAT に点が出ない**。SOP to DAT も `extract` を `points` にする必要がある
+- sample.toe の `/project1/coretext_demo` に4つ目の例 `shape_sop`(sop_shape → sop_dat)を追加
