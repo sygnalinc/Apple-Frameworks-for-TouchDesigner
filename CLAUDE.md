@@ -2835,3 +2835,34 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   素直な実装(幅は不変・位置のみ移動)
 - 実測(M2・TD実機・MCP HTTP直送): 0/+80/-80 で下線が行位置から左右へ正しくシフト、
   エラー・警告なし。検証ノード削除済み。常設インストール済み(TD再起動で反映)
+
+### 2026-08-05 RealityKit Splat TOP 再実装(macOS 27 GaussianSplatComponent・真のsplat描画)
+
+- 環境が **macOS 27.0 実機+SDK 27.0** になり、待っていた公開API
+  `GaussianSplatComponent` / `GaussianSplatResource` / `LowLevelBuffer` がSDKに入ったことを確認
+  (RealityFoundation.swiftmodule の swiftinterface で実確認)。記録済み方針どおり
+  **RealityKit Splat TOP を真のGaussian Splat描画で再実装**(ブランチ `macos27/realitykit-splat`)
+- **ヘッドレスharnessで先に実証**: 3DGS .ply 自前パース → LowLevelBuffer 投入 →
+  `RealityRenderer` オフスクリーン描画 → PNG。**macOS 26で不可能だったオフスクリーンsplat描画が
+  27では動く**(山岳ジオラマの実3DGSシーンを精細に視認)
+- プラグインは旧実装(削除済み・git履歴 89d1b41^ から回収)の RealityRenderer +MainActor +
+  オービットカメラ構成を土台に、.ply ロード経路を追加。USD/USDZ メッシュ描画は従来どおり共存
+  (temple_scan.usdz でリグレッション確認済み)
+- **実測(M2・TD実機・MCP HTTP直送)**: gs_sample.ply(369,085 splats・91MB)を丸ごとロード、
+  1280×720 で **splatレンダ約44fps・TD本体60fps維持・cook約0.8ms**。Yaw/Pitch/Distance オービット、
+  Info CHOP(executes/frames/render_rc/loaded/splats)、警告なし
+- **踏んだ地雷(pitfalls.md反映)**: ①**opacityにNaN/Infが1つでも混ざると全体が描画されない**
+  (`GSAsset: NaN/Inf detected`)→パースで除去必須 ②**LowLevelBufferのcapacityはアライメント要件
+  あり**(count×12素のままだと invalid(bufferCapacity:)→256B切り上げ)③plyの rot_0..3 は wxyz →
+  RealityKitへは xyzw ④scale/opacityは生値+.exponential/.sigmoid activation ⑤SHはdegree 0
+  (f_dc)で投入(f_rest_* の高次レイアウトは非公開・未対応)⑥3DGSはY下向き→X軸π回転で正立、
+  フレーミングは中央値+70パーセンタイル(bboxは背景splatで数百単位に暴れる)
+- **重要(環境)**: macOS 27 移行でホームが新規になり、**常設Plugins(約80個)と各 build/ 成果物が
+  消失**。今回 RealityKitSplatTOP のみ再ビルド・再インストール済み。**sample.toe は現在
+  大量の "Unknown operator type" 状態なので絶対に保存しないこと**(全プラグイン再ビルド・
+  再インストール後に開き直す)。TouchDesigner.app は /Applications に存在(SDKヘッダも従来パス)
+- **sample.toe がTDにより自動保存され(17:30・プラグイン欠損状態のまま)壊れた** → 規約どおり
+  git HEAD から復旧済み(壊れた版と sample.3.toe はscratchpadに退避)。検証でTDを開く際は
+  自動保存に注意(既知: 終了時以外にも保存が走ることがある)
+- 次にやること: 全プラグインの一括再ビルド+再インストール(xargs -P 6 並列で約20分)、
+  sample.toe への RealityKitSplat 利用例追加、SH degree 1〜3 レイアウトの調査(視覚差分で推定可能)

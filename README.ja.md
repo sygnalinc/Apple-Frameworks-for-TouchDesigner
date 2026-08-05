@@ -143,6 +143,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | プラグイン | 種類 | 内容 |
 |---|---|---|
 | [RealityKit Capture](RealityKitCapture/) | SOP | **写真フォルダ→3Dメッシュ**(RealityKit Object Capture)。テクスチャ付きOBJ出力 |
+| [RealityKit Splat](RealityKitSplat/) | TOP | **3D Gaussian Splatting(.ply)を真のsplatとして描画**(macOS 27 `GaussianSplatComponent`)+USD/USDZシーン。RealityRendererオフスクリーン。36.9万splat≈44fps @720p(M2) |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **写真の深度→3Dポイントクラウド**(カメラ較正/画角で逆投影)。RGBから色サンプル |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic動画**(macOS 26+): 深度(視差)マップ/**f値・ピント差し替え再レンダ**。メタデータ(フォーカス深度・被写体)は**Info CHOP**で出力 |
 | [Spatial Video](SpatialVideo/) | TOP | **MV-HEVC 立体視の左右眼をデコード** → Left / Right / Side-by-Side BGRA。メタデータ(基線・FOV・ヒーローアイ等)は**Info CHOP / Info DAT**で出力 |

@@ -145,6 +145,7 @@ grouped by category.
 | Plugin | Family | What it does |
 |---|---|---|
 | [RealityKit Capture](RealityKitCapture/) | SOP | **Photo folder → 3D mesh** (RealityKit Object Capture). Textured OBJ output |
+| [RealityKit Splat](RealityKitSplat/) | TOP | **True 3D Gaussian Splatting render** of 3DGS `.ply` (macOS 27 `GaussianSplatComponent`) + USD / USDZ scenes, offscreen via RealityRenderer. 369k splats ≈ 44fps @720p (M2) |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **Photo depth → 3D point cloud** (unproject via camera calibration / FOV). Colors sampled from RGB |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic video** (macOS 26+): depth (disparity) map or **re-render with adjustable focus / aperture**; metadata (focus depth, subjects) on its **Info CHOP** |
 | [Spatial Video](SpatialVideo/) | TOP | **Decode MV-HEVC stereo eyes** → Left / Right / Side-by-Side BGRA; metadata (baseline, FOV, hero eye ...) on its **Info CHOP / Info DAT** |
