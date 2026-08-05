@@ -11,7 +11,14 @@
 # 前提: Xcode（clang++）と TouchDesigner.app（C++ SDK ヘッダを流用）
 set -e
 
-source "$(dirname "${(%):-%N}")/version.sh"
+# bash/zsh 両対応で自分の場所を解決する(zsh専用の ${(%):-%N} だけだと
+# #!/bin/bash の build.sh から source されたとき bad substitution で死ぬ・実測)
+if [ -n "${BASH_SOURCE:-}" ]; then
+    _td_common_dir="$(dirname "${BASH_SOURCE[0]}")"
+else
+    _td_common_dir="$(dirname "${(%):-%N}")"
+fi
+source "$_td_common_dir/version.sh"
 
 TD_SDK="${TD_SDK:-/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP}"
 

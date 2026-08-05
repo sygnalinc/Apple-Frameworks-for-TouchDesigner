@@ -2866,3 +2866,29 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   自動保存に注意(既知: 終了時以外にも保存が走ることがある)
 - 次にやること: 全プラグインの一括再ビルド+再インストール(xargs -P 6 並列で約20分)、
   sample.toe への RealityKitSplat 利用例追加、SH degree 1〜3 レイアウトの調査(視覚差分で推定可能)
+
+### 2026-08-05 全84プラグインを macOS 27 環境で一括再ビルド・常設再インストール
+
+- ユーザー指示「開発しているpluginはすべてbuildしてpluginsフォルダに入れて」。macOS 27移行で
+  消えた常設Pluginsを全量復旧: **84バンドル全てビルド成功・署名検証OK・インストール完了**。
+  TD再起動後に全型の登録と sample.toe の全ノード0エラーを確認(68例コンテナ)
+- **踏んだ罠(環境系)**:
+  1. **common/build_plugin.sh の zsh専用構文(`${(%):-%N}`・`${=VAR}`)が #!/bin/bash の
+     build.sh から source されると bad substitution で全滅**。自己位置解決は BASH_SOURCE
+     フォールバック付きに修正済み。**一括ビルドは `zsh ./build.sh` で起動するのが安全**
+  2. **macOS の `xargs -I{}` は置換後コマンドが長いと "command line cannot be assembled"**
+     で静かに死ぬ(scratchpadの長いパス×複数置換で発生)→ 引数1個のヘルパースクリプト+
+     `xargs -P 6 -n 1` 方式に変更
+  3. **LLMMLX は Xcode 27 beta の Metal Toolchain が別コンポーネント**。
+     `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer xcodebuild
+     -downloadComponent MetalToolchain`(839MB)を先に実行しないと
+     "cannot execute tool 'metal'" で失敗する。xcode-select は CLT のままでよい
+     (DEVELOPER_DIR 環境変数だけで xcodebuild が使える・sudo不要)
+  4. **84バンドル一括入れ替え後の初回TD起動は一部プラグインの登録を取りこぼすことがある**
+     (今回 CoreWLAN 2件が未登録・バイナリは cplusplusCHOP 経由で正常動作)→ **TD再起動で解消**
+     (既知の「初回はプラグイン再検証」挙動の亜種)
+- ユーザーが `Assets/oowaku.ply` / `oowaku.spz` を追加(oowaku.ply は gs_sample.ply と同一
+  内容の山岳ジオラマ・gitignore済み)。登録済み RealityKit Splat TOP で oowaku.ply の
+  369,085 splats 描画を視認確認。**.spz(Niantic圧縮形式)は現行パーサ非対応**(将来課題:
+  gzip+固定小数の独自形式なのでデコーダ追加は可能)
+- 次にやること: .spz 対応の検討、sample.toe への RealityKitSplat 例追加、SH degree 1〜3
