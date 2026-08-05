@@ -134,7 +134,7 @@ grouped by category.
 
 | Plugin | Family | What it does |
 |---|---|---|
-| [LLM AFM](LLMAFM/) | DAT | **Apple Intelligence on-device LLM** (macOS 26+). **Structured output (JSON schema)** + **Tool Calling** (the LLM calls a tool, TouchDesigner executes it and returns the result) straight into show control |
+| [LLM AFM](LLMAFM/) | DAT | **Apple Intelligence LLM** (macOS 26+). macOS 27: **model select (On-Device AFM / Private Cloud Compute)**, **image input (vision)**, **reasoning levels**. **Structured output (JSON schema)** + **Tool Calling** (the LLM calls a tool, TouchDesigner executes it and returns the result) straight into show control |
 | [LLM MLX](LLMMLX/) | DAT | **Local LLM via Apple MLX** (mlx-swift-lm). Runs any mlx-community model (Gemma 4 / Qwen / Llama) fully on-device with token streaming. No API key; model auto-downloads from Hugging Face on first use |
 | [Translate](Translate/) | DAT | **On-device translation.** Wire to Speech Text for real-time subtitle translation |
 | [Text Analyze](TextAnalyze/) | DAT | Sentiment / language ID / named entities / semantic similarity (JA supported) + **tokens (token / POS / lemma)** and **embedding vectors** (numeric). "Drive visuals from speech mood/topic" |

@@ -75,6 +75,17 @@
 - FoundationModels は **Apple Intelligence有効**でないと unavailable。
   `SystemLanguageModel.default.availability` で理由分岐して status に出す
 - FoundationModels構造化出力は DynamicGenerationSchema で "name:type" スキーマ → スキーマ保証JSON
+- **FoundationModels の macOS 27(AFM3世代)拡張**(全て `#available(macOS 27.0, *)` ガードで
+  26互換を保てる):
+  - モデル選択: `LanguageModelSession(model: some LanguageModel, ...)`。
+    `PrivateCloudComputeLanguageModel()`(Appleサーバ側・quota付き)も渡せる
+  - `capabilities`(vision/reasoning/toolCalling/guidedGeneration)は `LanguageModel` プロトコル
+    要件。**`contextSize` は PCC モデル専用**(async throws)— LanguageModelSession には無い
+  - 画像入力: `Attachment(cgImage)` を `@PromptBuilder` クロージャに置く
+    (`streamResponse(options:contextOptions:) { attachment; prompt }`)。vision capability 必須
+  - Reasoning: `ContextOptions(reasoningLevel: .light/.moderate/.deep)` を
+    streamResponse/respond の `contextOptions:` へ
+  - トークン数: `session.usage.input/output.totalTokenCount`(27)
 - **Whisper(WhisperKit)は無音バッファに「[音楽]」等を幻覚する**。① RMS<0.004 のバッファは捨てる
   ② 括弧タグだけの確定行は破棄、の2段ガード必須。ストリーミング非対応なので
   「溜めて0.7秒毎に再認識 → 無音or30秒で確定行に落とす」チャンク方式

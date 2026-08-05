@@ -2892,3 +2892,30 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   369,085 splats 描画を視認確認。**.spz(Niantic圧縮形式)は現行パーサ非対応**(将来課題:
   gzip+固定小数の独自形式なのでデコーダ追加は可能)
 - 次にやること: .spz 対応の検討、sample.toe への RealityKitSplat 例追加、SH degree 1〜3
+
+### 2026-08-05 LLM AFM を macOS 27(AFM3)対応に拡張(26互換維持)
+
+- ユーザー「LLM AFMをMacOS27のAFM3対応にしたい」「MacOS26でも使えるように互換性は残したい」。
+  SDK実確認の結論: **AFM3という型は無く、macOS 27では FoundationModels が新世代モデルを自動使用**。
+  「AFM3対応」の実質は macOS 27 の新API採用 = 以下を実装:
+  - **Model メニュー**(ondevice/pcc): `LanguageModelSession(model:)` に
+    `PrivateCloudComputeLanguageModel()`(Appleサーバ側大型モデル)を渡せる
+  - **画像入力(Vision ページ: Image TOP + Use Image)**: Submit時に TOP を BGRA8/top-down で
+    ダウンロード → helper が CGImage 化 → `Attachment(cgImage)` を PromptBuilder に置いて生成。
+    LLM MLX と同じ「DATはTOPをパラメータ参照」パターン
+  - **Reasoning メニュー**(off/light/moderate/deep): `ContextOptions.ReasoningLevel`
+  - **診断**: Info DAT に model/capabilities 行、Info CHOP に context_size/input_tokens/
+    output_tokens、poll JSON に capabilities 配列
+- **26互換**: 27専用APIは全て `#available(macOS 27.0, *)` ガード。26では従来動作
+  (テキスト/構造化/Tool Calling)のまま、27専用機能を選ぶと status にエラーが出るだけ
+- **SDK実確認の要点(pitfalls反映)**: `capabilities` は LanguageModel プロトコル要件
+  (vision/reasoning/toolCalling/guidedGeneration)、**`contextSize` は PCCモデル専用**
+  (LanguageModelSession には無い・ビルドエラーで発見)、usage は session.usage(27)
+- **検証(M2・TD実機)**: 新パラメータ生成(Model/Reasoning/Imagetop/Useimage・メニュー項目とも
+  正しい)、Info DAT 3行(status/model/capabilities)。**この新macOS 27環境は Apple Intelligence
+  未有効のため生成テストは未実施**(status="unavailable: Apple Intelligence not enabled" が正しく
+  出ることを確認。PCC は "device not eligible (PCC)")。**ユーザーがシステム設定で
+  Apple Intelligence を有効化したら、テキスト生成・画像入力・Reasoning・PCC の実データ検証が必要**
+- ビルド・署名・常設インストール済み。README(LLMAFM+ルート英日)更新
+- 注意: TD検証セッション中に sample.toe がまた自動保存された(全プラグイン登録済み状態)。
+  規約どおり git HEAD へ復旧済み
