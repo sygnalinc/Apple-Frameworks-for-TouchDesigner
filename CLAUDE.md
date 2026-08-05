@@ -2919,3 +2919,22 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - ビルド・署名・常設インストール済み。README(LLMAFM+ルート英日)更新
 - 注意: TD検証セッション中に sample.toe がまた自動保存された(全プラグイン登録済み状態)。
   規約どおり git HEAD へ復旧済み
+
+### 2026-08-05 macOS 27 新機能の横断調査(op候補)
+
+- SDK 27.0 実機走査。新フレームワーク: **MediaIntelligence**(FaceGroupAnalyzer=顔クラスタリング/
+  VideoAnalyzer+HighlightAnalysisRequest=ハイライト区間+盛り上がりlevel曲線/KeyFrameAnalysisRequest)、
+  **VisualIntelligence**(SemanticContentDescriptor)、**SpatialPreview**(DocumentPreviewSession=
+  接続中Vision Proへ文書/USDをライブプッシュ)、**CoreAI**(調査済み・別記)、
+  **_Vision_FoundationModels**(OCRTool/BarcodeReaderTool=FoundationModels用の純正Visionツール)、
+  **_CoreSpotlight_FoundationModels**(SpotlightSearchTool)
+- 既存フレームワークの27追加: **Vision: GenerateIterativeSegmentationRequest**(seed point/box/
+  **scribble** の3プロンプト・fast/balanced/accurate・DL資産=SAM相当の純正API)、
+  **ImagePlayground: ImagePlaygroundOptions**(sizeSpecification=任意解像度・creationStrategy/variety/
+  personalization)、**MetalFX**(distortionTexture/contentWidth動的解像度/requiresPrevColorTexture)、
+  **RealityFoundation**(BloomComponent・NavigationMesh・BehaviorTree・AnimationGraph・Lightmap・
+  SkeletonResource+Retargeting 等27で大量追加)。SoundAnalysis/Speech/Translation/NL/SCK/VTは27追加なし
+- 提案の優先順位(ユーザーへ提示): ①Vision IterativeSegment TOP(SAM2の外部モデル不要版・
+  scribble入力が新規性)②MediaIntelligence Highlight DAT/CHOP ③MediaIntelligence FaceGroup DAT
+  ④ImagePlayground/Metal Upscale/LLM AFM(純正ツール)/RealityKit Splat(Bloom)の27アップグレード
+  ⑤SpatialPreview Out(Vision Pro実機待ち)⑥CoreAI(ツールチェーン待ち)
