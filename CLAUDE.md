@@ -2961,3 +2961,27 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   ③86バンドル入れ替え後のTD初回起動は10分超固まることがある→強制終了→再起動(既知の亜種)
 - 2件ともビルド・署名・常設インストール・TD実機検証済み。README(各+ルート英日)更新
 - 検証中に scratchpad が一度クリアされ tdmcp.py を再作成した(セッション横断の一時ファイルは消える前提で)
+
+### 2026-08-06 RealityKit Capture に Splat PLY 書き出しを追加(写真→splatパイプライン)
+
+- ユーザー「RealityKitCaptureをアップデートしてsplat対応にしたい」。**macOS 27 でも
+  PhotogrammetrySession に Gaussian Splat 学習出力は無い**(SDK実確認: Request は
+  modelFile/modelEntity/bounds/pointCloud/poses のみ・splat学習は CorePhotogrammetry 内部の非公開のまま)
+  → **pointCloud リクエスト(macOS 14+)で点群を取得し、3DGS形式(INRIA互換)の .ply に変換して
+  書き出す**方式で実装。RealityKit Splat TOP がそのまま真のsplatとして描画できる
+  =完全オンデバイスの「写真→splat」パイプライン
+- 実装: ph_start に splatPath/splatScale を追加。modelFile と pointCloud を同時リクエスト
+  (pendingRequests カウントで完了判定)。writeSplatPLY は f_dc=(c/255-0.5)/C0 の SH DC逆変換、
+  opacity=logit(0.95)、scale=log(最近傍距離中央値×係数・2000点サンプル総当り)、rot=恒等。
+  パラメータ Export Splat PLY / Splat PLY File / Splat Scale。Info DAT に splat / splat_points
+- **踏んだ罠**: ①Object Capture は Y上向き・3DGS ply 慣例は Y下向き → **書き出し時に y,z を反転**
+  (しないと Splat TOP のX軸180°自動正立で上下逆になる・実測)②pointCloud の点群密度は
+  Detail 非依存(SfM疎点群・templeRing 47枚で約1650点)③自前パッチスクリプトのガード条件ミスで
+  パラメータ定義だけ未挿入→「バイナリに文字列はあるのにTDにパラメータが出ない」状態を踏んだ
+  (lsofでロード確認→ソース確認で発見)
+- **実測(M2・templeRing 47枚)**: 再構成+点群→ 1656 splat の .ply、RealityKit Splat TOP で
+  **正立の神殿がsplat描画**されることを視認(等方ガウシアン・疎点群なのでぼかし気味=READMEに簡易版と明記)
+- あわせて **Music Understanding をユーザー追加の実サンプルで追検証**(gitignore済み):
+  music_sample_01.m4a=BPM135/E♭minor/14sections、music_sample_02.wav=BPM130/Gminor/9sections
+  (曲ごとに異なる正しい解析)。検証ループの「前回結果を読むレース」に注意(fresh nodeで再確認した)
+- README(RealityKitCapture+ルート英日)更新。ビルド・署名・常設インストール済み
