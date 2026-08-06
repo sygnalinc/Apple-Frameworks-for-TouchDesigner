@@ -2938,3 +2938,26 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   scribble入力が新規性)②MediaIntelligence Highlight DAT/CHOP ③MediaIntelligence FaceGroup DAT
   ④ImagePlayground/Metal Upscale/LLM AFM(純正ツール)/RealityKit Splat(Bloom)の27アップグレード
   ⑤SpatialPreview Out(Vision Pro実機待ち)⑥CoreAI(ツールチェーン待ち)
+
+### 2026-08-06 Vision IterSeg TOP + Music Understanding DAT 実装(macOS 27新機能・実データ検証済み)
+
+- **Vision IterSeg TOP**(`Visioniterseg`・icon VIS・CPUMem TOP+Swiftヘルパ vi_):
+  macOS 27 の `GenerateIterativeSegmentationRequest` = Apple純正の対話的セグメンテーション
+  (SAM相当・外部モデル不要)。プロンプト3種(seed point / seed box / **scribble**=入力1のTOPを
+  なぞり書きとして使用・Rチャンネル)。**モデルはOS管理のダウンロード資産**
+  (`DownloadableAssetsRequest`・Download Assetsパルス+asset_readyチャンネル)。
+  ユーザー指定の短名「VisionSegment」は**既存の人物セグメンテーションTOPと衝突**するため
+  「Vision IterSeg」に。実測(M2・640×426): 点2箇所・box・scribble全て正しい人物を個別マスク
+  (座標=TD uvと無変換一致)、解析1〜2秒、submits=results=5でフレーム落ちなし
+- **Music Understanding DAT**(`Musicunderstanding`・icon MUN・DAT+Swiftヘルパ mu_):
+  macOS 27 新フレームワーク MusicUnderstanding で音楽ファイルをオンデバイス楽曲解析。
+  Modeメニューで Summary/Rhythm(ビート・小節)/Key(調)/Structure(セクション)/Pace/
+  Loudness/Instruments(vocal・drum・bass・otherの区間+レベル曲線)のテーブル切替。
+  実測(M2・TD同梱テクノ曲70秒): **BPM123・144ビート・36小節・5セクション・G minor を正検出**
+  (ビート間隔0.488s=123BPMと整合)、loudness -11.4 LUFS、bass区間検出。解析は数十秒・非同期
+- **踏んだ罠**: ①MusicUnderstanding framework自体が27新規なので **-weak_framework でリンク**
+  (26でもdylibロード可能に。@availableガードと併用)②Vision新Swift APIの
+  `DownloadableAssetsRequestStatus` は notReady/downloading/ready/error(availableではない)
+  ③86バンドル入れ替え後のTD初回起動は10分超固まることがある→強制終了→再起動(既知の亜種)
+- 2件ともビルド・署名・常設インストール・TD実機検証済み。README(各+ルート英日)更新
+- 検証中に scratchpad が一度クリアされ tdmcp.py を再作成した(セッション横断の一時ファイルは消える前提で)

@@ -74,6 +74,7 @@ grouped by category.
 |---|---|---|
 | [Vision Subject](VisionSubject/) | TOP | **Cut out any subject** (same API as Photos' "Copy Subject"). Soft mask / transparent background |
 | [CoreML SAM2](CoreMLSAM2/) | TOP | **Point-prompted segmentation of any object** (SAM 2.1). Cut out whatever the audience touches |
+| [Vision IterSeg](VisionIterSeg/) | TOP | **Apple-native interactive segmentation** (macOS 27): seed point / box / **scribble** prompts → soft mask. No external model (OS-managed assets). SAM2 alternative |
 | [CoreImage Bokeh](CoreImageBokeh/) | TOP | Keep the subject sharp via a mask and **variably blur the background** |
 
 ### Tracking, motion & camera work
@@ -124,6 +125,7 @@ grouped by category.
 | [Speech Text](SpeechText/) | DAT | **Live transcription.** Apple SpeechAnalyzer (macOS 26+) / WhisperKit (macOS 14+, multilingual, translate) |
 | [Speech Synth](SpeechSynth/) | CHOP | On-device **speech synthesis** → PCM stereo |
 | [Speech Activity](SpeechActivity/) | CHOP | **Voice activity detection** (speaking / onset / offset). Start/stop trigger for transcription |
+| [Music Understanding](MusicUnderstanding/) | DAT | **On-device music analysis** (macOS 27): beats / bars / **BPM**, key, **song structure (sections)**, pace, loudness, **per-instrument activity** (vocal/drum/bass/other). Measured: 123BPM / G minor detected correctly |
 | [Shazam](Shazam/) | DAT | **Offline matching of your own audio** (ShazamKit). Sync a show to venue audio |
 | [AVAudio Spatial](AVAudioSpatial/) | CHOP | **3D placement** of a mono source → HRTF binaural (AVAudioEnvironmentNode). Returns audio to TD |
 | [AVAudio Mixer](AVAudioMixer/) | CHOP | **Multichannel surround → binaural** (5.1 / 7.1 / Quad speaker beds via HRTF). Returns audio to TD |

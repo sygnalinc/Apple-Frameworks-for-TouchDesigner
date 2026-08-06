@@ -72,6 +72,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 |---|---|---|
 | [Vision Subject](VisionSubject/) | TOP | **任意被写体の切り抜き**(写真アプリ「被写体をコピー」と同じAPI)。ソフトマスク/背景透過 |
 | [CoreML SAM2](CoreMLSAM2/) | TOP | **点を指定して任意物体をマスク**(SAM 2.1)。観客が触れたものを切り抜く演出に |
+| [Vision IterSeg](VisionIterSeg/) | TOP | **Apple純正の対話的セグメンテーション**(macOS 27): 点/矩形/**なぞり書き**プロンプト→ソフトマスク。外部モデル不要(OS管理資産)。SAM2代替 |
 | [CoreImage Bokeh](CoreImageBokeh/) | TOP | マスクで被写体を保持したまま**背景を可変ぼかし** |
 
 ### 追跡・モーション・カメラワーク
@@ -122,6 +123,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Speech Text](SpeechText/) | DAT | **ライブ文字起こし**。Apple SpeechAnalyzer(macOS26+)/ WhisperKit(macOS14+・多言語・英訳) |
 | [Speech Synth](SpeechSynth/) | CHOP | オンデバイス**音声合成**→ PCM stereo |
 | [Speech Activity](SpeechActivity/) | CHOP | **発話区間検出**(speaking/onset/offset)。文字起こしの開始・終了トリガーに |
+| [Music Understanding](MusicUnderstanding/) | DAT | **音楽ファイルのオンデバイス楽曲解析**(macOS 27): ビート/小節/**BPM**・調・**楽曲構造(セクション)**・ペース・ラウドネス・**楽器別アクティビティ**(vocal/drum/bass/other)。実測123BPM/Gマイナー正検出 |
 | [Shazam](Shazam/) | DAT | **自作音源のオフライン照合**(ShazamKit)。会場音源にショー進行を同期 |
 | [AVAudio Spatial](AVAudioSpatial/) | CHOP | モノ音源の**3D配置**→HRTFバイノーラル(AVAudioEnvironmentNode)。音声はTDに戻る |
 | [AVAudio Mixer](AVAudioMixer/) | CHOP | **多chサラウンド→バイノーラル**(5.1/7.1/Quad をHRTFで空間ダウンミックス)。音声はTDに戻る |
