@@ -68,7 +68,7 @@ public:
         std::string sig=file+"|"+std::to_string(page)+"|"+std::to_string((int)dpi)+"|"+imode;
         if (sig!=mySig){ mySig=sig; std::unique_lock<std::mutex> l(myMutex, std::try_to_lock);
             if (l.owns_lock() && !myPending && !myBusy){ myFile=file; myPage=page; myDpi=dpi; myInfoMode=imode; myPending=true; mySubmit++; l.unlock(); myCond.notify_one(); } else mySig.clear(); }
-        Result r; { std::lock_guard<std::mutex> l(myMutex); if(myResult.serial==myUploaded||!myResult.ok||myResult.bgra.empty()) return; r=myResult; myUploaded=r.serial; }
+        Result r; { std::lock_guard<std::mutex> l(myMutex); if(!myResult.ok||myResult.bgra.empty()) return; r=myResult; myUploaded=r.serial; }
         TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D; ui.textureDesc.width=r.w; ui.textureDesc.height=r.h; ui.textureDesc.pixelFormat=OP_PixelFormat::BGRA8Fixed;
         auto b=myContext->createOutputBuffer((size_t)r.w*r.h*4, TOP_BufferFlags::None, nullptr); if(!b) return;
         memcpy(b->data, r.bgra.data(), r.bgra.size()); out->uploadBuffer(&b, ui, nullptr);

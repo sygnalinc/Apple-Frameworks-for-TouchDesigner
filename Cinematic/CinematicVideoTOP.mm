@@ -133,7 +133,7 @@ public:
         int mode = j.mode;
         int lw=0, lh=0; unsigned long long serial=0;
         bool has = mode == 0 ? cn_latest_depth_info(myState,&lw,&lh,&serial) : cn_latest_render_info(myState,&lw,&lh,&serial);
-        if (!has || serial == myUploaded || lw <= 0 || lh <= 0) return;
+        if (!has || lw <= 0 || lh <= 0) return;
         if (mode == 0) {
             TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D; ui.textureDesc.width=lw; ui.textureDesc.height=lh; ui.textureDesc.pixelFormat=OP_PixelFormat::Mono32Float;
             auto buf = myContext->createOutputBuffer((size_t)lw*lh*sizeof(float), TOP_BufferFlags::None, nullptr); if(!buf) return;

@@ -3091,3 +3091,22 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **検証中に TouchDesigner がクラッシュ**(04:37・EXC_BAD_ACCESS)。クラッシュスタックは
   **libOPUI/libUI のみでプラグインのフレームは無し**=TD側UIのnull参照。`CrashAutoSave.sample.toe`
   が生成されている。bypass再検証はTD再起動後に持ち越し
+
+### 2026-08-08 bypass復帰の黒画像を全17 TOPへ横展開修正 + TD実機検証
+
+- CoreImageCode 単体の修正を、同じ構造を持つ **CPUMem TOP 全17件**へ展開:
+  CoreImageHDR / CoreImageRAW / CoreML / CoreMLSAM2 / CoreText / ImageIOFileIn /
+  MetalDenoise / MetalUpscale / PDFKit / VisionFlow / VisionSegment / VisionSubject /
+  VisionSaliency / ScreenCapture / CinematicVideo(以上15件は
+  `myResult.serial == myUploaded ||` の条件を機械的に除去)+ **CoreMLImageGen /
+  ImagePlayground の2件は構造が違う**(serial一致のときだけ変換+アップロードする形)ため、
+  **取り出した画素を `myPixels` にキャッシュし、アップロードだけ毎cook行う**よう書き換えた
+  (ヘルパへの `sd_copy_image`/`pg_copy_image` は従来どおり新画像のときだけ呼ぶ)
+- **TD実機検証**: CoreImageCode = bypass往復3回でもQRが復帰(パラメータ変更なし)。
+  CoreText = bypass解除後にテキスト復帰。いずれも修正前は黒だった
+- **検証設計の注意**: VisionSubject を `play=0` の静止入力で試したところ **before も黒**で
+  不成立だった(入力が1度も更新されず初回解析が走らないため)。bypass検証は
+  **必ず「修正前に生成できていること」を先に確認**してから行う
+- 17件とも署名・APIバージョン検査つきでインストール済み
+- 注意: この17件+先の6件(ビルド不能だったもの)でリリースDMGは大きく遅れている。
+  次回配布時にまとめて更新する

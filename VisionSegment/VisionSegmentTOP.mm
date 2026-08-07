@@ -100,7 +100,7 @@ public:
         MaskResult mask;
         {
             std::lock_guard<std::mutex> lock(myMutex);
-            if (myResult.serial == myUploadedSerial || myResult.data.empty())
+            if (myResult.data.empty())
                 return;
             mask = myResult;
             myUploadedSerial = myResult.serial;

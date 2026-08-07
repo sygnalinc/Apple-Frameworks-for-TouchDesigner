@@ -1277,7 +1277,7 @@ public:
 
         Result r;
         { std::lock_guard<std::mutex> l(myMutex);
-          if (myResult.serial == myUploaded || myResult.bgra.empty()) return;
+          if (myResult.bgra.empty()) return;
           r = myResult; myUploaded = r.serial; myLines = r.lines; myFitted = r.fitted;
           myTruncated = r.truncated; myFont = r.font; myMetrics = r.metrics; }
         TOP_UploadInfo ui; ui.textureDesc.texDim = OP_TexDim::e2D;

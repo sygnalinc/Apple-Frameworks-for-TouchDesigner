@@ -110,7 +110,7 @@ public:
         FrameResult frame;
         {
             std::lock_guard<std::mutex> lock(myMutex);
-            if (myResult.serial == myUploadedSerial || myResult.data.empty())
+            if (myResult.data.empty())
                 return;
             frame = myResult;
             myUploadedSerial = myResult.serial;

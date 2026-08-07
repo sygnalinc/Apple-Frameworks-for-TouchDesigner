@@ -36,7 +36,7 @@ public:
             else mySig.clear();
         }
         Result r;
-        { std::lock_guard<std::mutex> l(myMutex); if (myResult.serial == myUploaded || myResult.p.empty()) return; r = myResult; myUploaded = r.serial; }
+        { std::lock_guard<std::mutex> l(myMutex); if (myResult.p.empty()) return; r = myResult; myUploaded = r.serial; }
         TOP_UploadInfo ui;
         ui.textureDesc.texDim = OP_TexDim::e2D;
         ui.textureDesc.width = r.w; ui.textureDesc.height = r.h;

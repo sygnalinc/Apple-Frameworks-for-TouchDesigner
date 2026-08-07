@@ -129,30 +129,37 @@ public:
         }
 
         // 新しい画像ができていたらアップロード（行反転で TD の bottom-up へ）
+        // 新しい画像ができていたらセッションから取り出してキャッシュ（取り出しは1回だけ）
         if (active_session && imageSerial != myUploadedSerial && imgW > 0 && imgH > 0) {
             const uint64_t bytes = (uint64_t)imgW * imgH * 4;
             std::vector<uint8_t> pixels(bytes);
-            const int64_t copied =
-                sd_copy_image(active_session, pixels.data(), (int64_t)bytes);
+            const int64_t copied = sd_copy_image(active_session, pixels.data(), (int64_t)bytes);
             if (copied == (int64_t)bytes) {
-                OP_SmartRef<TOP_Buffer> buf =
-                    myContext->createOutputBuffer(bytes, TOP_BufferFlags::None, nullptr);
-                if (buf) {
-                    const bool flip = inputs->getParInt("Flip") != 0;
-                    uint8_t* dst = (uint8_t*)buf->data;
-                    const size_t row = (size_t)imgW * 4;
-                    for (int y = 0; y < imgH; y++) {
-                        const uint8_t* src = pixels.data() + (size_t)y * row;
-                        memcpy(dst + (size_t)(flip ? (imgH - 1 - y) : y) * row, src, row);
-                    }
-                    TOP_UploadInfo info;
-                    info.textureDesc.texDim = OP_TexDim::e2D;
-                    info.textureDesc.width = imgW;
-                    info.textureDesc.height = imgH;
-                    info.textureDesc.pixelFormat = OP_PixelFormat::RGBA8Fixed;
-                    output->uploadBuffer(&buf, info, nullptr);
-                    myUploadedSerial = imageSerial;
+                myPixels = std::move(pixels);
+                myPixW = imgW;
+                myPixH = imgH;
+                myUploadedSerial = imageSerial;
+            }
+        }
+        // bypass/無効化から復帰するとTDが保持テクスチャを捨てるため、キャッシュを毎executeアップロードする
+        // （serial一致でスキップすると再有効化後に黒画像のままになる）
+        if (!myPixels.empty() && myPixW > 0 && myPixH > 0) {
+            OP_SmartRef<TOP_Buffer> buf =
+                myContext->createOutputBuffer(myPixels.size(), TOP_BufferFlags::None, nullptr);
+            if (buf) {
+                const bool flip = inputs->getParInt("Flip") != 0;
+                uint8_t* dst = (uint8_t*)buf->data;
+                const size_t row = (size_t)myPixW * 4;
+                for (int y = 0; y < myPixH; y++) {
+                    const uint8_t* src = myPixels.data() + (size_t)y * row;
+                    memcpy(dst + (size_t)(flip ? (myPixH - 1 - y) : y) * row, src, row);
                 }
+                TOP_UploadInfo info;
+                info.textureDesc.texDim = OP_TexDim::e2D;
+                info.textureDesc.width = myPixW;
+                info.textureDesc.height = myPixH;
+                info.textureDesc.pixelFormat = OP_PixelFormat::RGBA8Fixed;
+                output->uploadBuffer(&buf, info, nullptr);
             }
         }
     }
@@ -328,6 +335,8 @@ private:
     int myCompute = 0;
     std::atomic<bool> myWantGenerate{false};
     int myUploadedSerial = 0;
+    std::vector<uint8_t> myPixels;   // 直近画像のキャッシュ（毎cookアップロード用）
+    int myPixW = 0, myPixH = 0;
     std::string myStatus = "no model";
     int myBusy = 0, myStep = 0, mySteps = 0;
     float myGenSeconds = 0;

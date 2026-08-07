@@ -114,7 +114,7 @@ public:
         {
             std::lock_guard<std::mutex> lock(myMutex);
             myLatest = myShared;   // Info CHOP 用に cook スレッド側へコピー
-            if (myShared.serial == myUploadedSerial || myShared.heat.empty())
+            if (myShared.heat.empty())
                 return;
             result = myShared;
             myUploadedSerial = myShared.serial;
