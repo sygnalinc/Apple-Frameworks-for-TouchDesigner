@@ -24,6 +24,21 @@ DMG="$REPO/dist/TDAppleOps-v$VERSION.dmg"
 
 CS=(codesign -f --timestamp --options runtime -s "$SIGN_ID")
 
+# リリースに含めない未検証プラグイン(develop ブランチで開発継続中)
+EXCLUDE=(
+    AVAudioMixerCHOP AVAudioSpatialCHOP AudioToolboxMixCHOP CaptionAuthorDAT
+    ColorSyncTOP CoreImageKeystoneTOP GameplayKitAgentsCHOP GameplayKitPathSOP
+    ImageCaptureDAT MetalFrameInterpTOP MetalMPSAnalyzeCHOP PhaseCHOP ShazamDAT
+    SpatialVideoTOP SwiftUITOP SwiftUIPanelCHOP UIWidgetDAT
+)
+
+is_excluded() {
+    local name; name="$(basename "$1" .plugin)"
+    local e
+    for e in "${EXCLUDE[@]}"; do [ "$e" = "$name" ] && return 0; done
+    return 1
+}
+
 # 1バンドルを内側から深署名(dylib → ネスト.app/framework → ヘルパ実行ファイル → 本体)
 sign_bundle() {
     local b="$1"
@@ -51,12 +66,13 @@ sign_bundle() {
 cmd_sign() {
     echo "== sign: $SRC → $DIST (identity: $SIGN_ID)"
     rm -rf "$DIST"; mkdir -p "$DIST"
-    local n=0
+    local n=0 skipped=0
     for b in "$SRC"/*.plugin; do
+        if is_excluded "$b"; then skipped=$((skipped+1)); continue; fi
         cp -R "$b" "$DIST/"
         n=$((n+1))
     done
-    echo "copied $n bundles"
+    echo "copied $n bundles (excluded $skipped unverified)"
     # 並列署名(timestampサーバ往復があるため)。スクリプト自身を再入呼び出し
     ls -d "$DIST"/*.plugin | xargs -P 6 -I{} "$REPO/tools/release.sh" _sign_one "{}"
     echo "== sign done"

@@ -2870,3 +2870,20 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 配布時の注意(既知): 配布版は署名が変わるためTD初回ロード時にプラグイン承認ダイアログが出る。
   wifiscan-helper.app は位置情報許可の再承認が一度必要
 - 残タスク(任意): GitHub Release への DMG 添付(公開操作のためユーザー確認待ち)
+
+### 2026-08-07 未検証17プラグインを develop ブランチへ分離(リリースは検証済み69本のみ)
+
+- ユーザー指示: 未検証プラグインは develop ブランチに移し、リリースは検証済みのみにする
+- **develop ブランチを main から作成して push**(全プラグイン入りの完全な状態を保持)。
+  未検証プラグインの開発継続は develop で行う
+- **main から17フォルダを git rm**: AVAudioMixer / AVAudioSpatial / AudioToolboxMix /
+  CaptionAuthor / ColorSync / CoreImageKeystone / GameplayKitAgents / GameplayKitPath /
+  ImageCapture / MetalFrameInterp / MetalMPSAnalyze / Phase / Shazam / SpatialVideo /
+  SwiftUI / SwiftUIPanel / UIWidget。依存する palette/NativePanel.tox・SwiftUIButton.tox
+  (SwiftUIPanel/UIWidget前提)も main から削除。README(英日)の該当17行を削除
+- **tools/release.sh に EXCLUDE リスト**(17バンドル名)を追加し、sign 時にコピーから除外
+- **リリース再構築**: 69バンドル署名→全数verify OK→DMG 18MB→公証 **Accepted**→staple→
+  spctl accepted(Notarized Developer ID)
+- 注意: ローカルの常設Pluginsディレクトリは全86本のまま(開発環境は不変)。sample.toe の
+  examples には除外17opの利用例が残っている(リリースDMGだけ導入した環境ではその17例が
+  Unknown operator type になる)→ リリース用に examples を分けるかは今後の課題
