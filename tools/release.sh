@@ -1,5 +1,5 @@
 #!/bin/bash
-# TDAppleOps リリースビルド: Developer ID 深署名 → 検証 → DMG → 公証 → ステープル
+# Apple Frameworks for TouchDesigner リリースビルド: Developer ID 深署名 → 検証 → DMG → 公証 → ステープル
 #
 # 使い方:
 #   tools/release.sh sign      # インストール済み全pluginを dist/ へコピーして深署名
@@ -19,8 +19,8 @@ VERSION="$(cat "$REPO/VERSION")"
 SIGN_ID="${SIGN_ID:-Developer ID Application: SYGNAL INC. (2ZSD5ZZLKB)}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-tdappleops}"
 SRC="${SRC:-$HOME/Library/Application Support/Derivative/TouchDesigner099/Plugins}"
-DIST="$REPO/dist/TDAppleOps-v$VERSION"
-DMG="$REPO/dist/TDAppleOps-v$VERSION.dmg"
+DIST="$REPO/dist/Apple-Frameworks-for-TouchDesigner-v$VERSION"
+DMG="$REPO/dist/Apple-Frameworks-for-TouchDesigner-v$VERSION.dmg"
 
 CS=(codesign -f --timestamp --options runtime -s "$SIGN_ID")
 
@@ -104,16 +104,16 @@ cmd_dmg() {
     rm -f "$DMG"
     # インストール手順を同梱
     cat > "$DIST/INSTALL.txt" <<EOF
-TDAppleOps v$VERSION — TouchDesigner Apple-native custom operators (macOS / Apple Silicon)
+Apple Frameworks for TouchDesigner v$VERSION — Apple-native custom operators (macOS / Apple Silicon)
 
 Install:
   Copy the .plugin bundles you want into:
     ~/Library/Application Support/Derivative/TouchDesigner099/Plugins/
   Then restart TouchDesigner.
 
-https://github.com/sygnalinc/TDAppleOps
+https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner
 EOF
-    hdiutil create -volname "TDAppleOps v$VERSION" -srcfolder "$DIST" -ov -format UDZO "$DMG" >/dev/null
+    hdiutil create -volname "Apple Frameworks for TouchDesigner v$VERSION" -srcfolder "$DIST" -ov -format UDZO "$DMG" >/dev/null
     codesign -f --timestamp -s "$SIGN_ID" "$DMG"
     echo "== dmg done: $DMG ($(du -h "$DMG" | cut -f1))"
 }

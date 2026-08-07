@@ -129,7 +129,7 @@ DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* i) { if(!i->setAPIVersion(DATCP
  i->customOPInfo.opIcon->setString("VCL"); i->customOPInfo.authorName->setString("SYGNAL Inc.");
  i->customOPInfo.majorVersion = 0;
  i->customOPInfo.minorVersion = 9;
- if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/VisionClassify/README.md");
+ if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/VisionClassify/README.md");
  i->customOPInfo.minInputs=0; i->customOPInfo.maxInputs=0; }
 DLLEXPORT DAT_CPlusPlusBase* CreateDATInstance(const OP_NodeInfo* i){return new VisionClassifyDAT(i);}
 DLLEXPORT void DestroyDATInstance(DAT_CPlusPlusBase* i){delete static_cast<VisionClassifyDAT*>(i);}

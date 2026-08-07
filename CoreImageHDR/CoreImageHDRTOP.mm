@@ -129,7 +129,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Cihdr");
     i->customOPInfo.opLabel->setString("CI HDR");
     i->customOPInfo.opIcon->setString("CIH");
-    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/CoreImageHDR/README.md");
+    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/CoreImageHDR/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.majorVersion = 0;
     i->customOPInfo.minorVersion = 9;

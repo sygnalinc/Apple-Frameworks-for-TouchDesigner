@@ -308,7 +308,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* info)
     info->customOPInfo.opType->setString("Visionanimalpose");
     info->customOPInfo.opLabel->setString("Vision Animal Pose");
     info->customOPInfo.opIcon->setString("VAP");
-    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/VisionAnimalPose/README.md");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/VisionAnimalPose/README.md");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.majorVersion = 0;
     info->customOPInfo.minorVersion = 9;

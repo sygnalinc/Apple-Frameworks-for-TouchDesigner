@@ -1,4 +1,4 @@
-# TDAppleOps
+# Apple Frameworks for TouchDesigner
 
 > Apple's on-device frameworks as native TouchDesigner operators.
 

@@ -1,8 +1,9 @@
 # CLAUDE.md — TDAppleOps 開発ガイド(AIエージェント向け)
 
-> リポジトリは 2026-07-20 に `TDAppleML` から **`TDAppleOps`** へ改称(中身がML専用でない
-> ため)。コード内のキャッシュパス `~/Library/Caches/TDAppleML/` と過去ログの旧名は、
-> 互換性・履歴保持のため据え置き。ローカル作業フォルダ名は `TDAppleML` のままでも可。
+> リポジトリは 2026-07-20 に `TDAppleML`→`TDAppleOps`、2026-08-07 に一般公開へ向け
+> **`Apple-Frameworks-for-TouchDesigner`**(表示名 "Apple Frameworks for TouchDesigner")へ改称。
+> 旧GitHub URLは自動リダイレクトされる。コード内のキャッシュパス `~/Library/Caches/TDAppleML/`
+> と過去ログの旧名は互換性・履歴保持のため据え置き。ローカル作業フォルダ名は `TDAppleML` のままでも可。
 
 このリポジトリで作業するAI/開発者が守るべきルールと、実装済みプラグインで得た知見の集約。
 **ここに書かれたハマりどころは全て実際に踏んだもの**。同じ穴に落ちないこと。
@@ -2029,7 +2030,7 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 
 - **authorName → "SYGNAL Inc."** 全81プラグイン統一(旧 TDAppleML/sygnal 混在)。会社名で表示。
   codesignは会社名にできず現状ad-hoc維持(要 Developer ID 法人証明書)。gitコミット作者は個人のまま
-- **opHelpURL 追加**(全81): `FillXXXPluginInfo` に `https://github.com/sygnalinc/TDAppleOps/
+- **opHelpURL 追加**(全81): `FillXXXPluginInfo` に `https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/
   blob/main/<Folder>/README.md` を **null ガード付き**で。OPの Help(`?`)ボタンから README が開く。
   **OP Create Dialog のホバー説明は SDK に該当フィールドが無く不可**(opHelpURL が代替)
 - **VisionFlow に Output メニュー追加**: `flow`(生RG32Float・従来) / `visualize`(RGBA8カラー・
@@ -2887,3 +2888,20 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 注意: ローカルの常設Pluginsディレクトリは全86本のまま(開発環境は不変)。sample.toe の
   examples には除外17opの利用例が残っている(リリースDMGだけ導入した環境ではその17例が
   Unknown operator type になる)→ リリース用に examples を分けるかは今後の課題
+
+### 2026-08-07 リポジトリを Apple-Frameworks-for-TouchDesigner へ改称(一般公開準備)
+
+- ユーザー「公開時に分かりやすい名前に」「macOSのフレームワーク/ライブラリを使ったpluginと
+  伝わる名前」→ 候補比較の結果 **`Apple-Frameworks-for-TouchDesigner`**(表示名
+  "Apple Frameworks for TouchDesigner")に決定。「for Mac/for TouchDesigner」形式は
+  Apple商標ガイドラインの推奨形でもある
+- `gh repo rename` で改称・説明文も更新。**旧URLはGitHubが自動リダイレクト**するため、
+  既存81バンドルに焼き込み済みの opHelpURL(旧TDAppleOps URL)もHelpボタンから飛べる
+- リポジトリ内の旧URL参照68ファイル(ソースの opHelpURL・README・release.sh)を新URLへ一括置換。
+  README(英日)のH1を "Apple Frameworks for TouchDesigner" に変更。ローカル remote URL 更新済み
+- release.sh の成果物名も統一: `dist/Apple-Frameworks-for-TouchDesigner-v0.9.0.dmg`。
+  新名称DMGを再公証 → **Accepted・staple・spctl accepted** を確認
+- **注意(develop運用)**: develop は全プラグイン入りで維持している。main には17フォルダ削除
+  コミットがあるため **main→develop の wholesale merge は厳禁**(削除が伝播して未検証
+  プラグインが消える)。共通修正は cherry-pick で運ぶこと
+- 注意: keychain の notarytool プロファイル名は `tdappleops` のまま(ローカル専用・変更不要)

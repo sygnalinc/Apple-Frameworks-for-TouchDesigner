@@ -311,7 +311,7 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* info)
     info->customOPInfo.opType->setString("Createmltrainingrecorder");
     info->customOPInfo.opLabel->setString("CreateML Training Recorder");
     info->customOPInfo.opIcon->setString("CTR");
-    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/CreateMLTrainingRecorder/README.md");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/CreateMLTrainingRecorder/README.md");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.majorVersion = 0;
     info->customOPInfo.minorVersion = 9;

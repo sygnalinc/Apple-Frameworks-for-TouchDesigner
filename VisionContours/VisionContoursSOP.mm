@@ -432,7 +432,7 @@ DLLEXPORT void FillSOPPluginInfo(SOP_PluginInfo* info)
     info->customOPInfo.opType->setString("Visioncontours");
     info->customOPInfo.opLabel->setString("Vision Contours");
     info->customOPInfo.opIcon->setString("VCS");
-    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/VisionContours/README.md");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/VisionContours/README.md");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.majorVersion = 0;
     info->customOPInfo.minorVersion = 9;
