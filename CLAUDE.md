@@ -3046,3 +3046,18 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   日本語検証は特にこの方式が必須(生成AIに漢字・かなを正しく描かせるのは非現実的)
 - 注意: この変更でリリース v0.9.1 のDMGは1コミット遅れている。サンプル映像4本(crowd/faces/
   face/ballet)の検証と合わせて次回まとめて配布物を更新する
+
+### 2026-08-07 VisionSimilarity / CoreImageBokeh / CoreImageEnhance を develop へ退避
+
+- ユーザー判断で3件を main から外し、非公開の develop ブランチで開発継続とする
+  (2026-08-07 の17件と同じ扱い。公開リリースは検証済みのみ、の方針)
+- **手順の要点**: develop は main より前の状態(opHelpURL の旧URLのまま)だったため、
+  **先に develop 側を main の最新状態へ同期してから** main で削除した。
+  `git worktree add` で develop を別ディレクトリにチェックアウトし、
+  `git checkout main -- <3フォルダ>` → コミット → push。作業ツリーを汚さずに済む。
+  **main→develop の wholesale merge は厳禁**(main の削除コミットが伝播して develop の
+  未検証プラグインが消える)ので、この folder単位の checkout が正しいやり方
+- main から3フォルダを git rm、README(英日)の該当3行を削除。release.sh は main 追跡分
+  だけを集める仕様なので EXCLUDE の追加は不要(配布は 66 → **63op**)
+- 注意: sample.toe の examples には除外した20op(17+3)の利用例が残っている。main だけを
+  clone した人が sample.toe を開くとその20例が Unknown operator type になる

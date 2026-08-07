@@ -74,7 +74,6 @@ grouped by category.
 |---|---|---|
 | [Vision Subject](VisionSubject/) | TOP | **Cut out any subject** (same API as Photos' "Copy Subject"). Soft mask / transparent background |
 | [CoreML SAM2](CoreMLSAM2/) | TOP | **Point-prompted segmentation of any object** (SAM 2.1). Cut out whatever the audience touches |
-| [CoreImage Bokeh](CoreImageBokeh/) | TOP | Keep the subject sharp via a mask and **variably blur the background** |
 
 ### Tracking, motion & camera work
 
@@ -83,7 +82,6 @@ grouped by category.
 | [Vision Track](VisionTrack/) | CHOP | **Track any object** (initial bbox → follow). Close to a Blob Track TOP alternative |
 | [Vision Flow](VisionFlow/) | TOP | **Optical flow** (motion vector field). **Optical Flow TOP alternative** (UV/Pixels) |
 | [Vision Saliency](VisionSaliency/) | TOP | Saliency map + **auto-framing** (crop rect of the region of interest → Crop TOP for automatic camera work) |
-| [Vision Similarity](VisionSimilarity/) | CHOP | **Similarity** of two images (Feature Print). "Fire when it looks like the reference" trigger |
 
 ### Image processing & super-resolution
 
@@ -91,7 +89,6 @@ grouped by category.
 |---|---|---|
 | [Metal Upscale](MetalUpscale/) | TOP | **Real-time super-resolution.** **Nvidia Upscaler TOP alternative** (MetalFX 2x / VT SuperRes 4x / VT LowLatency) |
 | [Metal Denoise](MetalDenoise/) | TOP | ML temporal noise reduction (supported hardware only; not on M2) |
-| [CoreImage Enhance](CoreImageEnhance/) | TOP | Auto exposure / saturation / color correction (Core Image) |
 | [CoreImage RAW](CoreImageRAW/) | TOP | **Develop DNG / ProRAW** in real time (exposure / WB / noise / sharpness) via CIRAWFilter |
 | [CoreImage HDR](CoreImageHDR/) | TOP | **HDR gain map** extraction + SDR/HDR (EDR) conversion from HEIC |
 | [ImageIO File In](ImageIOFileIn/) | TOP | **Read any image file (incl. HEIF/HEIC that TD can't show)** → Color, plus embedded **depth / disparity / Portrait Matte / semantic mattes**. Applies EXIF orientation |
