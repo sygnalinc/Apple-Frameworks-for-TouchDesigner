@@ -3028,3 +3028,21 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   公証 Accepted・staple・spctl accepted。**Release v0.9.1 を作成**(英日ノート付き)
 - **v0.9.0 のDMGは取り下げた**: 開発中に中身を2度差し替えた結果タグと不一致になっていたため、
   アセットを削除し「v0.9.1 に置き換わった」注記を追加(タグとリリース自体は履歴として残置)
+
+### 2026-08-07 VisionText DAT にも Aspect Correct UVs を追加
+
+- ユーザー指示。これで **uv を出す Vision系OPは全11件**が対応(Pose/Hand/Face/AnimalPose/Track/
+  Pose3D/Rect/Trajectory/Text + CoreML DAT + Barcode DAT)
+- 出力テーブルの `u,v,width,height`(テキスト領域のbbox)へ適用。text/confidence は非変換
+- **実測(M2・TD実機)**: Text TOP に "COFFEE" を描いて入力し OCR。Off で
+  u=0.5008 v=0.4931 w=0.4828 h=0.1750 → On で **v=0.4961 / h=0.0984**。
+  理論値 `0.5+(0.4931-0.5)/1.7778 = 0.4961` / `0.1750/1.7778 = 0.0984` と完全一致。
+  u と width は不変。confidence=1.000 で認識も正常
+- **VisionSaliency は意図的に対象外**: あのuv系(オートフレーミングのクロップ矩形)は
+  **Crop TOP に直結する前提**で生の0〜1画像座標である必要があるため。補正すると本来の用途が壊れる
+- **OCR素材の方針メモ**: 動画生成AIは文字レンダリングが不安定で「OCRが失敗したのか元が
+  崩れているのか」を切り分けられない。**答えが既知の素材(Text TOP でレンダした文字列)**を
+  正確性検証に使うのが確実(VisionBarcode の利用例が CoreImage Code TOP 生成QRを使うのと同じ考え)。
+  日本語検証は特にこの方式が必須(生成AIに漢字・かなを正しく描かせるのは非現実的)
+- 注意: この変更でリリース v0.9.1 のDMGは1コミット遅れている。サンプル映像4本(crowd/faces/
+  face/ballet)の検証と合わせて次回まとめて配布物を更新する
