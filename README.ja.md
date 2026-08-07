@@ -171,11 +171,11 @@ Apple公式の Core ML モデルを `models/`(gitignore)へ置いてください
 
 ## バージョン
 
-現在のリリース: **0.9.0**([`VERSION`](VERSION))
+現在のリリース: **0.9.1**([`VERSION`](VERSION))
 
 | 層 | 値 | ルール |
 |---|---|---|
-| リポジトリ(gitタグ) | `v0.9.0` | op追加・機能追加で **minor**、修正で **patch**。`opType` のリネーム/削除は**破壊的変更**としてリリースノートに明記 |
+| リポジトリ(gitタグ) | `v0.9.1` | op追加・機能追加で **minor**、修正で **patch**。`opType` のリネーム/削除は**破壊的変更**としてリリースノートに明記 |
 | バンドル(`Info.plist`) | `CFBundleShortVersionString` = リポジトリ版 / `CFBundleVersion` = gitコミット数 | ビルド時に `common/version.sh` が自動で焼き込む |
 | オペレータ(`customOPInfo`) | `majorVersion = 0` / `minorVersion = 9` | **opごと**。TDが `.toe` 保存値と比較する。後方互換でない変更(パラメータ削除・意味変更)をした**そのopだけ** `majorVersion` を +1 する |
 

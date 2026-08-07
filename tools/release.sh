@@ -66,6 +66,17 @@ cmd_sign() {
         done
     done < <(cd "$REPO" && git ls-files '*/build.sh' | sed 's|/build.sh||')
     echo "copied $n bundles (from repo builds)"
+    # 各プラグインのビルド時点の版が残らないよう、配布物へ現在の VERSION を焼き直す。
+    # **署名より前**に行う(Info.plist を後から書き換えると署名が壊れるため)
+    local build; build="$(cd "$REPO" && git rev-list --count HEAD)"
+    for b in "$DIST"/*.plugin; do
+        local pl="$b/Contents/Info.plist"
+        /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$pl" >/dev/null 2>&1 \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $VERSION" "$pl" >/dev/null 2>&1
+        /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $build" "$pl" >/dev/null 2>&1 \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $build" "$pl" >/dev/null 2>&1
+    done
+    echo "stamped version $VERSION (build $build)"
     # 並列署名(timestampサーバ往復があるため)。スクリプト自身を再入呼び出し
     ls -d "$DIST"/*.plugin | xargs -P 6 -I{} "$REPO/tools/release.sh" _sign_one "{}"
     echo "== sign done"
@@ -91,6 +102,10 @@ cmd_verify() {
         fi
         if [[ "$info" != *"Developer ID Application"* ]]; then
             echo "NOT DEVELOPER ID: $(basename "$b")"; fail=1
+        fi
+        local sv; sv="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$b/Contents/Info.plist" 2>/dev/null)"
+        if [ "$sv" != "$VERSION" ]; then
+            echo "VERSION MISMATCH: $(basename "$b") -> $sv (expected $VERSION)"; fail=1
         fi
         if [ -x "$scan" ]; then
             local api; api="$("$scan" "$b/Contents/MacOS/$(basename "$b" .plugin)" 2>/dev/null)"

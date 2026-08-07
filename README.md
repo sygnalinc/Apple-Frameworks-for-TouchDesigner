@@ -174,11 +174,11 @@ placed in `models/` (gitignored) — see each plugin's README for the download l
 
 ## Versioning
 
-Current release: **0.9.0** (see [`VERSION`](VERSION))
+Current release: **0.9.1** (see [`VERSION`](VERSION))
 
 | Layer | Value | Rule |
 |---|---|---|
-| Repository (git tag) | `v0.9.0` | Adding operators / features bumps **minor**, fixes bump **patch**. Renaming or removing an `opType` is a **breaking** change and is called out in the release notes. |
+| Repository (git tag) | `v0.9.1` | Adding operators / features bumps **minor**, fixes bump **patch**. Renaming or removing an `opType` is a **breaking** change and is called out in the release notes. |
 | Bundle (`Info.plist`) | `CFBundleShortVersionString` = repo version, `CFBundleVersion` = git commit count | Stamped automatically by `common/version.sh` at build time. |
 | Operator (`customOPInfo`) | `majorVersion = 0`, `minorVersion = 9` | **Per operator.** TouchDesigner compares these with the values saved in a `.toe`. Bump `majorVersion` **only** for that one operator when a change is not backwards compatible (parameter removed / semantics changed). |
 
