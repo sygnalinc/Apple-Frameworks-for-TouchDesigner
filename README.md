@@ -223,3 +223,13 @@ by Apple's SDK agreement, which does not restrict your code), the TouchDesigner 
 supplied by your own install, and models are downloaded separately under their own licenses.
 Build-time dependencies (`apple/ml-stable-diffusion`, `argmaxinc/WhisperKit`) are MIT and
 fetched via SPM, not vendored. Details in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+### Sample media
+
+The demo clips in `Assets/sample_*.mp4` were **generated with Adobe Firefly (Google Veo 3.1 Fast)**
+for this repository, so they carry no third-party model release or location permit. They exist
+purely to exercise the operators (`sample.toe` → `/project1/examples`) and are covered by the
+same MIT license as the rest of the repository. People appearing in them are synthetic and do
+not depict real individuals. Firefly's generative models are trained on licensed and public
+domain content and its output is intended for commercial use; if you redistribute these clips
+outside this project, check Adobe's current generative AI terms for your own account tier.

@@ -217,3 +217,12 @@ Apple公式の Core ML モデルを `models/`(gitignore)へ置いてください
 各自のインストールから供給され、モデルは各自が固有ライセンスの下でダウンロードします。ビルド時
 依存(`apple/ml-stable-diffusion` / `argmaxinc/WhisperKit`)はいずれも MIT で、SPM が取得する
 だけで同梱していません。詳細は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) を参照。
+
+### サンプル素材
+
+`Assets/sample_*.mp4` のデモ映像は、本リポジトリ用に **Adobe Firefly(Google Veo 3.1 Fast)で
+生成**したものです。したがって第三者の肖像権処理やロケ許可を必要としません。用途はオペレータの
+動作確認(`sample.toe` の `/project1/examples`)に限られ、リポジトリ本体と同じ MIT ライセンスで
+配布します。登場する人物は合成であり実在の人物ではありません。Firefly の生成モデルはライセンス
+済み・パブリックドメインのコンテンツで学習されており商用利用を想定していますが、これらの映像を
+本プロジェクト外へ再配布する場合は、ご自身のプランに適用される Adobe の生成AI利用条件を確認してください。

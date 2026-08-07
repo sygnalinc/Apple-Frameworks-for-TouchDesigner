@@ -2949,3 +2949,33 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   `OP_CommonAPIVersion`(CPlusPlus_Common.h)と一致するか確認する。直し方は**当該プラグインの再ビルド**
 - **リリース物をユーザーの常設Pluginsフォルダから集めてはいけない**(サードパーティ製が混入する)。
   必ずリポジトリのビルド成果物から集める
+
+### 2026-08-07 サンプル映像8本をAI生成して同梱・examplesを全面的に張り直し
+
+- ユーザーが **Adobe Firefly(Google Veo 3.1 Fast)** で提案どおり8本を生成し `Assets/` に追加
+  (いずれも 1280x720 / 24fps / 8秒・合計約28MB・**コミット可能**)。従来の実写素材
+  (`test_video_1.mp4` 183MB 等)は巨大でgitignoreだったため**リポジトリに存在せず、
+  examplesの映像系は全て壊れていた**。これが解消した
+- **共有ソースを1本→9本に**: `examples/media_{people,hands,animals,throw,objects,cutout,
+  horizon,contours}`(+従来の `media_video` は people を指す汎用)。各例の `src`(Select TOP)を
+  用途に応じて張り替え(**28コンテナ**)
+- **実測(M2・TD実機)— 全て新素材で検証**:
+  - VisionPose **5人**・VisionFace **5顔**(people)
+  - VisionHand **2手**(hands)
+  - **VisionAnimalPose 2匹**(animals)← **素材が無く未検証だったopの初の実データ検証**
+  - **VisionTrajectory 4/4 valid**(throw)← **こちらも初の実データ検証**。AI生成の弾道でも
+    `VNDetectTrajectoriesRequest` が成立した
+  - CoreML DAT(YOLO)= **apple / laptop / cup**、VisionClassify = coffee / drink / liquid(objects)
+  - VisionRect 4矩形(objects)、VisionContours 8プリム/893点(contours)
+  - VisionHorizon valid=1・角度3.5°、VisionAesthetics score **0.784**(horizon)
+  - VisionSubject: ブリキロボットのカットアウトを**視認確認**、VisionTrack: 再Startで
+    u=0.512/v=0.466/conf=1.0 で追従(cutout)
+- **踏んだ罠**: ①Vision系CHOPのスロットチャンネル名は **`body1:valid`(コロン)**。
+  `body1/valid` では取れず「検出0」と誤診する ②examplesは出力が使われないため
+  **毎フレームcookされない**。検証は Execute DAT(onFrameEnd)で駆動する。特に
+  VisionTrajectory/VisionTrack は**連続フレーム必須**で、間隔を空けたforce cookでは絶対に成立しない
+  ③VisionTrack の `Top` がコンテナを指したままだった(→`src`に修正)。初期bboxは被写体に合わせる
+- `afm_describe_demo` が参照していた削除済み `test_image_1.jpg` を sample_people.mp4 へ差し替え
+  (classify = people / adult / clothing を確認)。削除済み2素材はgitからも除去
+- **ライセンス表記**: README(英日)の License 節に「Sample media / サンプル素材」小節を追加。
+  Firefly生成のため第三者の肖像権処理・ロケ許可が不要で、人物は合成、リポジトリと同じMITで配布する旨を明記
