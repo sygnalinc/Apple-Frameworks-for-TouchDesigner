@@ -15,6 +15,8 @@
 #import <CoreVideo/CoreVideo.h>
 #import <Vision/Vision.h>
 
+#include "../common/AspectCoords.h"
+
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -111,17 +113,22 @@ public:
             std::lock_guard<std::mutex> lock(myMutex);
             s = myTrack;
         }
+        const tdaspect::Mapper map{ inputs->getParInt("Aspectcorrectuv") != 0,
+                                    top ? (float)top->textureDesc.width  : 0.0f,
+                                    top ? (float)top->textureDesc.height : 0.0f };
         const bool on = active && s.valid;
         output->channels[0][0] = on ? 1.0f : 0.0f;
-        output->channels[1][0] = on ? s.u : 0.0f;
-        output->channels[2][0] = on ? s.v : 0.0f;
-        output->channels[3][0] = on ? s.w : 0.0f;
-        output->channels[4][0] = on ? s.h : 0.0f;
+        output->channels[1][0] = on ? map.x(s.u) : 0.0f;
+        output->channels[2][0] = on ? map.y(s.v) : 0.0f;
+        output->channels[3][0] = on ? map.dx(s.w) : 0.0f;
+        output->channels[4][0] = on ? map.dy(s.h) : 0.0f;
         output->channels[5][0] = on ? s.confidence : 0.0f;
     }
 
     void setupParameters(OP_ParameterManager* manager, void*) override
     {
+        // uv を入力画像のアスペクト比へ再スケール（Body Track CHOP と同名・同既定）
+        tdaspect::appendAspectCorrect<OP_ParameterManager, OP_NumericParameter>(manager, "Vision Track");
         {
             OP_StringParameter p("Top");
             p.label = "TOP";

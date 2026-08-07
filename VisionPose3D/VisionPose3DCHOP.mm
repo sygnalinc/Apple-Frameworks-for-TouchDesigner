@@ -20,6 +20,8 @@
 #import <Vision/Vision.h>
 #import <simd/simd.h>
 
+#include "../common/AspectCoords.h"
+
 #include <atomic>
 #include <condition_variable>
 #include <cstring>
@@ -160,19 +162,28 @@ public:
             std::lock_guard<std::mutex> lock(myMutex);
             pose = myPose;
         }
+        const tdaspect::Mapper map{ inputs->getParInt("Aspectcorrectuv") != 0,
+                                    top ? (float)top->textureDesc.width  : 0.0f,
+                                    top ? (float)top->textureDesc.height : 0.0f };
         const bool on = active && pose.valid;
         output->channels[0][0] = on ? 1.0f : 0.0f;
         output->channels[1][0] = on ? pose.bodyHeight : 0.0f;
         output->channels[2][0] = on ? pose.heightMeasured : 0.0f;
         for (int c = 0; c < 3; c++)
             output->channels[3 + c][0] = on ? pose.camera[c] : 0.0f;
-        for (int j = 0; j < kNumJoints; j++)
-            for (int c = 0; c < 5; c++)
+        for (int j = 0; j < kNumJoints; j++) {
+            // tx,ty,tz はメートル単位なので変換しない。u,v（投影座標）のみ再スケール
+            for (int c = 0; c < 3; c++)
                 output->channels[6 + j * 5 + c][0] = on ? pose.joints[j][c] : 0.0f;
+            output->channels[6 + j * 5 + 3][0] = on ? map.x(pose.joints[j][3]) : 0.0f;
+            output->channels[6 + j * 5 + 4][0] = on ? map.y(pose.joints[j][4]) : 0.0f;
+        }
     }
 
     void setupParameters(OP_ParameterManager* manager, void*) override
     {
+        // uv を入力画像のアスペクト比へ再スケール（Body Track CHOP と同名・同既定）
+        tdaspect::appendAspectCorrect<OP_ParameterManager, OP_NumericParameter>(manager, "Vision Pose 3D");
         {
             OP_StringParameter p("Top");
             p.label = "TOP";

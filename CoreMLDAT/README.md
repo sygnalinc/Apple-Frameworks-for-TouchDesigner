@@ -53,6 +53,23 @@ Ultralytics 等で Core ML 変換した YOLOv8/v11(NMS込みエクスポート)�
 
 `executes / submits / analyzes / analyze_ms / detections / loaded`
 
+
+### Aspect Correct UVs（アスペクト比補正）
+
+`Aspect Correct UVs`（既定 **Off**）は uv の1単位が縦横で同じピクセル距離になるよう再スケールする。
+TD標準 **Body Track CHOP** の同名パラメータと同じ役割・同じ既定値。
+
+```
+aspect = 入力幅 / 入力高さ
+u' = u                             （0〜1 のまま）
+v' = 0.5 + (v - 0.5) / aspect      （中心を保って 1/aspect に縮小）
+bbox の height（v方向の距離）も 1/aspect、width は不変
+```
+
+`u` が 0〜1 のままなので、`tx = u - 0.5` / `ty = v - 0.5` でインスタンシングすると
+**カメラの Ortho Width を 1 のまま**で元映像にぴったり重なる（手動スケール不要）。
+生の 0〜1 画像座標が欲しいときは Off のままにする。
+
 ## 注意
 
 - **NMS(重複除去)込みでエクスポートされたモデルが対象**。生テンソルを出す検出モデル

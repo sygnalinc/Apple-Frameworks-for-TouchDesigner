@@ -23,6 +23,8 @@
 #import <CoreVideo/CoreVideo.h>
 #import <Vision/Vision.h>
 
+#include "../common/AspectCoords.h"
+
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
@@ -167,25 +169,30 @@ public:
             std::lock_guard<std::mutex> lock(myMutex);
             faces = myFaces;
         }
+        const tdaspect::Mapper map{ inputs->getParInt("Aspectcorrectuv") != 0,
+                                    top ? (float)top->textureDesc.width  : 0.0f,
+                                    top ? (float)top->textureDesc.height : 0.0f };
         for (int i = 0; i < myMaxFaces; i++) {
             const bool on = active && i < (int)faces.size() && faces[i].valid;
             const Face& face = (i < (int)faces.size()) ? faces[i] : myEmpty;
             int ch = i * perFace();
             output->channels[ch++][0] = on ? 1.0f : 0.0f;
-            for (int c = 0; c < 4; c++)
-                output->channels[ch++][0] = on ? face.bbox[c] : 0.0f;
+            output->channels[ch++][0] = on ? map.x(face.bbox[0]) : 0.0f;
+            output->channels[ch++][0] = on ? map.y(face.bbox[1]) : 0.0f;
+            output->channels[ch++][0] = on ? map.dx(face.bbox[2]) : 0.0f;
+            output->channels[ch++][0] = on ? map.dy(face.bbox[3]) : 0.0f;
             for (int c = 0; c < 3; c++)
                 output->channels[ch++][0] = on ? face.rot[c] : 0.0f;
             if (myQuality)
                 output->channels[ch++][0] = on ? face.quality : 0.0f;
             for (int c = 0; c < kNumCentroids; c++) {
-                output->channels[ch++][0] = on ? face.centroid[c][0] : 0.0f;
-                output->channels[ch++][0] = on ? face.centroid[c][1] : 0.0f;
+                output->channels[ch++][0] = on ? map.x(face.centroid[c][0]) : 0.0f;
+                output->channels[ch++][0] = on ? map.y(face.centroid[c][1]) : 0.0f;
             }
             if (myLandmarks) {
                 for (int p = 0; p < kNumLandmarks; p++) {
-                    output->channels[ch++][0] = on ? face.points[p][0] : 0.0f;
-                    output->channels[ch++][0] = on ? face.points[p][1] : 0.0f;
+                    output->channels[ch++][0] = on ? map.x(face.points[p][0]) : 0.0f;
+                    output->channels[ch++][0] = on ? map.y(face.points[p][1]) : 0.0f;
                 }
             }
         }
@@ -193,6 +200,8 @@ public:
 
     void setupParameters(OP_ParameterManager* manager, void*) override
     {
+        // uv を入力画像のアスペクト比へ再スケール（Body Track CHOP と同名・同既定）
+        tdaspect::appendAspectCorrect<OP_ParameterManager, OP_NumericParameter>(manager, "Vision Face");
         {
             OP_StringParameter p("Top");
             p.label = "TOP";

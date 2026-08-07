@@ -2979,3 +2979,35 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   (classify = people / adult / clothing を確認)。削除済み2素材はgitからも除去
 - **ライセンス表記**: README(英日)の License 節に「Sample media / サンプル素材」小節を追加。
   Firefly生成のため第三者の肖像権処理・ロケ許可が不要で、人物は合成、リポジトリと同じMITで配布する旨を明記
+
+### 2026-08-07 Vision系OPに Aspect Correct UVs を追加(Body Track CHOP 互換・Ortho Width=1 対応)
+
+- ユーザー要望「uv を入力画像のアスペクト比に応じて正しい比率で出力したい」→「**Body Track CHOP の
+  Aspect Correct 機能と同じように**」→「**インスタンシングして Ortho Width=1 のカメラで
+  映像に重ねられる仕様に**」
+- TD公式ドキュメントで Body Track CHOP のパラメータを確認: `aspectcorrectuv` / ラベル
+  "Aspect Correct UVs" / **Toggle・既定Off**。説明は "Rescales the u and v positions so that
+  they have the correct aspect ratio of the input image."
+- **共通ヘッダ `common/AspectCoords.h`**(namespace tdaspect)を新設。Mapper + appendAspectCorrect()
+  テンプレートで10プラグインに同じ実装を配る
+- **変換式(Ortho Width=1 で合う向きを選定)**:
+  `u' = u`(0〜1のまま) / `v' = 0.5 + (v-0.5)/aspect` / v方向の距離は 1/aspect・u方向は不変。
+  **u を 0〜1 に保つのが要点** — Instance TX=u-0.5 / TY=v-0.5 が
+  Ortho Width=1 の画面いっぱいに一致する(縦視野は自動的に 1/aspect になるため)。
+  u を aspect 倍する実装も試したが、その場合 Ortho Width を aspect に変える必要があり要件に合わない
+- **対応10プラグイン**: VisionPose / VisionHand / VisionFace / VisionAnimalPose / VisionTrack /
+  VisionPose3D(u,v のみ。tx,ty,tz はメートルなので不変)/ VisionRect(bbox+四隅)/
+  VisionTrajectory(検出点・投影点+放物線係数 a,b は 1/aspect・c は y 変換)/
+  CoreML DAT(bbox)/ VisionBarcode DAT(bbox+四隅)。信頼度・角度・IDは非変換
+- **実測(M2・1280x720・同一フレームで厳密比較)**: u=0.81578→0.81578(不変)、
+  v=0.68205→0.60240(= 0.5+(0.68205-0.5)/1.7778 に厳密一致)、bbox height 0.57449→0.32315
+  (=÷1.7778)、width 不変
+- **視覚検証**: VisionPose の全uvを Shuffle(Sequence All Channels)で 175サンプルの tx/ty にし、
+  Geo インスタンシング → **Ortho Width=1 のカメラ** → Render → 映像に Composite。
+  **On で5人全員の関節に赤点が正確に重なる**ことを視認。Off では点が縦に伸びて頭が人物の上に浮く
+- 10件とも再ビルド・署名・インストール・**TD再起動後に全10opでパラメータ生成を確認**。各README更新
+- **踏んだ罠**: ①python の文字列 replace はアンカーが1文字でも違うと**黙って何もしない**。
+  今回コメント行を含むブロックを見落として2回無駄にビルドした → **assert で必ず検証する**。
+  ②`replace(..., 1)` は最初の出現に当たる。`const int perHand` のように getChannelName と execute の
+  両方にある変数宣言は**別関数側に入ってしまう**(コンパイルエラーで気づけたが要注意)。
+  ③Shuffle CHOP で「N個の1サンプルch → 1chのNサンプル」は `seqall`(Sequence All Channels)

@@ -2,6 +2,7 @@
 #import <Foundation/Foundation.h>
 #import <CoreVideo/CoreVideo.h>
 #import <Vision/Vision.h>
+#include "../common/AspectCoords.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -20,7 +21,7 @@ public:
  VisionBarcodeDAT(const OP_NodeInfo*){myThread=std::thread([this]{worker();});}
  ~VisionBarcodeDAT()override{{std::lock_guard<std::mutex>l(myMutex);myQuit=true;}myCond.notify_all();if(myThread.joinable())myThread.join();}
  void getGeneralInfo(DAT_GeneralInfo*g,const OP_Inputs*,void*)override{g->cookEveryFrameIfAsked=true;}
- void execute(DAT_Output*out,const OP_Inputs*in,void*)override{
+ void execute(DAT_Output*out,const OP_Inputs*in,void*)override{const OP_TOPInput*aspTop=in->getParTOP("Top");const tdaspect::Mapper map{in->getParInt("Aspectcorrectuv")!=0,aspTop?(float)aspTop->textureDesc.width:0.f,aspTop?(float)aspTop->textureDesc.height:0.f};
   myExec++;bool active=in->getParInt("Active")!=0,flip=in->getParInt("Flip")!=0;
   int max=std::clamp(in->getParInt("Maxcodes"),1,100);float min=std::clamp((float)in->getParDouble("Minconfidence"),0.f,1.f);
   std::string sig=std::to_string(max)+":"+std::to_string(min)+(flip?":1":":0");if(sig!=mySig){mySig=sig;myLast=-1;}
@@ -36,12 +37,12 @@ public:
   for(int r=0;r<(int)rows.size();r++){char b[32];snprintf(b,sizeof(b),"%d",r+1);out->setCellString(r+1,0,b);
    out->setCellString(r+1,1,rows[r].symbology.c_str());out->setCellString(r+1,2,rows[r].payload.c_str());
    snprintf(b,sizeof(b),"%.6f",rows[r].confidence);out->setCellString(r+1,3,b);
-   for(int c=0;c<4;c++){snprintf(b,sizeof(b),"%.6f",rows[r].bbox[c]);out->setCellString(r+1,4+c,b);}
-   for(int c=0;c<8;c++){snprintf(b,sizeof(b),"%.6f",rows[r].corners[c]);out->setCellString(r+1,8+c,b);}}
+   {const float bv[4]={map.x(rows[r].bbox[0]),map.y(rows[r].bbox[1]),map.dx(rows[r].bbox[2]),map.dy(rows[r].bbox[3])};for(int c=0;c<4;c++){snprintf(b,sizeof(b),"%.6f",bv[c]);out->setCellString(r+1,4+c,b);}}
+   for(int c=0;c<8;c++){float cv=(c%2==0)?map.x(rows[r].corners[c]):map.y(rows[r].corners[c]);snprintf(b,sizeof(b),"%.6f",cv);out->setCellString(r+1,8+c,b);}}
   myCount=(int)rows.size();
  }
  void setupParameters(OP_ParameterManager*m,void*)override{
-  OP_StringParameter top("Top");top.label="TOP";top.page="Vision Barcode";m->appendTOP(top);
+  OP_StringParameter top("Top");top.label="TOP";top.page="Vision Barcode";m->appendTOP(top);tdaspect::appendAspectCorrect<OP_ParameterManager,OP_NumericParameter>(m,"Vision Barcode");
   OP_NumericParameter a("Active");a.label="Active";a.page="Vision Barcode";a.defaultValues[0]=1;m->appendToggle(a);
   OP_NumericParameter n("Maxcodes");n.label="Max Codes";n.page="Vision Barcode";n.defaultValues[0]=10;n.minSliders[0]=1;n.maxSliders[0]=10;n.minValues[0]=1;n.maxValues[0]=100;n.clampMins[0]=n.clampMaxes[0]=true;m->appendInt(n);
   OP_NumericParameter c("Minconfidence");c.label="Minimum Confidence";c.page="Vision Barcode";c.defaultValues[0]=0;c.minSliders[0]=0;c.maxSliders[0]=1;c.minValues[0]=0;c.maxValues[0]=1;c.clampMins[0]=c.clampMaxes[0]=true;m->appendFloat(c);

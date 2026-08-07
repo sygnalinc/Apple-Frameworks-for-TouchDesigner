@@ -4,6 +4,8 @@
 #import <CoreVideo/CoreVideo.h>
 #import <Vision/Vision.h>
 
+#include "../common/AspectCoords.h"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -158,23 +160,31 @@ public:
             std::lock_guard<std::mutex> lock(myMutex);
             animals = myAnimals;
         }
+        const tdaspect::Mapper map{ inputs->getParInt("Aspectcorrectuv") != 0,
+                                    top ? (float)top->textureDesc.width  : 0.0f,
+                                    top ? (float)top->textureDesc.height : 0.0f };
         constexpr int per = 5 + kNumJoints * 3;
         for (int a = 0; a < myMaxAnimals; ++a) {
             const bool valid = active && a < (int)animals.size();
             const Animal* animal = valid ? &animals[a] : nullptr;
             const int base = a * per;
             output->channels[base][0] = valid ? 1.0f : 0.0f;
-            for (int i = 0; i < 4; ++i)
-                output->channels[base + 1 + i][0] = valid ? animal->bbox[i] : 0.0f;
-            for (int j = 0; j < kNumJoints; ++j)
-                for (int f = 0; f < 3; ++f)
-                    output->channels[base + 5 + j * 3 + f][0] =
-                        valid ? animal->joints[j][f] : 0.0f;
+            output->channels[base + 1][0] = valid ? map.x(animal->bbox[0]) : 0.0f;
+            output->channels[base + 2][0] = valid ? map.y(animal->bbox[1]) : 0.0f;
+            output->channels[base + 3][0] = valid ? map.dx(animal->bbox[2]) : 0.0f;
+            output->channels[base + 4][0] = valid ? map.dy(animal->bbox[3]) : 0.0f;
+            for (int j = 0; j < kNumJoints; ++j) {
+                output->channels[base + 5 + j * 3 + 0][0] = valid ? map.x(animal->joints[j][0]) : 0.0f;
+                output->channels[base + 5 + j * 3 + 1][0] = valid ? map.y(animal->joints[j][1]) : 0.0f;
+                output->channels[base + 5 + j * 3 + 2][0] = valid ? animal->joints[j][2] : 0.0f;
+            }
         }
     }
 
     void setupParameters(OP_ParameterManager* manager, void*) override
     {
+        // uv を入力画像のアスペクト比へ再スケール（Body Track CHOP と同名・同既定）
+        tdaspect::appendAspectCorrect<OP_ParameterManager, OP_NumericParameter>(manager, "Vision Animal Pose");
         OP_StringParameter top("Top"); top.label = "TOP"; top.page = "Vision Animal Pose";
         manager->appendTOP(top);
         OP_NumericParameter active("Active"); active.label = "Active"; active.page = "Vision Animal Pose";

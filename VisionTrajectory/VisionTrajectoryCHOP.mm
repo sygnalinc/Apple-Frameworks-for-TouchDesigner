@@ -3,6 +3,7 @@
 #import <CoreVideo/CoreVideo.h>
 #import <CoreMedia/CoreMedia.h>
 #import <Vision/Vision.h>
+#include "../common/AspectCoords.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -32,9 +33,9 @@ public:
   std::string sig=std::to_string(s.length)+":"+std::to_string(s.minRadius)+":"+std::to_string(s.maxRadius)+":"+std::to_string(s.targetFps)+(flip?":1":":0");if(sig!=mySig){mySig=sig;myLast=-1;myReset=true;}
   const OP_TOPInput*top=in->getParTOP("Top");if(active&&top&&(int64_t)top->totalCooks!=myLast){std::unique_lock<std::mutex>l(myMutex,std::try_to_lock);if(l.owns_lock()&&!myPending&&!myBusy){OP_TOPInputDownloadOptions o;o.pixelFormat=OP_PixelFormat::BGRA8Fixed;o.verticalFlip=flip;myDownload=top->downloadTexture(o,nullptr);if(myDownload){mySettings=s;myPending=true;myLast=top->totalCooks;mySubmit++;l.unlock();myCond.notify_one();}}}
   std::vector<Trajectory>r;{std::lock_guard<std::mutex>l(myMutex);r=myRows;}int per=6+myLength*4;
-  for(int t=0;t<myMax;t++){bool valid=active&&t<(int)r.size();int base=t*per;for(int q=0;q<per;q++)out->channels[base+q][0]=0;if(!valid)continue;const auto&x=r[t];out->channels[base][0]=1;out->channels[base+1][0]=x.a;out->channels[base+2][0]=x.b;out->channels[base+3][0]=x.c;out->channels[base+4][0]=x.radius;out->channels[base+5][0]=(float)x.detected.size();
-   for(int p=0;p<myLength;p++){if(p<(int)x.detected.size()){out->channels[base+6+p*4][0]=x.detected[p].x;out->channels[base+7+p*4][0]=x.detected[p].y;}if(p<(int)x.projected.size()){out->channels[base+8+p*4][0]=x.projected[p].x;out->channels[base+9+p*4][0]=x.projected[p].y;}}}}
- void setupParameters(OP_ParameterManager*m,void*)override{OP_StringParameter top("Top");top.label="TOP";top.page="Vision Trajectory";m->appendTOP(top);OP_NumericParameter a("Active");a.label="Active";a.page="Vision Trajectory";a.defaultValues[0]=1;m->appendToggle(a);
+  const tdaspect::Mapper map{in->getParInt("Aspectcorrectuv")!=0,top?(float)top->textureDesc.width:0.f,top?(float)top->textureDesc.height:0.f};for(int t=0;t<myMax;t++){bool valid=active&&t<(int)r.size();int base=t*per;for(int q=0;q<per;q++)out->channels[base+q][0]=0;if(!valid)continue;const auto&x=r[t];out->channels[base][0]=1;out->channels[base+1][0]=map.dy(x.a);out->channels[base+2][0]=map.dy(x.b);out->channels[base+3][0]=map.y(x.c);out->channels[base+4][0]=x.radius;out->channels[base+5][0]=(float)x.detected.size();
+   for(int p=0;p<myLength;p++){if(p<(int)x.detected.size()){out->channels[base+6+p*4][0]=map.x(x.detected[p].x);out->channels[base+7+p*4][0]=map.y(x.detected[p].y);}if(p<(int)x.projected.size()){out->channels[base+8+p*4][0]=map.x(x.projected[p].x);out->channels[base+9+p*4][0]=map.y(x.projected[p].y);}}}}
+ void setupParameters(OP_ParameterManager*m,void*)override{OP_StringParameter top("Top");top.label="TOP";top.page="Vision Trajectory";m->appendTOP(top);tdaspect::appendAspectCorrect<OP_ParameterManager,OP_NumericParameter>(m,"Vision Trajectory");OP_NumericParameter a("Active");a.label="Active";a.page="Vision Trajectory";a.defaultValues[0]=1;m->appendToggle(a);
   OP_NumericParameter n("Maxtrajectories");n.label="Max Trajectories";n.page="Vision Trajectory";n.defaultValues[0]=4;n.minSliders[0]=1;n.maxSliders[0]=10;n.minValues[0]=1;n.maxValues[0]=100;n.clampMins[0]=n.clampMaxes[0]=true;m->appendInt(n);
   OP_NumericParameter len("Length");len.label="Trajectory Length";len.page="Vision Trajectory";len.defaultValues[0]=5;len.minSliders[0]=5;len.maxSliders[0]=30;len.minValues[0]=5;len.maxValues[0]=30;len.clampMins[0]=len.clampMaxes[0]=true;m->appendInt(len);
   OP_NumericParameter mi("Minradius");mi.label="Minimum Object Radius";mi.page="Vision Trajectory";mi.defaultValues[0]=.005;mi.minSliders[0]=0;mi.maxSliders[0]=.1;mi.minValues[0]=0;mi.clampMins[0]=true;m->appendFloat(mi);

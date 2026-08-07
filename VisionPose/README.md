@@ -61,6 +61,23 @@ body スロットはトラッキングで維持される（人が入れ替わっ
 Info CHOP（動作診断）: `executes / submits / analyzes / last_w / last_h / last_bytes`。
 `analyzes` が `executes` に追従していればフレーム落ちなし。
 
+
+### Aspect Correct UVs（アスペクト比補正）
+
+`Aspect Correct UVs`（既定 **Off**）は uv の1単位が縦横で同じピクセル距離になるよう再スケールする。
+TD標準 **Body Track CHOP** の同名パラメータと同じ役割・同じ既定値。
+
+```
+aspect = 入力幅 / 入力高さ
+u' = u                             （0〜1 のまま）
+v' = 0.5 + (v - 0.5) / aspect      （中心を保って 1/aspect に縮小）
+bbox の height（v方向の距離）も 1/aspect、width は不変
+```
+
+`u` が 0〜1 のままなので、`tx = u - 0.5` / `ty = v - 0.5` でインスタンシングすると
+**カメラの Ortho Width を 1 のまま**で元映像にぴったり重なる（手動スケール不要）。
+生の 0〜1 画像座標が欲しいときは Off のままにする。
+
 ## ビルド
 
 ```

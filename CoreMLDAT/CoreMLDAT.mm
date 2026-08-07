@@ -18,6 +18,8 @@
 #import <CoreML/CoreML.h>
 #import <Vision/Vision.h>
 
+#include "../common/AspectCoords.h"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -149,7 +151,11 @@ public:
             output->setCellString(i + 1, 1, rows[i].label.c_str());
             snprintf(buf, sizeof(buf), "%.4f", rows[i].confidence);
             output->setCellString(i + 1, 2, buf);
-            const float vals[4] = {rows[i].u, rows[i].v, rows[i].w, rows[i].h};
+            const tdaspect::Mapper map{ inputs->getParInt("Aspectcorrectuv") != 0,
+                                        top ? (float)top->textureDesc.width  : 0.0f,
+                                        top ? (float)top->textureDesc.height : 0.0f };
+            const float vals[4] = {map.x(rows[i].u), map.y(rows[i].v),
+                                   map.dx(rows[i].w), map.dy(rows[i].h)};
             for (int c = 0; c < 4; c++) {
                 snprintf(buf, sizeof(buf), "%.4f", vals[c]);
                 output->setCellString(i + 1, 3 + c, buf);
@@ -166,6 +172,8 @@ public:
             p.page = "CoreML Detect";
             manager->appendTOP(p);
         }
+        // uv を入力画像のアスペクト比へ再スケール（Body Track CHOP と同名・同既定）
+        tdaspect::appendAspectCorrect<OP_ParameterManager, OP_NumericParameter>(manager, "CoreML Detect");
         {
             OP_NumericParameter p("Active");
             p.label = "Active";
