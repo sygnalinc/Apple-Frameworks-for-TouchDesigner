@@ -2835,3 +2835,24 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   素直な実装(幅は不変・位置のみ移動)
 - 実測(M2・TD実機・MCP HTTP直送): 0/+80/-80 で下線が行位置から左右へ正しくシフト、
   エラー・警告なし。検証ノード削除済み。常設インストール済み(TD再起動で反映)
+
+### 2026-08-07 Developer ID リリース署名パイプライン構築(tools/release.sh)
+
+- SYGNAL INC. の Apple Developer Program 法人アカウント取得を受け、ストア外配布用の
+  リリースパイプラインを構築。ユーザーが Developer ID Application 証明書を作成し
+  (`Developer ID Application: SYGNAL INC. (2ZSD5ZZLKB)`・秘密鍵ごとキーチェーンに導入済み)、
+  Apple Distribution 証明書(App Store用・今回は不使用)と区別することを確認
+- **tools/release.sh**: sign(インストール済み86 pluginを dist/ へコピーし深署名)→ verify →
+  dmg(INSTALL.txt同梱・署名付きUDZO)→ notarize(notarytool submit --wait + stapler)。
+  深署名はネスト内側から: Frameworks/*.dylib → ネスト .app/.framework(wifiscan-helper.app等)→
+  Helpers 直下の Mach-O 実行ファイル(mlxllm-helper)→ バンドル本体。全て
+  `--timestamp --options runtime`(公証必須要件)。dist/ は gitignore
+- **実測**: 86バンドル全て署名・`codesign --verify --deep --strict` 通過・runtime フラグ+
+  Developer ID チェーン確認。DMG 19MB 作成・署名済み。spctl は「Unnotarized Developer ID」
+  (=公証だけが残り)
+- **踏んだ罠**: ①xargs -P + `export -f` は環境サイズ超過(command line too long)→ スクリプト
+  自身を `_sign_one` で再入呼び出し。②`set -o pipefail` 下の `codesign -dv 2>&1 | grep -q` は
+  grep -q の早期終了 SIGPIPE で codesign が非ゼロ扱い=全件誤検知 → 出力を変数に取って比較
+- **未完(ユーザー作業待ち)**: 公証認証情報の登録。App Store Connect の APIキー(App Manager
+  以上)か Apple ID の app用パスワードで `xcrun notarytool store-credentials tdappleops` を
+  一度実行してもらう → 以後 `./tools/release.sh notarize` で submit→staple まで自動
