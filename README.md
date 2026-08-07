@@ -78,7 +78,6 @@ grouped by category.
 
 | Plugin | Family | What it does |
 |---|---|---|
-| [Vision Track](VisionTrack/) | CHOP | **Track any object** (initial bbox → follow). Close to a Blob Track TOP alternative |
 | [Vision Flow](VisionFlow/) | TOP | **Optical flow** (motion vector field). **Optical Flow TOP alternative** (UV/Pixels) |
 | [Vision Saliency](VisionSaliency/) | TOP | Saliency map + **auto-framing** (crop rect of the region of interest → Crop TOP for automatic camera work) |
 
