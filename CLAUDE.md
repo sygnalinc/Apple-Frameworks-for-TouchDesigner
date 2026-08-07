@@ -2914,3 +2914,38 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   (18MB・検証済み69プラグイン・Notarized Developer ID)を添付
   https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.0
 - リポジトリはまだ **PRIVATE**。一般公開は Settings → Visibility を Public に切り替えた時点
+
+### 2026-08-07 起動時プラグインエラーの原因究明: OP_CommonAPIVersion 不一致(TDダウングレード)
+
+- 症状: TD起動時に **CoreTextTOP.plugin / ImageIOPointCloudSOP.plugin** だけが
+  "provides an invalid opType name" で拒否される。opType 文字列(`Coretext`/`Imageiopointcloud`)は
+  規約通りで、バイナリにも正しく埋まっている
+- **真因**: TD の `setAPIVersion()` は `apiVersion = version;` の直後に範囲チェックし、
+  **不一致なら早期returnする**。その結果 opType が空文字のままになり、TDは
+  「invalid opType name」という**原因と無関係に見えるエラー**を出す。
+  この2つだけが **OP_CommonAPIVersion = 2**(新しいTD SDK)でビルドされており、
+  ユーザーが **TouchDesigner をダウングレード**したため現行TD(2025.32280・common=1)が拒否していた
+- **診断ツール `tools/apiscan.c`**: PluginInfo構造体の**先頭int32がapiVersion**で、
+  Min/Max=0 のゼロ初期化バッファを渡すと **opTypeポインタに触れる前に早期return**する性質を利用し、
+  バンドルが宣言しているAPIバージョンを安全に読み出す。全69本を走査してこの2本だけを特定
+- **修正**: 2プラグインを現行SDKで再ビルド(common=1確認)→ 署名・インストール → TD再起動で
+  **両方ロード成功・coretext_demo/ImageIOPointCloud例ともエラー0**を確認
+- **release.sh を2点修正**:
+  1. **配布物の収集元をユーザーの常設Pluginsフォルダ → リポジトリの build/ 成果物に変更**。
+     常設フォルダから集めていたため **Azure Kinect(K4ABody/K4ADepth/K4ASelect)** という
+     サードパーティ製3本がDMGに混入していた(ユーザー指摘)。`git ls-files '*/build.sh'` から
+     収集するので main が追跡するものだけが対象になり、EXCLUDEリストも不要になった(69→**66本**)
+  2. **verify に APIバージョン検査を追加**(apiscanで全数 common を現行SDKと突合)。
+     同じ事故を出荷前に止められる
+- 新DMG(66本)を再公証(Accepted・staple・spctl accepted)し、GitHub Release v0.9.0 の
+  アセットを差し替え済み
+
+### 新規ハマりどころ
+
+- **TDの「invalid opType name」エラーは、opType文字列が正しくても出る**。真因が
+  `setAPIVersion()` の失敗(SDKバージョン不一致)であることが多い。TDのバージョンを
+  上げ下げした環境では、**古い/新しいSDKでビルドされたバンドルが混在**して一部だけ拒否される。
+  `tools/apiscan.c` で各バンドルの宣言APIバージョンを読み、現行SDKの
+  `OP_CommonAPIVersion`(CPlusPlus_Common.h)と一致するか確認する。直し方は**当該プラグインの再ビルド**
+- **リリース物をユーザーの常設Pluginsフォルダから集めてはいけない**(サードパーティ製が混入する)。
+  必ずリポジトリのビルド成果物から集める

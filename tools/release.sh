@@ -2,7 +2,7 @@
 # Apple Frameworks for TouchDesigner リリースビルド: Developer ID 深署名 → 検証 → DMG → 公証 → ステープル
 #
 # 使い方:
-#   tools/release.sh sign      # インストール済み全pluginを dist/ へコピーして深署名
+#   tools/release.sh sign      # リポジトリのビルド成果物を dist/ へ集めて深署名
 #   tools/release.sh verify    # dist/ の全バンドルを codesign 検証
 #   tools/release.sh dmg       # dist/ から配布DMGを作成し署名
 #   tools/release.sh notarize  # DMGを公証(要: notarytool keychain-profile)→ステープル
@@ -18,26 +18,17 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="$(cat "$REPO/VERSION")"
 SIGN_ID="${SIGN_ID:-Developer ID Application: SYGNAL INC. (2ZSD5ZZLKB)}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-tdappleops}"
-SRC="${SRC:-$HOME/Library/Application Support/Derivative/TouchDesigner099/Plugins}"
+# 配布物は「main が追跡しているプラグインフォルダの build/ 成果物」だけを集める。
+# ユーザーの常設 Plugins フォルダから集めるとサードパーティ製(Azure Kinect 等)が
+# 混入するため、必ずリポジトリ由来にすること。
 DIST="$REPO/dist/Apple-Frameworks-for-TouchDesigner-v$VERSION"
 DMG="$REPO/dist/Apple-Frameworks-for-TouchDesigner-v$VERSION.dmg"
 
 CS=(codesign -f --timestamp --options runtime -s "$SIGN_ID")
 
-# リリースに含めない未検証プラグイン(develop ブランチで開発継続中)
-EXCLUDE=(
-    AVAudioMixerCHOP AVAudioSpatialCHOP AudioToolboxMixCHOP CaptionAuthorDAT
-    ColorSyncTOP CoreImageKeystoneTOP GameplayKitAgentsCHOP GameplayKitPathSOP
-    ImageCaptureDAT MetalFrameInterpTOP MetalMPSAnalyzeCHOP PhaseCHOP ShazamDAT
-    SpatialVideoTOP SwiftUITOP SwiftUIPanelCHOP UIWidgetDAT
-)
-
-is_excluded() {
-    local name; name="$(basename "$1" .plugin)"
-    local e
-    for e in "${EXCLUDE[@]}"; do [ "$e" = "$name" ] && return 0; done
-    return 1
-}
+# 現在の TD SDK が期待する OP_CommonAPIVersion(バンドルの宣言値と一致必須)
+SDK_ROOT="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus"
+EXPECT_COMMON="$(grep -h -m1 'OP_CommonAPIVersion = ' "$SDK_ROOT/CHOP/CPlusPlus_Common.h" | sed 's/[^0-9]*\([0-9]*\).*/\1/')"
 
 # 1バンドルを内側から深署名(dylib → ネスト.app/framework → ヘルパ実行ファイル → 本体)
 sign_bundle() {
@@ -64,23 +55,30 @@ sign_bundle() {
 }
 
 cmd_sign() {
-    echo "== sign: $SRC → $DIST (identity: $SIGN_ID)"
+    echo "== sign: repo builds → $DIST (identity: $SIGN_ID)"
     rm -rf "$DIST"; mkdir -p "$DIST"
-    local n=0 skipped=0
-    for b in "$SRC"/*.plugin; do
-        if is_excluded "$b"; then skipped=$((skipped+1)); continue; fi
-        cp -R "$b" "$DIST/"
-        n=$((n+1))
-    done
-    echo "copied $n bundles (excluded $skipped unverified)"
+    local n=0
+    while read -r d; do
+        for b in "$REPO/$d"/build/*.plugin; do
+            [ -d "$b" ] || continue
+            cp -R "$b" "$DIST/"
+            n=$((n+1))
+        done
+    done < <(cd "$REPO" && git ls-files '*/build.sh' | sed 's|/build.sh||')
+    echo "copied $n bundles (from repo builds)"
     # 並列署名(timestampサーバ往復があるため)。スクリプト自身を再入呼び出し
     ls -d "$DIST"/*.plugin | xargs -P 6 -I{} "$REPO/tools/release.sh" _sign_one "{}"
     echo "== sign done"
 }
 
 cmd_verify() {
-    echo "== verify: $DIST"
+    echo "== verify: $DIST (expect OP_CommonAPIVersion=$EXPECT_COMMON)"
     local fail=0
+    # 現行 TD SDK と API バージョンが合わないバンドルを検出する。
+    # (TD をダウングレードした環境では新SDKビルドが残りやすく、TD は
+    #  "invalid opType name" という無関係に見えるエラーで拒否する)
+    local scan="$REPO/dist/.apiscan"
+    cc -o "$scan" "$REPO/tools/apiscan.c" 2>/dev/null
     for b in "$DIST"/*.plugin; do
         if ! codesign --verify --deep --strict "$b" 2>/dev/null; then
             echo "VERIFY FAIL: $(basename "$b")"; fail=1
@@ -93,6 +91,12 @@ cmd_verify() {
         fi
         if [[ "$info" != *"Developer ID Application"* ]]; then
             echo "NOT DEVELOPER ID: $(basename "$b")"; fail=1
+        fi
+        if [ -x "$scan" ]; then
+            local api; api="$("$scan" "$b/Contents/MacOS/$(basename "$b" .plugin)" 2>/dev/null)"
+            if [[ "$api" != *"common=$EXPECT_COMMON"* ]]; then
+                echo "API VERSION MISMATCH: $(basename "$b") -> $api"; fail=1
+            fi
         fi
     done
     [ $fail -eq 0 ] && echo "== all $(ls -d "$DIST"/*.plugin | wc -l | tr -d ' ') bundles verified OK"
