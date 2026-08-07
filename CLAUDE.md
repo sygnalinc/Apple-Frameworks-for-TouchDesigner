@@ -2905,3 +2905,12 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   コミットがあるため **main→develop の wholesale merge は厳禁**(削除が伝播して未検証
   プラグインが消える)。共通修正は cherry-pick で運ぶこと
 - 注意: keychain の notarytool プロファイル名は `tdappleops` のまま(ローカル専用・変更不要)
+
+### 2026-08-07 GitHub Release v0.9.0 作成 + DMG添付
+
+- 既存の v0.9.0 Release(7/25作成・旧コミット・79 operators表記・アセット無し)は develop分離/
+  公証/改称より前の陳腐化した状態だったため削除し、タグを現行HEADへ張り直して再作成
+- **Release v0.9.0**: 英日リリースノート + `Apple-Frameworks-for-TouchDesigner-v0.9.0.dmg`
+  (18MB・検証済み69プラグイン・Notarized Developer ID)を添付
+  https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.0
+- リポジトリはまだ **PRIVATE**。一般公開は Settings → Visibility を Public に切り替えた時点
