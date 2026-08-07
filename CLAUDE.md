@@ -3068,3 +3068,26 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   main で git rm → README英日の行を削除)。**同期を先に行うこと**が要点
 - 公開対象は **61op**(main 追跡59フォルダ。Multipeer CHOP/DAT が In/Out で2バンドルずつ)
 - develop のみの非公開は計22op
+
+### 2026-08-08 ビルドシステムの重大バグ(6件が無言でビルド不能)+ CoreImageCode の bypass 復帰不良
+
+- ユーザー報告「CoreImageCode を bypass/無効化して戻すと黒画像のまま」
+- **原因1(プラグイン側)**: `execute` が `if(myResult.serial==myUploaded) return;` で
+  **一度アップロードしたら二度と上げない**構造だった。通常cook中はTDが前回テクスチャを保持
+  するので露見しないが、bypass/無効化でそれが破棄され、再有効化しても新規アップロードが
+  起きないため黒のまま(パラメータを変えると再生成→serial更新→復帰する症状と一致)。
+  → キャッシュ済みの結果を**毎execute アップロード**するよう変更(空のときだけ return)
+- **同じ構造が18 TOP にある**(`myUploaded`/`myUploadedSerial` で grep)。動画入力のものは
+  次フレームで自己回復するが、**静止画入力や生成系(CoreImageCode)は復帰しない**。
+  他TOPへの横展開は次の課題
+- **原因2(ビルドシステム・より重大)**: `common/build_plugin.sh` は **zsh専用**
+  (`${(%):-%N}`・`arr+="x"` など)なのに、6件の build.sh が `#!/bin/bash` だった。
+  bash から source すると `bad substitution` → `set -e` で**何もビルドされないまま無言で終了**。
+  終了コードも0に見える出力だったため気づかず、**2026-07-23(version.sh 導入)以降
+  CoreImageCode / CoreAudioProcessTap / CoreWLAN / Spotlight / SpeechSynth / VisionHorizon の
+  6件はビルドされていなかった**(=リリースDMGのこの6件は07-23以前のバイナリで、
+  opHelpURL の新URL等が入っていない)。6件の shebang を zsh に統一し、共通ヘルパ冒頭に
+  「このファイルは zsh 専用・呼び出し側も #!/bin/zsh にすること」を明記。6件とも再ビルド済み
+- **検証中に TouchDesigner がクラッシュ**(04:37・EXC_BAD_ACCESS)。クラッシュスタックは
+  **libOPUI/libUI のみでプラグインのフレームは無し**=TD側UIのnull参照。`CrashAutoSave.sample.toe`
+  が生成されている。bypass再検証はTD再起動後に持ち越し
