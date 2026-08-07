@@ -3011,3 +3011,20 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   ②`replace(..., 1)` は最初の出現に当たる。`const int perHand` のように getChannelName と execute の
   両方にある変数宣言は**別関数側に入ってしまう**(コンパイルエラーで気づけたが要注意)。
   ③Shuffle CHOP で「N個の1サンプルch → 1chのNサンプル」は `seqall`(Sequence All Channels)
+
+### 2026-08-07 v0.9.1 リリース(patch判断の根拠 + 配布時バージョン焼き直し)
+
+- ユーザー提案で **0.10.0 ではなく 0.9.1**(patch)に決定。根拠: 追加した Aspect Correct UVs は
+  **既定Offの追加パラメータで後方互換**(既存 .toe の挙動は不変)。このリポジトリでは
+  オペレータの `customOPInfo.minorVersion` が .toe との互換判定に使われるため、
+  **互換性が変わっていないのに minorVersion を上げると .toe 側へ無用な差分が伝わる**。
+  patch なら minorVersion=9 据え置きでリポジトリ版と自然に揃う。差分の大半が実際バグ修正
+  (起動エラー・K4A混入)であることも patch 寄り。0.x は「いつでも変わりうる」前提なので許容
+- **release.sh に配布時のバージョン焼き直しを追加**: 収集後・**署名前**に全バンドルの
+  Info.plist へ現在の VERSION と git コミット数を書き込む。従来は「各プラグインを最後に
+  ビルドした時点の版」が残り、VERSION を上げても再ビルドしたものだけ新版になっていた。
+  verify にも `CFBundleShortVersionString == VERSION` 検査を追加
+- 66バンドル署名・全数verify(署名/Hardened Runtime/APIバージョン/**版一致**)・DMG 18MB・
+  公証 Accepted・staple・spctl accepted。**Release v0.9.1 を作成**(英日ノート付き)
+- **v0.9.0 のDMGは取り下げた**: 開発中に中身を2度差し替えた結果タグと不一致になっていたため、
+  アセットを削除し「v0.9.1 に置き換わった」注記を追加(タグとリリース自体は履歴として残置)
