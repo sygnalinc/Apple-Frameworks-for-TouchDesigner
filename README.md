@@ -199,6 +199,11 @@ Current release: **0.9.0** (see [`VERSION`](VERSION))
 | Bundle (`Info.plist`) | `CFBundleShortVersionString` = repo version, `CFBundleVersion` = git commit count | Stamped automatically by `common/version.sh` at build time. |
 | Operator (`customOPInfo`) | `majorVersion = 0`, `minorVersion = 9` | **Per operator.** TouchDesigner compares these with the values saved in a `.toe`. Bump `majorVersion` **only** for that one operator when a change is not backwards compatible (parameter removed / semantics changed). |
 
+**Release builds** are Developer ID signed (SYGNAL INC.), hardened-runtime, timestamped and
+**notarized by Apple** — they open on any Mac without Gatekeeper warnings. Local development
+builds (`./build.sh`) remain ad-hoc signed. The release pipeline is
+[`tools/release.sh`](tools/release.sh) (`sign` → `verify` → `dmg` → `notarize`).
+
 **Why 0.x:** operator names (`opType`) are the public API here, and several were renamed,
 merged or removed during early development — each of which breaks `.toe` files that
 referenced them. The API is not frozen yet.
@@ -208,7 +213,7 @@ referenced them. The API is not frozen yet.
 1. Freeze operator naming (`opType` / `opLabel`)
 2. Verify the remaining hardware / material dependent operators on real data
    (Image Capture, CoreLocation Beacon, AudioToolbox Mix with 4-ch FOA …)
-3. Ship a **Developer ID signed + notarized** release archive (builds are ad-hoc signed today)
+3. ~~Ship a **Developer ID signed + notarized** release archive~~ — done (`tools/release.sh`)
 4. Keep `sample.toe` usage examples working against the frozen names
 
 ## Requirements

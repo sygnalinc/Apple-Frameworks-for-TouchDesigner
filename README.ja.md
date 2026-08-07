@@ -196,6 +196,11 @@ Apple公式の Core ML モデルを `models/`(gitignore)へ置いてください
 | バンドル(`Info.plist`) | `CFBundleShortVersionString` = リポジトリ版 / `CFBundleVersion` = gitコミット数 | ビルド時に `common/version.sh` が自動で焼き込む |
 | オペレータ(`customOPInfo`) | `majorVersion = 0` / `minorVersion = 9` | **opごと**。TDが `.toe` 保存値と比較する。後方互換でない変更(パラメータ削除・意味変更)をした**そのopだけ** `majorVersion` を +1 する |
 
+**リリースビルド**は Developer ID(SYGNAL INC.)署名 + Hardened Runtime + timestamp +
+**Apple公証(notarize)済み** — どのMacでもGatekeeper警告なしで開ける。ローカル開発ビルド
+(`./build.sh`)は従来どおり ad-hoc 署名。リリース手順は
+[`tools/release.sh`](tools/release.sh)(`sign` → `verify` → `dmg` → `notarize`)。
+
 **0.x である理由**: このリポジトリでは opType がユーザーから見た公開APIであり、開発初期に
 リネーム・統合・削除を何度も行った(そのたびに参照していた `.toe` が壊れる)。まだAPIを凍結していない。
 
@@ -204,7 +209,7 @@ Apple公式の Core ML モデルを `models/`(gitignore)へ置いてください
 1. op命名(`opType` / `opLabel`)の凍結
 2. ハード/素材依存で未検証のopを実データで検証(Image Capture、CoreLocation Beacon、
    AudioToolbox Mix の4ch FOA など)
-3. **Developer ID 署名 + notarize** 済みの配布アーカイブを用意(現在は ad-hoc 署名)
+3. ~~**Developer ID 署名 + notarize** 済みの配布アーカイブを用意~~ — 完了(`tools/release.sh`)
 4. 凍結後の名前で `sample.toe` の利用例が動作すること
 
 ## 必要環境

@@ -2856,3 +2856,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **未完(ユーザー作業待ち)**: 公証認証情報の登録。App Store Connect の APIキー(App Manager
   以上)か Apple ID の app用パスワードで `xcrun notarytool store-credentials tdappleops` を
   一度実行してもらう → 以後 `./tools/release.sh notarize` で submit→staple まで自動
+
+### 2026-08-07 公証(Notarization)完了 — 配布可能なリリースDMGが完成
+
+- ユーザーが `xcrun notarytool store-credentials tdappleops` を登録 → `./tools/release.sh notarize`
+  で `dist/TDAppleOps-v0.9.0.dmg` を提出。**status: Accepted**(submission id
+  ace53cd0-916c-4d6f-9a52-e6a28d0321be)→ stapler staple 成功
+- **Gatekeeper実測**: quarantine属性を付けたDMG本体・DMGから取り出した .plugin とも
+  `spctl` が **accepted / source=Notarized Developer ID**。=ダウンロードした他人のMacでも
+  警告なしで使える状態を確認
+- README(英日)のバージョン節に「リリースビルドは Developer ID + notarize 済み」を追記、
+  1.0.0条件の該当項目を完了に更新
+- 配布時の注意(既知): 配布版は署名が変わるためTD初回ロード時にプラグイン承認ダイアログが出る。
+  wifiscan-helper.app は位置情報許可の再承認が一度必要
+- 残タスク(任意): GitHub Release への DMG 添付(公開操作のためユーザー確認待ち)
