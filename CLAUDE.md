@@ -3061,3 +3061,10 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   だけを集める仕様なので EXCLUDE の追加は不要(配布は 66 → **63op**)
 - 注意: sample.toe の examples には除外した20op(17+3)の利用例が残っている。main だけを
   clone した人が sample.toe を開くとその20例が Unknown operator type になる
+
+### 2026-08-07 VisionAesthetics / CoreLocation Beacon も develop へ退避
+
+- 前エントリと同じ手順(worktree で develop へ `git checkout main -- <folder>` して同期 →
+  main で git rm → README英日の行を削除)。**同期を先に行うこと**が要点
+- 公開対象は **61op**(main 追跡59フォルダ。Multipeer CHOP/DAT が In/Out で2バンドルずつ)
+- develop のみの非公開は計22op
