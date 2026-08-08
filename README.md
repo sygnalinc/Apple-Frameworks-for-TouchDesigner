@@ -17,8 +17,7 @@ FoundationModels, ScreenCaptureKit, RealityKit and more — directly inside Touc
   OP, its channel / texture format matches the original as closely as possible.
 
 Each plugin has its own `README` with parameters, output specs, measured performance and
-caveats. `sample.toe` (`/project1/examples`) contains a **minimal usage example for every OP**,
-grouped by category.
+caveats. `demo.toe` contains a **minimal usage example for every OP**, one container each.
 
 ## Table of contents
 
@@ -191,7 +190,7 @@ referenced them. The API is not frozen yet.
 2. Verify the remaining hardware / material dependent operators on real data
    (Image Capture, CoreLocation Beacon, AudioToolbox Mix with 4-ch FOA …)
 3. ~~Ship a **Developer ID signed + notarized** release archive~~ — done (`tools/release.sh`)
-4. Keep `sample.toe` usage examples working against the frozen names
+4. Keep `demo.toe` usage examples working against the frozen names
 
 ## Requirements
 
@@ -222,7 +221,7 @@ fetched via SPM, not vendored. Details in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_N
 
 The demo clips in `Assets/sample_*.mp4` were **generated with Adobe Firefly (Google Veo 3.1 Fast)**
 for this repository, so they carry no third-party model release or location permit. They exist
-purely to exercise the operators (`sample.toe` → `/project1/examples`) and are covered by the
+purely to exercise the operators (`demo.toe`) and are covered by the
 same MIT license as the rest of the repository. People appearing in them are synthetic and do
 not depict real individuals. Firefly's generative models are trained on licensed and public
 domain content and its output is intended for commercial use; if you redistribute these clips

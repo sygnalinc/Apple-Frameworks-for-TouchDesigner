@@ -16,7 +16,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
   テクスチャ形式を既存OPに極力合わせています
 
 各プラグインの詳細(パラメータ・出力仕様・実測値・注意)は**サブフォルダの README** を参照。
-`sample.toe` の `/project1/examples` に**全OPの最小利用例**をカテゴリ別に配置しています。
+`demo.toe` に**全OPの最小利用例**を1オペレータ1コンテナで配置しています。
 
 ## 目次
 
@@ -187,7 +187,7 @@ Apple公式の Core ML モデルを `models/`(gitignore)へ置いてください
 2. ハード/素材依存で未検証のopを実データで検証(Image Capture、CoreLocation Beacon、
    AudioToolbox Mix の4ch FOA など)
 3. ~~**Developer ID 署名 + notarize** 済みの配布アーカイブを用意~~ — 完了(`tools/release.sh`)
-4. 凍結後の名前で `sample.toe` の利用例が動作すること
+4. 凍結後の名前で `demo.toe` の利用例が動作すること
 
 ## 必要環境
 
@@ -216,7 +216,7 @@ Apple公式の Core ML モデルを `models/`(gitignore)へ置いてください
 
 `Assets/sample_*.mp4` のデモ映像は、本リポジトリ用に **Adobe Firefly(Google Veo 3.1 Fast)で
 生成**したものです。したがって第三者の肖像権処理やロケ許可を必要としません。用途はオペレータの
-動作確認(`sample.toe` の `/project1/examples`)に限られ、リポジトリ本体と同じ MIT ライセンスで
+動作確認(`demo.toe`)に限られ、リポジトリ本体と同じ MIT ライセンスで
 配布します。登場する人物は合成であり実在の人物ではありません。Firefly の生成モデルはライセンス
 済み・パブリックドメインのコンテンツで学習されており商用利用を想定していますが、これらの映像を
 本プロジェクト外へ再配布する場合は、ご自身のプランに適用される Adobe の生成AI利用条件を確認してください。

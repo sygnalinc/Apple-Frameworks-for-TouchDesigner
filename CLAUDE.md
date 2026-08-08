@@ -3110,3 +3110,18 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 17件とも署名・APIバージョン検査つきでインストール済み
 - 注意: この17件+先の6件(ビルド不能だったもの)でリリースDMGは大きく遅れている。
   次回配布時にまとめて更新する
+
+### 2026-08-08 sample.toe → demo.toe に改称 + examples を /project1 直下へフラット化(ユーザー編集)
+
+- ユーザーが利用例を再編。**`/project1/examples` コンテナを廃止し、1オペレータ1コンテナを
+  `/project1` 直下へ**(現在54コンテナ)。共有ソースの `media_video` も廃し、**各コンテナ内に
+  素材の Movie File In を直接置く**方式(例: CoreML TOP の `sample_crowd_2`)に変わった
+- ファイル名は `sample.toe` → **`demo.toe`**(途中経過の `example.toe` はユーザー環境に残置)。
+  git は `sample.toe` を削除し `demo.toe` を追跡。README(英日)の参照6箇所を更新し、
+  `/project1/examples` の記述も削除。`CrashAutoSave.sample.toe` も削除
+- **CoreML CHOP の利用例を新スタイルで作成**: `sample_street(Movie File In) → Coreml1 → out` +
+  note。MobileCLIP S0 画像エンコーダで映像を512次元埋め込みに変換。
+  実測 valid=1 / count=512 / value0=0.0246。**Max Values を 256→512** に上げてモデルの
+  全次元を出す(既定256だと打ち切られる。count はモデル本来の要素数を返すので突き合わせ可)
+- 注意: TD の作業中に構成が変わることがあるので、examples を触る前に毎回
+  `/project1` の子を確認する(`/project1/examples` はもう無い)
