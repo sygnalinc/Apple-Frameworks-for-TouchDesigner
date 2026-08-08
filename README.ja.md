@@ -20,10 +20,11 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 
 ## デモ
 
-いずれも `demo.toe` を M2 MacBook Air で 60fps 実行しながら収録したものです。
+いずれも `demo.toe` を M2 MacBook Air で動かして収録したものです。ImagePlayground だけは
+生成結果の静止画で、それ以外は 60fps で動いているところをそのまま撮っています。
 
-GIFは `docs/demo/`。作り直すときは `./tools/make_demo_gifs.sh`
-(元の画面収録 `.mp4` はローカルのみでコミットしません)。
+書き出し先は `docs/demo/`。作り直すときは `./tools/make_demo_gifs.sh`
+(元の収録ファイルはローカルのみでコミットしません)。
 
 | | |
 |:--:|:--:|
@@ -33,6 +34,10 @@ GIFは `docs/demo/`。作り直すときは `./tools/make_demo_gifs.sh`
 | **[Vision Face](VisionFace/)** — 1顔76ランドマーク・同時12顔 | **[CoreML](CoreMLDAT/)** — YOLOv3 で物体検出 |
 | ![Vision Text](docs/demo/visiontext.gif) | ![Vision AnimalPose](docs/demo/visionanimalpose.gif) |
 | **[Vision Text](VisionText/)** — OCR・文字列ごとの矩形 | **[Vision AnimalPose](VisionAnimalPose/)** — 1匹25関節・犬と猫 |
+| ![CoreML depth](docs/demo/coreml-depth.gif) | ![Vision Subject](docs/demo/visionsubject.gif) |
+| **[CoreML](CoreML/)** — Depth Anything V2 で単眼深度推定 | **[Vision Subject](VisionSubject/)** — グリーンバック無しの被写体切り抜き |
+| ![CoreText](docs/demo/coretext.gif) | ![ImagePlayground](docs/demo/imageplayground.jpg) |
+| **[CoreText](CoreText/)** — 日本語の縦組みを一文字ずつ表示 | **[ImagePlayground](ImagePlayground/)** — 顔写真(左)からイラスト(右)を生成 |
 
 ## 目次
 

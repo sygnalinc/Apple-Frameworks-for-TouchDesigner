@@ -21,10 +21,11 @@ caveats. `demo.toe` contains a **minimal usage example for every OP**, one conta
 
 ## Demos
 
-All captured from `demo.toe` on an M2 MacBook Air, running live at 60 fps.
+All captured from `demo.toe` on an M2 MacBook Air — running live at 60 fps, except
+ImagePlayground, which is a generated result.
 
-GIFs live in `docs/demo/`; regenerate them from the screen recordings with
-`./tools/make_demo_gifs.sh` (the source `.mp4`s stay local and are not committed).
+The media lives in `docs/demo/`; regenerate it from the screen recordings with
+`./tools/make_demo_gifs.sh` (the sources stay local and are not committed).
 
 | | |
 |:--:|:--:|
@@ -34,6 +35,10 @@ GIFs live in `docs/demo/`; regenerate them from the screen recordings with
 | **[Vision Face](VisionFace/)** — 76 landmarks per face, 12 faces at once | **[CoreML](CoreMLDAT/)** — object detection with YOLOv3 |
 | ![Vision Text](docs/demo/visiontext.gif) | ![Vision AnimalPose](docs/demo/visionanimalpose.gif) |
 | **[Vision Text](VisionText/)** — OCR with per-string bounding boxes | **[Vision AnimalPose](VisionAnimalPose/)** — 25 joints per animal, dog and cat |
+| ![CoreML depth](docs/demo/coreml-depth.gif) | ![Vision Subject](docs/demo/visionsubject.gif) |
+| **[CoreML](CoreML/)** — monocular depth with Depth Anything V2 | **[Vision Subject](VisionSubject/)** — subject cutout, no green screen |
+| ![CoreText](docs/demo/coretext.gif) | ![ImagePlayground](docs/demo/imageplayground.jpg) |
+| **[CoreText](CoreText/)** — vertical Japanese typesetting, revealed a character at a time | **[ImagePlayground](ImagePlayground/)** — a face photo (left) turned into an illustration (right) |
 
 ## Table of contents
 

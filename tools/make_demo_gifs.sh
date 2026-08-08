@@ -32,6 +32,12 @@ CLIPS=(
     "visionanimalpose|VisionAnimalPose.mp4|2.6|3.0|480|12|8:8:14:14|64"  # 2.6s まで骨格だけで元動画が出ない
     # 人混みの街路はほぼ全画素が毎フレーム変わるので、幅と fps を落として強めに除去する
     "coreml-yolo|CoreMLDAT(yolo).mp4|0|4.0|440|10|12:12:20:20|64"
+    "coreml-depth|CoreMLTOP(depthanything).mp4|0|4.0|480|12|8:8:14:14|64"
+    # 単色背景の切り抜きは差分がほとんど無いので、全尺入れても軽い
+    "visionsubject|VisionSubject.mp4|0|6.4|480|12|8:8:14:14|64"
+    # 背景が動かない紙面 + 増えていく文字だけなので、全尺・高解像でも軽い
+    # (縦組みの明朝は線が細いため幅と色数を上げている)
+    "coretext|CoreText.mp4|1.5|10.0|640|10|8:8:14:14|96"   # 冒頭は真っ白なので少し後ろから
 )
 
 for c in "${CLIPS[@]}"; do
@@ -39,6 +45,21 @@ for c in "${CLIPS[@]}"; do
     name="$parts[1]"; file="$parts[2]"; ss="$parts[3]"; dur="$parts[4]"
     ffmpeg -v error -y -ss "$ss" -t "$dur" -i "$SRC/$file" \
         -vf "$(filter "$parts[5]" "$parts[6]" "$parts[7]" "$parts[8]")" -loop 0 "$OUT/$name.gif"
-    printf "%-14s %5s KB  (%ss from %ss of %s)\n" \
+    printf "%-20s %5s KB  (%ss from %ss of %s)\n" \
         "$name.gif" "$(( $(stat -f%z "$OUT/$name.gif") / 1024 ))" "$dur" "$ss" "$file"
+done
+
+# 動きの無いものは静止画で足りる。レターボックスの黒帯を切って JPEG にする。
+# name | source | crop(w:h:x:y) | 幅
+STILLS=(
+    "imageplayground|ImagePlayground.png|1280:640:0:40|800"
+)
+
+for s in "${STILLS[@]}"; do
+    parts=("${(@s:|:)s}")
+    name="$parts[1]"; file="$parts[2]"
+    ffmpeg -v error -y -i "$SRC/$file" \
+        -vf "crop=$parts[3],scale=$parts[4]:-1:flags=lanczos" -q:v 3 "$OUT/$name.jpg"
+    printf "%-20s %5s KB  (still from %s)\n" \
+        "$name.jpg" "$(( $(stat -f%z "$OUT/$name.jpg") / 1024 ))" "$file"
 done
