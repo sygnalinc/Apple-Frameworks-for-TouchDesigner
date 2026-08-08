@@ -350,6 +350,13 @@ private:
 
             for (VNFaceObservation* obs in request.results) {
                 Face face;
+                // ランドマークの未使用スロットは -1 で埋める（0 だと bbox 隅の
+                // 「実在しない点」に見えてしまい、線を引くと画面外へ飛ぶ）。
+                // 領域ごとの点数は顔の constellation により変わる（目が6点のこともある）。
+                for (int i = 0; i < kNumLandmarks; i++) {
+                    face.points[i][0] = -1.0f;
+                    face.points[i][1] = -1.0f;
+                }
                 face.valid = true;
                 const CGRect b = obs.boundingBox;
                 face.bbox[0] = (float)(b.origin.x + b.size.width * 0.5);
@@ -380,12 +387,36 @@ private:
                     regionCentroid(lm.rightEye, b, face.centroid[1]);
                     regionCentroid(lm.nose, b, face.centroid[2]);
                     regionCentroid(lm.outerLips, b, face.centroid[3]);
-                    VNFaceLandmarkRegion2D* all = lm.allPoints;
-                    if (all) {
-                        const CGPoint* pts = all.normalizedPoints;
-                        const int n = std::min((int)all.pointCount, kNumLandmarks);
-                        for (int i = 0; i < n; i++)
-                            mapPoint(pts[i], b, face.points[i]);
+                    // allPoints は「領域を繋いだ順」ではなく描画に使えない並びなので、
+                    // **領域ごとに、その領域内の正しい順序で**詰め直す。
+                    // 並び（p0 始まり・合計76点）:
+                    //   0-15  faceContour(16)  16-21 leftEye(6)   22-27 rightEye(6)
+                    //   28-33 leftEyebrow(6)   34-39 rightEyebrow(6)
+                    //   40-47 nose(8)          48-52 noseCrest(5)  53-55 medianLine(3)
+                    //   56-69 outerLips(14)    70-75 innerLips(6)
+                    // 点数は macOS 26 実測（合計ちょうど 76）。輪郭は 16 点あり、
+                    // 11 点に切ると顎の片側が途中で切れる。
+                    // 領域が取れなかった分は 0 のまま（描画側は confidence ではなく
+                    // この並びを前提に線を引ける）。
+                    {
+                        VNFaceLandmarkRegion2D* regions[10] = {
+                            lm.faceContour, lm.leftEye, lm.rightEye,
+                            lm.leftEyebrow, lm.rightEyebrow,
+                            lm.nose, lm.noseCrest, lm.medianLine,
+                            lm.outerLips, lm.innerLips,
+                        };
+                        const int counts[10] = {16, 6, 6, 6, 6, 8, 5, 3, 14, 6};
+                        int base = 0;
+                        for (int r = 0; r < 10; r++) {
+                            VNFaceLandmarkRegion2D* reg = regions[r];
+                            if (reg) {
+                                const CGPoint* pts = reg.normalizedPoints;
+                                const int n = std::min((int)reg.pointCount, counts[r]);
+                                for (int i = 0; i < n && base + i < kNumLandmarks; i++)
+                                    mapPoint(pts[i], b, face.points[base + i]);
+                            }
+                            base += counts[r];
+                        }
                     }
                 }
                 result.push_back(face);

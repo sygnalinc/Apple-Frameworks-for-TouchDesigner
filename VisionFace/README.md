@@ -12,7 +12,7 @@ TD ネイティブのカスタム CHOP。Windows+NVIDIA 専用 Face Track CHOP �
 | `face{i}/bbox:u,v,width,height` | 顔バウンディングボックス（中心+サイズ・0〜1） |
 | `face{i}/roll` `yaw` `pitch` | 顔の向き（ラジアン。**取得できない軸は 0**） |
 | `face{i}/left_eye:u,v` `right_eye` `nose` `mouth` | 主要ランドマークの中心（画像正規化座標） |
-| `face{i}/p{0..75}:u,v` | Landmarks オン時のみ・全76ランドマーク点 |
+| `face{i}/p{0..75}:u,v` | Landmarks オン時のみ・全76ランドマーク点。**領域ごとに、その領域内の正しい順序**で並ぶので連番で結べば輪郭が描ける |
 
 face の並びは bbox 中心の x で左→右にソート。
 
@@ -42,6 +42,27 @@ bbox の height（v方向の距離）も 1/aspect、width は不変
 `u` が 0〜1 のままなので、`tx = u - 0.5` / `ty = v - 0.5` でインスタンシングすると
 **カメラの Ortho Width を 1 のまま**で元映像にぴったり重なる（手動スケール不要）。
 生の 0〜1 画像座標が欲しいときは Off のままにする。
+
+
+### ランドマークの並び（p0..p75）
+
+`allPoints` の生の並びは描画に使えないため、**領域ごとに詰め直して**出力している。
+連番で結べば輪郭・目・眉・鼻・唇がそのまま線になる。
+
+| 範囲 | 領域 | 点数 | 閉じる |
+|---|---|---|---|
+| 0-15 | faceContour（輪郭） | 16 | 開 |
+| 16-21 / 22-27 | leftEye / rightEye | 6 / 6 | 閉 |
+| 28-33 / 34-39 | leftEyebrow / rightEyebrow | 6 / 6 | 開 |
+| 40-47 | nose | 8 | 開 |
+| 48-52 | noseCrest | 5 | 開 |
+| 53-55 | medianLine | 3 | 開 |
+| 56-69 | outerLips | 14 | 閉 |
+| 70-75 | innerLips | 6 | 閉 |
+
+点数は macOS 26 での実測（合計ちょうど76）。**領域内の点数は顔によって変わることがあり、
+使われなかったスロットには `u = v = -1` が入る**ので、描画側でスキップすること。
+`demo.toe` の Vision Face 例（`geo2/contour`）が実装例。
 
 ## 注意
 
