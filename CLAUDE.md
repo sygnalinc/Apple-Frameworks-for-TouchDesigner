@@ -3415,3 +3415,13 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   TD の Python API に存在する(`dir(app)` で確認)。ライセンス版のまま NC の制限を再現できる
   可能性があるので、実際に掛けて上記8件の挙動を確認すれば「未検証」を解消できる(今回は
   ユーザーが作業中のTDに影響するため実行していない)
+
+### 2026-08-08 利用者向けスキル td-apple-ops を追加
+
+- 既存の `td-apple-plugin` は**作る側**のスキルなので、**使う側**(既存OPでTDプロジェクトを組む)の
+  スキルを新設。`.claude/skills/td-apple-ops/` に実体を置き、`~/.claude/skills/` へシンボリックリンク
+  (td-apple-plugin と同じ運用。単一ソースのままセッションを跨いで使える)
+- 構成: `SKILL.md`(導入・OPの選び方・外さない5つのルール・チャンネル名の書式・NC制限)/
+  `wiring.md`(cookを回す・Info CHOP・Flip・Aspect Correct UVs→Ortho Width=1・骨格線・
+  マスク合成・VisionFlow可視化・音声/LLMの注意)/ `troubleshooting.md`(症状別)
+- **OP一覧はスキルに転記しない**(必ず陳腐化する)。ルートREADMEを正として参照させる方針
