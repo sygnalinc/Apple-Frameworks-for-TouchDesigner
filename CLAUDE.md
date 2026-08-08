@@ -3425,3 +3425,16 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   `wiring.md`(cookを回す・Info CHOP・Flip・Aspect Correct UVs→Ortho Width=1・骨格線・
   マスク合成・VisionFlow可視化・音声/LLMの注意)/ `troubleshooting.md`(症状別)
 - **OP一覧はスキルに転記しない**(必ず陳腐化する)。ルートREADMEを正として参照させる方針
+
+### 2026-08-08 ops_catalog.json の追跡をやめた(生成物・黙って腐る)
+
+- ユーザー質問「ops_catalog.json はもういらない?」→ 調べたところ**誰も参照しておらず、
+  内容も大きく古かった**ので追跡をやめた
+  - 最終更新は 7/22。その後の develop 分離・CoreMLDetect→CoreMLDAT 改名・Aspect Correct UVs 追加を
+    一切反映しておらず、`_count: 82` に対し **main に存在しない 24 op**(Visiontrack / Visionsegment /
+    Swiftui / Phase 等)を載せたままだった
+  - 参照は `tools/gen_ops_catalog.py`(生成元)と CLAUDE.md の履歴行のみ。README からのリンクも無し
+- `git rm --cached` + `.gitignore` へ追加。**生成スクリプトは残す**(実行して 59 ops を正しく出力する
+  ことを確認済み)。必要になった時点で `python3 tools/gen_ops_catalog.py` で作り直す
+- 教訓: **一覧は1箇所だけを正にする**。人間向けはルート README、機械可読が要るときだけ生成。
+  同じ理由で新スキル td-apple-ops にも OP 一覧を転記していない

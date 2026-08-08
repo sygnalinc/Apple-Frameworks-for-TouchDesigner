@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 # ops_catalog.json を .mm ソースから生成(TD不要・best-effort)。
+#
+#   python3 tools/gen_ops_catalog.py
+#
+# 出力の ops_catalog.json は**コミットしない**(.gitignore 済み)。以前は追跡していたが、
+# op の追加・改名・develop への移動のたびに黙って古くなり、実際に「main に存在しない
+# 24 op を載せたまま」の状態になっていた。必要になった時点で作り直すのが正。
+# 人間向けの一覧はルート README.md / README.ja.md が正。
 import os, re, json
 
 import os as _os
