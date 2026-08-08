@@ -17,7 +17,7 @@ TDAppleOps 本体は [MIT ライセンス](LICENSE)です。プラグインの�
 
 | | |
 |---|---|
-| Where | `Assets/td_mcp_server.tox`, and embedded in `demo.toe` as `/project1/td_mcp_server` |
+| Where | Embedded in `demo.toe` as `/project1/td_mcp_server` |
 | Source | https://github.com/johnsabath/touchdesigner-mcp (John Sabath) |
 | License | MIT — stated in that project's README |
 

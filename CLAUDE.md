@@ -3390,3 +3390,12 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   エンドポイントは**認証なしで TD 内の任意 Python を実行できる**(`run` ツール)ので、
   同一LAN上の誰でも TD とマシンを操作できる。この旨を notices と README に明記した
 - **未決**: demo.toe から `td_mcp_server` を外すかどうかはユーザー判断待ち(今回は表記のみ)
+
+### 2026-08-08 Assets/td_mcp_server.tox を削除(demo.toe への影響なしを確認)
+
+- 削除前に無参照を確認: ①`demo.toe` のバイナリに "Assets/td_mcp_server" の文字列は0件
+  ②ロード中の demo.toe で `externaltox` を持つ COMP が1つも無い(=サーバの中身は .toe に
+  埋め込み済みで、外部 tox に依存していない)③リポジトリ内の言及はドキュメントのみ
+- `git rm` して、LICENSE / THIRD_PARTY_NOTICES.md / README(英日)の所在表記を
+  「`demo.toe` に `/project1/td_mcp_server` として埋め込み」へ更新。出典表記自体は維持
+- 注意: **同梱をやめたわけではない**(demo.toe の中に本体がある)ので、出典表記は引き続き必要

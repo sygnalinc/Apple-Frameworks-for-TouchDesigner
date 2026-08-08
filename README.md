@@ -236,7 +236,7 @@ fetched via SPM, not vendored.
 
 One third-party component **is** bundled: the development-time
 [TouchDesigner MCP server](https://github.com/johnsabath/touchdesigner-mcp) COMP (MIT, by
-John Sabath) in `Assets/td_mcp_server.tox`, also embedded in `demo.toe`. It is a tool for
+John Sabath), embedded in `demo.toe` as `/project1/td_mcp_server`. It is a tool for
 driving TouchDesigner from an AI agent while building these plugins — no plugin needs it.
 **It opens an unauthenticated Python-execution endpoint on port 9988, on all interfaces**;
 delete `/project1/td_mcp_server` unless you are using it.

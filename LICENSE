@@ -23,5 +23,5 @@ SOFTWARE.
 ---
 
 Third-party components bundled in this repository (currently the TouchDesigner MCP
-server COMP in `Assets/td_mcp_server.tox`, MIT, by John Sabath) keep their own
-licenses. See THIRD_PARTY_NOTICES.md for the full list and notices.
+server COMP embedded in `demo.toe`, MIT, by John Sabath) keep their own licenses.
+See THIRD_PARTY_NOTICES.md for the full list and notices.

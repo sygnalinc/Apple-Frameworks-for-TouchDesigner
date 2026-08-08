@@ -231,7 +231,7 @@ cd VisionPose && ./build.sh      # → VisionPose/build/VisionPoseCHOP.plugin
 
 第三者コンポーネントは**1つだけ同梱**しています。開発用の
 [TouchDesigner MCP server](https://github.com/johnsabath/touchdesigner-mcp) COMP
-(MIT・John Sabath 氏)で、`Assets/td_mcp_server.tox` と `demo.toe` に含まれます。
+(MIT・John Sabath 氏)で、`demo.toe` に `/project1/td_mcp_server` として含まれます。
 プラグインの実装・検証を AI エージェントから行うためのツールで、どのプラグインにも不要です。
 **ポート9988で全インターフェースに対し、認証なしで Python を実行できる口を開く**ため、
 使わないときは `/project1/td_mcp_server` を削除してください。
