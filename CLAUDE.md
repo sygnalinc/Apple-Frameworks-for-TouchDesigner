@@ -3298,3 +3298,12 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   demo.toe の note も同内容に更新
 - **教訓**: Vision の領域点数は constellation により変わる。固定長で切ると**エラーも警告も
   出ずに形だけ壊れる**。実データで枠の使用数を数えて確かめること
+
+### 2026-08-08 VisionAnimalPose にも骨格線を追加 + 4例の線を見やすく調整
+
+- `geo2/bones`(Script SOP)で25関節を接続: 耳(上→中→下)/ 目-鼻 / 鼻→首 / 首→尾(3点) /
+  前脚(首→肘→膝→足) / 後脚(尾の付け根→肘→膝→足)。実測 **2匹で41本**、犬と猫それぞれの
+  骨格が正しく描かれることを視認
+- **4例すべてで `lineMAT` の Wire Width を 3 に**(既定1pxだと線が細くて見えにくかった)。
+  色も分けた: Pose=緑 / Hand=橙 / Face=水色 / AnimalPose=黄
+- 線描画の型が4例で揃った(Script SOP → soptoPOP → outPOP + render/display フラグ + Trigger)
