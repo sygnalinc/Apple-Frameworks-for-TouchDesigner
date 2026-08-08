@@ -158,8 +158,10 @@ cd VisionPose && ./build.sh      # → VisionPose/build/VisionPoseCHOP.plugin
   `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/` に `.plugin` をコピー
   → TD 再起動で OP Create Dialog に現れる
 
-モデルを使うプラグイン(CoreML / CoreML SAM2 / CoreML ImageGen 等)は、各 README のリンク先から
-Apple公式の Core ML モデルを `models/`(gitignore)へ置いてください。
+モデルを使うプラグイン(CoreML / CoreML SAM2 / CoreML ImageGen / LLM MLX 等)は、モデルファイルを
+`models/` に置いてください。**モデル本体はリポジトリに含まれません** —
+[`models/README.md`](models/README.md) に、利用例が期待するファイル名と入手先の一覧・
+ダウンロード手順があります。`demo.toe` の各利用例の note にも同じリンクを書いてあります。
 
 ## バージョン
 

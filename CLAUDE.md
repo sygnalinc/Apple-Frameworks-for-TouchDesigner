@@ -3204,3 +3204,18 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   「動いていない」のか「ロード中」なのか判別できないため
 - note に**この罠を明記**: リポジトリIDを直接書くなら**クォートで囲む**か
   パラメータを定数モードに戻すこと。VLM は gemma 系4bitでは不可(Qwen2-VL 系を使う)
+
+### 2026-08-08 models/ をREADMEだけ共有・各利用例のnoteにモデル入手先を明記
+
+- ユーザー指摘「models フォルダは git で共有されていない?」→ そのとおりで完全に未追跡だった
+  (.gitignore の `models/`)。**フォルダ自体を追跡するため `models/*` + `!models/README.md`** に変更
+- **`models/README.md` を新設**(唯一追跡されるファイル)。利用例が期待する**ファイル名 → 用途 →
+  入手先URL** の表と、`hf download <repo> --local-dir models/<name>` の手順、
+  ライセンスは各モデル固有である旨を記載
+  - DepthAnythingV2 / MobileCLIP(image+text)/ YOLOv3 / SAM2.1-tiny /
+    Stable Diffusion 2.1 base / gemma-3-4b-it-qat-4bit / Qwen2-VL-2B(VLM用)
+- **demo.toe の該当6例(CoreML TOP/CHOP/DAT・SAM2・ImageGen・LLM MLX)の note に
+  入手先ブロックを追記**。ファイル名・URL・hf download コマンドをその場で読める
+- ついでに note に残っていた**古い共有ソース表記**(`shared via examples/media_*`)を除去。
+  examples フラット化で `media_video` 方式は廃止済みのため実態と食い違っていた
+- ルート README(英日)のモデル案内を `models/README.md` への導線に更新

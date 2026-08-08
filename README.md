@@ -160,8 +160,10 @@ TouchDesigner 2023 or later.
   `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/`
   → it appears in the OP Create Dialog after a TouchDesigner restart.
 
-Model-based plugins (CoreML / CoreML SAM2 / CoreML ImageGen…) need an Apple Core ML model
-placed in `models/` (gitignored) — see each plugin's README for the download link.
+Model-based plugins (CoreML / CoreML SAM2 / CoreML ImageGen / LLM MLX…) need a model file
+placed in `models/`. The models are **not** in this repository — [`models/README.md`](models/README.md)
+lists every file the examples expect and where to download it. Each example in `demo.toe`
+repeats the download link in its own note.
 
 ## Versioning
 

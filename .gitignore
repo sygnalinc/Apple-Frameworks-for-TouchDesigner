@@ -4,7 +4,9 @@ __pycache__/
 *.pyc
 Backup/
 *.toe.*
-models/
+# モデル本体は巨大なので追跡しない。ただし入手先を書いた README だけは共有する
+models/*
+!models/README.md
 .build/
 # 100MB超のテスト動画はローカルのみ(LFS不使用)
 Assets/test_animal.mp4
