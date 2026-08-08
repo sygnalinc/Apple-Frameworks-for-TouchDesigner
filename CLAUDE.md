@@ -3125,3 +3125,21 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   全次元を出す(既定256だと打ち切られる。count はモデル本来の要素数を返すので突き合わせ可)
 - 注意: TD の作業中に構成が変わることがあるので、examples を触る前に毎回
   `/project1` の子を確認する(`/project1/examples` はもう無い)
+
+### 2026-08-08 demo.toe をカテゴリ別グリッドへ整理 + 利用例の不足を洗い出し
+
+- `/project1` 直下の46コンテナを **ルート README と同じ10カテゴリ**の行に並べ替え。
+  各行の左端に `_cat_01`〜`_cat_10` のラベル Text DAT を置き、旧 `_cat_IO/_cat_Audio/
+  _cat_CoreML/_cat_Vision` は撤去。インフラ(_README / media_audio / td_mcp_server)は最下段へ
+- `_README` を索引に更新(カテゴリ表・不足14件・外部モデルが要るOP・注意)
+- **利用例が無いプラグイン14件**(main の60opに対して): Cinematic Video / CoreImage HDR /
+  CoreImage RAW / ImageIO File In / ImageIO PointCloud / ImagePlayground / Vision Document /
+  CreateML / CreateML Training Recorder / CoreML Motion / CA Process Tap / CoreWLAN /
+  CoreWLAN Scan / Spotlight
+  - 素材/権限が要るもの(Cinematic=実Cinematic動画、HDR/RAW/FileIn/PointCloud=実写HEIC・DNG、
+    CoreWLAN系=Wi-Fi環境、CA Process Tap=音を出すアプリ)と、すぐ作れるもの
+    (Vision Document / CreateML / Spotlight / ImagePlayground)に分かれる
+- **MetalFrameInterp の利用例が残っていた**が、これは develop 送りで main には無い。
+  公開版では Unknown operator type になるため要削除(ユーザー判断待ち)
+- MCP run の癖: **exec のスコープ分離でリスト内包表記から外側の変数が見えない**
+  (`NameError: name 'placed' is not defined`)。明示的な for ループで書く
