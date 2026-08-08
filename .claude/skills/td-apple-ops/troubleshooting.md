@@ -4,6 +4,8 @@
 
 ## OP が Create Dialog に出ない / "Unknown operator type"
 
+0. **起動時の許可ダイアログを閉じてしまっていないか。** TD は新しいプラグインごとに
+   許可を求め、その結果を `Plugins.json` に記録する。許可しなかったものは登録されない
 1. `.plugin` を `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/` に
    置いたか。置いた**あと TouchDesigner を再起動**したか(起動時にしか走査しない)
 2. 12個以上を一度に入れ替えた直後の初回起動は**再検証で数分かかる**。2回目以降はキャッシュで通常速度。

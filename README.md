@@ -167,17 +167,24 @@ Grab the DMG from the
 **[latest release](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/latest)**.
 It is signed with a Developer ID and **notarized**, so it opens without a Gatekeeper warning.
 
-Open it and drag the `.plugin` bundles you want into
-`~/Library/Application Support/Derivative/TouchDesigner099/Plugins/`, or copy them all:
+Open it and drag **only the `.plugin` bundles you actually need** into
+`~/Library/Application Support/Derivative/TouchDesigner099/Plugins/`.
+
+> **Start with a few.** TouchDesigner asks you to approve **each new plugin individually**
+> on the next launch, so copying all 59 means dismissing 59 dialogs before you reach the
+> network. You can always add more later — the approval is remembered per plugin.
+
+If you do want everything:
 
 ```sh
 cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.9.2/"*.plugin \
       ~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins/
 ```
 
-**Restart TouchDesigner** — the operators appear in the OP Create Dialog. (Plugins are only
-scanned at startup. Right after replacing many bundles the first launch re-verifies them and
-can take a few minutes; the second is back to normal.)
+Then **restart TouchDesigner** — approve the plugins when asked, and they appear in the OP
+Create Dialog. (Plugins are only scanned at startup. Right after adding or replacing many
+bundles the first launch also re-verifies them and can take a few minutes; the second is back
+to normal.)
 
 ### 2. Try the examples
 

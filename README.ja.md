@@ -166,18 +166,24 @@ GIFは `docs/demo/`。作り直すときは `./tools/make_demo_gifs.sh`
 から DMG をダウンロードしてください。Developer ID 署名 + **公証済み**なので、
 ダウンロードしたマシンでも Gatekeeper の警告なしに開けます。
 
-開いたら、使いたい `.plugin` を
-`~/Library/Application Support/Derivative/TouchDesigner099/Plugins/` へドラッグします。
-まとめてコピーするなら:
+開いたら、**使いたい `.plugin` だけ**を
+`~/Library/Application Support/Derivative/TouchDesigner099/Plugins/` へドラッグしてください。
+
+> **まずは必要なものだけを推奨。** TouchDesigner は次の起動時に**プラグイン1つずつ
+> 許可のダイアログ**を出します。59個すべてコピーすると、ネットワークに辿り着く前に
+> 59回ダイアログを閉じることになります。あとから足せますし、許可はプラグインごとに
+> 記憶されます。
+
+まとめて入れる場合は:
 
 ```sh
 cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.9.2/"*.plugin \
       ~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins/
 ```
 
-そのあと **TouchDesigner を再起動**すると OP Create Dialog に現れます
-(プラグインは起動時にしか走査されません。多数を入れ替えた直後の初回起動は再検証で
-数分かかることがあります。2回目以降は通常速度です)。
+そのあと **TouchDesigner を再起動**し、ダイアログで許可すると OP Create Dialog に現れます
+(プラグインは起動時にしか走査されません。多数を追加・入れ替えた直後の初回起動は
+再検証も走るため数分かかることがあります。2回目以降は通常速度です)。
 
 ### 2. 利用例を動かす
 

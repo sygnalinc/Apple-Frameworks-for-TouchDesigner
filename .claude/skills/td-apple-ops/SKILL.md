@@ -24,7 +24,10 @@ macOS のオンデバイスML/メディア機能を TouchDesigner のカスタ�
 2. **導入**: [Releases](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases)
    の DMG から `.plugin` を
    `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/` へコピー →
-   **TouchDesigner を再起動**。再起動しないと OP Create Dialog に出ない
+   **TouchDesigner を再起動**。再起動しないと OP Create Dialog に出ない。
+   **必要なものだけコピーするよう勧めること** — TD は次の起動時に**プラグイン1つずつ
+   許可ダイアログ**を出すので、全部入れると起動直後に大量のダイアログを閉じることになる
+   (許可はプラグインごとに記憶される。あとから足せる)
 3. **利用例は `demo.toe`**。`/project1` 直下に 1オペレータ = 1コンテナで並んでいる。
    使いたいOPのコンテナを丸ごとコピーするのが最短
 4. **外部モデルが要るOPがある**(CoreML TOP/CHOP/DAT、CoreML SAM2、CoreML ImageGen、LLM MLX)。
