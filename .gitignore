@@ -29,3 +29,7 @@ Assets/LIVE_Photo_sample/
 Assets/portrait_mode_sample/
 .xcbuild/
 dist/
+
+# README用GIFの元になる画面収録(1本5MB前後・GIFだけコミットする)
+# 作り直すときは ./tools/make_demo_gifs.sh
+demo_capture/

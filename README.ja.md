@@ -18,8 +18,25 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 各プラグインの詳細(パラメータ・出力仕様・実測値・注意)は**サブフォルダの README** を参照。
 `demo.toe` に**全OPの最小利用例**を1オペレータ1コンテナで配置しています。
 
+## デモ
+
+いずれも `demo.toe` を M2 MacBook Air で 60fps 実行しながら収録したものです。
+
+GIFは `docs/demo/`。作り直すときは `./tools/make_demo_gifs.sh`
+(元の画面収録 `.mp4` はローカルのみでコミットしません)。
+
+| | |
+|:--:|:--:|
+| ![Vision Pose](docs/demo/visionpose.gif) | ![Vision Hand](docs/demo/visionhand.gif) |
+| **[Vision Pose](VisionPose/)** — 1人34キーポイント・同時5人 | **[Vision Hand](VisionHand/)** — 片手21関節 |
+| ![Vision Face](docs/demo/visionface.gif) | ![CoreML](docs/demo/coreml-yolo.gif) |
+| **[Vision Face](VisionFace/)** — 1顔76ランドマーク・同時12顔 | **[CoreML](CoreMLDAT/)** — YOLOv3 で物体検出 |
+| ![Vision Text](docs/demo/visiontext.gif) | |
+| **[Vision Text](VisionText/)** — OCR・文字列ごとの矩形 | |
+
 ## 目次
 
+- [デモ](#デモ)
 - [Nvidia専用OPの macOS 代替として](#nvidia専用opの-macos-代替として)
 - [プラグイン一覧](#プラグイン一覧)
 - [使い方](#使い方)

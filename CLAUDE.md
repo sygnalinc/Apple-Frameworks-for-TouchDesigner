@@ -3331,3 +3331,23 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   静止フレームでの検証は `moviefilein.play=False` + `index` 固定 + CHOP を force cook
 - 検証中に TD が落ちたが、**落ちる直前の project.save() は成功していた**(demo.toe は無事)。
   再起動して note・接続・プリム数がディスク版に入っていることを確認済み
+
+### 2026-08-08 デモGIFをREADMEに掲載(demo_capture の画面収録 → docs/demo/*.gif)
+
+- ユーザーが `demo_capture/` に5本の画面収録(1280x720・60fps・5〜9.4秒)を追加。
+  VisionPose / VisionHand / VisionFace / VisionText / CoreMLDAT(yolo)
+- **`tools/make_demo_gifs.sh`**(zsh)で GIF 化して `docs/demo/*.gif` へ。README(英日)の冒頭に
+  「Demos / デモ」節を新設し2列テーブルで掲載、目次にも追加
+- **GIFはフレーム間差分でしか縮まない**ので、単に色数やディザを削っても効かない(実測: 64色・
+  ディザ無しにしても 520w/12fps で 3.3MB のまま)。効いた順に:
+  ① **hqdn3d で軽くノイズ除去**(変化しない画素が増えて差分が効く)② 幅を480pxへ ③ 12fps
+  ④ **尺を4秒前後に切る**。これで1本1.0〜1.9MB・計約6.8MB
+  - 人混みの街路(CoreMLDAT)はほぼ全画素が毎フレーム変わるので、440w/10fps+強めの hqdn3d が必要
+- **元動画が終わって背景だけになる区間を落とす**: VisionFace は4.0秒以降が輪郭のみ、
+  VisionText は認識枠が出るのが3.4秒から。`signalstats` の YAVG を 2Hz でサンプルして
+  切れ目を機械的に見つけた(`ffmpeg -vf "fps=2,signalstats,metadata=print:key=lavfi.signalstats.YAVG"`)
+- `demo_capture/`(27MB)は **.gitignore**。GIFだけコミットする
+- **zshの罠**: `"...max_colors=$3:stats_mode=diff..."` のように `$N:s` が続くと **zsh の履歴修飾子
+  `:s` と解釈されて文字列が食われる**(ffmpeg が "64teuse=dither=none" を受け取って失敗)。
+  `${3}` と波括弧で囲む
+- GitHub の README は **mp4 を埋め込めない**(markdown内の `<video>` はサニタイズされる)ので GIF 一択

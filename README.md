@@ -19,8 +19,25 @@ FoundationModels, ScreenCaptureKit, RealityKit and more — directly inside Touc
 Each plugin has its own `README` with parameters, output specs, measured performance and
 caveats. `demo.toe` contains a **minimal usage example for every OP**, one container each.
 
+## Demos
+
+All captured from `demo.toe` on an M2 MacBook Air, running live at 60 fps.
+
+GIFs live in `docs/demo/`; regenerate them from the screen recordings with
+`./tools/make_demo_gifs.sh` (the source `.mp4`s stay local and are not committed).
+
+| | |
+|:--:|:--:|
+| ![Vision Pose](docs/demo/visionpose.gif) | ![Vision Hand](docs/demo/visionhand.gif) |
+| **[Vision Pose](VisionPose/)** — 34 keypoints per person, 5 people at once | **[Vision Hand](VisionHand/)** — 21 joints per hand |
+| ![Vision Face](docs/demo/visionface.gif) | ![CoreML](docs/demo/coreml-yolo.gif) |
+| **[Vision Face](VisionFace/)** — 76 landmarks per face, 12 faces at once | **[CoreML](CoreMLDAT/)** — object detection with YOLOv3 |
+| ![Vision Text](docs/demo/visiontext.gif) | |
+| **[Vision Text](VisionText/)** — OCR with per-string bounding boxes | |
+
 ## Table of contents
 
+- [Demos](#demos)
 - [As a macOS alternative to NVIDIA-only OPs](#as-a-macos-alternative-to-nvidia-only-ops)
 - [Plugin catalog](#plugin-catalog)
 - [Getting started](#getting-started)
