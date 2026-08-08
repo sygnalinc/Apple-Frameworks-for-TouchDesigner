@@ -227,12 +227,21 @@ diagnostics, …) and every pitfall actually hit during development are collecte
 This project's own code is released under the **[MIT License](LICENSE)** — use it freely,
 including commercially.
 
-It contains **only original code**: no Apple source, no TouchDesigner SDK, and no model
+All of the plugin code is original: no Apple source, no TouchDesigner SDK, and no model
 weights are redistributed here. Apple frameworks are used through their public APIs (governed
 by Apple's SDK agreement, which does not restrict your code), the TouchDesigner C++ SDK is
 supplied by your own install, and models are downloaded separately under their own licenses.
 Build-time dependencies (`apple/ml-stable-diffusion`, `argmaxinc/WhisperKit`) are MIT and
-fetched via SPM, not vendored. Details in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+fetched via SPM, not vendored.
+
+One third-party component **is** bundled: the development-time
+[TouchDesigner MCP server](https://github.com/johnsabath/touchdesigner-mcp) COMP (MIT, by
+John Sabath) in `Assets/td_mcp_server.tox`, also embedded in `demo.toe`. It is a tool for
+driving TouchDesigner from an AI agent while building these plugins — no plugin needs it.
+**It opens an unauthenticated Python-execution endpoint on port 9988, on all interfaces**;
+delete `/project1/td_mcp_server` unless you are using it.
+
+Details in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ### Sample media
 

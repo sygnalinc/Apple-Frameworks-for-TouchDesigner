@@ -3370,3 +3370,23 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   この clip だけ **560px / 128色** に上げ、尺を 3.2秒に詰めて 2.0MB に収めた。
   `make_demo_gifs.sh` の CLIPS に色数の列を追加して clip ごとに指定できるようにした
 - デモGIF計6本・約9.1MB
+
+### 2026-08-08 td_mcp_server(第三者コンポーネント)の出典を明記
+
+- ユーザー質問「td-mcp を .toe に含めているが問題ないか」を調査。
+  [johnsabath/touchdesigner-mcp](https://github.com/johnsabath/touchdesigner-mcp) は
+  **README に MIT と明記**されており使用・再配布とも可。ただし:
+  - **LICENSE ファイルが無い**(`gh api` でも `license: null`)。MIT は著作権表示と許諾表示の
+    同梱が条件だが、複製すべき著作権行が公開されていない。上流に LICENSE 追加を依頼するのが確実
+  - こちらは `Assets/td_mcp_server.tox` を追跡し、**demo.toe にも埋め込んでいる**
+    (`externaltox` はローカル絶対パスを指すが実ファイルは無く、内容は .toe 側に保存されている)
+  - にもかかわらず README / THIRD_PARTY_NOTICES.md が「**自作コードのみ・第三者ライブラリは
+    同梱していない**」と**事実と異なる記述**になっていた
+- LICENSE 末尾に第三者コンポーネントへの導線、THIRD_PARTY_NOTICES.md に専用節(出典・MIT・
+  LICENSE不在の但し書き)、README(英日)のライセンス節に要約を追記。誤記も訂正
+- **セキュリティの実測**: この COMP は Web Server DAT をポート9988で起動するが、
+  **Web Server DAT に bind アドレスの指定が無く 0.0.0.0 で待ち受ける**。自機のLAN IP
+  (`10.59.224.215:9988`)へ MCP の initialize を POST して **HTTP 200** を確認。
+  エンドポイントは**認証なしで TD 内の任意 Python を実行できる**(`run` ツール)ので、
+  同一LAN上の誰でも TD とマシンを操作できる。この旨を notices と README に明記した
+- **未決**: demo.toe から `td_mcp_server` を外すかどうかはユーザー判断待ち(今回は表記のみ)

@@ -222,12 +222,21 @@ cd VisionPose && ./build.sh      # → VisionPose/build/VisionPoseCHOP.plugin
 
 本プロジェクトの自作コードは **[MIT ライセンス](LICENSE)** です。商用を含め自由に利用できます。
 
-このリポジトリには**自作コードのみ**が含まれ、Apple のソース・TouchDesigner SDK・モデルの
+プラグインのコードはすべて自作で、Apple のソース・TouchDesigner SDK・モデルの
 重みは同梱・再配布していません。Apple フレームワークは公開API経由で利用し(Apple の SDK
 使用許諾に従いますが、あなたのコードのライセンスは制約されません)、TouchDesigner の C++ SDK は
 各自のインストールから供給され、モデルは各自が固有ライセンスの下でダウンロードします。ビルド時
 依存(`apple/ml-stable-diffusion` / `argmaxinc/WhisperKit`)はいずれも MIT で、SPM が取得する
-だけで同梱していません。詳細は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) を参照。
+だけで同梱していません。
+
+第三者コンポーネントは**1つだけ同梱**しています。開発用の
+[TouchDesigner MCP server](https://github.com/johnsabath/touchdesigner-mcp) COMP
+(MIT・John Sabath 氏)で、`Assets/td_mcp_server.tox` と `demo.toe` に含まれます。
+プラグインの実装・検証を AI エージェントから行うためのツールで、どのプラグインにも不要です。
+**ポート9988で全インターフェースに対し、認証なしで Python を実行できる口を開く**ため、
+使わないときは `/project1/td_mcp_server` を削除してください。
+
+詳細は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) を参照。
 
 ### サンプル素材
 

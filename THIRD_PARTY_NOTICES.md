@@ -1,13 +1,55 @@
 # Third-party notices / 第三者ソフトウェアとライセンス
 
-TDAppleOps itself is released under the [MIT License](LICENSE). The repository contains
-**only original code**: no Apple source, no TouchDesigner SDK, no bundled third-party
-libraries, and no model weights are redistributed here. The components below are used at
-build time or download time and remain under their own licenses.
+TDAppleOps itself is released under the [MIT License](LICENSE). All of the plugin code is
+original: no Apple source, no TouchDesigner SDK, and no model weights are redistributed
+here. One third-party component **is** bundled — the development-time MCP server COMP
+listed below. Everything else is used at build time or download time and remains under its
+own license.
 
-TDAppleOps 本体は [MIT ライセンス](LICENSE)です。このリポジトリには**自作コードのみ**が
-含まれ、Apple のソース・TouchDesigner SDK・第三者ライブラリ・モデルの重みは同梱・再配布
-していません。以下はビルド時／ダウンロード時に利用されるもので、それぞれ独自のライセンスに従います。
+TDAppleOps 本体は [MIT ライセンス](LICENSE)です。プラグインのコードはすべて自作で、Apple の
+ソース・TouchDesigner SDK・モデルの重みは同梱・再配布していません。第三者コンポーネントは
+**1つだけ同梱**しています(下記の開発用 MCP サーバ COMP)。それ以外はビルド時／
+ダウンロード時に利用されるもので、それぞれ独自のライセンスに従います。
+
+## Bundled third-party component / 同梱している第三者コンポーネント
+
+### TouchDesigner MCP server
+
+| | |
+|---|---|
+| Where | `Assets/td_mcp_server.tox`, and embedded in `demo.toe` as `/project1/td_mcp_server` |
+| Source | https://github.com/johnsabath/touchdesigner-mcp (John Sabath) |
+| License | MIT — stated in that project's README |
+
+A development-time tool: it lets an AI agent drive TouchDesigner (inspect and edit the
+network, run Python) while building and verifying these plugins. It is not required by any
+plugin.
+
+Note on the notice itself: that repository states MIT in its README but does not currently
+ship a `LICENSE` file, so there is no published copyright line to reproduce verbatim. This
+entry is the attribution; if the upstream project adds a `LICENSE`, its notice should be
+copied here.
+
+**Security:** the COMP starts a TouchDesigner Web Server DAT on port **9988**. The Web
+Server DAT has no bind-address option, so it listens on **all interfaces**, not just
+localhost, and the endpoint executes arbitrary Python inside TouchDesigner **without
+authentication**. Anyone on the same network can therefore control TouchDesigner and, through
+it, the machine. Delete `/project1/td_mcp_server` (or turn its `webserver` Active off) unless
+you are actively using an MCP client.
+
+開発用のツールです(AIエージェントが TouchDesigner を操作してプラグインの実装・検証を
+行うために使用)。プラグインの動作には不要です。
+
+**注意:** 上流リポジトリは README で MIT と明記していますが `LICENSE` ファイルが無いため、
+そのまま複製すべき著作権表示が公開されていません。本項が出典表記にあたります。上流に
+`LICENSE` が追加されたら、その通知文をここへ複製してください。
+
+**セキュリティ:** この COMP は TouchDesigner の Web Server DAT をポート **9988** で起動します。
+Web Server DAT には bind アドレスの指定が無いため **localhost ではなく全インターフェース**で
+待ち受け、そのエンドポイントは**認証なしで** TouchDesigner 内の任意の Python を実行できます。
+同じネットワーク上の誰でも TouchDesigner と、それを通じてマシンを操作できます。MCP クライアントを
+実際に使うとき以外は `/project1/td_mcp_server` を削除するか、内部の `webserver` を Active Off に
+してください。
 
 ## Apple frameworks / Apple フレームワーク
 
