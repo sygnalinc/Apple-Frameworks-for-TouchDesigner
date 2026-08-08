@@ -46,7 +46,7 @@ File / Page(0始まり・描画とText/Annotations共用)/ DPI / Info DAT Mode
 
 ## 注意
 
-- **TouchDesigner Non-Commercial では未検証**。無償版は解像度が 1280x1280 に制限されるため、ページ描画（実測 1275x1650）が制限に掛かる。出力解像度を下げて回避する
+- **TouchDesigner Non-Commercial** では解像度が 1280x1280 に制限される。上限を超える出力は**自動で上限内へ縮小**し、その旨を警告に出す(縮小しないと TD 側で絵が崩れるため)。フル解像度が要るなら商用ライセンスを使う
 
 - 座標系はPDFポイント(左下原点)
 - 旧 **PDFKit DAT** は本TOPのInfo DATに統合され廃止(2026-07-21)

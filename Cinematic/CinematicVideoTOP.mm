@@ -15,6 +15,7 @@
 #include <vector>
 #include "TOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
+#include "../common/NonCommercialLimit.h"
 #include "../common/PyCallbacksBootstrap.h"
 using namespace TD;
 
@@ -134,14 +135,32 @@ public:
         int lw=0, lh=0; unsigned long long serial=0;
         bool has = mode == 0 ? cn_latest_depth_info(myState,&lw,&lh,&serial) : cn_latest_render_info(myState,&lw,&lh,&serial);
         if (!has || lw <= 0 || lh <= 0) return;
-        if (mode == 0) {
-            TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D; ui.textureDesc.width=lw; ui.textureDesc.height=lh; ui.textureDesc.pixelFormat=OP_PixelFormat::Mono32Float;
-            auto buf = myContext->createOutputBuffer((size_t)lw*lh*sizeof(float), TOP_BufferFlags::None, nullptr); if(!buf) return;
-            cn_copy_depth(myState, buf->data); out->uploadBuffer(&buf, ui, nullptr);
+        const OP_PixelFormat pf = (mode == 0) ? OP_PixelFormat::Mono32Float
+                                              : OP_PixelFormat::RGBA16Float;
+        const size_t bytes = (size_t)lw * lh * ((mode == 0) ? sizeof(float) : 4 * sizeof(uint16_t));
+
+        if ((uint32_t)lw > tdnc::kMaxDim || (uint32_t)lh > tdnc::kMaxDim) {
+            // NC の 1280x1280 上限を超える。超えたまま渡すと TD がクランプ後の幅で
+            // バッファを読み絵が崩れるので、いったん自前バッファへ出して縮小する。
+            // (上限内のときは下の直接コピー経路のままで、余計なコピーはしない)
+            std::vector<uint8_t> tmp(bytes);
+            if (mode == 0) cn_copy_depth(myState, tmp.data());
+            else           cn_copy_render(myState, tmp.data());
+            uint32_t cw = (uint32_t)lw, ch = (uint32_t)lh;
+            myNCScaled = tdnc::fit(tmp, cw, ch, pf);
+            TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D;
+            ui.textureDesc.width=cw; ui.textureDesc.height=ch; ui.textureDesc.pixelFormat=pf;
+            auto buf = myContext->createOutputBuffer(tmp.size(), TOP_BufferFlags::None, nullptr); if(!buf) return;
+            memcpy(buf->data, tmp.data(), tmp.size());
+            out->uploadBuffer(&buf, ui, nullptr);
         } else {
-            TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D; ui.textureDesc.width=lw; ui.textureDesc.height=lh; ui.textureDesc.pixelFormat=OP_PixelFormat::RGBA16Float;
-            auto buf = myContext->createOutputBuffer((size_t)lw*lh*4*sizeof(uint16_t), TOP_BufferFlags::None, nullptr); if(!buf) return;
-            cn_copy_render(myState, buf->data); out->uploadBuffer(&buf, ui, nullptr);
+            myNCScaled = false;
+            TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D;
+            ui.textureDesc.width=lw; ui.textureDesc.height=lh; ui.textureDesc.pixelFormat=pf;
+            auto buf = myContext->createOutputBuffer(bytes, TOP_BufferFlags::None, nullptr); if(!buf) return;
+            if (mode == 0) cn_copy_depth(myState, buf->data);
+            else           cn_copy_render(myState, buf->data);
+            out->uploadBuffer(&buf, ui, nullptr);
         }
         myUploaded = serial; myFrames++;
     }
@@ -180,7 +199,11 @@ public:
         if (slot >= myMetaSnap.count) { c->value = 0; return; }
         c->value = (f == 0) ? 1.0f : myMetaSnap.sub[slot][f - 1];
     }
-    void getWarningString(OP_String* s, void*) override { if (myStatus == "error" && !myErr.empty()) s->setString(("Cinematic: " + myErr).c_str()); }
+    std::atomic<bool> myNCScaled{false};   // NC上限で縮小したか（警告表示用）
+    void getWarningString(OP_String* s, void*) override {
+        if (myStatus == "error" && !myErr.empty()) s->setString(("Cinematic: " + myErr).c_str());
+        else if (myNCScaled) s->setString(tdnc::kWarning);
+    }
 
 private:
     void worker() {

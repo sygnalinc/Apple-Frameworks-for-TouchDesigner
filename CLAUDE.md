@@ -3618,3 +3618,34 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   ③ 縮小したことを warning で知らせる。これを各 CPUMem TOP のアップロード箇所に入れる。
   Upscale のように「拡大が目的」のOPでも、壊れた絵よりは上限で頭打ちの正しい絵のほうがよい
 - 検証コンテナと計測コードは撤去済み。TD は Commercial に復帰済み
+
+### 2026-08-08 NC の解像度上限バグを修正(共通ヘッダ + 10 TOP)
+
+- 前エントリで特定した「上限超えの宣言 → TD がクランプ後の幅でバッファを読む → 斜めシアー」を修正
+- **`common/NonCommercialLimit.h` を新設**:
+  - `tdnc::active()` … TD の Python `licenses.isNonCommercial` を引く(GIL を取って
+    `PyImport_ImportModule("td")`)。結果は 120 cook キャッシュ。**上限内なら Python に触らない**
+  - `tdnc::fit(vector, w, h, fmt)` … 上限超え時だけアスペクト維持で縮小。8bit/32bit float は
+    ボックス平均、16F 等は成分を解釈できないので最近傍。**要素型テンプレート**にして
+    `vector<uint8_t>` と `vector<uint16_t>`(RGBA16Float)の両方を受ける
+  - `tdnc::kWarning` … 縮小したことを利用者に伝える文言
+- **適用した10 TOP**: Metal Upscale / Screen Capture / ImageIO File In / PDFKit / CoreText /
+  CoreImage HDR / CoreImage RAW / CoreML / CoreImage Code / Cinematic Video。
+  各 build.sh に Python.h と `-undefined dynamic_lookup` を追加(既にあるものはそのまま)
+- **未適用4件は構造上超えない**: Metal Denoise / Vision Flow / Vision Subject は入力解像度を
+  そのまま出すが、入力側は TD が既にクランプ済み。CoreML SAM2(256px)/ ImageGen(≤1024)/
+  ImagePlayground(~1024)も上限未満
+- **検証(NC制限を再現して実測)**: 5件とも**警告が TD のクランプ警告から自作の縮小警告に変わり**、
+  絵が正しく出た(街路 / 画面収録 / テストパターン / PDF本文 / テキスト)。CoreImage Code は
+  2400x2400 指定 → 1280x1280 の**読み取り可能なQR**を確認。ライセンス版では従来どおり
+  フル解像度・警告なしで、縮小経路に入らないことも確認
+- **踏んだ罠**:
+  ① **キャッシュのせいで判定が遅れる**。NC を途中で適用すると 120 cook(約2秒)経つまで
+     気づかない。実運用では起動時から NC なので初回判定で当たるが、検証時はここで
+     「修正が効いていない」と誤診した
+  ② Cinematic は `cn_copy_*` で TD のバッファへ直接書いていたので、上限超えのときだけ
+     一時バッファ経由にした(**上限内では従来どおり直接コピーで、余計なコピーを増やさない**)
+  ③ 警告メンバ名がプラグインごとに違う(`myWarning` / 状態から組み立て)。CoreML と Cinematic は
+     専用の `myNCScaled` フラグを足した
+- README(ルート英日 + 該当8プラグイン)の「未検証」記述を「自動で縮小する」へ更新。
+  10 TOP を常設インストール済み

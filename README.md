@@ -273,10 +273,12 @@ referenced them. The API is not frozen yet.
 
 ### Non-Commercial TouchDesigner is not well tested
 
-Everything here was built and measured on a **licensed** TouchDesigner install. The free
-**Non-Commercial** license [caps resolution at 1280x1280](https://derivative.ca/download), and
-we have not verified the operators under that cap — expect clamped, distorted or failing output
-where a plugin produces something larger. The ones most likely to hit it:
+The free **Non-Commercial** license
+[caps resolution at 1280x1280](https://derivative.ca/download). Operators that would produce
+something larger now **scale their output down to fit** and say so in a warning — verified by
+reproducing the cap with `app.addNonCommercialLimit()`. Without that, TouchDesigner allocates the
+clamped texture but still reads the plugin's larger buffer, and the image comes out sheared or
+blank with no error. The operators that hit the cap:
 
 | Plugin | Why |
 |---|---|
@@ -287,8 +289,8 @@ where a plugin produces something larger. The ones most likely to hit it:
 | [PDFKit](PDFKit/) | Page render (measured 1275x1650) |
 | [CoreText](CoreText/) | Whatever output resolution you set |
 
-Lowering the output resolution is the workaround. If you hit something that a smaller
-resolution does not fix, please open an issue — Non-Commercial reports are welcome.
+If you need the full resolution, use a commercial license. If you hit something that scaling
+down does not explain, please open an issue — Non-Commercial reports are welcome.
 
 ## Writing your own plugin
 

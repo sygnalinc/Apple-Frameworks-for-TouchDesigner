@@ -22,6 +22,7 @@
 #include <vector>
 #include "TOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
+#include "../common/NonCommercialLimit.h"
 using namespace TD;
 
 // ---- macOS標準フォントパネル(NSFontPanel)ブリッジ ----
@@ -1276,6 +1277,15 @@ public:
           if (myResult.bgra.empty()) return;
           r = myResult; myUploaded = r.serial; myLines = r.lines; myFitted = r.fitted;
           myTruncated = r.truncated; myFont = r.font; myMetrics = r.metrics; }
+        // NC の 1280x1280 上限に収めてから宣言する（超えたまま渡すと TD が
+        // クランプ後の幅でバッファを読み、絵が斜めに崩れる）
+        {   // Result の w/h は int なので uint32_t に受け直して渡す
+            uint32_t fw = (uint32_t)r.w, fh = (uint32_t)r.h;
+            if (tdnc::fit(r.bgra, fw, fh, OP_PixelFormat::BGRA8Fixed)) {
+                r.w = (int)fw; r.h = (int)fh; myWarn = tdnc::kWarning;
+            }
+        }
+
         TOP_UploadInfo ui; ui.textureDesc.texDim = OP_TexDim::e2D;
         ui.textureDesc.width = r.w; ui.textureDesc.height = r.h;
         ui.textureDesc.pixelFormat = OP_PixelFormat::BGRA8Fixed;

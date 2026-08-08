@@ -21,7 +21,7 @@ Display Index(display時)、出力Width/Height、Frame Rate、Show Cursor、Rest
 
 ## 注意
 
-- **TouchDesigner Non-Commercial では未検証**。無償版は解像度が 1280x1280 に制限されるため、ネイティブ解像度のディスプレイ取り込み（実測 1710x1112）が制限に掛かる。出力解像度を下げて回避する
+- **TouchDesigner Non-Commercial** では解像度が 1280x1280 に制限される。上限を超える出力は**自動で上限内へ縮小**し、その旨を警告に出す(縮小しないと TD 側で絵が崩れるため)。フル解像度が要るなら商用ライセンスを使う
 
 初回はmacOSの画面収録権限が必要。許可後にTouchDesignerの再起動が必要な場合がある。
 ウインドウのプルダウンは非同期で列挙するため、作成直後は数百msで埋まる。選んだウインドウが

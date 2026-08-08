@@ -38,7 +38,7 @@ DNG / Apple ProRAW / カメラRAW を `CIRAWFilter` で**リアルタイム現�
 
 ## 注意
 
-- **TouchDesigner Non-Commercial では未検証**。無償版は解像度が 1280x1280 に制限されるため、RAW 写真は通常 4000px 級で制限に掛かる。出力解像度を下げて回避する
+- **TouchDesigner Non-Commercial** では解像度が 1280x1280 に制限される。上限を超える出力は**自動で上限内へ縮小**し、その旨を警告に出す(縮小しないと TD 側で絵が崩れるため)。フル解像度が要るなら商用ライセンスを使う
 
 - 対応形式は macOS が解釈できる RAW(各社DNG・Apple ProRAW 等)。`filterWithImageURL` が nil を返す
   ファイルは `Not a supported RAW file` を表示

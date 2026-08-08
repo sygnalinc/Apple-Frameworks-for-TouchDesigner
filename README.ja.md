@@ -270,10 +270,11 @@ ln -s "$PWD/.claude/skills/td-apple-ops" ~/.claude/skills/td-apple-ops
 
 ### TouchDesigner Non-Commercial では検証が不十分です
 
-開発・実測はすべて**ライセンス版**の TouchDesigner で行っています。無償の
-**Non-Commercial** 版は[解像度が 1280x1280 に制限される](https://derivative.ca/download)ため、
-それを超える出力をするオペレータは**制限による問題が出る可能性があります**(クランプ・
-表示の破綻・失敗)。この状態での検証はできていません。特に該当しそうなもの:
+無償の **Non-Commercial** 版は[解像度が 1280x1280 に制限されます](https://derivative.ca/download)。
+上限を超える出力をするオペレータは**自動で上限内へ縮小**し、その旨を警告に出します
+(`app.addNonCommercialLimit()` で制限を再現して検証済み)。縮小しないと、TouchDesigner は
+クランプ後のサイズでテクスチャを確保しつつプラグインの大きいバッファをそのまま読むため、
+**エラーも出さずに絵が斜めに崩れたり真っ白になります**。該当するオペレータ:
 
 | プラグイン | 理由 |
 |---|---|
@@ -284,8 +285,8 @@ ln -s "$PWD/.claude/skills/td-apple-ops" ~/.claude/skills/td-apple-ops
 | [PDFKit](PDFKit/) | ページ描画が実測 1275x1650 |
 | [CoreText](CoreText/) | 指定した出力解像度しだい |
 
-回避策は出力解像度を下げることです。解像度を下げても直らない問題に当たった場合は
-Issue を立ててください。Non-Commercial 版からの報告は歓迎します。
+フル解像度が必要な場合は商用ライセンスを使ってください。縮小では説明のつかない問題に
+当たった場合は Issue を立ててください。Non-Commercial 版からの報告は歓迎します。
 
 ## プラグインを自作する人へ
 

@@ -22,6 +22,7 @@
 #include <vector>
 #include "TOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
+#include "../common/NonCommercialLimit.h"
 using namespace TD;
 
 namespace {
@@ -103,6 +104,12 @@ public:
 
         Result r;
         { std::lock_guard<std::mutex> l(myMutex); if (myResult.bytes.empty()) return; r = myResult; myUploaded = r.serial; }
+        // NC の 1280x1280 上限に収めてから宣言する（超えたまま渡すと TD が
+        // クランプ後の幅でバッファを読み、絵が斜めに崩れる）
+        if (tdnc::fit(r.bytes, r.w, r.h,
+                      r.color ? OP_PixelFormat::BGRA8Fixed : OP_PixelFormat::Mono32Float))
+            myWarning = tdnc::kWarning;
+
         TOP_UploadInfo ui;
         ui.textureDesc.texDim = OP_TexDim::e2D;
         ui.textureDesc.width = r.w; ui.textureDesc.height = r.h;
