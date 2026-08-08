@@ -33,7 +33,6 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | やりたいこと | TD標準(Win+NVIDIA) | このリポジトリ |
 |---|---|---|
 | 人物ポーズ推定 | Body Track CHOP | [Vision Pose](VisionPose/) |
-| 背景除去・人物マスク | Nvidia Background TOP | [Vision Segment](VisionSegment/) |
 | 超解像アップスケール | Nvidia Upscaler TOP | [Metal Upscale](MetalUpscale/) |
 | オプティカルフロー | Optical Flow TOP | [Vision Flow](VisionFlow/) |
 | 顔トラッキング | Face Track CHOP | [Vision Face](VisionFace/) |
@@ -48,7 +47,6 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | [Vision Pose3D](VisionPose3D/) | CHOP | 単一人物の**3Dポーズ**(17関節・メートル単位+2D投影・身長推定)。約2fpsのじっくり系 |
 | [Vision Hand](VisionHand/) | CHOP | 手指トラッキング(21関節×最大100手・左右判定) |
 | [Vision Face](VisionFace/) | CHOP | 顔検出+bbox・roll/yaw/pitch・ランドマーク(最大76点)・顔写りスコア。**Face Track CHOP 代替** |
-| [Vision Segment](VisionSegment/) | TOP | 人物セグメンテーション。**Nvidia Background TOP 代替**(統合マスク/人物別R/G/B/A分離) |
 
 ### 物体・シーンの認識・読み取り
 

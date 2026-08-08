@@ -3162,3 +3162,12 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 素材生成のメモ: `cupsfilter` は **HTML→PDF に非対応**。AppKit の
   `NSAttributedString(html:)` → NSImage → PNG で文書画像を作った(swiftc の小スクリプト)
 - 残る未着手は11件(素材・環境・学習が要るもの)。_README に分類して記載
+
+### 2026-08-08 VisionSegment を develop へ退避
+
+- 手順は従来どおり(worktree で develop へ `git checkout main -- VisionSegment` して同期 →
+  main で git rm → README英日の一覧行を削除)。今回は **「Nvidia専用OPの macOS 代替」表**にも
+  参照があったので併せて削除(この表に残るのは Pose / Upscale / Flow / Face の4件)
+- 公開対象は **59オペレータ**(main 追跡57フォルダ)。develop のみの非公開は計25op
+- demo.toe には VisionSegment の利用例が残っている(MetalFrameInterp と同じ状態)。
+  公開版では Unknown operator type になるため、まとめて削除するかはユーザー判断待ち

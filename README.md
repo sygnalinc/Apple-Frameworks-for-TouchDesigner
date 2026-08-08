@@ -34,7 +34,6 @@ caveats. `demo.toe` contains a **minimal usage example for every OP**, one conta
 | Goal | Stock OP (Win+NVIDIA) | This repo |
 |---|---|---|
 | Body pose estimation | Body Track CHOP | [Vision Pose](VisionPose/) |
-| Background removal / person mask | Nvidia Background TOP | [Vision Segment](VisionSegment/) |
 | Super-resolution upscaling | Nvidia Upscaler TOP | [Metal Upscale](MetalUpscale/) |
 | Optical flow | Optical Flow TOP | [Vision Flow](VisionFlow/) |
 | Face tracking | Face Track CHOP | [Vision Face](VisionFace/) |
@@ -49,7 +48,6 @@ caveats. `demo.toe` contains a **minimal usage example for every OP**, one conta
 | [Vision Pose3D](VisionPose3D/) | CHOP | Single-person **3D pose** (17 joints in meters + 2D projection + height estimate). ~2fps, slow/deliberate |
 | [Vision Hand](VisionHand/) | CHOP | Hand tracking (21 joints × up to 100 hands, left/right) |
 | [Vision Face](VisionFace/) | CHOP | Face detection + bbox, roll/yaw/pitch, landmarks (up to 76), capture-quality score. **Face Track CHOP alternative** |
-| [Vision Segment](VisionSegment/) | TOP | Person segmentation. **Nvidia Background TOP alternative** (combined mask / per-person R/G/B/A split) |
 
 ### Object & scene recognition
 
