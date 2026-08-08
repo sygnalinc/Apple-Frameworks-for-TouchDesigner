@@ -160,27 +160,50 @@ GIFは `docs/demo/`。作り直すときは `./tools/make_demo_gifs.sh`
 
 ## 使い方
 
-### 1. プラグインをビルド
+### 1. 導入(リリースビルドを落とすだけ・ビルド不要)
+
+**[最新リリース](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/latest)**
+から DMG をダウンロードしてください。Developer ID 署名 + **公証済み**なので、
+ダウンロードしたマシンでも Gatekeeper の警告なしに開けます。
+
+開いたら、使いたい `.plugin` を
+`~/Library/Application Support/Derivative/TouchDesigner099/Plugins/` へドラッグします。
+まとめてコピーするなら:
 
 ```sh
-cd VisionPose && ./build.sh      # → VisionPose/build/VisionPoseCHOP.plugin
+cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.9.2/"*.plugin \
+      ~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins/
 ```
 
-前提: Xcode(`clang++`)と TouchDesigner.app(C++ SDK ヘッダを流用)。実行は TD 2023 系以降。
+そのあと **TouchDesigner を再起動**すると OP Create Dialog に現れます
+(プラグインは起動時にしか走査されません。多数を入れ替えた直後の初回起動は再検証で
+数分かかることがあります。2回目以降は通常速度です)。
 
-### 2. TouchDesigner で使う
+### 2. 利用例を動かす
 
-- **お試し**: `C++ CHOP/TOP/DAT/SOP` を置き、Plugin Path に `.plugin` を指定(再起動不要)
-- **常設のカスタムOPとして**:
-  `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/` に `.plugin` をコピー
-  → TD 再起動で OP Create Dialog に現れる
+このリポジトリを clone して [`demo.toe`](demo.toe) を開いてください。`/project1` に
+1オペレータ = 1コンテナで並んでいるので、**使いたいOPのコンテナを丸ごとコピー**するのが
+出発点として最短です。利用例が使う映像素材は同梱してあるので、clone しただけで動きます。
 
 モデルを使うプラグイン(CoreML / CoreML SAM2 / CoreML ImageGen / LLM MLX 等)は、モデルファイルを
 `models/` に置いてください。**モデル本体はリポジトリに含まれません** —
 [`models/README.md`](models/README.md) に、利用例が期待するファイル名と入手先の一覧・
 ダウンロード手順があります。`demo.toe` の各利用例の note にも同じリンクを書いてあります。
 
-### 3. AIコーディングエージェントと組む場合
+### 3. ソースからビルドする場合(任意)
+
+プラグインを改造したいとき、またはリリースビルドと SDK バージョンが異なる
+TouchDesigner で動かしたいときだけ必要です。
+
+```sh
+cd VisionPose && ./build.sh      # → VisionPose/build/VisionPoseCHOP.plugin
+```
+
+前提: Xcode(`clang++`)と TouchDesigner.app(C++ SDK ヘッダを流用)。実行は TD 2023 系以降。
+ビルドしたものを再起動せずに試すには、`C++ CHOP/TOP/DAT/SOP` を置いて
+Plugin Path に `.plugin` を指定します。
+
+### 4. AIコーディングエージェントと組む場合
 
 [`.claude/skills/td-apple-ops/`](.claude/skills/td-apple-ops/) に、これらのOPを**使う側**の
 スキルを置いてあります。導入手順、OPの選び方、非同期OP特有の配線ルール(cookを回す・

@@ -3459,3 +3459,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   VisionAnimalPose の骨格接続修正、VisionText への Aspect Correct UVs 追加
 - 公開対象は 0.9.1 の66 → **59オペレータ**(VisionSimilarity / CoreImageBokeh / CoreImageEnhance /
   VisionAesthetics / CoreLocation Beacon / VisionTrack / VisionSegment を develop へ退避したため)
+
+### 2026-08-08 README の「使い方」をリリースDMG優先の順序に変更
+
+- ユーザー指示「まずリリースビルドをダウンロードして使う方法を案内して」。従来は
+  **1. プラグインをビルド** から始まっており、Xcode が要る前提に見えていた
+- 新しい順序(英日): **1. 導入(リリースDMG・ビルド不要)** → **2. 利用例を動かす(demo.toe)** →
+  **3. ソースからビルド(任意)** → **4. AIエージェントと組む場合**。
+  1 に公証済みで Gatekeeper 警告が出ないこと、プラグインは起動時にしか走査されないこと、
+  多数入れ替え直後の初回起動が数分かかることを明記
+- **踏んだ罠**: 最初 `cp -R /Volumes/Apple*Frameworks*/*.plugin ...` と書いたが、
+  **古いバージョンのDMGが同時にマウントされているとグロブが両方に一致する**
+  (実機で v0.9.0 が残っており 59個のはずが128個に一致した)。バージョンを明示する
+  `"/Volumes/Apple Frameworks for TouchDesigner v0.9.2/"*.plugin` に修正し、
+  実際にコピーして59個・コピー後も `codesign --verify --deep --strict` が通ることを確認

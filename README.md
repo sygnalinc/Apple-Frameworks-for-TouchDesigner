@@ -161,28 +161,49 @@ GIFs live in `docs/demo/`; regenerate them from the screen recordings with
 
 ## Getting started
 
-### 1. Build a plugin
+### 1. Install (download the release — no build needed)
+
+Grab the DMG from the
+**[latest release](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/latest)**.
+It is signed with a Developer ID and **notarized**, so it opens without a Gatekeeper warning.
+
+Open it and drag the `.plugin` bundles you want into
+`~/Library/Application Support/Derivative/TouchDesigner099/Plugins/`, or copy them all:
 
 ```sh
-cd VisionPose && ./build.sh      # → VisionPose/build/VisionPoseCHOP.plugin
+cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.9.2/"*.plugin \
+      ~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins/
 ```
 
-Requires Xcode (`clang++`) and TouchDesigner.app (its C++ SDK headers are reused). Runs on
-TouchDesigner 2023 or later.
+**Restart TouchDesigner** — the operators appear in the OP Create Dialog. (Plugins are only
+scanned at startup. Right after replacing many bundles the first launch re-verifies them and
+can take a few minutes; the second is back to normal.)
 
-### 2. Use it in TouchDesigner
+### 2. Try the examples
 
-- **Quick try:** drop a `C++ CHOP/TOP/DAT/SOP` and point Plugin Path at the `.plugin` (no restart).
-- **As a permanent custom OP:** copy the `.plugin` into
-  `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/`
-  → it appears in the OP Create Dialog after a TouchDesigner restart.
+Clone this repository and open [`demo.toe`](demo.toe). `/project1` holds one container per
+operator — copy the whole container of the one you want as a starting point. Every clip the
+examples use is included, so it runs straight from a clone.
 
 Model-based plugins (CoreML / CoreML SAM2 / CoreML ImageGen / LLM MLX…) need a model file
 placed in `models/`. The models are **not** in this repository — [`models/README.md`](models/README.md)
 lists every file the examples expect and where to download it. Each example in `demo.toe`
 repeats the download link in its own note.
 
-### 3. If you build with an AI coding agent
+### 3. Build from source (optional)
+
+Only needed to modify a plugin, or to run on a TouchDesigner whose SDK version differs from
+the release build.
+
+```sh
+cd VisionPose && ./build.sh      # → VisionPose/build/VisionPoseCHOP.plugin
+```
+
+Requires Xcode (`clang++`) and TouchDesigner.app (its C++ SDK headers are reused). Runs on
+TouchDesigner 2023 or later. To try a freshly built bundle without restarting, drop a
+`C++ CHOP/TOP/DAT/SOP` and point its Plugin Path at the `.plugin`.
+
+### 4. If you build with an AI coding agent
 
 [`.claude/skills/td-apple-ops/`](.claude/skills/td-apple-ops/) is a skill for **using** these
 operators: install steps, how to pick an OP, the wiring rules async operators need (drive the
