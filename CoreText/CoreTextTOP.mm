@@ -317,22 +317,18 @@ static CFAttributedStringRef makeAttrStringFrom(const Style& st, CTFontRef font,
     else if (st.alignH == 2) al = kCTTextAlignmentRight;
     else if (st.alignH == 3) al = kCTTextAlignmentJustified;
     CTLineBreakMode lb = (st.wrapMode == 1) ? kCTLineBreakByClipping : kCTLineBreakByWordWrapping;
-    // 行送り: LineHeightMultiple は1行目のベースラインまで動かしてしまう(実測)ため使わない。
-    // 1.0超は「行間への加算」(LineSpacingAdjustment・1行目は不動)、
-    // 1.0未満は行高自体を詰める(MaximumLineHeight。この場合のみ1行目もわずかに動く)
+    // 行送りは **常に LineSpacingAdjustment**(行間への加算・1行目のベースラインは動かない)。
+    // 使ってはいけないもの(いずれも1行目まで動く・実測):
+    //   - LineHeightMultiple : 1行目のベースライン位置にも掛かる
+    //   - MaximumLineHeight  : 行高を詰めるとascentが縮み1行目が上がる。以前は 1.0未満で
+    //     これを使っており、1.00→0.95 にしただけで1行目が 70→61 へ飛んでいた(実測・修正済み)
     CGFloat natural = CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font);
-    CGFloat delta = (st.lineHeight - 1.0f) * natural;
+    CGFloat spacing = (st.lineHeight - 1.0f) * natural;   // 負値可(行間が詰まる)
     CTParagraphStyleSetting ps[4];
     int nps = 0;
     ps[nps++] = { kCTParagraphStyleSpecifierAlignment, sizeof(al), &al };
     ps[nps++] = { kCTParagraphStyleSpecifierLineBreakMode, sizeof(lb), &lb };
-    CGFloat spacing = delta, maxLH = 0;
-    if (delta >= 0) {
-        ps[nps++] = { kCTParagraphStyleSpecifierLineSpacingAdjustment, sizeof(spacing), &spacing };
-    } else {
-        maxLH = std::max<CGFloat>(natural + delta, 1);   // 0以下は不正なので1pxで下限ガード
-        ps[nps++] = { kCTParagraphStyleSpecifierMaximumLineHeight, sizeof(maxLH), &maxLH };
-    }
+    ps[nps++] = { kCTParagraphStyleSpecifierLineSpacingAdjustment, sizeof(spacing), &spacing };
     CTParagraphStyleRef para = CTParagraphStyleCreate(ps, nps);
 
     CFMutableDictionaryRef a = CFDictionaryCreateMutable(nullptr, 0,

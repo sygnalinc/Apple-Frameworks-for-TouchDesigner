@@ -53,7 +53,7 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Shear X / Shear Y (deg) | **シアー(疑似イタリック)**。フォント行列にせん断を入れるので**書体を問わず**角度指定でき、和文書体も傾けられる。縁取り/Embolden/グラデ/シャドウも追従 |
 | | Slant Axis (deg) | 可変フォントの `slnt` 軸(**書体が軸を持つ場合のみ**。書体デザイナー設計の本物の傾き) |
 | | Auto Fit Font Size | **描画領域に収まるまで自動縮小**(Font Sizeが上限)。Word Wrap Onなら折り返して収まるサイズ、Offなら1行のまま収まるサイズ。実サイズはInfo CHOP `fitted_size` |
-| | Tracking / Line Height / Ligatures | 字間(pt・-100〜100で重なりも可)/ 行送り倍率(0〜・**1行目は固定**。1.0未満は行高を詰める)/ リガチャ |
+| | Tracking / Line Height / Ligatures | 字間(pt・-100〜100で重なりも可)/ 行送り倍率(0〜・**どの値でも1行目のベースラインは動かない**。行間だけが伸縮し、小さくすると行が重なる)/ リガチャ |
 | | Horizontal/Vertical Align | 左/中/右/両端揃え・上/中/下 |
 | | Vertical Text | 縦書き(右→左の段組) |
 | | Text Wrap | 改行制御(CSS text-wrap相当): **Wrap**=幅で折返し / **No Wrap**=改行なし / **Balance**=各行の長さを均等化 / **Pretty**=最終行の孤立を回避 / **Stable**=Wrapと同じ |
