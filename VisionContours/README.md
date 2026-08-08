@@ -31,6 +31,26 @@ TouchDesignerジオメトリ処理へ直接渡せる。macOS 11以降。
 | Simplify Epsilon | Ramer–Douglas–Peucker簡略化。0で無効 |
 | Detect Dark on Light | 暗い物体/明るい背景向け最適化 |
 | Flip Image Vertically | 既定On。TDのTOP入力には必須 |
+| Aspect Correct UVs | 既定Off。点の縦方向を入力画像のアスペクト比に合わせる（下記） |
+
+### Aspect Correct UVs（アスペクト比補正）
+
+点は Vision の 0〜1（左下原点）なので、**そのままだと 0〜1 の正方形に入る**。16:9 の映像だと
+輪郭が縦に間延びし、映像に重ねたときシルエットからはみ出す。
+
+`Aspect Correct UVs` を On にすると縦だけを 1/aspect に縮める（横は 0〜1 のまま）:
+
+```
+aspect = 入力幅 / 入力高さ
+P.x' = P.x                              （0〜1 のまま）
+P.y' = 0.5 + (P.y - 0.5) / aspect       （中心を保って縦を縮める）
+```
+
+これで **Geometry COMP を -0.5 だけ寄せ、Ortho Width = 1 のカメラ**で撮ると元映像にぴったり
+重なる。1280x720 での実測は `P.y` が `0.2188..0.7812`（= 0.5 ± 0.5/1.7778）。
+TD標準 Body Track CHOP の同名パラメータと同じ役割・同じ既定値で、他の Vision 系OPとも揃えてある。
+
+素の 0〜1 座標が欲しい場合（Sweep や Extrude に渡して独自にスケールする等）は Off のままでよい。
 
 ## Info CHOP
 
