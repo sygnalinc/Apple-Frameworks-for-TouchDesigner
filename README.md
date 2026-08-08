@@ -29,15 +29,15 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 
 | | |
 |:--:|:--:|
-| ![Vision Pose](docs/demo/visionpose.gif) | ![Vision Hand](docs/demo/visionhand.gif) |
+| <img src="docs/demo/visionpose.gif" width="400" alt="Vision Pose"> | <img src="docs/demo/visionhand.gif" width="400" alt="Vision Hand"> |
 | **[Vision Pose](VisionPose/)** — 34 keypoints per person, 5 people at once | **[Vision Hand](VisionHand/)** — 21 joints per hand |
-| ![Vision Face](docs/demo/visionface.gif) | ![CoreML](docs/demo/coreml-yolo.gif) |
+| <img src="docs/demo/visionface.gif" width="400" alt="Vision Face"> | <img src="docs/demo/coreml-yolo.gif" width="400" alt="CoreML"> |
 | **[Vision Face](VisionFace/)** — 76 landmarks per face, 12 faces at once | **[CoreML](CoreMLDAT/)** — object detection with YOLOv3 |
-| ![Vision Text](docs/demo/visiontext.gif) | ![Vision AnimalPose](docs/demo/visionanimalpose.gif) |
+| <img src="docs/demo/visiontext.gif" width="400" alt="Vision Text"> | <img src="docs/demo/visionanimalpose.gif" width="400" alt="Vision AnimalPose"> |
 | **[Vision Text](VisionText/)** — OCR with per-string bounding boxes | **[Vision AnimalPose](VisionAnimalPose/)** — 25 joints per animal, dog and cat |
-| ![CoreML depth](docs/demo/coreml-depth.gif) | ![Vision Subject](docs/demo/visionsubject.gif) |
+| <img src="docs/demo/coreml-depth.gif" width="400" alt="CoreML depth"> | <img src="docs/demo/visionsubject.gif" width="400" alt="Vision Subject"> |
 | **[CoreML](CoreML/)** — monocular depth with Depth Anything V2 | **[Vision Subject](VisionSubject/)** — subject cutout, no green screen |
-| ![CoreText](docs/demo/coretext.gif) | ![ImagePlayground](docs/demo/imageplayground.jpg) |
+| <img src="docs/demo/coretext.gif" width="400" alt="CoreText"> | <img src="docs/demo/imageplayground.jpg" width="400" alt="ImagePlayground"> |
 | **[CoreText](CoreText/)** — vertical Japanese typesetting, revealed a character at a time | **[ImagePlayground](ImagePlayground/)** — a face photo (left) turned into an illustration (right) |
 
 ## Table of contents

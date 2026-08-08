@@ -28,15 +28,15 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 
 | | |
 |:--:|:--:|
-| ![Vision Pose](docs/demo/visionpose.gif) | ![Vision Hand](docs/demo/visionhand.gif) |
+| <img src="docs/demo/visionpose.gif" width="400" alt="Vision Pose"> | <img src="docs/demo/visionhand.gif" width="400" alt="Vision Hand"> |
 | **[Vision Pose](VisionPose/)** — 1人34キーポイント・同時5人 | **[Vision Hand](VisionHand/)** — 片手21関節 |
-| ![Vision Face](docs/demo/visionface.gif) | ![CoreML](docs/demo/coreml-yolo.gif) |
+| <img src="docs/demo/visionface.gif" width="400" alt="Vision Face"> | <img src="docs/demo/coreml-yolo.gif" width="400" alt="CoreML"> |
 | **[Vision Face](VisionFace/)** — 1顔76ランドマーク・同時12顔 | **[CoreML](CoreMLDAT/)** — YOLOv3 で物体検出 |
-| ![Vision Text](docs/demo/visiontext.gif) | ![Vision AnimalPose](docs/demo/visionanimalpose.gif) |
+| <img src="docs/demo/visiontext.gif" width="400" alt="Vision Text"> | <img src="docs/demo/visionanimalpose.gif" width="400" alt="Vision AnimalPose"> |
 | **[Vision Text](VisionText/)** — OCR・文字列ごとの矩形 | **[Vision AnimalPose](VisionAnimalPose/)** — 1匹25関節・犬と猫 |
-| ![CoreML depth](docs/demo/coreml-depth.gif) | ![Vision Subject](docs/demo/visionsubject.gif) |
+| <img src="docs/demo/coreml-depth.gif" width="400" alt="CoreML depth"> | <img src="docs/demo/visionsubject.gif" width="400" alt="Vision Subject"> |
 | **[CoreML](CoreML/)** — Depth Anything V2 で単眼深度推定 | **[Vision Subject](VisionSubject/)** — グリーンバック無しの被写体切り抜き |
-| ![CoreText](docs/demo/coretext.gif) | ![ImagePlayground](docs/demo/imageplayground.jpg) |
+| <img src="docs/demo/coretext.gif" width="400" alt="CoreText"> | <img src="docs/demo/imageplayground.jpg" width="400" alt="ImagePlayground"> |
 | **[CoreText](CoreText/)** — 日本語の縦組みを一文字ずつ表示 | **[ImagePlayground](ImagePlayground/)** — 顔写真(左)からイラスト(右)を生成 |
 
 ## 目次
