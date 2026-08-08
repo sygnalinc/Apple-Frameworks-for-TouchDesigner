@@ -3235,3 +3235,25 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   各コンテナは削除済み、applescript_demo → applescript にリネーム済みだったので、
   develop送りopの参照切れは demo.toe から解消された
 - _README を新カテゴリ表+色の対応+外部モデルが要るOP+未着手11件の索引に更新
+
+### 2026-08-08 VisionPose 利用例: 骨格線の生成を追加(データは完成・描画は未解決)
+
+- ユーザー要望「点だけでなく関節を繋いで描画したい」
+- **`geo2/skeleton`(Script SOP)を追加**。Vision Pose CHOP を読んで骨(19本)の線分を生成:
+  骨盤→胴→首→鼻、目・耳、肩→肘→手首、腰→膝→足首。**両端の confidence が
+  Minconf 未満なら描かない**(Vision に無い つま先/かかと/指 は confidence=0 なので自動的に除外)
+  - 実測: 5人分で **95プリム / 190点**。座標も検証済み(x≈0.25, y≈-0.04..0.1 と妥当)
+  - Aspect Correct UVs = On 前提で `-0.5` するだけで Ortho Width=1 のカメラに載る設計
+- **踏んだ罠**:
+  ① Script SOP のポリゴンは `appendPoly(2, addPoints=False)` → `poly[0].point = pa` が正しい。
+     最初 `appendPoly(0,...)` + `line.append()` と書いて **1本しか生成されなかった**
+  ② Script SOP は入力が無いと毎フレーム cook しない。custom par `Trigger` に
+     `op('../Visionpose1').totalCooks` の式を入れて dirty にする
+  ③ **script で作った Geometry COMP には既定の `torus1` が入る**。消し忘れると
+     画面いっぱいの塗りになる(実際に踏んだ)
+- **未解決**: geo2 が描画されない。`soptoPOP` で POP 化(190点/93プリム)し、render/display
+  フラグも立て、Constant/Wireframe 双方の MAT を試したが表示されない。**この TD は POP 世代**で、
+  動いている geo1 は「1点のPOP + インスタンシング」構成。**同じくインスタンシングで
+  骨1本ごとに単位線分を配置する方式**に切り替えるのが確実だと思われる(次の手)
+- 例自体は壊していない(点の描画・映像の合成は従来どおり動作)。render1 の解像度は
+  Resolution Multiplier を切って 1280x720 にした(128x128 では合成が破綻していたため)
