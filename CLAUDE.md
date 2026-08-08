@@ -3307,3 +3307,27 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **4例すべてで `lineMAT` の Wire Width を 3 に**(既定1pxだと線が細くて見えにくかった)。
   色も分けた: Pose=緑 / Hand=橙 / Face=水色 / AnimalPose=黄
 - 線描画の型が4例で揃った(Script SOP → soptoPOP → outPOP + render/display フラグ + Trigger)
+
+### 2026-08-08 VisionAnimalPose の骨格接続を修正(top/bottom は「先端/付け根」だった)
+
+ユーザー指摘「AnimalPoseの繋ぎ方が不自然」+ WWDC23 のスケルトン画像。実データを読んで原因を特定。
+
+- **真因**: Apple の関節名の `top` / `bottom` は**画面の上下ではなく、その部位の先端 / 付け根**。
+  猫(高信頼度・実測)で確定: `tail_top`=(856,240) **尻尾の先端** / `tail_bottom`=(865,389) **腰の付け根**。
+  耳も同じで `ear_top`=先端 / `ear_bottom`=頭に付く付け根(垂れ耳の犬では ear_top が画面下に来る)
+- 背骨を `neck → tail_top` で結んでいたため、**尻尾を立てた猫で首から尻尾の先まで空中を横切る線**に
+  なっていた。後脚も尻尾の先から生えていた
+- **修正**: 胴 `nose → neck → tail_bottom`(腰)/ 尾 `tail_bottom → tail_middle → tail_top` /
+  後脚は `tail_bottom` から。耳は**閉じた三角形**、頭部は `ear_bottom → eye → nose`。
+  接続は Apple の joint group(head / trunk / tail / 各脚)に沿わせた
+- **実測(M2・frame 40 で静止して検証)**: 修正後、猫は背骨が背中に沿い尻尾が腰から立ち上がる、
+  犬も背骨・四肢とも自然。2匹で52本。再生に戻した動画でも視認確認
+- VisionAnimalPose/README.md に「関節名の top / bottom は先端 / 付け根」の表と、
+  骨格を引くときの注意を追記。demo.toe の note も同内容に更新
+
+- **検証手順のメモ**: アスペクト補正の影響を外して生 uv を読むために一時的に
+  `Aspectcorrectuv` を Off にしたら、**インスタンシングの overlay が画面外へ飛んだ**
+  (例は補正 On + Ortho Width=1 前提のため)。解析が終わったら必ず On に戻すこと。
+  静止フレームでの検証は `moviefilein.play=False` + `index` 固定 + CHOP を force cook
+- 検証中に TD が落ちたが、**落ちる直前の project.save() は成功していた**(demo.toe は無事)。
+  再起動して note・接続・プリム数がディスク版に入っていることを確認済み
