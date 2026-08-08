@@ -3399,3 +3399,19 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - `git rm` して、LICENSE / THIRD_PARTY_NOTICES.md / README(英日)の所在表記を
   「`demo.toe` に `/project1/td_mcp_server` として埋め込み」へ更新。出典表記自体は維持
 - 注意: **同梱をやめたわけではない**(demo.toe の中に本体がある)ので、出典表記は引き続き必要
+
+### 2026-08-08 Non-Commercial 版の解像度制限について未検証である旨を明記
+
+- ユーザー指示「NonCommercial での検証が不十分なので解像度制限による問題が出る可能性を記載したい」
+- **NC の上限は 1280x1280**(https://derivative.ca/download で確認)。開発・実測はすべて
+  ライセンス版(2025.32280)で行っており、NC 環境での確認はしていない
+- 各READMEの実測解像度を機械的に走査して**上限超えのOPを特定**し、ルートREADME(英日)の
+  必要環境に節を新設して表で列挙 + 該当8プラグインの「注意」節に1行ずつ追記:
+  - Metal Upscale(2x/4x は必ず超える=OPの用途そのもの)/ Cinematic Video(3840x2160)/
+    ImageIO File In・CoreImage RAW・CoreImage HDR(実機写真 3024x4032 級)/
+    Screen Capture(1710x1112)/ PDFKit(1275x1650)/ CoreText(指定解像度しだい)
+  - 回避策は出力解像度を下げること、直らなければ Issue を、と案内
+- **次にやるなら**: `app.addNonCommercialLimit()` / `app.removeNonCommercialLimit()` が
+  TD の Python API に存在する(`dir(app)` で確認)。ライセンス版のまま NC の制限を再現できる
+  可能性があるので、実際に掛けて上記8件の挙動を確認すれば「未検証」を解消できる(今回は
+  ユーザーが作業中のTDに影響するため実行していない)

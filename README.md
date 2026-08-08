@@ -214,6 +214,25 @@ referenced them. The API is not frozen yet.
 - macOS 12+ (Apple Silicon recommended). Some features need a newer macOS — noted in each README.
 - Xcode and TouchDesigner.app to build.
 
+### Non-Commercial TouchDesigner is not well tested
+
+Everything here was built and measured on a **licensed** TouchDesigner install. The free
+**Non-Commercial** license [caps resolution at 1280x1280](https://derivative.ca/download), and
+we have not verified the operators under that cap — expect clamped, distorted or failing output
+where a plugin produces something larger. The ones most likely to hit it:
+
+| Plugin | Why |
+|---|---|
+| [Metal Upscale](MetalUpscale/) | 2x / 4x output always exceeds the cap — this is the whole point of the OP |
+| [Cinematic Video](Cinematic/) | Re-rendered output measured at 3840x2160 |
+| [ImageIO File In](ImageIOFileIn/) / [CoreImage RAW](CoreImageRAW/) / [CoreImage HDR](CoreImageHDR/) | Camera photos are routinely 4000px+ (measured 3024x4032) |
+| [Screen Capture](ScreenCapture/) | Native display capture (measured 1710x1112) |
+| [PDFKit](PDFKit/) | Page render (measured 1275x1650) |
+| [CoreText](CoreText/) | Whatever output resolution you set |
+
+Lowering the output resolution is the workaround. If you hit something that a smaller
+resolution does not fix, please open an issue — Non-Commercial reports are welcome.
+
 ## Writing your own plugin
 
 The shared build / implementation patterns (async worker, TOP download flip, Info CHOP

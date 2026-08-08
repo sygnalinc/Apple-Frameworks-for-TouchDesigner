@@ -211,6 +211,25 @@ cd VisionPose && ./build.sh      # → VisionPose/build/VisionPoseCHOP.plugin
 - macOS 12+(Apple Silicon 推奨)。一部の機能はより新しい macOS を要求(各 README に明記)
 - ビルドに Xcode と TouchDesigner.app
 
+### TouchDesigner Non-Commercial では検証が不十分です
+
+開発・実測はすべて**ライセンス版**の TouchDesigner で行っています。無償の
+**Non-Commercial** 版は[解像度が 1280x1280 に制限される](https://derivative.ca/download)ため、
+それを超える出力をするオペレータは**制限による問題が出る可能性があります**(クランプ・
+表示の破綻・失敗)。この状態での検証はできていません。特に該当しそうなもの:
+
+| プラグイン | 理由 |
+|---|---|
+| [Metal Upscale](MetalUpscale/) | 2x / 4x の出力は必ず上限を超える(このOPの用途そのもの) |
+| [Cinematic Video](Cinematic/) | 再レンダ出力が実測 3840x2160 |
+| [ImageIO File In](ImageIOFileIn/) / [CoreImage RAW](CoreImageRAW/) / [CoreImage HDR](CoreImageHDR/) | 実機写真は通常 4000px 級(実測 3024x4032) |
+| [Screen Capture](ScreenCapture/) | ネイティブ解像度のディスプレイ取り込み(実測 1710x1112) |
+| [PDFKit](PDFKit/) | ページ描画が実測 1275x1650 |
+| [CoreText](CoreText/) | 指定した出力解像度しだい |
+
+回避策は出力解像度を下げることです。解像度を下げても直らない問題に当たった場合は
+Issue を立ててください。Non-Commercial 版からの報告は歓迎します。
+
 ## プラグインを自作する人へ
 
 共通のビルド・実装パターン(非同期ワーカー、TOP のダウンロード flip、Info CHOP 診断 など)と
