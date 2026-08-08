@@ -3721,3 +3721,16 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - demo.toe の描画(`geo2/contour`)を新レイアウトへ更新。README(該当+ルート英日)も更新
 - **注意**: 実行中のTDはプラグインをプロセス内キャッシュしているため、**TD再起動まで
   例は旧76点のまま**。再起動後に見た目を再確認すること
+
+### 2026-08-09 v0.10.0 リリース
+
+- **patch(0.9.3)ではなく minor(0.10.0)** にした理由: VisionFace のランドマークを 76→85 に
+  変更しており、`p` インデックスがずれる**後方非互換**だから(この op の majorVersion も 0→1)。
+  0.x でも「壊れる変更が入った」ことがバージョンから分かるようにする
+- 57プラグインを全て再ビルド(並列・全件成功)→ `release.sh sign → verify → dmg → notarize`。
+  59バンドル・全数verify通過(署名/Hardened Runtime/Developer ID/APIバージョン/版一致)。
+  DMG 18MB → 公証 **Accepted** → staple → spctl accepted
+- v0.9.2 からの中身: **NC の解像度上限で絵が崩れる不具合を10 TOPで修正**(最大の成果。
+  上限超えの宣言に対し TD がクランプ後の幅でバッファを読むため斜めシアーになっていた)、
+  **VisionFace のランドマーク切り捨てを解消**(76→85・輪郭17点目など)、
+  Vision Contours に Aspect Correct UVs、CoreText の行送りで1行目が動く問題を修正
