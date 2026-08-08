@@ -31,8 +31,8 @@ GIFは `docs/demo/`。作り直すときは `./tools/make_demo_gifs.sh`
 | **[Vision Pose](VisionPose/)** — 1人34キーポイント・同時5人 | **[Vision Hand](VisionHand/)** — 片手21関節 |
 | ![Vision Face](docs/demo/visionface.gif) | ![CoreML](docs/demo/coreml-yolo.gif) |
 | **[Vision Face](VisionFace/)** — 1顔76ランドマーク・同時12顔 | **[CoreML](CoreMLDAT/)** — YOLOv3 で物体検出 |
-| ![Vision Text](docs/demo/visiontext.gif) | |
-| **[Vision Text](VisionText/)** — OCR・文字列ごとの矩形 | |
+| ![Vision Text](docs/demo/visiontext.gif) | ![Vision AnimalPose](docs/demo/visionanimalpose.gif) |
+| **[Vision Text](VisionText/)** — OCR・文字列ごとの矩形 | **[Vision AnimalPose](VisionAnimalPose/)** — 1匹25関節・犬と猫 |
 
 ## 目次
 

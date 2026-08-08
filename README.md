@@ -32,8 +32,8 @@ GIFs live in `docs/demo/`; regenerate them from the screen recordings with
 | **[Vision Pose](VisionPose/)** — 34 keypoints per person, 5 people at once | **[Vision Hand](VisionHand/)** — 21 joints per hand |
 | ![Vision Face](docs/demo/visionface.gif) | ![CoreML](docs/demo/coreml-yolo.gif) |
 | **[Vision Face](VisionFace/)** — 76 landmarks per face, 12 faces at once | **[CoreML](CoreMLDAT/)** — object detection with YOLOv3 |
-| ![Vision Text](docs/demo/visiontext.gif) | |
-| **[Vision Text](VisionText/)** — OCR with per-string bounding boxes | |
+| ![Vision Text](docs/demo/visiontext.gif) | ![Vision AnimalPose](docs/demo/visionanimalpose.gif) |
+| **[Vision Text](VisionText/)** — OCR with per-string bounding boxes | **[Vision AnimalPose](VisionAnimalPose/)** — 25 joints per animal, dog and cat |
 
 ## Table of contents
 

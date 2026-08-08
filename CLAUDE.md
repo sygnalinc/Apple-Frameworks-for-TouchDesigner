@@ -3351,3 +3351,13 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   `:s` と解釈されて文字列が食われる**(ffmpeg が "64teuse=dither=none" を受け取って失敗)。
   `${3}` と波括弧で囲む
 - GitHub の README は **mp4 を埋め込めない**(markdown内の `<video>` はサニタイズされる)ので GIF 一択
+
+### 2026-08-08 デモGIFに VisionAnimalPose を追加 + サンプル映像9本をコミット
+
+- ユーザーが `demo_capture/VisionAnimalPose.mp4` を追加。**冒頭2.6秒は骨格だけで元動画が出ない**
+  ため 2.6s から3秒を切り出し(切れ目は YAVG が 18→146 に変わる点で判定)。1.5MB
+- README(英日)のデモ表がこれで **3行×2列** に揃った(Pose / Hand / Face / CoreML(YOLO) /
+  Text / AnimalPose の6本・計約8.4MB)
+- **`Assets/sample_*.mp4` 9本(計41MB)をコミット**。demo.toe の Vision系利用例が参照しているのに
+  未追跡で、clone しただけでは映像系の例が全部空になっていた(最大は sample_street.mp4 の15MBで
+  GitHub の100MB制限内)

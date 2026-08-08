@@ -25,6 +25,7 @@ CLIPS=(
     "visionhand|VisionHand.mp4|0|4.0|480|12|8:8:14:14"
     "visionface|VisionFace.mp4|0|4.0|480|12|8:8:14:14"      # 4.0s 以降は元動画が終わり輪郭だけになる
     "visiontext|VisionText.mp4|3.4|3.0|480|12|8:8:14:14"    # 認識枠が出るのは 3.4s から
+    "visionanimalpose|VisionAnimalPose.mp4|2.6|3.0|480|12|8:8:14:14"  # 2.6s まで骨格だけで元動画が出ない
     # 人混みの街路はほぼ全画素が毎フレーム変わるので、幅と fps を落として強めに除去する
     "coreml-yolo|CoreMLDAT(yolo).mp4|0|4.0|440|10|12:12:20:20"
 )
