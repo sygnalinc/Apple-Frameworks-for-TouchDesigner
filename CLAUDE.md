@@ -3257,3 +3257,25 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   骨1本ごとに単位線分を配置する方式**に切り替えるのが確実だと思われる(次の手)
 - 例自体は壊していない(点の描画・映像の合成は従来どおり動作)。render1 の解像度は
   Resolution Multiplier を切って 1280x720 にした(128x128 では合成が破綻していたため)
+
+### 2026-08-08 VisionHand / VisionFace にも線描画を追加(3例とも描画確認)
+
+- VisionPose の骨格線は**描画できていた**(前エントリの「未解決」は誤り)。原因は
+  `.save()` のキャプチャが POP パイプラインの落ち着く前だったため。数フレーム置くと
+  5人ぶんのスティックフィギュアが正しく描かれる
+- **VisionHand**: `geo2/bones`(Script SOP)で指5本(wrist→cmc/mcp→…→tip)＋手のひら
+  (index/middle/ring/little の mcp を連結)。実測 2手で **46本**
+- **VisionFace**: `geo2/contour`(Script SOP)で p0..p75 を領域ごとに連結。並びは Apple の
+  76点コンステレーション順(0-10輪郭 / 11-18左目 / 19-26右目 / 27-32左眉 / 33-38右眉 /
+  39-47鼻 / 48-52鼻筋 / 56-69外唇 / 70-75内唇)。目と唇は閉ループ。
+  実測 **12顔で816本**、全員の顔に正しく描かれることを視認
+- **描画に必要だった手順(3例共通・pitfalls級)**:
+  ① Script SOP → `soptoPOP` → `outPOP` と繋ぐ(このTDは POP 世代で、Geometry COMP は
+     POP を描く)。② **outPOP の render/display フラグを立てる**(立てないと何も出ない)。
+  ③ script で作った Geometry COMP には既定の `torus1` が入るので消す
+  ④ Script SOP は入力が無いと毎フレーム cook しない → custom par `Trigger` に
+     元CHOPの `totalCooks` を式で入れて dirty にする
+  ⑤ ポリゴンは `appendPoly(2, addPoints=False)` → `poly[0].point = pa`
+- 3例とも render1 の Resolution Multiplier を切って 1280x720 に(128x128 では合成が破綻)
+- Face のランドマーク領域範囲は Apple の並び順に依存する。ある領域だけ崩れて見える場合は
+  スクリプト先頭の REGIONS を直す旨を note に明記
