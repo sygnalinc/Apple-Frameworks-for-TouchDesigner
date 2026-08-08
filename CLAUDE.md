@@ -3219,3 +3219,19 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - ついでに note に残っていた**古い共有ソース表記**(`shared via examples/media_*`)を除去。
   examples フラット化で `media_video` 方式は廃止済みのため実態と食い違っていた
 - ルート README(英日)のモデル案内を `models/README.md` への導線に更新
+
+### 2026-08-08 demo.toe を9カテゴリへ再編・ノードを色分け
+
+- ユーザー指定のカテゴリで配置し直し、**コンテナの色もカテゴリで統一**:
+  01 Vision Pose系(青) / 02 その他Vision(青緑) / 03 LLM(紫) / 04 CoreML(藍) /
+  05 画像生成(赤紫) / 06 描画(橙) / 07 Sound(緑) / 08 Text(黄緑) / 09 その他(灰)
+- 1行8個で折り返し、超える分は同カテゴリ内の2行目へ(02=11件、09=12件)。
+  ラベル `_cat_01`〜`_cat_09` も同じ色にして行頭に配置
+- 分類の判断: **01 は「ポーズ/キーポイント推定」**として VisionPose / Pose3D / Hand /
+  Face / AnimalPose を入れた(VisionFace は検出+ランドマークなので境界。02へ移したい場合は
+  1行変えるだけ)。08 Text は NLP 系(TextAnalyze / Translate)で、OCR の VisionText と
+  文書構造の VisionDocument は Vision なので 02 に置いた
+- ユーザー側で VisionSegment / MetalFrameInterp / mlx_vision_demo / shortcuts_demo の
+  各コンテナは削除済み、applescript_demo → applescript にリネーム済みだったので、
+  develop送りopの参照切れは demo.toe から解消された
+- _README を新カテゴリ表+色の対応+外部モデルが要るOP+未着手11件の索引に更新
