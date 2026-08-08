@@ -3512,3 +3512,22 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - CoreText/README.md のパラメータ説明を「どの値でも1行目のベースラインは動かない」に更新。
   リビルド・常設インストール済み
 - **注意**: リリース v0.9.2 の DMG はこの修正の1コミット前。次回配布時に取り込む
+
+### 2026-08-08 CoreText デモにタイプライター表示(一文字ずつ)を追加
+
+- `/project1/coretext` に4ノード追加:
+  `type_source`(全文・Text DAT)→ `typer`(Execute DAT・onFrameEnd)→ `type_out`(Text DAT)
+  → `typewriter`(CoreText TOP の Text DAT に接続)。書き換えるたびに CoreText が再レンダする
+- typer は `absTime.seconds` で進めるので **fps が落ちても表示速度が変わらない**。
+  `CPS`(1秒あたりの文字数)と `HOLD`(全部出てから先頭へ戻るまでの秒数)で調整。
+  文字数は Python の文字列長なので日本語もそのまま1文字ずつ進む(バイト数ではない)。
+  カーソルは 2Hz で点滅、消灯時は空白にして行幅が揺れないようにした
+- **サンプル文は夏目漱石『吾輩は猫である』(1905) 冒頭**(126文字)。漱石は1916年没で
+  日本・米国とも保護期間満了=パブリックドメイン。青空文庫収録
+- **踏んだ罠**:
+  ① **Text Wrap が `balance` / `pretty` だとタイプ中に行が組み直されてガタガタ動く** →
+     `wrap` にする(README にも明記)
+  ② 新規作成した CoreText TOP が **`Vertical=True`** で生成された(par の default は False
+     なのに実値が True)。縦書きになって驚いたので明示的に False にした
+  ③ Execute DAT のフレーム末コールバックのパラメータ名は **`frameend`**(`framiend` ではない)
+- 実機で 126文字が5行に組まれ、先頭から1文字ずつ増えることを視認確認。エラーなし。demo.toe 保存済み
