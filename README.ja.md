@@ -180,6 +180,23 @@ cd VisionPose && ./build.sh      # → VisionPose/build/VisionPoseCHOP.plugin
 [`models/README.md`](models/README.md) に、利用例が期待するファイル名と入手先の一覧・
 ダウンロード手順があります。`demo.toe` の各利用例の note にも同じリンクを書いてあります。
 
+### 3. AIコーディングエージェントと組む場合
+
+[`.claude/skills/td-apple-ops/`](.claude/skills/td-apple-ops/) に、これらのOPを**使う側**の
+スキルを置いてあります。導入手順、OPの選び方、非同期OP特有の配線ルール(cookを回す・
+Info CHOP の読み方・`Flip`・`Aspect Correct UVs`)、uv をインスタンシングで映像に重ねる型、
+症状別のトラブルシュート — いずれも利用例を組む過程で実際に踏んだものだけです。
+
+Claude Code はこのリポジトリが文脈にあれば自動で読み込みます。他のプロジェクトからも
+使いたい場合はシンボリックリンクを張ってください:
+
+```sh
+ln -s "$PWD/.claude/skills/td-apple-ops" ~/.claude/skills/td-apple-ops
+```
+
+使う側ではなく**作る側**のスキルは
+[プラグインを自作する人へ](#プラグインを自作する人へ)を参照してください。
+
 ## バージョン
 
 現在のリリース: **0.9.1**([`VERSION`](VERSION))
@@ -234,7 +251,8 @@ Issue を立ててください。Non-Commercial 版からの報告は歓迎し�
 
 共通のビルド・実装パターン(非同期ワーカー、TOP のダウンロード flip、Info CHOP 診断 など)と
 実際に踏んだハマりどころは [`CLAUDE.md`](CLAUDE.md) にまとめてあります。エージェント向けに蒸留した
-スキルが [`.claude/skills/td-apple-plugin/`](.claude/skills/td-apple-plugin/) にあります。
+スキルが [`.claude/skills/td-apple-plugin/`](.claude/skills/td-apple-plugin/) にあります
+(OPを**使う側**のスキルは [`td-apple-ops`](.claude/skills/td-apple-ops/))。
 `common/build_plugin.sh` が bundle 組み立て・署名を共通化しています。
 
 ## ライセンス

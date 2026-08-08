@@ -182,6 +182,24 @@ placed in `models/`. The models are **not** in this repository — [`models/READ
 lists every file the examples expect and where to download it. Each example in `demo.toe`
 repeats the download link in its own note.
 
+### 3. If you build with an AI coding agent
+
+[`.claude/skills/td-apple-ops/`](.claude/skills/td-apple-ops/) is a skill for **using** these
+operators: install steps, how to pick an OP, the wiring rules async operators need (drive the
+cook, read the Info CHOP, `Flip`, `Aspect Correct UVs`), recipes such as overlaying keypoints
+on video with instancing, and a symptom-by-symptom troubleshooting list. Everything in it was
+actually hit while building the examples.
+
+Claude Code loads it automatically when this repository is in context. To reach it from any
+project:
+
+```sh
+ln -s "$PWD/.claude/skills/td-apple-ops" ~/.claude/skills/td-apple-ops
+```
+
+For *writing* plugins rather than using them, see
+[Writing your own plugin](#writing-your-own-plugin) below.
+
 ## Versioning
 
 Current release: **0.9.1** (see [`VERSION`](VERSION))
@@ -238,7 +256,9 @@ resolution does not fix, please open an issue — Non-Commercial reports are wel
 The shared build / implementation patterns (async worker, TOP download flip, Info CHOP
 diagnostics, …) and every pitfall actually hit during development are collected in
 [`CLAUDE.md`](CLAUDE.md), with a distilled agent skill under
-[`.claude/skills/td-apple-plugin/`](.claude/skills/td-apple-plugin/).
+[`.claude/skills/td-apple-plugin/`](.claude/skills/td-apple-plugin/)
+(the counterpart for *using* the operators is
+[`td-apple-ops`](.claude/skills/td-apple-ops/)).
 `common/build_plugin.sh` factors out bundle assembly and signing.
 
 ## License
