@@ -3584,3 +3584,37 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   黒帯のまま使うと他と並べたとき浮くので、明るい中間色にした(20KB)
 - 全10件が 480x270 であることを `sips` で確認。合計 約12MB。README の `<img width="400">` は
   そのまま残す(将来サイズ違いが混ざっても崩れないため)
+
+### 2026-08-08 Non-Commercial の実バグを再現・原因特定(修正は未実施)
+
+- ユーザー要望「NCで使ってもバグが出ないようにしたい」。`app.addNonCommercialLimit(password=...)`
+  で**ライセンス版のまま NC 制限を再現**できる(パスワード付きなら `removeNonCommercialLimit` で
+  戻せる。**パスワード無しだとセッション中は解除不能**なので必ず付けること)
+- **実際に壊れることを確認した**(検証用に `_nctest` を作り、上限超えの5 TOP を比較):
+
+  | OP | 通常 | NC | 結果 |
+  |---|---|---|---|
+  | Metal Upscale | 2560x1440 | 1280x720 | **斜めに歪んだガベージ** |
+  | Screen Capture | 1710x1112 | 1280x832 | **斜めに歪んだガベージ** |
+  | ImageIO File In | 3024x4032 | 960x1280 | **RGB縞のガベージ** |
+  | CoreText | 2000x2000 | 1280x1280 | 背景のみ・**文字が出ない** |
+  | PDFKit | 1275x1650 | 989x1280 | **真っ白** |
+
+- **原因**: TD は上限超えの宣言に対し **テクスチャをクランプしたサイズで確保し、こちらのバッファを
+  その幅で読む**(リサンプルはしない)。プラグインは 2560 幅でバイトを並べているので行がずれ、
+  典型的な斜めシアーになる。**エラーにはならず静かに壊れる**
+- **計測で確定**(MetalUpscale に一時的なプローブを入れて実測):
+  - ライセンス版: `want=2560x1440 / suggested=1280x720` → **出力は 2560x1440**(要求が通る)
+  - NC: `suggested` は **1280x720 のまま変わらない**(= Common ページの値であって上限ではない)。
+    TD 側が勝手に 1280x720 で確保する
+  - つまり **`getSuggestedOutputDesc` では上限を知れない**。SDK に上限を問い合わせるAPIも無い
+- **上限の検出手段**: TD の Python に **`licenses.isNonCommercial`** がある(NC適用中 True /
+  解除後 False を実測)。`licenses.type` も "TouchDesigner Non-Commercial" / "Commercial" と変わる。
+  プラグインからは CoreWLANScan と同じ埋め込み Python(`PyRun_String` + `-undefined dynamic_lookup`)
+  で引ける
+- **修正方針(未実装)**: 共有ヘッダ `common/NonCommercialLimit.h` を作り、
+  ① `licenses.isNonCommercial` をキャッシュ付きで判定 ② 超えていたら**アップロード直前に
+  1280x1280 以内へ縮小(アスペクト維持のボックスフィルタ)して textureDesc も揃える**
+  ③ 縮小したことを warning で知らせる。これを各 CPUMem TOP のアップロード箇所に入れる。
+  Upscale のように「拡大が目的」のOPでも、壊れた絵よりは上限で頭打ちの正しい絵のほうがよい
+- 検証コンテナと計測コードは撤去済み。TD は Commercial に復帰済み
