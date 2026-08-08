@@ -3143,3 +3143,22 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   公開版では Unknown operator type になるため要削除(ユーザー判断待ち)
 - MCP run の癖: **exec のスコープ分離でリスト内包表記から外側の変数が見えない**
   (`NameError: name 'placed' is not defined`)。明示的な for ループで書く
+
+### 2026-08-08 demo.toe: カテゴリ再編(CoreML統合・demo廃止)+ 利用例3件を追加
+
+- ユーザー指示でカテゴリを再編:
+  - **CoreML系を1カテゴリに統合**(06 CoreML = CoreML TOP/CHOP/DAT・SAM2・ImageGen)。
+    従来 02/03/06 に散っていたものを集約
+  - **「Demos」カテゴリを廃止**し、作例を主役OPのカテゴリへ振り分け
+    (mlx_vision_demo→08 Language & Text、applescript_demo/shortcuts_demo→10 System)
+  - 09 を「3D / Geometry / Document」、10 を「System / Devices / Network」に分割(旧09が13件で長すぎた)
+- **利用例3件を追加**:
+  - **Vision Document**: `Assets/sample_document.png`(新規・見出し/段落/3列の表/箇条書きを含む
+    文書画像・約690KB)→ 31行6列(type/page/index/row/col/text)を抽出。
+    **このOPは TOP ではなく File パラメータ(画像ファイルパス)を受ける**のが要点
+  - **Spotlight**: Query="CoreText"・Search パルスで **21件**ヒット(Mode=Name)
+  - **ImagePlayground**: Prompt+Style(illustration)を設定。Generate はユーザーが押す前提
+    (生成は前面GUIアプリ内でのみ動作)
+- 素材生成のメモ: `cupsfilter` は **HTML→PDF に非対応**。AppKit の
+  `NSAttributedString(html:)` → NSImage → PNG で文書画像を作った(swiftc の小スクリプト)
+- 残る未着手は11件(素材・環境・学習が要るもの)。_README に分類して記載
