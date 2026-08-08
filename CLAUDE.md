@@ -3446,3 +3446,16 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   使うためのシンボリックリンク手順を記載(英日)
 - 既存の「プラグインを自作する人へ」の `td-apple-plugin` の行にも、**使う側は td-apple-ops** と
   相互リンクを追加。作る側/使う側のどちらから入っても辿り着ける
+
+### 2026-08-08 v0.9.2 リリース
+
+- VERSION を 0.9.2 へ。**57プラグインを全て再ビルド**(並列 `xargs -P 6`・全件成功)してから
+  `tools/release.sh sign → verify → dmg → notarize`。59バンドル(Multipeer は In/Out で2つずつ)
+- verify は署名・Hardened Runtime・Developer ID・**OP_CommonAPIVersion=1**・**版一致**を全数検査して通過。
+  DMG 18MB → 公証 **Accepted** → staple → `spctl` accepted(Notarized Developer ID)
+- v0.9.1 からの中身(なぜ patch でなく必要だったか): **bypass/無効化から戻すと黒画像になる不具合を
+  全17 TOP で修正**、**ビルド不能だった6件を修復**(共通ヘルパが zsh 専用なのに shebang が bash
+  → 7/23以降ずっとビルドされていなかった)、VisionFace のランドマーク並び修正、
+  VisionAnimalPose の骨格接続修正、VisionText への Aspect Correct UVs 追加
+- 公開対象は 0.9.1 の66 → **59オペレータ**(VisionSimilarity / CoreImageBokeh / CoreImageEnhance /
+  VisionAesthetics / CoreLocation Beacon / VisionTrack / VisionSegment を develop へ退避したため)
