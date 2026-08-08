@@ -222,11 +222,17 @@ ln -s "$PWD/.claude/skills/td-apple-ops" ~/.claude/skills/td-apple-ops
 
 ## バージョン
 
-現在のリリース: **0.9.1**([`VERSION`](VERSION))
+現在のリリース: **0.9.2**([`VERSION`](VERSION))
+
+| バージョン | 日付 | OP数 | 主な内容 |
+|---|---|---|---|
+| **[0.9.2](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.2)** | 2026-08-08 | 59 | bypass から戻すと黒画像になる不具合を全17 TOP で修正、ビルド不能だった6件を修復。Vision Face のランドマーク並び、Vision AnimalPose の骨格接続。Vision Text に `Aspect Correct UVs` |
+| [0.9.1](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.1) | 2026-08-08 | 66 | Vision系10opに `Aspect Correct UVs`。SDKバージョン不一致による起動時ロードエラーを修正 |
+| [0.9.0](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.0) | 2026-08-07 | — | 最初の Developer ID 署名 + 公証リリース。DMGは取り下げ済み(0.9.2 を使ってください) |
 
 | 層 | 値 | ルール |
 |---|---|---|
-| リポジトリ(gitタグ) | `v0.9.1` | op追加・機能追加で **minor**、修正で **patch**。`opType` のリネーム/削除は**破壊的変更**としてリリースノートに明記 |
+| リポジトリ(gitタグ) | `v0.9.2` | op追加・機能追加で **minor**、修正で **patch**。`opType` のリネーム/削除は**破壊的変更**としてリリースノートに明記 |
 | バンドル(`Info.plist`) | `CFBundleShortVersionString` = リポジトリ版 / `CFBundleVersion` = gitコミット数 | ビルド時に `common/version.sh` が自動で焼き込む |
 | オペレータ(`customOPInfo`) | `majorVersion = 0` / `minorVersion = 9` | **opごと**。TDが `.toe` 保存値と比較する。後方互換でない変更(パラメータ削除・意味変更)をした**そのopだけ** `majorVersion` を +1 する |
 
