@@ -32,7 +32,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | <img src="docs/demo/visionpose.gif" width="400" alt="Vision Pose"> | <img src="docs/demo/visionhand.gif" width="400" alt="Vision Hand"> |
 | **[Vision Pose](VisionPose/)** — 34 keypoints per person, 5 people at once | **[Vision Hand](VisionHand/)** — 21 joints per hand |
 | <img src="docs/demo/visionface.gif" width="400" alt="Vision Face"> | <img src="docs/demo/coreml-yolo.gif" width="400" alt="CoreML"> |
-| **[Vision Face](VisionFace/)** — 76 landmarks per face, 12 faces at once | **[CoreML](CoreMLDAT/)** — object detection with YOLOv3 |
+| **[Vision Face](VisionFace/)** — 85 landmarks per face, 12 faces at once | **[CoreML](CoreMLDAT/)** — object detection with YOLOv3 |
 | <img src="docs/demo/visiontext.gif" width="400" alt="Vision Text"> | <img src="docs/demo/visionanimalpose.gif" width="400" alt="Vision AnimalPose"> |
 | **[Vision Text](VisionText/)** — OCR with per-string bounding boxes | **[Vision AnimalPose](VisionAnimalPose/)** — 25 joints per animal, dog and cat |
 | <img src="docs/demo/coreml-depth.gif" width="400" alt="CoreML depth"> | <img src="docs/demo/visionsubject.gif" width="400" alt="Vision Subject"> |
@@ -69,7 +69,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | [Vision Pose](VisionPose/) | CHOP | Multi-person 2D body pose (34 keypoints). **Channel format compatible with Body Track CHOP.** 5 people @ 60fps |
 | [Vision Pose3D](VisionPose3D/) | CHOP | Single-person **3D pose** (17 joints in meters + 2D projection + height estimate). ~2fps, slow/deliberate |
 | [Vision Hand](VisionHand/) | CHOP | Hand tracking (21 joints × up to 100 hands, left/right) |
-| [Vision Face](VisionFace/) | CHOP | Face detection + bbox, roll/yaw/pitch, landmarks (up to 76), capture-quality score. **Face Track CHOP alternative** |
+| [Vision Face](VisionFace/) | CHOP | Face detection + bbox, roll/yaw/pitch, landmarks (up to 85), capture-quality score. **Face Track CHOP alternative** |
 
 ### Object & scene recognition
 

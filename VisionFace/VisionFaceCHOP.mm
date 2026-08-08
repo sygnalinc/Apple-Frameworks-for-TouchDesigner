@@ -12,7 +12,7 @@
 //   face{i}/right_eye:u,v            右目の中心
 //   face{i}/nose:u,v                 鼻
 //   face{i}/mouth:u,v                口の中心
-//   （Landmarks オン時）face{i}/p{0..75}:u,v   全76ランドマーク点
+//   （Landmarks オン時）face{i}/p{0..84}:u,v   全85ランドマーク点
 //
 // face の並びは bbox 中心の x で左→右にソートする。
 //
@@ -41,7 +41,10 @@ using namespace TD;
 namespace {
 
 constexpr int kMaxFaces = 100;
-constexpr int kNumLandmarks = 76;
+// 各領域の点数は Vision が返す実測値（288サンプルで一定・macOS 26）。合計85。
+// allPoints は76しか返さないが、これは medianLine が他領域と重複しているため。
+// **確保数を実測より小さくすると末尾が切り捨てられ、輪郭が片側だけ短くなる**（実際に踏んだ）。
+constexpr int kNumLandmarks = 85;
 constexpr int kNumCentroids = 4;   // left_eye, right_eye, nose, mouth
 
 static const char* kCentroidNames[kNumCentroids] = {
@@ -230,7 +233,7 @@ public:
         }
         {
             OP_NumericParameter p("Landmarks");
-            p.label = "All Landmark Points (76)";
+            p.label = "All Landmark Points (85)";
             p.page = "Vision Face";
             p.defaultValues[0] = 0;
             manager->appendToggle(p);
@@ -389,13 +392,15 @@ private:
                     regionCentroid(lm.outerLips, b, face.centroid[3]);
                     // allPoints は「領域を繋いだ順」ではなく描画に使えない並びなので、
                     // **領域ごとに、その領域内の正しい順序で**詰め直す。
-                    // 並び（p0 始まり・合計76点）:
-                    //   0-15  faceContour(16)  16-21 leftEye(6)   22-27 rightEye(6)
-                    //   28-33 leftEyebrow(6)   34-39 rightEyebrow(6)
-                    //   40-47 nose(8)          48-52 noseCrest(5)  53-55 medianLine(3)
-                    //   56-69 outerLips(14)    70-75 innerLips(6)
-                    // 点数は macOS 26 実測（合計ちょうど 76）。輪郭は 16 点あり、
-                    // 11 点に切ると顎の片側が途中で切れる。
+                    // 並び（p0 始まり・合計85点）:
+                    //   0-16  faceContour(17)  17-22 leftEye(6)   23-28 rightEye(6)
+                    //   29-34 leftEyebrow(6)   35-40 rightEyebrow(6)
+                    //   41-48 nose(8)          49-54 noseCrest(6)  55-64 medianLine(10)
+                    //   65-78 outerLips(14)    79-84 innerLips(6)
+                    // 点数は macOS 26 実測（288サンプルで一定）。**allPoints は76しか返さないが
+                    // 領域の合計は85**（medianLine が他領域と重複するため）。
+                    // 確保数を実測より小さくすると末尾が切り捨てられる。以前 contour を 16 に
+                    // していたため 17 点目が落ち、輪郭の片側だけ短く終わって左右非対称に見えた。
                     // 領域が取れなかった分は 0 のまま（描画側は confidence ではなく
                     // この並びを前提に線を引ける）。
                     {
@@ -405,7 +410,7 @@ private:
                             lm.nose, lm.noseCrest, lm.medianLine,
                             lm.outerLips, lm.innerLips,
                         };
-                        const int counts[10] = {16, 6, 6, 6, 6, 8, 5, 3, 14, 6};
+                        const int counts[10] = {17, 6, 6, 6, 6, 8, 6, 10, 14, 6};
                         int base = 0;
                         for (int r = 0; r < 10; r++) {
                             VNFaceLandmarkRegion2D* reg = regions[r];
@@ -463,8 +468,10 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     info->customOPInfo.opType->setString("Visionface");
     info->customOPInfo.opLabel->setString("Vision Face");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
-    info->customOPInfo.majorVersion = 0;
-    info->customOPInfo.minorVersion = 9;
+    // ランドマークの並びを 76 → 85 に変更した（輪郭17点目などの切り捨てを解消）。
+    // p インデックスがずれる後方非互換の変更なので、この op だけ major を上げる。
+    info->customOPInfo.majorVersion = 1;
+    info->customOPInfo.minorVersion = 0;
     info->customOPInfo.opIcon->setString("VFC");
     if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/VisionFace/README.md");
     info->customOPInfo.minInputs = 0;
