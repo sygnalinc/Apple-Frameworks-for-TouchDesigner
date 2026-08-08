@@ -3171,3 +3171,20 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 公開対象は **59オペレータ**(main 追跡57フォルダ)。develop のみの非公開は計25op
 - demo.toe には VisionSegment の利用例が残っている(MetalFrameInterp と同じ状態)。
   公開版では Unknown operator type になるため、まとめて削除するかはユーザー判断待ち
+
+### 2026-08-08 LLM AFM の利用例に Tool Calling を追加
+
+- `/project1/LLMAFM` に **ツール呼び出しの往復**を組み込んだ:
+  `sensor`(Constant CHOP: temperature/humidity)+ `handler`(Execute DAT)+ `Llmafm1`
+  - Enable Tool Calling / Tool Name=`get_sensor` / Tool Parameters=`name:string`
+  - handler が `pending_tool_args` を検知 → sensor CHOP から値を引いて Tool Result へ
+    JSON を書き → Return Tool Result をパルス
+- **実測**: 「Use the get_sensor tool with name "temperature"...」→
+  **"The current temperature is 42.0°C."**、humidity に変えると **"The humidity value is 58.0."**。
+  LLM が TD のライブ値を読んでいることを確認
+- **踏んだ罠(既知の再確認)**: 最初 `datexecuteDAT` の `onTableChange` でハンドラを書いたら
+  **pending_tool が出たまま止まった**。非同期な C++ DAT の更新では onTableChange が
+  安定して発火しない → **Execute DAT の onFrameEnd で毎フレーム polling** に変更して解決
+- **踏んだ罠(新規)**: オンデバイスモデルは小さく、「What is the current temperature?」のような
+  曖昧な聞き方だと**ツールを使わず「センサーがありません」と答える**。プロンプトでツール名を
+  明示すると確実に呼ぶ。note にも明記した
