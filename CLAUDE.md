@@ -3188,3 +3188,19 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **踏んだ罠(新規)**: オンデバイスモデルは小さく、「What is the current temperature?」のような
   曖昧な聞き方だと**ツールを使わず「センサーがありません」と答える**。プロンプトでツール名を
   明示すると確実に呼ぶ。note にも明記した
+
+### 2026-08-08 LLM MLX の利用例が動かない不具合を修正(Model が式モードで SyntaxError)
+
+- ユーザー報告「LLMMLXが動いてない?」→ `Llmmlx1` に
+  `Error: SyntaxError: invalid decimal literal` が出ていた
+- **原因**: `Model` パラメータが **Expression モード**なのに、式ではなく
+  `gemma-3-4b-it-qat-4bit` という**裸の文字列**が入っていた。Python が
+  `gemma - 3 - 4b - ...` の数式として解釈して構文エラー(4b が不正な数値リテラル)
+- **修正**: `project.folder + '/models/gemma-3-4b-it-qat-4bit'` という正しい式に。
+  ローカルフォルダ指定なので完全オフラインで動く
+- **検証(M2・TD実機)**: Load → Info DAT の `status=ready`(ヘルパプロセス
+  `mlxllm-helper --serve` も起動確認)→ Submit「Name one primary color.」→ **"Red"**
+- 例に **`info`(Info DAT)を追加**。status(loading model / ready)が見えないと
+  「動いていない」のか「ロード中」なのか判別できないため
+- note に**この罠を明記**: リポジトリIDを直接書くなら**クォートで囲む**か
+  パラメータを定数モードに戻すこと。VLM は gemma 系4bitでは不可(Qwen2-VL 系を使う)
