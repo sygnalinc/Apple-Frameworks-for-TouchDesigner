@@ -10,9 +10,14 @@ Removes temporal noise from video with Apple's **ML temporal noise filter**
 ### ⚠ Limited hardware support
 
 **On M2 it measures `isSupported=false` (maximumDimensions = 0x0) and does not run.** In that
-case the node shows the error "Temporal noise filter not supported on this hardware" (it does not
-crash). The implementation should work as-is on supported hardware (presumably newer Apple
-Silicon), but **it has not been verified on real data with the M2 used for this repository**.
+case the node **passes the input through unchanged and raises a warning** —
+"Temporal noise filter not supported on this hardware — passing the input through unchanged".
+It is deliberately a warning rather than an error, so that opening a network on an unsupported
+machine does not break everything downstream. The implementation should work as-is on supported
+hardware (presumably newer Apple Silicon), but **it has not been verified on real data with the
+M2 used for this repository**.
+
+The same applies below macOS 26: a warning plus passthrough, never an error.
 
 ### Parameters
 
@@ -49,9 +54,13 @@ Apple の **ML テンポラルノイズフィルタ**(VTTemporalNoiseFilter・ma
 ### ⚠ 対応ハードウェアが限られる
 
 **M2 実測では `isSupported=false`(maximumDimensions=0x0)で動作しない**。
-その場合ノードは "Temporal noise filter not supported on this hardware" のエラー表示になる
-(クラッシュはしない)。対応環境(より新しい世代のApple Siliconと推定)では
-そのまま動く実装になっているが、**本リポジトリのM2では実データ検証未実施**。
+その場合ノードは**入力をそのまま素通しして警告**を出す
+("Temporal noise filter not supported on this hardware — passing the input through unchanged")。
+非対応マシンで開いただけのネットワークが下流ごと壊れないよう、**エラーではなく警告**にしてある。
+対応環境(より新しい世代のApple Siliconと推定)ではそのまま動く実装になっているが、
+**本リポジトリのM2では実データ検証未実施**。
+
+macOS 26 未満でも同じく警告 + 素通しで、エラーにはしない。
 
 ### パラメータ
 

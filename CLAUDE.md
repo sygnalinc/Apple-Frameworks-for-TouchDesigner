@@ -3835,3 +3835,20 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   MCPから `cook(force=True)` しても**中身は cook されない**。
   検証するときは **一時的に `comp.allowCooking = True` にして cook → 確認 → False に戻す**
   (この手順で src 1280x720・out1 1280x720・valid=10 を実測。戻し済み)
+
+### 2026-08-09 Metal Denoise: 非対応ハードをエラーから「警告+素通し」に変更
+
+- ユーザー報告「MetalDenoiseのdemoがエラーで動いてない」。原因は既知の
+  **M2 が VTTemporalNoiseFilter 非対応**(`isSupported=false`)。バグではないが、
+  デモとしては赤いエラーノードで壊れて見える
+- **挙動を変更**: 非対応ハード / macOS 26 未満は `getErrorString` ではなく
+  **`getWarningString` + 入力の素通し**(`passthrough()` を追加)。非対応マシンで
+  開いただけのネットワークが下流ごと止まらないようにする
+- **検証(TD再起動なし)**: 新バイナリを `/private/tmp/.../dn_<epoch>/` にコピーして
+  素の `cplusplusTOP` の Plugin Path で読ませ、**errors 空 / warning のみ /
+  出力 1280x720 が入力と同一**を視認確認(同一パスはプロセス内キャッシュで旧コードのまま)
+- demo.toe の note を「このMacでは効果が出ない・素通しになる」旨に書き換え。
+  MetalDenoise コンテナの allowCooking も他と揃えて False に戻した
+- README(MetalDenoise 英日 + ルート英日一覧)を「エラー」→「警告+素通し」に更新
+- **注意**: 稼働中のTDは常設パスの旧バイナリをキャッシュしているため、
+  `/project1/MetalDenoise` は**TD再起動までエラー表示のまま**

@@ -4,7 +4,8 @@
 // 映像の時間方向ノイズを除去する。暗所カメラのざらつき低減など。
 //
 // **注意: 対応ハードウェアが限られる**。M2 実測では isSupported=false
-// (maximumDimensions=0x0)で動作しない。対応環境ではエラー表示なしで動く想定。
+// (maximumDimensions=0x0)で動作しない。その場合は**入力をそのまま通しつつ警告を出す**
+// (エラーにして下流ごと止めると、非対応マシンで開いただけのネットワークが壊れるため)。
 // 入出力は 64RGBAHalf(TD の RGBA16Float と同一レイアウト)。
 //
 // 実装: 処理はワーカースレッドで非同期(cook 非ブロック)。前フレーム列を
@@ -153,6 +154,14 @@ public:
             error->setString(myError.c_str());
     }
 
+    // 非対応ハード / 非対応OS はエラーではなく警告。映像は素通しする
+    void getWarningString(OP_String* warning, void*) override
+    {
+        std::lock_guard<std::mutex> lock(myMutex);
+        if (!myWarning.empty())
+            warning->setString(myWarning.c_str());
+    }
+
 private:
     // ---------------------------------------------------------- worker
 
@@ -172,12 +181,15 @@ private:
                 strength = myStrength;
             }
             FrameResult result;
-            std::string error;
+            std::string error, warning;
             const auto t0 = std::chrono::steady_clock::now();
-            if (@available(macOS 26.0, *))
-                process(download, strength, result, error);
-            else
-                error = "Denoise requires macOS 26+";
+            if (@available(macOS 26.0, *)) {
+                process(download, strength, result, error, warning);
+            } else {
+                // 非対応OSでも下流を止めない。素通し + 警告
+                warning = "Denoise requires macOS 26+ — passing the input through unchanged";
+                passthrough(download, result);
+            }
             myProcessMs = std::chrono::duration<float, std::milli>(
                               std::chrono::steady_clock::now() - t0).count();
             myAnalyzeCount++;
@@ -188,6 +200,7 @@ private:
                     myResult = std::move(result);
                 }
                 myError = error;
+                myWarning = warning;
                 myBusy = false;
             }
         }
@@ -258,9 +271,24 @@ private:
         return true;
     }
 
+    // ダウンロードした入力をそのまま結果にする(非対応ハード/OS 用の素通し)
+    void passthrough(OP_SmartRef<OP_TOPDownloadResult>& download, FrameResult& out)
+    {
+        if (!download)
+            return;
+        const void* data = download->getData();
+        const uint32_t w = download->textureDesc.width;
+        const uint32_t h = download->textureDesc.height;
+        if (!data || w == 0 || h == 0)
+            return;
+        out.width = w;
+        out.height = h;
+        out.data.assign((const uint8_t*)data, (const uint8_t*)data + (size_t)w * h * 8);
+    }
+
     API_AVAILABLE(macos(26.0))
     void process(OP_SmartRef<OP_TOPDownloadResult>& download, float strength,
-                 FrameResult& out, std::string& error)
+                 FrameResult& out, std::string& error, std::string& warning)
     {
         if (!download)
             return;
@@ -271,6 +299,13 @@ private:
             return;
 
         @autoreleasepool {
+            // 非対応ハードは「エラーで止める」のではなく素通し + 警告
+            if (!VTTemporalNoiseFilterConfiguration.isSupported) {
+                warning = "Temporal noise filter not supported on this hardware — "
+                          "passing the input through unchanged";
+                passthrough(download, out);
+                return;
+            }
             if (!ensureSession(w, h, error))
                 return;
 
@@ -373,6 +408,7 @@ private:
     OP_SmartRef<OP_TOPDownloadResult> myPending;
     FrameResult myResult;
     std::string myError;
+    std::string myWarning;
     uint64_t mySerial = 0;
     uint64_t myUploadedSerial = 0;
     int64_t myLastCookSeen = -1;
