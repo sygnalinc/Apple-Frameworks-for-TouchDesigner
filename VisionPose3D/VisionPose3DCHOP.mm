@@ -8,17 +8,22 @@
 //   valid                     検出できたか（1/0）
 //   bodyheight                推定身長（メートル）
 //   heightestimation          0=reference（既定身長で推定）/ 1=measured（実測）
-//   camera:tx,ty,tz           カメラ位置（シーン原点=人物 root 基準・メートル）
+//   camera:tx,ty,tz           人物 root のカメラ基準位置（メートル・被写体は -Z 側）
 //   {joint}:tx,ty,tz          17関節の3D位置（Space パラメータ基準・メートル・y上向き）
 //   {joint}:u,v               17関節の入力画像への2D投影（0〜1・左下原点）
 //
 // Space パラメータ:
 //   root（既定）  Vision そのまま。人物の腰が原点。人が跳んでも近づいても図は動かず、
 //                 手足の形だけが変わる
-//   camera        カメラを原点にした座標。人物が跳ぶ・前後に動くと図もそのまま動く。
-//                 `inverse(cameraOriginMatrix)` を掛けるので **カメラの回転（見下ろし
-//                 角など）も正しく入る**。TD側で camera:tx,ty,tz を引き算しても
-//                 平行移動しか打ち消せず、傾いたカメラでは合わないのでここで変換する
+//   camera        カメラを原点にした座標。人物が跳ぶ・前後に動くと図もそのまま動く
+//
+// cameraOriginMatrix の向きに注意（実測で確定）:
+//   名前から「カメラの姿勢」に見えるが、実体は **model 空間 → カメラ空間** の変換。
+//   カメラ基準の座標は `M * p` で得る。`inverse(M) * p` でも `p - t` でもない。
+//   8フレームで検証: `M * p` を射影した (x/z, y/z) は Vision 自身が返す pointInImage と
+//   **残差 0.00000（正規化画像座標）** で一致する。対して inverse(M) は 0.0266、
+//   平行移動を引くだけは 0.0131 の残差が残る。
+//   カメラ空間は -Z が前方（TD のカメラと同じ向き）なので、被写体は -Z 側に来る。
 //
 // 実装: cook のたびに TOP を非同期ダウンロードし、ワーカースレッドが
 // Vision 推定 → 結果を保存。cook は最新結果を出力するだけ（1〜2フレーム遅れ）。
@@ -83,10 +88,10 @@ struct Pose3D
     bool valid = false;
     float bodyHeight = 0;
     float heightMeasured = 0;      // 1=measured / 0=reference
-    float camera[3] = {};          // カメラ位置（tx,ty,tz・root 基準）
+    float camera[3] = {};          // root のカメラ基準位置（tx,ty,tz）
     float joints[kNumJoints][5] = {};   // tx, ty, tz（root 基準）, u, v
-    // root 基準 → カメラ基準 に移す行列（= inverse(cameraOriginMatrix)）。
-    // Space=camera のときだけ使う。回転も含むので単なる引き算では代用できない
+    // model（root 基準）→ カメラ基準 に移す行列（= cameraOriginMatrix そのもの）。
+    // Space=camera のときだけ使う
     simd_float4x4 toCamera = matrix_identity_float4x4;
 };
 
@@ -176,8 +181,8 @@ public:
         const tdaspect::Mapper map{ inputs->getParInt("Aspectcorrectuv") != 0,
                                     top ? (float)top->textureDesc.width  : 0.0f,
                                     top ? (float)top->textureDesc.height : 0.0f };
-        // camera を選ぶと関節をカメラ基準へ移す。camera:tx,ty,tz は常に root 基準の
-        // カメラ位置のまま（カメラ基準では定義上ゼロになって情報が無いため）
+        // camera を選ぶと関節をカメラ基準へ移す（camera:tx,ty,tz はどちらのモードでも
+        // 「root のカメラ基準位置」= toCamera の平行移動列のまま）
         const bool toCam = inputs->getParInt("Space") != 0;
         const bool on = active && pose.valid;
         output->channels[0][0] = on ? 1.0f : 0.0f;
@@ -313,7 +318,7 @@ private:
                     out.camera[0] = cam.columns[3].x;
                     out.camera[1] = cam.columns[3].y;
                     out.camera[2] = cam.columns[3].z;
-                    out.toCamera = simd_inverse(cam);
+                    out.toCamera = cam;   // model → camera。逆行列ではない（上のコメント参照）
 
                     for (int j = 0; j < kNumJoints; j++) {
                         VNHumanBodyRecognizedPoint3D* pt =
