@@ -16,6 +16,10 @@
 //   2D検出器は3Dとは別のモデルなので、独立した比較対象になる。3Dの関節を画像に投影して
 //   2D検出の位置と比べ、ズレの大きい関節＝3D推定が苦手にしている関節、と読む。
 //   （どちらが正しいかは決まらないが、両者が一致していれば少なくとも画像とは整合している）
+//
+//   ズレは px ではなく **人物の大きさ（2D検出のバウンディングボックス高）に対する %** で出す。
+//   px のままだと 1920 幅の映像が 1280 幅より不利になり、被写体が小さく写っているだけで
+//   数字が良く見えてしまう。%なら解像度も画角も違うクリップ同士を並べられる。
 
 #import <Foundation/Foundation.h>
 #import <Vision/Vision.h>
@@ -133,6 +137,20 @@ int main(int argc, const char** argv)
                         nang++;
                     }
                 }
+                // 人物の大きさ = 2D検出点の縦の広がり（px）。VNHumanBodyPoseObservation には
+                // boundingBox が無いので自前で求める。前傾すると多少縮むが 0 にはならないし、
+                // 3D側の推定に依存しないので比較の物差しとして使える
+                double ylo = 1e9, yhi = -1e9;
+                for (int k = 0; k < np; k++) {
+                    VNRecognizedPoint* q = [o2 recognizedPointForJointName:pairs[k].j2d error:nil];
+                    if (!q || q.confidence < 0.5f) continue;
+                    const double y = q.y * (double)H;
+                    if (y < ylo) ylo = y;
+                    if (y > yhi) yhi = y;
+                }
+                const double scale = yhi - ylo;
+                if (scale < 20.0) continue;   // 検出点が少なすぎて尺度にならない
+
                 for (int k = 0; k < np; k++) {
                     VNPoint* p3 = [o3 pointInImageForJointName:jn[pairs[k].idx3d] error:nil];
                     VNRecognizedPoint* p2 = [o2 recognizedPointForJointName:pairs[k].j2d error:nil];
@@ -141,7 +159,7 @@ int main(int argc, const char** argv)
                     // 正規化座標のままだと縦横でスケールが違うのでピクセルに直す
                     const double dx = (p3.x - p2.x) * (double)W;
                     const double dy = (p3.y - p2.y) * (double)H;
-                    const double d = sqrt(dx * dx + dy * dy);
+                    const double d = 100.0 * sqrt(dx * dx + dy * dy) / scale;
                     sum[k] += d; cnt[k]++;
                     if (d > worst[k]) worst[k] = d;
                 }
@@ -152,12 +170,12 @@ int main(int argc, const char** argv)
                frames, both, frames ? 100.0 * both / frames : 0.0, W, H);
         if (!both) return 1;
 
-        printf("3D関節を画像に投影した位置と、2D姿勢推定の位置とのズレ（px）\n");
+        printf("3D関節を画像に投影した位置と、2D姿勢推定の位置とのズレ（人物の身長比 %%）\n");
         printf("  %-12s %8s %8s %6s\n", "joint", "mean", "worst", "n");
         double tot = 0; int totn = 0;
         for (int k = 0; k < np; k++) {
             if (!cnt[k]) { printf("  %-12s %8s\n", pairs[k].name, "-"); continue; }
-            printf("  %-12s %8.1f %8.1f %6d\n", pairs[k].name, sum[k] / cnt[k], worst[k], cnt[k]);
+            printf("  %-12s %8.2f %8.2f %6d\n", pairs[k].name, sum[k] / cnt[k], worst[k], cnt[k]);
             tot += sum[k]; totn += cnt[k];
         }
         if (nang) {
@@ -180,7 +198,7 @@ int main(int argc, const char** argv)
         }
         free(pitch); free(htilt); free(armL); free(armR); free(kneeL); free(kneeR);
 
-        printf("\n全関節平均 = %.1f px  ← クリップ比較用の総合スコア（小さいほど画像と整合）\n",
+        printf("\n全関節平均 = %.2f %%（人物の身長比）← クリップ比較用の総合スコア\n",
                totn ? tot / totn : 0.0);
     }
     return 0;
