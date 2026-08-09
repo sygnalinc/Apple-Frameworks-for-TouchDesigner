@@ -90,8 +90,25 @@ real camera's.** Verified: rendering `root` space with the camera driven this wa
 difference 0.0000 over the whole frame). The rotation uses TD's own `Rz·Ry·Rx` order — measured
 against a Camera COMP's `worldTransform` rather than assumed.
 
-`cam:distance` / `cam:azimuth` / `cam:elevation` are the scalars you usually want for driving
-effects — how close the performer is and how far off-axis — without wiring up a Math CHOP.
+**These are relative, not absolute.** `cam:*` describes the camera *in the performer's own frame*,
+and that frame turns with the body — so a locked-off tripod still produces a swinging `cam:ry`.
+That is the point, not a bug:
+
+| Channel | What it actually tells you | Use it for |
+|---|---|---|
+| `cam:ry` | **Which way the performer is facing** relative to the lens. 0 = facing you, ±90 = profile | Trigger on "turns to face the audience", crossfade between front/side looks, drive a spatial-audio pan |
+| `cam:distance` | How far the performer is from the lens (metres, exact only if Camera FOV is set — otherwise still monotonic) | Proximity effects: brightness, reverb, particle density as someone walks in |
+| `cam:azimuth` / `cam:elevation` | Where the performer sits angularly in the frame | Follow-spot, auto-pan, keeping a graphic pinned near them |
+| `cam:rx` | Shooting angle above/below the body. Noisy on hard frames | Rarely; check against `valid` first |
+| `cam:tx,ty,tz` (+ `cam:r*`) | The real camera's pose in `root` space | Only in `root` space: park a TD camera there to match the footage, then orbit away from it |
+
+`cam:ry` was verified against an independent measure — the sign and magnitude track which shoulder
+is nearer the lens, and the on-screen shoulder width collapses to 0.004 when `cam:ry` reaches 65°
+(edge-on). Nothing else in the output gives you facing direction this directly.
+
+Note the redundancy: matching the TD camera with `cam:t*`/`cam:r*` in `root` space produces the
+same picture as `camera` space with the camera at the origin. Reach for the former only when you
+want the body fixed at the origin (easy to orbit) and the camera moving.
 
 ### Why there is no `bodyheight` / `heightestimation`
 
@@ -272,8 +289,24 @@ Select CHOP の `^*cam*` 一発で落とせる（利用例の select4 がそれ�
 **ピクセル単位で完全一致**した（画面全体の平均絶対差 0.0000）。回転は TD の `Rz·Ry·Rx` の順で出している
 （推測ではなく Camera COMP の `worldTransform` と突き合わせて確定した）。
 
-`cam:distance` / `cam:azimuth` / `cam:elevation` は演出を駆動するときに欲しくなるスカラー
-（どれだけ近いか・光軸からどれだけ外れているか）を、Math CHOP を組まずに直接出したもの。
+**これらは絶対量ではなく相対量。** `cam:*` は**演者自身の座標系から見たカメラ**を表していて、
+その座標系は体と一緒に回る。だから三脚で固定していても `cam:ry` は振れる。これは不具合ではなく、
+むしろそこが使いどころ:
+
+| チャンネル | 実際に何が分かるか | 使い道 |
+|---|---|---|
+| `cam:ry` | **演者がレンズに対してどちらを向いているか**（0=正面、±90=真横） | 「客席を向いた」ことをトリガに、正面/横で見せ方を切り替える、音を左右に振る |
+| `cam:distance` | レンズからの距離（Camera FOV を設定すれば実寸。未設定でも単調に変化） | 近づくほど明るく/リバーブを減らす等の近接演出 |
+| `cam:azimuth` / `cam:elevation` | 画面内で角度的にどこにいるか | 追いかけスポット、自動パン、演者の近くに文字を貼り付ける |
+| `cam:rx` | 体を見下ろす/見上げる角度。難しいフレームでは暴れる | 使うなら `valid` と併せて |
+| `cam:tx,ty,tz`（+ `cam:r*`） | 実カメラの `root` 空間での姿勢 | `root` 空間のときだけ。TDカメラを実カメラに合わせ、そこから回り込む用 |
+
+`cam:ry` は独立指標で裏を取ってある。どちらの肩がレンズに近いかと符号・大きさが一致し、
+`cam:ry` が 65° に達すると画面上の肩幅が 0.004 まで潰れる（ほぼ真横）。**向きをこれだけ直接
+取れるチャンネルは他に無い。**
+
+冗長性の注意: `root` 空間で `cam:t*`/`cam:r*` を TDカメラに挿した絵は、`camera` 空間でカメラを
+原点に置いた絵と同じ。前者を選ぶ意味があるのは、**体を原点に固定したまま**カメラを回り込ませたいとき。
 
 ### `bodyheight` / `heightestimation` を出していない理由
 
