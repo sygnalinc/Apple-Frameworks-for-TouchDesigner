@@ -99,6 +99,13 @@ term flips to ±178°. Taking the chest normal (shoulder vector × up) and an `a
 covering the full circle instead — measured +125…+138° on that back-facing clip, −6° when the actor
 faces the lens and ±89…91° when he turns to profile in the same shot.
 
+**`body:facing` flips by ~180° on profile views.** Measured over three clips at 10 fps, adjacent
+frames disagree by more than 90° on **16–18 % of frames**, with jumps as large as 179.6°. A body
+seen exactly side-on has nearly the same silhouette whichever way it faces, so a monocular
+estimator cannot resolve it — this is the data, not a bug in the channel. If you drive something
+visible with it, add a de-flip step (when the value jumps more than 90° between frames, add 180°
+and keep it continuous) or gate on frames where `|body:facing|` is away from 90°.
+
 `body:pitch` and `body:roll` are measured in the performer's **own** frame (right = shoulder
 vector, forward = chest normal), so "bending forward" means the same thing whichever way they are
 facing. Standing still they sit within ±3°; the bow clip reaches +31°.
@@ -279,6 +286,12 @@ Camera COMP を原点・回転0で置けば、実カメラの光軸をそのま�
 向きの情報が2軸に分裂する: 全編ずっと後ろ姿の映像で yaw は −35° 付近のまま動かず、代わりに
 pitch が ±178° に振れた。胸の法線（肩ベクトル × 上方向）を `atan2` すれば1本の角度で全周を
 表せる。実測で 後ろ姿 +125〜138°、同一ショット内で 正面 −6° / 真横 ±89〜91°。
+
+**`body:facing` は横向き付近で約180度反転する。** 3クリップを 10fps で測ると、隣接フレームで
+90度を超える飛びが **16〜18%** のフレームで起き、最大 179.6度。真横のシルエットは前後で
+ほとんど同じなので、単眼では原理的に解けない。チャンネルの不具合ではなくデータがそうなっている。
+見えるものを駆動するなら、**飛んだら180度足して連続にする**後処理を入れるか、
+`|body:facing|` が 90度から離れたフレームだけを使う。
 
 `body:pitch` / `body:roll` は**演者自身の枠**（right=肩ベクトル、forward=胸の法線）で測るので、
 どちらを向いていても「前に曲げた」が同じ意味になる。直立時は ±3° 以内、お辞儀の素材で +31°。
