@@ -1,4 +1,95 @@
-# Image Gen TOP — text2img / img2img（macOS / Core ML 画像生成）
+# CoreML ImageGen TOP — text2img / img2img
+
+**English** | [日本語](#日本語)
+
+## English
+
+A custom TOP that runs **text2img / img2img inside TD** using an **external Core ML image
+generation model** (Stable Diffusion and friends). The current backend is Apple's
+[ml-stable-diffusion](https://github.com/apple/ml-stable-diffusion) (SD 2.x / SDXL, detected
+automatically from the model folder — by the presence of `TextEncoder2.mlmodelc`). Inference
+lives in a helper dylib so **other Core ML generative models** can be added later on the helper
+side.
+
+> Consistent with the rule that **CoreML operators use external models**. Apple's built-in
+> [Image Playground](../ImagePlayground/), which needs no external model, is a **separate TOP**
+> (`ImagePlayground`).
+
+Measured (M2 / SD 2.1 base split_einsum / 15 steps / CPU+ANE):
+**text2img 7.6 s, img2img 4.5 s**. Loading the model (the first ANE compile) takes about 2
+minutes.
+
+### Backends
+
+| Backend | Description | Measured (M2) |
+|---|---|---|
+| **Stable Diffusion (Core ML)** | ml-stable-diffusion. Point Model Folder at SD 2.x / SDXL / SD Turbo (auto-detected) | Turbo 1 step **0.8 s** / SD2.1 15 steps 7.6 s |
+
+Strength only applies when Image to Image is on.
+
+### Usage
+
+1. Point `Model Folder` at a Core ML SD model folder (the level that directly contains
+   `TextEncoder.mlmodelc`, `UnetChunk*.mlmodelc`, `VAEDecoder.mlmodelc`, …). Get models from
+   `apple/coreml-stable-diffusion-*` on Hugging Face and put them in `models/` — **models are not
+   part of this repository**
+2. Wait for the Info DAT status to read `ready (SD)` / `ready (SDXL)`
+3. Write a `Prompt` and pulse `Generate` — the output texture is replaced when it finishes
+4. **img2img**: connect an input TOP and turn on `Image to Image`. `Strength` controls fidelity
+   to the source (lower = closer to the original). The input is resized to the model's sample
+   size (512/1024) automatically
+
+### Real-time generation with SD Turbo
+
+Combine [SD Turbo](https://huggingface.co/apple/coreml-sd-turbo) (a 1-to-few-step distilled
+model) with **Continuous Generate** and continuous generation becomes real-time conversion:
+
+1. Point `Model Folder` at the Core ML SD Turbo model (standard SD layout — auto-detected as the
+   SD pipeline)
+2. **`Steps` = 1–2, `Guidance Scale` = 1.0** — Turbo is meant to run with CFG disabled. This
+   pipeline's CFG formula is `neg + g×(pos−neg)`, so **g = 1.0 means "prompt only"** (setting it
+   to 0 makes the prompt be ignored)
+3. Turn on `Continuous Generate` — as soon as one generation finishes it **regenerates with the
+   latest input frame and parameters** (no Generate pulse needed)
+4. For live video conversion turn on `Image to Image`. With Turbo, start tuning around
+   `Steps = 2 × Strength = 0.5` (one effective step)
+
+A fixed Seed keeps consecutive frames visually stable; -1 (random) changes them every frame.
+
+### Parameters
+
+| Parameter | Default | Description |
+|---|---|---|
+| Model Folder | — | Folder of the (external) Core ML generative model |
+| Compute Units | CPU + Neural Engine | ANE is recommended for split_einsum; use CPU+GPU for ORIGINAL conversions |
+| Prompt / Negative Prompt | — | Prompts |
+| Steps | 15 | Sampling steps (the scheduler is DPM-Solver++) |
+| Guidance Scale | 7.5 | Prompt fidelity |
+| Seed (-1 = Random) | -1 | Random seed. -1 randomises each run (the seed used appears in status) |
+| Image to Image (Input 0) | Off | Use the input TOP as the initial image |
+| Img2img Strength | 0.6 | Noise amount (1.0 is effectively text2img) |
+| Generate | — | Run generation (pulses during busy are ignored) |
+| Continuous Generate | Off | Always regenerate as soon as the previous run finishes (real-time mode) |
+| Flip Output Vertically | On | Match TD's bottom-up textures |
+
+Info CHOP: `busy / step / steps / gen_seconds / image_serial / executes` (usable for a progress
+bar). Info DAT: `status` (loading model / ready / generating / done (7.6s, seed 4242) / error…).
+
+### Notes
+
+- Generation is asynchronous; TD's frames keep running. A Generate pulse during busy is ignored
+- The first model load is especially slow (ANE compile). Parameters respond while loading but
+  generation is unavailable
+- The Swift helper (`helper/`, builds ml-stable-diffusion via SPM) ships as
+  `libImageGenHelper.dylib`
+
+### Build
+
+```
+./build.sh    # swift build of the helper → the plugin → the bundle (needs network the first time)
+```
+
+## 日本語
 
 **外部の Core ML 画像生成モデル**（Stable Diffusion 等）で **TD 内から text2img / img2img**
 する カスタム TOP。現行バックエンドは Apple 公式
@@ -13,7 +104,7 @@
 実測（M2 / SD 2.1 base split_einsum / 15 steps / CPU+ANE）:
 **text2img 7.6秒・img2img 4.5秒**。モデルロード（初回のANEコンパイル）は約2分。
 
-## バックエンド
+### バックエンド
 
 | Backend | 内容 | 実測(M2) |
 |---|---|---|
@@ -21,7 +112,7 @@
 
 Strength は Image to Image オン時のみ有効。
 
-## 使い方
+### 使い方
 
 1. `Model Folder` に Core ML SD モデルのフォルダを指定
    （`TextEncoder.mlmodelc` `UnetChunk*.mlmodelc` `VAEDecoder.mlmodelc` 等が直下にある階層。
@@ -32,7 +123,7 @@ Strength は Image to Image オン時のみ有効。
 4. **img2img**: 入力 TOP を接続し `Image to Image` をオン。`Strength` で元画像への忠実度
    （小さいほど元画像寄り）。入力はモデルのサンプルサイズ（512/1024）へ自動リサイズ
 
-## SD Turbo でリアルタイム生成/変換
+### SD Turbo でリアルタイム生成/変換
 
 [SD Turbo](https://huggingface.co/apple/coreml-sd-turbo)（1〜数ステップの蒸留モデル）と
 **Continuous Generate** を組み合わせると、連続生成＝リアルタイム変換になる:
@@ -48,7 +139,7 @@ Strength は Image to Image オン時のみ有効。
 
 Seed は固定値にすると連続フレームの見た目が安定し、-1（ランダム）だと毎フレーム変化する。
 
-## パラメータ
+### パラメータ
 
 | パラメータ | 既定 | 内容 |
 |---|---|---|
@@ -67,13 +158,13 @@ Seed は固定値にすると連続フレームの見た目が安定し、-1（�
 Info CHOP: `busy / step / steps / gen_seconds / image_serial / executes`（進捗バー等に使える）。
 Info DAT: `status`（loading model / ready / generating / done (7.6s, seed 4242) / error...）。
 
-## 注意
+### 注意
 
 - 生成は非同期で TD のフレームは止まらない。busy 中の Generate は無視される
 - モデルロードは初回が特に遅い（ANE コンパイル）。ロード完了までパラメータは効くが生成不可
 - Swift ヘルパ（helper/ ・SPMで ml-stable-diffusion をビルド）を `libImageGenHelper.dylib` として同梱
 
-## ビルド
+### ビルド
 
 ```
 ./build.sh    # helper の swift build → plugin本体 → bundle（要ネットワーク初回のみ）
