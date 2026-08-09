@@ -36,17 +36,18 @@ Things that do **not** help (all measured on M2):
 | An IOSurface-backed pixel buffer | No difference (158 ms either way) |
 | A different request revision | Only revision 1 exists |
 
-### Output channels (97)
+### Output channels (98)
 
 | Channel | Description |
 |---|---|
 | `valid` | Whether a person was detected (1/0) |
 | `bodyheight` | Estimated height (metres) |
-| `heightestimation` | 0 = reference (estimated from a default height) / 1 = measured (real, when depth such as LiDAR is available) |
+| `heightestimation` | 0 = reference / 1 = measured — see below. **With a TOP input this is always 0** |
 | `cam:tx,ty,tz` | Camera position in the person's root space (metres) |
 | `cam:rx,ry,rz` | Camera rotation in **degrees, ready to drop into a TD Camera COMP** |
 | `cam:distance` | Lens-to-hips distance (metres) |
 | `cam:azimuth` / `cam:elevation` | How far off the lens axis the hips sit (degrees; + is right / up) |
+| `cam:fov` | The horizontal field of view Vision itself assumes (degrees) — drop it into a Camera COMP's FOV Angle and the 3D skeleton lands on the source video |
 | `{joint}:tx,ty,tz` | Joint 3D position (metres, y up; origin set by **Coordinate Space**) |
 | `{joint}:u,v` | The joint's 2D projection into the input image (0–1, bottom-left origin) |
 
@@ -93,6 +94,43 @@ against a Camera COMP's `worldTransform` rather than assumed.
 
 `cam:distance` / `cam:azimuth` / `cam:elevation` are the scalars you usually want for driving
 effects — how close the performer is and how far off-axis — without wiring up a Math CHOP.
+
+### `bodyheight` and `heightestimation` — read this before trusting the metres
+
+`heightestimation` reports how the scale was obtained: `measured` (1) means **LiDAR depth** was
+available and `bodyheight` is the person's real height; `reference` (0) means no depth was present,
+so Vision **assumes 1.8 m**.
+
+A TOP carries colour only, so **this operator always reports `reference`, and `bodyheight` is a
+constant 1.8000** (measured across every frame of the sample clips). It tells you nothing about the
+performer.
+
+The consequence matters: **every metre value is scaled by that 1.8 m assumption.** For a 1.65 m
+dancer, limb lengths and `cam:distance` all come out about 9 % too large. Ratios, directions and
+angles are unaffected — so `cam:azimuth`, `cam:elevation` and anything normalised stay trustworthy,
+while absolute distances should be treated as "1.8 m-relative" units.
+
+(`top_head:ty - left_ankle:ty` also varies frame to frame, from 1.30 to 1.74 in the sample. That is
+the pose changing — bent or split legs — not the height estimate moving.)
+
+### Overlaying the skeleton on the source video
+
+The example (`demo.toe`, `/project1/VisionPose3D`) renders the skeleton over the footage. Three
+settings, no manual tweaking:
+
+| | Value |
+|---|---|
+| Coordinate Space | `camera` |
+| Camera COMP transform | position `(0, 0, 0)`, rotation `(0, 0, 0)` |
+| Camera COMP FOV Angle | `cam:fov` (98.82° for these clips) |
+
+Common mistakes: putting `cam:distance` into the camera's `tz` (it is a scalar distance, not a
+position), and driving the camera with `cam:rx/ry/rz` while in `camera` space (the joints are
+already expressed from the lens, so the rotation gets applied twice). `cam:t*` / `cam:r*` are for
+`root` space.
+
+Expect the overlay to trail by a frame or two on fast movement — analysis runs at 6–9 Hz, so a
+split leap will be caught slightly late.
 
 ### Parameters
 
@@ -161,17 +199,18 @@ TD 側のフレームレートは落ちず、チャンネル値が毎秒数回�
 | IOSurface 付きのピクセルバッファ | 差なし（どちらも158ms） |
 | 別のリビジョン | revision 1 しか存在しない |
 
-### 出力チャンネル（97ch）
+### 出力チャンネル（98ch）
 
 | チャンネル | 内容 |
 |---|---|
 | `valid` | 検出できたか（1/0） |
 | `bodyheight` | 推定身長（メートル） |
-| `heightestimation` | 0=reference（既定身長から推定）/ 1=measured（実測。LiDAR等の深度がある場合） |
+| `heightestimation` | 0=reference / 1=measured（下記参照）。**TOP 入力では常に 0** |
 | `cam:tx,ty,tz` | カメラ位置（人物 root 基準・メートル） |
 | `cam:rx,ry,rz` | カメラ回転（**度・TD Camera COMP にそのまま挿せる**） |
 | `cam:distance` | レンズ〜腰の距離（メートル） |
 | `cam:azimuth` / `cam:elevation` | 腰がレンズ光軸から何度ずれているか（度・+右 / +上） |
+| `cam:fov` | Vision が内部で想定している水平画角（度）。Camera COMP の FOV Angle に入れると3D骨格が元映像に重なる |
 | `{joint}:tx,ty,tz` | 関節の3D位置（メートル・y上向き・原点は **Coordinate Space** で決まる） |
 | `{joint}:u,v` | 関節の入力画像への2D投影（0〜1・左下原点） |
 
@@ -214,6 +253,40 @@ Select CHOP の `^*cam*` 一発で落とせる（利用例の select4 がそれ�
 
 `cam:distance` / `cam:azimuth` / `cam:elevation` は演出を駆動するときに欲しくなるスカラー
 （どれだけ近いか・光軸からどれだけ外れているか）を、Math CHOP を組まずに直接出したもの。
+
+### `bodyheight` と `heightestimation` — メートル値を信じる前に
+
+`heightestimation` はスケールの出どころを示す。`measured`(1) は **LiDAR の深度**が使えた場合で、
+`bodyheight` は本人の実身長。`reference`(0) は深度が無かった場合で、Vision は **1.8m と仮定**する。
+
+TOP は色情報しか運ばないので、**このオペレータは常に `reference` を返し、`bodyheight` は
+定数 1.8000**（サンプル映像の全フレームで実測）。演者について何も教えてくれない。
+
+効いてくるのはここ: **メートル値はすべてこの 1.8m 仮定でスケールされている。** 身長 1.65m の
+ダンサーなら、手足の長さも `cam:distance` も約 9% 大きく出る。比・向き・角度は影響を受けないので、
+`cam:azimuth` / `cam:elevation` や正規化した量はそのまま信用してよい。絶対距離は
+「1.8m を基準とした単位」と考える。
+
+（`top_head:ty - left_ankle:ty` もサンプルで 1.30〜1.74 と動くが、これは脚を曲げたり開いたりする
+ポーズの変化であって、身長推定が揺れているわけではない。）
+
+### 骨格を元映像に重ねる
+
+利用例（`demo.toe` の `/project1/VisionPose3D`）は骨格を映像の上にレンダしている。
+手で合わせる必要はなく、設定は3つだけ:
+
+| | 値 |
+|---|---|
+| Coordinate Space | `camera` |
+| Camera COMP の位置・回転 | 位置 `(0, 0, 0)`・回転 `(0, 0, 0)` |
+| Camera COMP の FOV Angle | `cam:fov`（この素材で 98.82°） |
+
+やりがちな誤り: `cam:distance` をカメラの `tz` に入れる（あれは位置ではなくスカラーの距離）、
+`camera` 空間のままカメラを `cam:rx/ry/rz` で回す（関節が既にレンズ基準なので二重に効く）。
+`cam:t*` / `cam:r*` を使うのは `root` 空間のとき。
+
+速い動きでは重なりが1〜2フレーム遅れる。解析が毎秒6〜9回なので、スプリットリープのような
+一瞬の姿勢は少し遅れて出る。
 
 ### パラメータ
 

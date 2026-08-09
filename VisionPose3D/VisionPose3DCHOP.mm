@@ -4,7 +4,7 @@
 // （VNDetectHumanBodyPose3DRequest・macOS 14+・17関節）を推定して出力する。
 // 2D複数人の VisionPose CHOP と対になる、単一人物・3D版。
 //
-// 出力チャンネル（97ch・1サンプル）:
+// 出力チャンネル（98ch・1サンプル）:
 //   valid                     検出できたか（1/0）
 //   bodyheight                推定身長（メートル）
 //   heightestimation          0=reference（既定身長で推定）/ 1=measured（実測）
@@ -12,6 +12,8 @@
 //   cam:rx,ry,rz              カメラ回転（度・TD Camera COMP にそのまま入る）
 //   cam:distance              レンズ〜腰の距離（メートル）
 //   cam:azimuth,elevation     腰がレンズ光軸から何度ずれているか（度・+右 / +上）
+//   cam:fov                   Vision の水平画角（度）。TD Camera COMP の FOV Angle に入れると
+//                             3D骨格が元映像にそのまま重なる（実測 98.824°・全フレーム一定）
 //   {joint}:tx,ty,tz          17関節の3D位置（Space パラメータ基準・メートル・y上向き）
 //   {joint}:u,v               17関節の入力画像への2D投影（0〜1・左下原点）
 //
@@ -67,6 +69,7 @@ static const char* kFixedNames[] = {
     "cam:rx", "cam:ry", "cam:rz",          // カメラ回転（度・TD Camera COMP にそのまま入る）
     "cam:distance",                        // レンズ〜腰の距離（メートル）
     "cam:azimuth", "cam:elevation",        // 腰がレンズ光軸から何度ずれているか（度）
+    "cam:fov",                             // Vision が内部で使っている水平画角（度）
 };
 constexpr int kFixedChans = (int)(sizeof(kFixedNames) / sizeof(kFixedNames[0]));
 
@@ -133,10 +136,11 @@ public:
             myWorker.join();
     }
 
-    // cam:* の9ch（位置3・回転3・distance/azimuth/elevation）を埋める。
+    // cam:* の10ch（位置3・回転3・distance/azimuth/elevation・fov）を埋める。
     // M は model→camera なので、カメラの姿勢は inverse(M) 側に出る。
-    static void fillCameraChannels(const simd_float4x4& M, float* out)
+    static void fillCameraChannels(const Pose3D& pose, float* out)
     {
+        const simd_float4x4& M = pose.toCamera;
         // 腰をレンズから見た位置（= M * 原点）。被写体は -Z 側
         const simd_float3 s = simd_make_float3(M.columns[3].x, M.columns[3].y, M.columns[3].z);
 
@@ -165,6 +169,23 @@ public:
         out[6] = dist;
         out[7] = azimuth;
         out[8] = elevation;
+
+        // Vision が内部で使っている画角。u = 0.5 + fx*(x/-z) が厳密に成り立つので
+        // （残差 0.00000 を実測済み）、原点を通る最小二乗で fx を逆算して角度に直す。
+        // これを TD Camera COMP の FOV Angle に入れると、3D骨格が元映像にそのまま重なる
+        double num = 0.0, den = 0.0;
+        for (int j = 0; j < kNumJoints; j++) {
+            const simd_float4 c = simd_mul(M, simd_make_float4(pose.joints[j][0],
+                                                               pose.joints[j][1],
+                                                               pose.joints[j][2], 1.0f));
+            if (fabsf(c.z) < 1e-6f)
+                continue;
+            const double ratio = c.x / -c.z;
+            num += (pose.joints[j][3] - 0.5) * ratio;
+            den += ratio * ratio;
+        }
+        // den が小さい＝全関節が光軸上に並んでいて画角を決められない（レバー比が無い）
+        out[9] = (den > 1e-9) ? (float)(2.0 * atan(0.5 / (num / den)) * 180.0 / M_PI) : 0.0f;
     }
 
     void getGeneralInfo(CHOP_GeneralInfo* ginfo, const OP_Inputs*, void*) override
@@ -235,7 +256,7 @@ public:
         fixed[1] = on ? pose.bodyHeight : 0.0f;
         fixed[2] = on ? pose.heightMeasured : 0.0f;
         if (on)
-            fillCameraChannels(pose.toCamera, fixed + 3);
+            fillCameraChannels(pose, fixed + 3);
         for (int i = 0; i < kFixedChans; i++)
             output->channels[i][0] = fixed[i];
         for (int j = 0; j < kNumJoints; j++) {
