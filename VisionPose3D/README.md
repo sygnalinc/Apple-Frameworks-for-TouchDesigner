@@ -36,18 +36,16 @@ Things that do **not** help (all measured on M2):
 | An IOSurface-backed pixel buffer | No difference (158 ms either way) |
 | A different request revision | Only revision 1 exists |
 
-### Output channels (98)
+### Output channels (96)
 
 | Channel | Description |
 |---|---|
 | `valid` | Whether a person was detected (1/0) |
-| `bodyheight` | Estimated height (metres) |
-| `heightestimation` | 0 = reference / 1 = measured — see below. **With a TOP input this is always 0** |
 | `cam:tx,ty,tz` | Camera position in the person's root space (metres) |
 | `cam:rx,ry,rz` | Camera rotation in **degrees, ready to drop into a TD Camera COMP** |
 | `cam:distance` | Lens-to-hips distance (metres) |
 | `cam:azimuth` / `cam:elevation` | How far off the lens axis the hips sit (degrees; + is right / up) |
-| `cam:fov` | The horizontal field of view Vision itself assumes (degrees) — drop it into a Camera COMP's FOV Angle and the 3D skeleton lands on the source video |
+| `cam:fov` | The horizontal FOV the reconstruction used (degrees) — drop it into a Camera COMP's FOV Angle and the 3D skeleton lands on the source video |
 | `{joint}:tx,ty,tz` | Joint 3D position (metres, y up; origin set by **Coordinate Space**) |
 | `{joint}:u,v` | The joint's 2D projection into the input image (0–1, bottom-left origin) |
 
@@ -95,23 +93,23 @@ against a Camera COMP's `worldTransform` rather than assumed.
 `cam:distance` / `cam:azimuth` / `cam:elevation` are the scalars you usually want for driving
 effects — how close the performer is and how far off-axis — without wiring up a Math CHOP.
 
-### `bodyheight` and `heightestimation` — read this before trusting the metres
+### Why there is no `bodyheight` / `heightestimation`
 
-`heightestimation` reports how the scale was obtained: `measured` (1) means **LiDAR depth** was
-available and `bodyheight` is the person's real height; `reference` (0) means no depth was present,
-so Vision **assumes 1.8 m**.
+Vision can report a person's real height — but only when depth is available
+(`heightEstimation == measured`, from LiDAR). Depth reaches Vision through
+`initWithCVPixelBuffer:depthData:orientation:options:`, and **a TOP carries colour only**, so this
+operator always lands in `reference` mode, where Vision simply assumes 1.8 m. Measured across
+7 clips and 44 detections: `measured` never once, `bodyHeight` exactly 1.8000 every time. A channel
+that can only ever hold one value is noise, so both were removed.
 
-A TOP carries colour only, so **this operator always reports `reference`, and `bodyheight` is a
-constant 1.8000** (measured across every frame of the sample clips). It tells you nothing about the
-performer.
+This is a limitation of the *input*, not of the Mac: that initialiser is
+`API_AVAILABLE(macos 14.0)`, so feeding depth on macOS is possible — it would need an input path
+that carries depth and camera intrinsics, which a TOP does not.
 
-The consequence matters: **every metre value is scaled by that 1.8 m assumption.** For a 1.65 m
-dancer, limb lengths and `cam:distance` all come out about 9 % too large. Ratios, directions and
-angles are unaffected — so `cam:azimuth`, `cam:elevation` and anything normalised stay trustworthy,
-while absolute distances should be treated as "1.8 m-relative" units.
-
-(`top_head:ty - left_ankle:ty` also varies frame to frame, from 1.30 to 1.74 in the sample. That is
-the pose changing — bent or split legs — not the height estimate moving.)
+**What this means for the metres you do get:** every distance is scaled by the 1.8 m assumption.
+For a 1.65 m performer, `cam:distance` and the joint positions all come out about 9 % too large.
+Ratios, directions and angles are unaffected, so `cam:azimuth`, `cam:elevation` and anything
+normalised stay trustworthy — treat absolute distances as "1.8 m-relative" units.
 
 ### Overlaying the skeleton on the source video
 
@@ -132,12 +130,37 @@ already expressed from the lens, so the rotation gets applied twice). `cam:t*` /
 Expect the overlay to trail by a frame or two on fast movement — analysis runs at 6–9 Hz, so a
 split leap will be caught slightly late.
 
+### Camera FOV — set this if you care about distances
+
+Left at 0, Vision assumes a **horizontal FOV of 98.824°** — a very wide lens. That number is not
+estimated from the footage: it comes out identical on all 8 clips measured here, across both
+1280x720 and 1920x1080 and completely different framings. It is a fixed assumption.
+
+Give the operator the real lens angle and it passes proper intrinsics
+(`VNImageOptionCameraIntrinsics`) to Vision, which honours them. Same frame, in TouchDesigner:
+
+| Camera FOV | `cam:distance` |
+|---|---|
+| 0 (Vision's 98.8° assumption) | 2.8 m |
+| 120° | 2.05 m |
+| 70° | 5.14 m |
+| 40° | 8.54 m |
+
+**The pose itself does not change.** Joint positions in `root` space are bit-identical at every
+FOV — Vision estimates the body independently of the lens. What the FOV fixes is *where the body
+is placed relative to the camera*: `cam:distance`, `cam:tx/ty/tz`, `cam:rx/ry/rz`, and all
+`camera`-space joint coordinates.
+
+So: leave it at 0 if you only use the skeleton's shape. Set it if you use distances, camera-space
+positions, or want the overlay to match a narrow lens.
+
 ### Parameters
 
 | Parameter | Default | Description |
 |---|---|---|
 | TOP | — | Path of the TOP to analyse |
 | Active | On | Enable/disable analysis |
+| Camera FOV (deg, 0 = auto) | 0 | Horizontal FOV of the real lens. 0 leaves Vision's own assumption — see below |
 | Coordinate Space | root | Origin for `{joint}:tx,ty,tz` — see above |
 | Flip Image Vertically | **On** | TD's TOP download is upside down (bottom-up), so this defaults to On |
 
@@ -199,18 +222,16 @@ TD 側のフレームレートは落ちず、チャンネル値が毎秒数回�
 | IOSurface 付きのピクセルバッファ | 差なし（どちらも158ms） |
 | 別のリビジョン | revision 1 しか存在しない |
 
-### 出力チャンネル（98ch）
+### 出力チャンネル（96ch）
 
 | チャンネル | 内容 |
 |---|---|
 | `valid` | 検出できたか（1/0） |
-| `bodyheight` | 推定身長（メートル） |
-| `heightestimation` | 0=reference / 1=measured（下記参照）。**TOP 入力では常に 0** |
 | `cam:tx,ty,tz` | カメラ位置（人物 root 基準・メートル） |
 | `cam:rx,ry,rz` | カメラ回転（**度・TD Camera COMP にそのまま挿せる**） |
 | `cam:distance` | レンズ〜腰の距離（メートル） |
 | `cam:azimuth` / `cam:elevation` | 腰がレンズ光軸から何度ずれているか（度・+右 / +上） |
-| `cam:fov` | Vision が内部で想定している水平画角（度）。Camera COMP の FOV Angle に入れると3D骨格が元映像に重なる |
+| `cam:fov` | 再構成に使われた水平画角（度）。Camera COMP の FOV Angle に入れると3D骨格が元映像に重なる |
 | `{joint}:tx,ty,tz` | 関節の3D位置（メートル・y上向き・原点は **Coordinate Space** で決まる） |
 | `{joint}:u,v` | 関節の入力画像への2D投影（0〜1・左下原点） |
 
@@ -254,21 +275,22 @@ Select CHOP の `^*cam*` 一発で落とせる（利用例の select4 がそれ�
 `cam:distance` / `cam:azimuth` / `cam:elevation` は演出を駆動するときに欲しくなるスカラー
 （どれだけ近いか・光軸からどれだけ外れているか）を、Math CHOP を組まずに直接出したもの。
 
-### `bodyheight` と `heightestimation` — メートル値を信じる前に
+### `bodyheight` / `heightestimation` を出していない理由
 
-`heightestimation` はスケールの出どころを示す。`measured`(1) は **LiDAR の深度**が使えた場合で、
-`bodyheight` は本人の実身長。`reference`(0) は深度が無かった場合で、Vision は **1.8m と仮定**する。
+Vision は実身長を返せる（`heightEstimation == measured`）が、それは**深度がある場合だけ**。
+深度は `initWithCVPixelBuffer:depthData:orientation:options:` で渡すもので、**TOP は色しか
+運ばない**ため、このオペレータは必ず `reference`（＝Vision が 1.8m と仮定するモード）になる。
+7クリップ・44検出で実測したところ **measured は一度も出ず、bodyHeight は毎回きっかり 1.8000**。
+1つの値しか取り得ないチャンネルはノイズなので両方削除した。
 
-TOP は色情報しか運ばないので、**このオペレータは常に `reference` を返し、`bodyheight` は
-定数 1.8000**（サンプル映像の全フレームで実測）。演者について何も教えてくれない。
+**これは Mac の制約ではなく入力の制約。** 上記の初期化子は `API_AVAILABLE(macos 14.0)` なので
+macOS でも深度を渡すこと自体はできる。やるなら深度とカメラ内部パラメータを運ぶ入力経路が要る
+（TOP にはそれが無い）。
 
-効いてくるのはここ: **メートル値はすべてこの 1.8m 仮定でスケールされている。** 身長 1.65m の
-ダンサーなら、手足の長さも `cam:distance` も約 9% 大きく出る。比・向き・角度は影響を受けないので、
+**得られるメートル値への影響:** 距離はすべて 1.8m 仮定でスケールされている。身長 1.65m の
+演者なら `cam:distance` も関節位置も約 9% 大きく出る。比・向き・角度は影響を受けないので
 `cam:azimuth` / `cam:elevation` や正規化した量はそのまま信用してよい。絶対距離は
 「1.8m を基準とした単位」と考える。
-
-（`top_head:ty - left_ankle:ty` もサンプルで 1.30〜1.74 と動くが、これは脚を曲げたり開いたりする
-ポーズの変化であって、身長推定が揺れているわけではない。）
 
 ### 骨格を元映像に重ねる
 
@@ -288,12 +310,36 @@ TOP は色情報しか運ばないので、**このオペレータは常に `ref
 速い動きでは重なりが1〜2フレーム遅れる。解析が毎秒6〜9回なので、スプリットリープのような
 一瞬の姿勢は少し遅れて出る。
 
+### Camera FOV — 距離を使うなら設定する
+
+0 のままだと Vision は**水平画角 98.824° の広角**を仮定する。これは映像から推定した値ではなく、
+ここで測った8クリップすべて（1280x720 と 1920x1080、画角もフレーミングもばらばら）で
+まったく同じ値が出る**固定の仮定**。
+
+実カメラの画角を渡すと、`VNImageOptionCameraIntrinsics` として Vision に伝わり、
+Vision はそれを尊重する。TouchDesigner 上で同一フレームを測った結果:
+
+| Camera FOV | `cam:distance` |
+|---|---|
+| 0（Vision の 98.8° 仮定） | 2.8 m |
+| 120° | 2.05 m |
+| 70° | 5.14 m |
+| 40° | 8.54 m |
+
+**姿勢そのものは変わらない。** `root` 空間の関節座標は画角を変えても完全に同一で、Vision は
+レンズと無関係に体の形を推定している。画角が効くのは**体をカメラに対してどこに置くか**、
+つまり `cam:distance` / `cam:tx,ty,tz` / `cam:rx,ry,rz` と `camera` 空間の関節座標だけ。
+
+骨格の形しか使わないなら 0 のままでよい。距離やカメラ基準の座標を使うなら、あるいは望遠寄りの
+レンズで撮った映像に重ねたいなら設定する。
+
 ### パラメータ
 
 | パラメータ | 既定 | 内容 |
 |---|---|---|
 | TOP | — | 解析する映像の TOP パス |
 | Active | On | 解析の有効/無効 |
+| Camera FOV (deg, 0 = auto) | 0 | 実カメラの水平画角。0 なら Vision の仮定のまま。下記参照 |
 | Coordinate Space | root | `{joint}:tx,ty,tz` の原点。上記参照 |
 | Flip Image Vertically | **On** | TD の TOP ダウンロードは上下逆（bottom-up）のため既定 On |
 

@@ -4,16 +4,16 @@
 // （VNDetectHumanBodyPose3DRequest・macOS 14+・17関節）を推定して出力する。
 // 2D複数人の VisionPose CHOP と対になる、単一人物・3D版。
 //
-// 出力チャンネル（98ch・1サンプル）:
+// 出力チャンネル（96ch・1サンプル）:
 //   valid                     検出できたか（1/0）
-//   bodyheight                推定身長（メートル）
-//   heightestimation          0=reference（既定身長で推定）/ 1=measured（実測）
 //   cam:tx,ty,tz              カメラ位置（人物 root 基準・メートル）
 //   cam:rx,ry,rz              カメラ回転（度・TD Camera COMP にそのまま入る）
 //   cam:distance              レンズ〜腰の距離（メートル）
 //   cam:azimuth,elevation     腰がレンズ光軸から何度ずれているか（度・+右 / +上）
-//   cam:fov                   Vision の水平画角（度）。TD Camera COMP の FOV Angle に入れると
-//                             3D骨格が元映像にそのまま重なる（実測 98.824°・全フレーム一定）
+//   cam:fov                   3D再構成に使われた水平画角（度）。TD Camera COMP の FOV Angle に
+//                             入れると3D骨格が元映像にそのまま重なる。Camera FOV パラメータが
+//                             0 なら Vision の既定 98.824°（8クリップ・解像度違いでも常に同値＝
+//                             実カメラの画角を推定しているわけではない固定の仮定）
 //   {joint}:tx,ty,tz          17関節の3D位置（Space パラメータ基準・メートル・y上向き）
 //   {joint}:u,v               17関節の入力画像への2D投影（0〜1・左下原点）
 //
@@ -33,6 +33,14 @@
 //   **残差 0.00000（正規化画像座標）** で一致する。対して inverse(M) は 0.0266、
 //   平行移動を引くだけは 0.0131 の残差が残る。
 //   カメラ空間は -Z が前方（TD のカメラと同じ向き）なので、被写体は -Z 側に来る。
+//
+// bodyHeight / heightEstimation を出していない理由:
+//   Vision は深度があれば実身長を返す（heightEstimation = measured）が、**深度は
+//   `initWithCVPixelBuffer:depthData:...` で渡すもので、TOP は色しか運ばない**。
+//   そのためこのオペレータでは永久に reference = 1.8m 固定になる（7クリップ44検出で
+//   measured=0・bodyHeight=1.8000 を実測）。常に同じ値しか出ないチャンネルは出さない。
+//   なお macOS でも深度入力自体は可能（上記 init は macos 14.0+）なので、深度を運ぶ
+//   入力経路を足せば measured にできる。「Macだから無理」ではなく「TOP入力だから無理」
 //
 // 実装: cook のたびに TOP を非同期ダウンロードし、ワーカースレッドが
 // Vision 推定 → 結果を保存。cook は最新結果を出力するだけ（1〜2フレーム遅れ）。
@@ -64,7 +72,7 @@ constexpr int kNumJoints = 17;
 // 関節以外の固定チャンネル。カメラ系は全て "cam:" 始まりにしてあるので、
 // 関節だけ欲しいときは Select CHOP の `^*cam*` 一発で落とせる
 static const char* kFixedNames[] = {
-    "valid", "bodyheight", "heightestimation",
+    "valid",
     "cam:tx", "cam:ty", "cam:tz",          // カメラ位置（人物 root 基準）
     "cam:rx", "cam:ry", "cam:rz",          // カメラ回転（度・TD Camera COMP にそのまま入る）
     "cam:distance",                        // レンズ〜腰の距離（メートル）
@@ -109,8 +117,6 @@ static VNHumanBodyPose3DObservationJointName JointKey(int i)
 struct Pose3D
 {
     bool valid = false;
-    float bodyHeight = 0;
-    float heightMeasured = 0;      // 1=measured / 0=reference
     float joints[kNumJoints][5] = {};   // tx, ty, tz（root 基準）, u, v
     // model（root 基準）→ カメラ基準 に移す行列（= cameraOriginMatrix そのもの）。
     // Space=camera のときだけ使う
@@ -221,6 +227,11 @@ public:
         myExecCount++;
         const bool active = inputs->getParInt("Active") != 0;
         myFlip = inputs->getParInt("Flip") != 0;
+        const float fov = (float)inputs->getParDouble("Fov");
+        if (fov != myFov.load()) {
+            myFov = fov;
+            myLastCookSeen = -1;      // 静止画入力でも撮り直させる
+        }
         const OP_TOPInput* top = inputs->getParTOP("Top");
 
         if (active && top && top->totalCooks != myLastCookSeen) {
@@ -253,10 +264,8 @@ public:
         const bool on = active && pose.valid;
         float fixed[kFixedChans] = {};
         fixed[0] = on ? 1.0f : 0.0f;
-        fixed[1] = on ? pose.bodyHeight : 0.0f;
-        fixed[2] = on ? pose.heightMeasured : 0.0f;
         if (on)
-            fillCameraChannels(pose, fixed + 3);
+            fillCameraChannels(pose, fixed + 1);
         for (int i = 0; i < kFixedChans; i++)
             output->channels[i][0] = fixed[i];
         for (int j = 0; j < kNumJoints; j++) {
@@ -289,6 +298,17 @@ public:
             p.page = "Vision Pose 3D";
             p.defaultValues[0] = 1;
             manager->appendToggle(p);
+        }
+        {
+            // 実カメラの水平画角。0 なら Vision の既定（98.8度の広角仮定）のまま
+            OP_NumericParameter p("Fov");
+            p.label = "Camera FOV (deg, 0 = auto)";
+            p.page = "Vision Pose 3D";
+            p.defaultValues[0] = 0.0;
+            p.minValues[0] = 0.0;      p.minSliders[0] = 0.0;
+            p.maxValues[0] = 150.0;    p.maxSliders[0] = 150.0;
+            p.clampMins[0] = true;     p.clampMaxes[0] = true;
+            manager->appendFloat(p);
         }
         {
             // 関節座標の基準。root=Vision そのまま（腰が原点）/ camera=カメラが原点
@@ -372,17 +392,28 @@ private:
                 if (!myRequest)
                     myRequest = [[VNDetectHumanBodyPose3DRequest alloc] init];
                 VNDetectHumanBodyPose3DRequest* request = myRequest;
+
+                // 実カメラの画角を渡す。渡さないと Vision は **水平98.8度の広角を仮定**し、
+                // 被写体との距離が大きく狂う（同一フレームで 40度指定なら root_z -7.21m、
+                // 未指定なら -2.20m と3倍以上違う・実測）。関節の角度そのものは画角に
+                // 依存しないので、影響するのは cam:* と camera 空間の座標だけ
+                NSDictionary* opts = @{};
+                const float fovDeg = myFov.load();
+                if (fovDeg > 1.0f) {
+                    const float fx = (w * 0.5f) / tanf(fovDeg * (float)M_PI / 360.0f);
+                    const simd_float3x3 K = simd_matrix(simd_make_float3(fx, 0, 0),
+                                                        simd_make_float3(0, fx, 0),
+                                                        simd_make_float3(w * 0.5f, h * 0.5f, 1));
+                    opts = @{ VNImageOptionCameraIntrinsics:
+                                  [NSData dataWithBytes:&K length:sizeof(K)] };
+                }
                 VNImageRequestHandler* handler =
-                    [[VNImageRequestHandler alloc] initWithCVPixelBuffer:buffer options:@{}];
+                    [[VNImageRequestHandler alloc] initWithCVPixelBuffer:buffer options:opts];
                 [handler performRequests:@[request] error:nil];
 
                 VNHumanBodyPose3DObservation* obs = request.results.firstObject;
                 if (obs) {
                     out.valid = true;
-                    out.bodyHeight = (float)obs.bodyHeight;
-                    out.heightMeasured =
-                        (obs.heightEstimation == VNHumanBodyPose3DObservationHeightEstimationMeasured)
-                            ? 1.0f : 0.0f;
                     const simd_float4x4 cam = obs.cameraOriginMatrix;
                     out.toCamera = cam;   // model → camera。逆行列ではない（上のコメント参照）
 
@@ -425,6 +456,7 @@ private:
 
     // ワーカー専用。使い回して初期化コストを避ける
     VNDetectHumanBodyPose3DRequest* myRequest API_AVAILABLE(macos(14.0)) = nil;
+    std::atomic<float> myFov{0.0f};   // 実カメラの水平画角（0=Vision既定）
 };
 
 }   // namespace

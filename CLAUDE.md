@@ -4268,3 +4268,34 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - Tポーズでも **左手首だけ 11.7%** と他(3〜5%)から浮く。左右非対称な崩れ方をする傾向は
   スクワット(後ろ姿)でも見えており、**片側だけ壊れる**のがこのモデルの典型的な失敗
 - 検出率は Tポーズ 84.4% / 不屈 84.7% と低め。全身が画面内にあるかどうかに素直に効く
+
+### 2026-08-10 bodyheight/heightestimation 削除 + Camera FOV パラメータ追加(intrinsics を渡せる)
+
+- ユーザー「iPhoneならLiDARのdepthが取れるがMacには無い。bodyheightは意味のない数字では?
+  不要なパラメーターは非表示にしたい」
+- **削除(98ch → 96ch)**: `bodyheight` / `heightestimation`。**7クリップ・44検出で
+  measured=0・bodyHeight=1.8000 固定**を実測。1つの値しか取り得ないチャンネルは出さない
+- **ただし「Macだから無理」は不正確**。深度は `initWithCVPixelBuffer:depthData:orientation:options:`
+  で渡すもので、これは **API_AVAILABLE(macos 14.0)**。正しくは「**TOP は色しか運ばないから無理**」。
+  深度とカメラ内部パラメータを運ぶ入力経路を足せば measured にできる(将来の選択肢として記録)
+
+- **副産物として重要な発見**: ユーザーの「cam:fov は映像素材ごとに計算している?」という質問を
+  実測したら、**8クリップ(1280x720/1920x1080・被写体も画角もばらばら)すべてで 98.823〜98.824°**。
+  = Vision は実カメラの画角を推定しておらず、**水平98.8°の広角を固定で仮定**していた
+- **`VNImageOptionCameraIntrinsics` は macOS でも効く**(実測)。そこで **Camera FOV パラメータ**
+  (既定0=Vision既定)を追加し、>1 なら intrinsics を組んで渡すようにした。TD実測(同一フレーム):
+
+  | Camera FOV | cam:distance |
+  |---|---|
+  | 0(98.8°仮定) | 2.8 m |
+  | 120° | 2.05 m |
+  | 70° | 5.14 m |
+  | 40° | 8.54 m |
+
+- **姿勢そのものは画角に依存しない**(model空間の関節座標は全FOVでビット一致)。効くのは
+  **カメラとの位置関係**だけ = `cam:distance` / `cam:t*` / `cam:r*` / camera空間の座標。
+  骨格の形しか使わないなら 0 のままでよい、と README に明記
+- 罠: `VNImageOptionCameraIntrinsics` の値は **NSData**(`NSValue valueWithBytes:objCType:` だと
+  nil になり辞書生成で例外)。intrinsics は列優先 `simd_matrix(col0,col1,col2)` で
+  `[[fx,0,0],[0,fy,0],[cx,cy,1]]`
+- パラメータ変更時は `myLastCookSeen = -1` で静止画入力でも再解析させる
