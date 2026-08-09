@@ -3805,3 +3805,14 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **ローカルの TD palette フォルダには3つとも残っている**
   (`~/Library/.../palette/sygnal/`)。開発機には全プラグインが入っているので動作はする。
   リポジトリと揃えたい場合はユーザー側で削除する(今回は触っていない)
+
+### 2026-08-09 palette/ を main から外して develop 側のみに
+
+- ユーザー指示「WifiScannerも不要なので一旦Paletteもmainから外してdevelopへ」
+- **develop 側は同期不要だった**: develop には既に3つの .tox(NativePanel / SwiftUIButton /
+  WifiScanner)と、3つとも説明した README が入っている。`WifiScanner.tox` は main と
+  **バイト一致**(sha256 0763e6c2…)を確認したうえで main から `git rm -r palette`
+- CoreWLANScan/README.md の `palette/WifiScanner.tox` へのリンク2箇所(英日)を削除。
+  リポジトリ内に palette への参照は履歴ログ(CLAUDE.md)以外に残っていないことを確認
+- ローカルの TD palette フォルダ(`~/Library/.../palette/sygnal/`)には3つとも残したまま。
+  開発機では引き続き使える(消すかはユーザー判断)

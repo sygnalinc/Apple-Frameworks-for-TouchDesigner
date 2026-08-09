@@ -52,8 +52,7 @@ Get SSID Names ON → <node>_ssid (Info DAT) appears → the SSID list shows up 
 - **Measured**: on placement (first cook) `_callbacks` connects, and the instant Get SSID goes ON
   `_ssid` is created; after the scan finishes 17 SSIDs (SYGNAL etc.) are listed automatically.
   Toggling ON/OFF repeatedly still leaves exactly one of each
-- Making the Info DAT by hand and pointing Operator at this OP works the same. If you want a
-  pre-wired component, see [palette/WifiScanner.tox](../palette/README.md)
+- Making the Info DAT by hand and pointing Operator at this OP works the same
 
 **Measured (M2, macOS 26.5.1)**: the helper returned 18 SSIDs (`SYGNAL` / `SYGNAL_GUEST` /
 `SCC_JBFES` / `Buffalo-G-D32E` …) with RSSI and channel.
@@ -168,8 +167,7 @@ Get SSID Names ON → 隣に <node名>_ssid(Info DAT)が出現 → SSID一覧が
   名前・viewer 表示など)。Callbacks DAT を消しても Get SSID ON でもう一度自動生成される
 - **実測**: 配置(初回cook)で `_callbacks` が接続され、Get SSID ON の瞬間に `_ssid` が生成、
   スキャン完了後 17 SSID(SYGNAL 等)が自動表示。ON/OFFを繰り返しても各1個のまま
-- 手動で Info DAT を作って Operator に本OPを指定しても同じ。配線済み Component が欲しい場合は
-  [palette/WifiScanner.tox](../palette/README.md) も使える
+- 手動で Info DAT を作って Operator に本OPを指定しても同じ
 
 **実測(M2・macOS 26.5.1)**: ヘルパーが 18件のSSID(`SYGNAL` / `SYGNAL_GUEST` / `SCC_JBFES` /
 `Buffalo-G-D32E` 等)を RSSI/チャンネル付きで取得。
