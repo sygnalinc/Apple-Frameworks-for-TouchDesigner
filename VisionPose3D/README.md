@@ -12,14 +12,29 @@ The single-person 3D counterpart to the 2D multi-person
 
 ### Performance (important)
 
-| | Value (M2, 1252x736 input) |
+| | Value (M2, 1280x720 input) |
 |---|---|
-| First analysis | **about 17 s** (loading/compiling the 3D model; fast afterwards) |
-| Steady state | **about 0.5 s per frame (≈ 2 fps)** |
+| First analysis | **about 17 s** (loading/compiling the 3D model; cached for the rest of the process) |
+| Steady state | **about 110–170 ms per analysis (≈ 6–9 per second)** |
 
-Not suited to real-time per-frame use. Aim it at pose judgement, measurement and snapshot-style
-uses. (Execution is asynchronous and cook never blocks, so TD's frame rate does not drop — the
-channel values simply update about twice a second.)
+Still not a 60 fps operator, but far from a slideshow. Execution is asynchronous and cook never
+blocks, so TD's own frame rate does not drop — the channel values simply update a handful of
+times per second.
+
+> Earlier versions of this README said 0.5 s (≈2 fps). Two things changed: the request object is
+> now **reused across frames** instead of being rebuilt each time (measured side by side on the
+> same input: **165 ms vs 323 ms**, and 307 completed analyses vs 141 in the same window), and
+> the OS itself got faster. Measured alone, the current build sits at **111 ms / 8.5 analyses per
+> second**.
+
+Things that do **not** help (all measured on M2):
+
+| Idea | Result |
+|---|---|
+| Downscaling the input (1280x720 → 480x270) | 182 ms → 159 ms. Vision resizes internally anyway, so barely worth the accuracy risk |
+| Forcing the Neural Engine or GPU with `setComputeDevice:forComputeStage:` | 166 ms (ANE) / 163 ms (GPU) vs 166 ms letting Vision choose — no gain |
+| An IOSurface-backed pixel buffer | No difference (158 ms either way) |
+| A different request revision | Only revision 1 exists |
 
 ### Output channels (91)
 
@@ -84,14 +99,27 @@ TD ネイティブのカスタム CHOP。`VNDetectHumanBodyPose3DRequest` を使
 
 ### 性能特性（重要）
 
-| | 値（M2・1252x736入力） |
+| | 値（M2・1280x720入力） |
 |---|---|
-| 初回解析 | **約17秒**（3Dモデルの初回ロード/コンパイル。以後は速い） |
-| 定常解析 | **約0.5秒/フレーム（≒2fps）** |
+| 初回解析 | **約17秒**（3Dモデルの初回ロード/コンパイル。以降はプロセス内でキャッシュ） |
+| 定常解析 | **約110〜170ms/回（≒毎秒6〜9回）** |
 
-リアルタイムの毎フレーム用途には向かない。姿勢の判定・計測・スナップショット的な
-用途向け（cook はブロックしない非同期実行なので、TD のフレームレートは落ちない。
-チャンネル値が約0.5秒間隔で更新される、という動き方になる）。
+60fps のオペレータではないが、紙芝居でもない。cook はブロックしない非同期実行なので
+TD 側のフレームレートは落ちず、チャンネル値が毎秒数回更新される、という動き方になる。
+
+> 以前この README は 0.5秒（≒2fps）と書いていた。変わった理由は2つ。
+> **リクエストを毎フレーム作り直すのをやめて使い回すようにしたこと**
+> （同一入力での並走比較で **165ms 対 323ms**、同じ時間に完了した解析数は 307 対 141）と、
+> OS 自体が速くなったこと。単独で走らせた現行ビルドは **111ms / 毎秒8.5回**。
+
+**効かなかった手**（いずれもM2で実測）:
+
+| 案 | 結果 |
+|---|---|
+| 入力を縮小（1280x720 → 480x270） | 182ms → 159ms。Vision が内部でリサイズするので、精度リスクに見合わない |
+| `setComputeDevice:forComputeStage:` で ANE / GPU を明示 | ANE 166ms / GPU 163ms に対し、指定なし 166ms。差が無い |
+| IOSurface 付きのピクセルバッファ | 差なし（どちらも158ms） |
+| 別のリビジョン | revision 1 しか存在しない |
 
 ### 出力チャンネル（91ch）
 
