@@ -238,15 +238,15 @@ ln -s "$PWD/.claude/skills/td-apple-ops" ~/.claude/skills/td-apple-ops
 | バージョン | 日付 | OP数 | 主な内容 |
 |---|---|---|---|
 | **[0.9.3](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.3)** | 2026-08-09 | 59 | Non-Commercial の解像度上限で絵が崩れる不具合を修正(10 TOP)。**Vision Face のランドマークを 76 → 85 点に**(旧レイアウトは各領域を切り捨てていた。`p` インデックスがずれる**後方非互換**)。Vision Contours に `Aspect Correct UVs`。CoreText の行送り修正 |
-| [0.9.2](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.2)** | 2026-08-08 | 59 | bypass から戻すと黒画像になる不具合を全17 TOP で修正、ビルド不能だった6件を修復。Vision Face のランドマーク並び、Vision AnimalPose の骨格接続。Vision Text に `Aspect Correct UVs` |
+| [0.9.2](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.2) | 2026-08-08 | 59 | bypass から戻すと黒画像になる不具合を全17 TOP で修正、ビルド不能だった6件を修復。Vision Face のランドマーク並び、Vision AnimalPose の骨格接続。Vision Text に `Aspect Correct UVs` |
 | [0.9.1](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.1) | 2026-08-08 | 66 | Vision系10opに `Aspect Correct UVs`。SDKバージョン不一致による起動時ロードエラーを修正 |
-| [0.9.0](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.0) | 2026-08-07 | — | 最初の Developer ID 署名 + 公証リリース。DMGは取り下げ済み(0.9.2 を使ってください) |
+| [0.9.0](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.0) | 2026-08-07 | — | 最初の Developer ID 署名 + 公証リリース。DMGは取り下げ済み(0.9.3 を使ってください) |
 
 | 層 | 値 | ルール |
 |---|---|---|
-| リポジトリ(gitタグ) | `v0.9.2` | op追加・機能追加で **minor**、修正で **patch**。`opType` のリネーム/削除は**破壊的変更**としてリリースノートに明記 |
+| リポジトリ(gitタグ) | `v0.9.3` | op追加・機能追加で **minor**、修正で **patch**。`opType` のリネーム/削除は**破壊的変更**としてリリースノートに明記 |
 | バンドル(`Info.plist`) | `CFBundleShortVersionString` = リポジトリ版 / `CFBundleVersion` = gitコミット数 | ビルド時に `common/version.sh` が自動で焼き込む |
-| オペレータ(`customOPInfo`) | `majorVersion = 0` / `minorVersion = 9` | **opごと**。TDが `.toe` 保存値と比較する。後方互換でない変更(パラメータ削除・意味変更)をした**そのopだけ** `majorVersion` を +1 する |
+| オペレータ(`customOPInfo`) | `majorVersion = 0` / `minorVersion = 9`(Vision Face のみ `majorVersion = 1`) | **opごと**。TDが `.toe` 保存値と比較する。後方互換でない変更(パラメータ削除・意味変更)をした**そのopだけ** `majorVersion` を +1 する |
 
 **リリースビルド**は Developer ID(SYGNAL INC.)署名 + Hardened Runtime + timestamp +
 **Apple公証(notarize)済み** — どのMacでもGatekeeper警告なしで開ける。ローカル開発ビルド

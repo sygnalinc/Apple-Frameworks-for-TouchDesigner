@@ -240,15 +240,15 @@ Current release: **0.9.3** (see [`VERSION`](VERSION))
 | Version | Date | Operators | Highlights |
 |---|---|---|---|
 | **[0.9.3](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.3)** | 2026-08-09 | 59 | Fixes garbled output under the Non-Commercial resolution cap (10 TOPs). **Vision Face landmarks 76 → 85** — the old layout truncated each region, so `p` indices shift (breaking for that operator). `Aspect Correct UVs` on Vision Contours. CoreText line-height fix. |
-| [0.9.2](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.2)** | 2026-08-08 | 59 | Fixes a TOP left black after bypass (all 17 CPUMem TOPs) and 6 plugins that had silently stopped building. Vision Face landmark order, Vision AnimalPose skeleton. `Aspect Correct UVs` on Vision Text. |
+| [0.9.2](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.2) | 2026-08-08 | 59 | Fixes a TOP left black after bypass (all 17 CPUMem TOPs) and 6 plugins that had silently stopped building. Vision Face landmark order, Vision AnimalPose skeleton. `Aspect Correct UVs` on Vision Text. |
 | [0.9.1](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.1) | 2026-08-08 | 66 | `Aspect Correct UVs` across 10 Vision operators. Fixes the startup load error caused by an SDK version mismatch. |
-| [0.9.0](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.0) | 2026-08-07 | — | First Developer ID signed + notarized release. Its DMG was withdrawn; use 0.9.2. |
+| [0.9.0](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.0) | 2026-08-07 | — | First Developer ID signed + notarized release. Its DMG was withdrawn; use 0.9.3. |
 
 | Layer | Value | Rule |
 |---|---|---|
-| Repository (git tag) | `v0.9.2` | Adding operators / features bumps **minor**, fixes bump **patch**. Renaming or removing an `opType` is a **breaking** change and is called out in the release notes. |
+| Repository (git tag) | `v0.9.3` | Adding operators / features bumps **minor**, fixes bump **patch**. Renaming or removing an `opType` is a **breaking** change and is called out in the release notes. |
 | Bundle (`Info.plist`) | `CFBundleShortVersionString` = repo version, `CFBundleVersion` = git commit count | Stamped automatically by `common/version.sh` at build time. |
-| Operator (`customOPInfo`) | `majorVersion = 0`, `minorVersion = 9` | **Per operator.** TouchDesigner compares these with the values saved in a `.toe`. Bump `majorVersion` **only** for that one operator when a change is not backwards compatible (parameter removed / semantics changed). |
+| Operator (`customOPInfo`) | `majorVersion = 0`, `minorVersion = 9` (Vision Face is `majorVersion = 1`) | **Per operator.** TouchDesigner compares these with the values saved in a `.toe`. Bump `majorVersion` **only** for that one operator when a change is not backwards compatible (parameter removed / semantics changed). |
 
 **Release builds** are Developer ID signed (SYGNAL INC.), hardened-runtime, timestamped and
 **notarized by Apple** — they open on any Mac without Gatekeeper warnings. Local development
