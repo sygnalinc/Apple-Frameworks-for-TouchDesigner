@@ -36,14 +36,17 @@ Things that do **not** help (all measured on M2):
 | An IOSurface-backed pixel buffer | No difference (158 ms either way) |
 | A different request revision | Only revision 1 exists |
 
-### Output channels (91)
+### Output channels (97)
 
 | Channel | Description |
 |---|---|
 | `valid` | Whether a person was detected (1/0) |
 | `bodyheight` | Estimated height (metres) |
 | `heightestimation` | 0 = reference (estimated from a default height) / 1 = measured (real, when depth such as LiDAR is available) |
-| `camera:tx,ty,tz` | The hips **as seen from the camera** (metres; the subject sits at negative Z). The channel name is historical — this is where the person is relative to the camera, not where the camera is |
+| `cam:tx,ty,tz` | Camera position in the person's root space (metres) |
+| `cam:rx,ry,rz` | Camera rotation in **degrees, ready to drop into a TD Camera COMP** |
+| `cam:distance` | Lens-to-hips distance (metres) |
+| `cam:azimuth` / `cam:elevation` | How far off the lens axis the hips sit (degrees; + is right / up) |
 | `{joint}:tx,ty,tz` | Joint 3D position (metres, y up; origin set by **Coordinate Space**) |
 | `{joint}:u,v` | The joint's 2D projection into the input image (0–1, bottom-left origin) |
 
@@ -56,7 +59,7 @@ left_hip left_knee left_ankle right_hip right_knee right_ankle`
 | Value | Origin | What it looks like |
 |---|---|---|
 | `root` (default) | The person's hips | Vision's native output. Standing upright, `top_head:ty ≈ +0.77` and `right_ankle:ty ≈ -0.87` (estimated height 1.8 m). **The figure never translates** — jumping or walking toward the camera only changes the shape of the limbs |
-| `camera` | The camera | The figure moves as the person does: jumps lift it, walking toward the camera brings it closer (measured: `root:tz` ≈ +2.3 for a subject about 2.4 m away) |
+| `camera` | The camera | The figure moves as the person does: jumps lift it, walking toward the camera brings it closer (measured: `root:tz` ≈ -2.4 for a subject about 2.4 m away — the subject sits at negative Z) |
 
 `camera` multiplies each joint by **`cameraOriginMatrix` itself — not its inverse**. Despite the
 name, that matrix is the *model → camera* transform.
@@ -76,8 +79,20 @@ same convention as a TD camera: put a Camera COMP at the origin with default rot
 straight down the real camera's axis. Since TD's FOV Angle is horizontal, a full body at ~2.5 m
 needs the camera pulled back (the example uses `tz = 2.5`) or a wider FOV.
 
-In both modes `camera:tx,ty,tz` is the hips in camera space, so it tells you directly how far away
-the person is (`camera:tz ≈ -2.5` for a subject 2.5 m from the lens).
+### The `cam:` channels
+
+They mean the same thing whatever `Coordinate Space` is set to, and they all start with `cam:`, so
+`^*cam*` in a Select CHOP strips them in one go when you only want joints (that is what the example
+does).
+
+**Wire `cam:tx,ty,tz` and `cam:rx,ry,rz` straight into a Camera COMP and TD's viewpoint becomes the
+real camera's.** Verified: rendering `root` space with the camera driven this way, and rendering
+`camera` space with the camera parked at the origin, come out **pixel-identical** (mean absolute
+difference 0.0000 over the whole frame). The rotation uses TD's own `Rz·Ry·Rx` order — measured
+against a Camera COMP's `worldTransform` rather than assumed.
+
+`cam:distance` / `cam:azimuth` / `cam:elevation` are the scalars you usually want for driving
+effects — how close the performer is and how far off-axis — without wiring up a Math CHOP.
 
 ### Parameters
 
@@ -146,14 +161,17 @@ TD 側のフレームレートは落ちず、チャンネル値が毎秒数回�
 | IOSurface 付きのピクセルバッファ | 差なし（どちらも158ms） |
 | 別のリビジョン | revision 1 しか存在しない |
 
-### 出力チャンネル（91ch）
+### 出力チャンネル（97ch）
 
 | チャンネル | 内容 |
 |---|---|
 | `valid` | 検出できたか（1/0） |
 | `bodyheight` | 推定身長（メートル） |
 | `heightestimation` | 0=reference（既定身長から推定）/ 1=measured（実測。LiDAR等の深度がある場合） |
-| `camera:tx,ty,tz` | 腰の**カメラから見た位置**（メートル・被写体は -Z 側）。チャンネル名は経緯上のもので、実体は「カメラの位置」ではなく「人物がカメラからどこにいるか」 |
+| `cam:tx,ty,tz` | カメラ位置（人物 root 基準・メートル） |
+| `cam:rx,ry,rz` | カメラ回転（**度・TD Camera COMP にそのまま挿せる**） |
+| `cam:distance` | レンズ〜腰の距離（メートル） |
+| `cam:azimuth` / `cam:elevation` | 腰がレンズ光軸から何度ずれているか（度・+右 / +上） |
 | `{joint}:tx,ty,tz` | 関節の3D位置（メートル・y上向き・原点は **Coordinate Space** で決まる） |
 | `{joint}:u,v` | 関節の入力画像への2D投影（0〜1・左下原点） |
 
@@ -166,7 +184,7 @@ left_hip left_knee left_ankle right_hip right_knee right_ankle`
 | 値 | 原点 | 見え方 |
 |---|---|---|
 | `root`（既定） | 人物の腰 | Vision そのまま。直立時は `top_head:ty ≈ +0.77`、`right_ankle:ty ≈ -0.87`（身長1.8m推定時）。**図は決して平行移動しない** — 跳んでも近づいても、変わるのは手足の形だけ |
-| `camera` | カメラ | 人の動きがそのまま図の動きになる。跳べば持ち上がり、近づけば手前に来る（実測: 約2.4m 先の被写体で `root:tz` ≈ +2.3） |
+| `camera` | カメラ | 人の動きがそのまま図の動きになる。跳べば持ち上がり、近づけば手前に来る（実測: 約2.4m 先の被写体で `root:tz` ≈ -2.4。被写体は -Z 側） |
 
 `camera` は各関節に **`cameraOriginMatrix` そのもの（逆行列ではない）** を掛ける。
 名前に反して、この行列は *model → カメラ* の変換である。
@@ -184,8 +202,18 @@ left_hip left_knee left_ankle right_hip right_knee right_ankle`
 Camera COMP を原点・回転0で置けば、実カメラの光軸をそのまま向く。ただし TD の FOV Angle は
 **水平**なので、2.5m 先の全身を入れるにはカメラを引くか（利用例は `tz = 2.5`）FOV を広げる必要がある。
 
-`camera:tx,ty,tz` はどちらのモードでも腰のカメラ基準位置なので、被写体までの距離がそのまま読める
-（レンズから 2.5m なら `camera:tz ≈ -2.5`）。
+### cam: チャンネル
+
+`Coordinate Space` が何であっても意味は同じ。全て `cam:` 始まりなので、関節だけ欲しいときは
+Select CHOP の `^*cam*` 一発で落とせる（利用例の select4 がそれ）。
+
+**`cam:tx,ty,tz` と `cam:rx,ry,rz` を Camera COMP にそのまま挿すと、TD の視点が実カメラと一致する。**
+検証済み: root 空間 + この駆動でレンダしたものと、camera 空間 + カメラ原点でレンダしたものが
+**ピクセル単位で完全一致**した（画面全体の平均絶対差 0.0000）。回転は TD の `Rz·Ry·Rx` の順で出している
+（推測ではなく Camera COMP の `worldTransform` と突き合わせて確定した）。
+
+`cam:distance` / `cam:azimuth` / `cam:elevation` は演出を駆動するときに欲しくなるスカラー
+（どれだけ近いか・光軸からどれだけ外れているか）を、Math CHOP を組まずに直接出したもの。
 
 ### パラメータ
 

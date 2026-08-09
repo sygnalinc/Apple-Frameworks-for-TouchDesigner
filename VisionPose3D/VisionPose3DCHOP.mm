@@ -4,13 +4,20 @@
 // （VNDetectHumanBodyPose3DRequest・macOS 14+・17関節）を推定して出力する。
 // 2D複数人の VisionPose CHOP と対になる、単一人物・3D版。
 //
-// 出力チャンネル（91ch・1サンプル）:
+// 出力チャンネル（97ch・1サンプル）:
 //   valid                     検出できたか（1/0）
 //   bodyheight                推定身長（メートル）
 //   heightestimation          0=reference（既定身長で推定）/ 1=measured（実測）
-//   camera:tx,ty,tz           人物 root のカメラ基準位置（メートル・被写体は -Z 側）
+//   cam:tx,ty,tz              カメラ位置（人物 root 基準・メートル）
+//   cam:rx,ry,rz              カメラ回転（度・TD Camera COMP にそのまま入る）
+//   cam:distance              レンズ〜腰の距離（メートル）
+//   cam:azimuth,elevation     腰がレンズ光軸から何度ずれているか（度・+右 / +上）
 //   {joint}:tx,ty,tz          17関節の3D位置（Space パラメータ基準・メートル・y上向き）
 //   {joint}:u,v               17関節の入力画像への2D投影（0〜1・左下原点）
+//
+// cam:* は Space に関係なく常に同じ意味。全て "cam:" 始まりなので、関節だけ欲しいときは
+// Select CHOP の `^*cam*` 一発で落とせる。Space=root のまま cam:t*/cam:r* を
+// Camera COMP に挿すと、TD の視点が実カメラと一致する。
 //
 // Space パラメータ:
 //   root（既定）  Vision そのまま。人物の腰が原点。人が跳んでも近づいても図は動かず、
@@ -35,7 +42,9 @@
 
 #include "../common/AspectCoords.h"
 
+#include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <condition_variable>
 #include <cstring>
 #include <mutex>
@@ -49,6 +58,17 @@ using namespace TD;
 namespace {
 
 constexpr int kNumJoints = 17;
+
+// 関節以外の固定チャンネル。カメラ系は全て "cam:" 始まりにしてあるので、
+// 関節だけ欲しいときは Select CHOP の `^*cam*` 一発で落とせる
+static const char* kFixedNames[] = {
+    "valid", "bodyheight", "heightestimation",
+    "cam:tx", "cam:ty", "cam:tz",          // カメラ位置（人物 root 基準）
+    "cam:rx", "cam:ry", "cam:rz",          // カメラ回転（度・TD Camera COMP にそのまま入る）
+    "cam:distance",                        // レンズ〜腰の距離（メートル）
+    "cam:azimuth", "cam:elevation",        // 腰がレンズ光軸から何度ずれているか（度）
+};
+constexpr int kFixedChans = (int)(sizeof(kFixedNames) / sizeof(kFixedNames[0]));
 
 // チャンネル名（Vision の関節名を snake_case で）
 static const char* kJointNames[kNumJoints] = {
@@ -88,7 +108,6 @@ struct Pose3D
     bool valid = false;
     float bodyHeight = 0;
     float heightMeasured = 0;      // 1=measured / 0=reference
-    float camera[3] = {};          // root のカメラ基準位置（tx,ty,tz）
     float joints[kNumJoints][5] = {};   // tx, ty, tz（root 基準）, u, v
     // model（root 基準）→ カメラ基準 に移す行列（= cameraOriginMatrix そのもの）。
     // Space=camera のときだけ使う
@@ -114,6 +133,40 @@ public:
             myWorker.join();
     }
 
+    // cam:* の9ch（位置3・回転3・distance/azimuth/elevation）を埋める。
+    // M は model→camera なので、カメラの姿勢は inverse(M) 側に出る。
+    static void fillCameraChannels(const simd_float4x4& M, float* out)
+    {
+        // 腰をレンズから見た位置（= M * 原点）。被写体は -Z 側
+        const simd_float3 s = simd_make_float3(M.columns[3].x, M.columns[3].y, M.columns[3].z);
+
+        // カメラの root 空間での姿勢 = inverse(M)。剛体なので R⁻¹ = Rᵀ
+        const simd_float3x3 R = simd_matrix(M.columns[0].xyz, M.columns[1].xyz, M.columns[2].xyz);
+        const simd_float3x3 Rt = simd_transpose(R);
+        const simd_float3 pos = -simd_mul(Rt, s);
+
+        // TD の Rotate Order "xyz" は R = Rz·Ry·Rx（実測でTDの worldTransform と一致）。
+        // その分解: y=asin(-r20) / x=atan2(r21,r22) / z=atan2(r10,r00)
+        // simd は列優先なので r[row][col] = Rt.columns[col][row]
+        const float r20 = Rt.columns[0][2], r21 = Rt.columns[1][2], r22 = Rt.columns[2][2];
+        const float r10 = Rt.columns[0][1], r00 = Rt.columns[0][0];
+        const float deg = 180.0f / (float)M_PI;
+        const float ry = asinf(std::max(-1.0f, std::min(1.0f, -r20)));
+        const float rx = atan2f(r21, r22);
+        const float rz = atan2f(r10, r00);
+
+        const float dist = simd_length(s);
+        // レンズ光軸（-Z）から腰が何度ずれているか。+azimuth=右 / +elevation=上
+        const float azimuth   = atan2f(s.x, -s.z) * deg;
+        const float elevation = atan2f(s.y, sqrtf(s.x * s.x + s.z * s.z)) * deg;
+
+        out[0] = pos.x;  out[1] = pos.y;  out[2] = pos.z;
+        out[3] = rx * deg; out[4] = ry * deg; out[5] = rz * deg;
+        out[6] = dist;
+        out[7] = azimuth;
+        out[8] = elevation;
+    }
+
     void getGeneralInfo(CHOP_GeneralInfo* ginfo, const OP_Inputs*, void*) override
     {
         ginfo->cookEveryFrameIfAsked = true;
@@ -122,7 +175,7 @@ public:
 
     bool getOutputInfo(CHOP_OutputInfo* info, const OP_Inputs*, void*) override
     {
-        info->numChannels = 6 + kNumJoints * 5;
+        info->numChannels = kFixedChans + kNumJoints * 5;
         info->numSamples = 1;
         info->startIndex = 0;
         return true;
@@ -131,18 +184,11 @@ public:
     void getChannelName(int32_t index, OP_String* name, const OP_Inputs*, void*) override
     {
         char buf[80];
-        if (index == 0) {
-            snprintf(buf, sizeof(buf), "valid");
-        } else if (index == 1) {
-            snprintf(buf, sizeof(buf), "bodyheight");
-        } else if (index == 2) {
-            snprintf(buf, sizeof(buf), "heightestimation");
-        } else if (index <= 5) {
-            const char* axis[3] = {"tx", "ty", "tz"};
-            snprintf(buf, sizeof(buf), "camera:%s", axis[index - 3]);
+        if (index < kFixedChans) {
+            snprintf(buf, sizeof(buf), "%s", kFixedNames[index]);
         } else {
-            const int j = (index - 6) / 5;
-            const int c = (index - 6) % 5;
+            const int j = (index - kFixedChans) / 5;
+            const int c = (index - kFixedChans) % 5;
             const char* f[5] = {"tx", "ty", "tz", "u", "v"};
             snprintf(buf, sizeof(buf), "%s:%s", kJointNames[j], f[c]);
         }
@@ -181,15 +227,17 @@ public:
         const tdaspect::Mapper map{ inputs->getParInt("Aspectcorrectuv") != 0,
                                     top ? (float)top->textureDesc.width  : 0.0f,
                                     top ? (float)top->textureDesc.height : 0.0f };
-        // camera を選ぶと関節をカメラ基準へ移す（camera:tx,ty,tz はどちらのモードでも
-        // 「root のカメラ基準位置」= toCamera の平行移動列のまま）
+        // cam:* は Space に関係なく常に同じ意味。関節だけ Space に従う
         const bool toCam = inputs->getParInt("Space") != 0;
         const bool on = active && pose.valid;
-        output->channels[0][0] = on ? 1.0f : 0.0f;
-        output->channels[1][0] = on ? pose.bodyHeight : 0.0f;
-        output->channels[2][0] = on ? pose.heightMeasured : 0.0f;
-        for (int c = 0; c < 3; c++)
-            output->channels[3 + c][0] = on ? pose.camera[c] : 0.0f;
+        float fixed[kFixedChans] = {};
+        fixed[0] = on ? 1.0f : 0.0f;
+        fixed[1] = on ? pose.bodyHeight : 0.0f;
+        fixed[2] = on ? pose.heightMeasured : 0.0f;
+        if (on)
+            fillCameraChannels(pose.toCamera, fixed + 3);
+        for (int i = 0; i < kFixedChans; i++)
+            output->channels[i][0] = fixed[i];
         for (int j = 0; j < kNumJoints; j++) {
             simd_float3 p = simd_make_float3(pose.joints[j][0], pose.joints[j][1], pose.joints[j][2]);
             if (toCam) {
@@ -198,9 +246,9 @@ public:
             }
             // tx,ty,tz はメートル単位なので変換しない。u,v（投影座標）のみ再スケール
             for (int c = 0; c < 3; c++)
-                output->channels[6 + j * 5 + c][0] = on ? p[c] : 0.0f;
-            output->channels[6 + j * 5 + 3][0] = on ? map.x(pose.joints[j][3]) : 0.0f;
-            output->channels[6 + j * 5 + 4][0] = on ? map.y(pose.joints[j][4]) : 0.0f;
+                output->channels[kFixedChans + j * 5 + c][0] = on ? p[c] : 0.0f;
+            output->channels[kFixedChans + j * 5 + 3][0] = on ? map.x(pose.joints[j][3]) : 0.0f;
+            output->channels[kFixedChans + j * 5 + 4][0] = on ? map.y(pose.joints[j][4]) : 0.0f;
         }
     }
 
@@ -315,9 +363,6 @@ private:
                         (obs.heightEstimation == VNHumanBodyPose3DObservationHeightEstimationMeasured)
                             ? 1.0f : 0.0f;
                     const simd_float4x4 cam = obs.cameraOriginMatrix;
-                    out.camera[0] = cam.columns[3].x;
-                    out.camera[1] = cam.columns[3].y;
-                    out.camera[2] = cam.columns[3].z;
                     out.toCamera = cam;   // model → camera。逆行列ではない（上のコメント参照）
 
                     for (int j = 0; j < kNumJoints; j++) {
