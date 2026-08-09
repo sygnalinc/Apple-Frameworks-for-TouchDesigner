@@ -53,6 +53,15 @@
   vImage(ITU-R 601 videoRange)でBGRA↔420v変換。2x固定・入力96〜960px
 - **VTTemporalNoiseFilter(Metal Denoise)は M2非対応**(isSupported=false・maximumDimensions=0x0)。
   VT系は必ず isSupported と supportedScaleFactors/maximumDimensions をプローブしてから設計する
+- **Appleは対応チップの一覧を公開していない**。SDKヘッダも「current platform で isSupported を
+  見よ」としか書いていないので、**動かすマシンで実測するしかない**。
+  `tools/vtprobe.m` が一族(OpticalFlow/MotionBlur/FRC/SuperRes/TemporalNoise/LowLatency×2)を
+  まとめて調べる。M2実測では**TemporalNoiseFilter だけが非対応で他6つは全部対応** —
+  「Apple Silicon かどうか」「macOS 26 かどうか」の話ではない
+- **非対応ハードは「エラー」ではなく「警告 + 入力の素通し」にする**。エラーにすると、
+  非対応マシンで開いただけのネットワークが下流ごと止まる。`getErrorString` ではなく
+  `getWarningString` を実装し、`process()` の冒頭で isSupported を見て入力をそのまま
+  結果へコピーする(Metal Denoise がこの形。非対応OSの分岐も同じ扱いにする)
 - MetalFX Spatial は SharedストレージのテクスチャでOK(Apple Silicon)。outputTextureの usage は
   `scaler.outputTextureUsage` を必ず含める
 - **ANE系プラグインの同時実行は競合で数倍遅くなる**(実測: YOLO 38→262ms、LLSR 4→324ms)。
@@ -383,6 +392,13 @@
   注意: ホスト(通常op)の showDocked は既定 True で別意味(自分の docked を表示するか)
 
 ## Core Text(テキストレンダリング)
+
+- **文字送りの実測(英字・34pt)**: 1文字 ≒ **15px**、行送り ≒ **42px**。
+  吹き出しの幅/高さを文字数から見積もるときの目安。見積りがずれても **Auto Fit** を
+  On にしておけば縮めて収まるので破綻しない(逆に大きく余ると間延びして見える)
+- **`Padl/Padr/Padt/Padb` で描画位置を決められる**ので、キャンバスを出力解像度いっぱいに
+  取れば **Transform TOP を挟まずに好きな位置へテキストを置ける**
+  (LINE風チャットの吹き出しは CoreText 1 + Rectangle 1 + Over 1 の3ノードで組んだ)
 
 - **システムUIフォント(SF)のグリフ「アウトライン」は TD プロセス内では信用できない**(実測)。
   `kCGTextStroke` での再描画も `CTFontCreatePathForGlyph` のパス抽出も、特定グリフ(e/k/A/B等)に

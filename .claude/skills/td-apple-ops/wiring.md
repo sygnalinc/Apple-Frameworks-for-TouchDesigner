@@ -104,9 +104,13 @@ Script SOP(骨を生成) → soptoPOP → outPOP → Geometry COMP → Render
 
 ### Vision Face のランドマークの並び
 
-`p0..p75` は**領域ごとに、その領域内の正しい順序**で並ぶので連番で結べば輪郭が描ける。
+`p0..p84`(**85点**)は**領域ごとに、その領域内の正しい順序**で並ぶので連番で結べば輪郭が描ける。
 未使用スロットは `u = v = -1` の番兵なので、描画側でスキップすること
 (0のままだと bbox の隅に線が飛ぶ)。範囲は VisionFace/README.md の表を参照。
+
+**鼻だけは連番で結ぶと左右非対称に見える**(Vision の並びがそうなっている)。
+小鼻の掃引は `p42` から、鼻筋は `49-52`、小鼻の横棒 `53-54` は分けて描き、
+`medianLine`(55-64)は他領域と重複するので描かない。
 
 ## マスクを合成する(CoreML SAM2 等)
 
@@ -134,6 +138,23 @@ Vision Rect の `tl/tr/br/bl` へ別の映像を射影変換で貼る。実例�
   `0..1` の内側だけ合成する
 - 検出は非同期なので、カメラが速く動くと貼り込みが**1〜2フレーム遅れる**
 
+## 会話をチャット画面として描く(LLM AFM / LLM MLX)
+
+LLM系DATの出力は `index | role | text` のテーブル。これを吹き出しで描くレシピ。
+実例は demo.toe の `/project1/LLMAFM/chat`。
+
+- 吹き出し1個 = **CoreText TOP(本文)+ Rectangle TOP(角丸)+ Over** の3ノード。
+  スロットを固定数(8個など)作っておき、使わないぶんは
+  テキストを空・`fillalpha=0` にして隠す
+- **各吹き出しのキャンバスを出力解像度いっぱいに取る**と、Transform TOP を挟まずに
+  CoreText の `Padl/Padr/Padt/Padb` と Rectangle の `centerx/centery`(単位=pixels)だけで
+  位置が決まる
+- レイアウト計算は **Execute DAT の `onFrameEnd`**。非同期な C++ DAT は
+  `onTableChange` が安定して発火しない
+- 吹き出しの寸法は文字数からの見積りでよい(**英字34pt で 1文字≒15px・行送り42px**)。
+  ずれても CoreText の **Auto Fit** が縮めて収める
+- 新しいメッセージを下に積むなら、**下端から上へ**積んで画面上端に達したら打ち切る
+
 ## Vision Flow が黒く見えるとき
 
 プラグインは正常。原因は2つ:
@@ -153,11 +174,17 @@ Vision Rect の `tl/tr/br/bl` へ別の映像を射影変換で貼る。実例�
 
 ## LLM 系
 
+- **LLM AFM(オンデバイス ~3B)はコンテキスト窓が小さい。** 40語程度の Instructions +
+  Keep Context で3ターン続けるだけで `status: error: Exceeded model context window size`
+  になる(実測)。Instructions は短く、出たら `Clear Conversation` をパルスする
+- **ツールは名前を明示しないと呼ばれないことがある。** 「What is the temperature on stage?」
+  だと「取得できません」と答え、「Use the get_sensor tool with name "temperature".」だと
+  確実に呼ぶ(同一セッションで実測)
+- **構造化出力(Output Schema)とチャット表示は両立しない。** Schema を設定すると
+  assistant の返答が JSON になる。会話として見せるなら Schema は空にする
 - **LLM MLX の `Model` パラメータを Expression モードにするなら文字列をクォートする。**
   裸で `gemma-3-4b-it-qat-4bit` と書くと Python が数式として解釈し
   `SyntaxError: invalid decimal literal` になる。ローカルフォルダ指定なら
   `project.folder + '/models/gemma-3-4b-it-qat-4bit'`
 - **Info DAT を必ず隣に置く。** `status` が `loading model` か `ready` か見えないと
   「動いていない」のか「ロード中」なのか判別できない(初回は数十秒かかる)
-- **LLM AFM のツール呼び出しは、プロンプトでツール名を明示する。** オンデバイスモデルは小さく、
-  曖昧な聞き方だとツールを使わず「センサーがありません」と答える

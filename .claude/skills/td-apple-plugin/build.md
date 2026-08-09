@@ -80,6 +80,31 @@ cp -R <Name>/build/<Name>.plugin \
 - cplusplus系ノードは plugin設定直後にカスタムパラメータが未生成のことがある →
   `reinitpulse` をパルスするか1フレーム待つ
 
+## 調査用のデバッグコードは「ソースから消す」だけでは足りない
+
+一時的に仕込んだ `setWarningString("PROBE ...")` のようなコードは、
+**ソースから消したあと常設Pluginsへ再インストールし直す**まで残り続ける。
+ソースはきれいなのにインストール済みバイナリだけ汚れている状態は気づきにくい
+(実例: NC解像度の調査で入れたプローブが、翌日まで警告を出し続けていた)。
+
+一括監査:
+
+```sh
+P=~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins
+for d in "$P"/*.plugin; do
+  exe="$d/Contents/MacOS/$(basename "$d" .plugin)"
+  [ -f "$exe" ] && strings -a "$exe" | grep -q PROBE && echo "$(basename $d)"
+done
+```
+
+## リリース物はリポジトリの build/ から集める
+
+`tools/release.sh` は `git ls-files '*/build.sh'` から対象を決め、各 `<Name>/build/*.plugin`
+を収集する。**インストール済みの Plugins フォルダから集めてはいけない** —
+サードパーティ製(Azure Kinect 等)や、古い/デバッグ入りのバンドルが混入する。
+verify では署名・Hardened Runtime・Developer ID に加えて
+**`OP_CommonAPIVersion` と `CFBundleShortVersionString`** も全数照合する。
+
 ## Git
 
 - 巨大ファイル厳禁: `models/`(数GB)・`*.pt`・ビルド産物(`build/`)・`.build/` は gitignore 済み

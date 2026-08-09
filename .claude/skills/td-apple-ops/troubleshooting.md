@@ -30,6 +30,22 @@
 | 静止画入力で何も起きない | 入力が更新されないと再解析されない | パラメータを一度変える(変更検知で再投入される) |
 | そもそも cook されていない | 出力が誰にも使われていない | Null + ビューア、または Execute DAT で毎フレーム cook |
 
+## demo.toe の利用例が動かない / 値が更新されない
+
+`demo.toe` の利用例(base COMP)は **`allowCooking = False`** が既定。全部を常時 cook すると
+全例のML推論が同時に走るため。この状態では中の Movie File In は **128x128 のまま**で、
+CHOP から読める値は**前に cook されたときの残留値**になる。
+
+見たい例のコンテナを選んで **`allowCooking` を On**(ノードを開いて中を表示するだけでも
+cook が回る)。Python からなら `op('/project1/VisionFace').allowCooking = True`。
+
+## 警告は出るが映像は流れている(Metal Denoise)
+
+`Temporal noise filter not supported on this hardware — passing the input through unchanged`
+はハードウェアの非対応。**エラーではなく警告 + 素通し**なので下流は止まらないが、
+**ノイズ除去は効いていない**。対応可否は `tools/vtprobe.m` で確認できる。
+Apple は対応チップ一覧を公開していないので、動かすマシンで実測するしかない。
+
 ## 検出0になる
 
 1. **チャンネル名の区切りを間違えていないか。** スロット直下は**コロン**(`body1:valid`)。

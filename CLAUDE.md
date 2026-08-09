@@ -3898,3 +3898,29 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **新しく分かった制約**: オンデバイスモデルは**コンテキスト窓が小さい**。40語程度の
   Instructions + 3ターンで `error: Exceeded model context window size` になる。
   Instructions を短くし、出たら Clear Conversation。LLMAFM/README(英日)に追記
+
+### 2026-08-09 今セッションの罠を skill へ反映
+
+ユーザー指示「踏んだ罠はskillsにも反映できる事はしておいて」。4ファイルへ振り分け:
+
+- **td-apple-plugin/verification.md**: ①`run` の exec スコープ回避は「インラインで書く」だけ
+  でなく**処理全体を1関数に入れて呼ぶ**のが確実、と追記(今回何度も効いた)
+  ②TDノード操作の節を新設(カスタムOPは `create('<OpType>TOP', name)` / base COMP は
+  `connect(comp.outputConnectors[0])` / シーケンスは `seq.<name>.numBlocks` /
+  OP参照parはパス文字列 / glslmultiTOP は `_pixel` 等が自動ドック生成)
+  ③**demo.toe の利用例は `allowCooking = False`** で、force cook しても中は cook されず
+  読めた値は残留値、という節を新設
+- **td-apple-plugin/build.md**: ①調査用デバッグコードは**ソースから消すだけでなく再インストール**
+  が要る(strings で一括監査するワンライナー付き)②リリース物は**リポジトリの build/ から集める**
+  (インストール済みフォルダから集めると第三者製が混入する)
+- **td-apple-plugin/pitfalls.md**: ①VT系は**対応チップ一覧が非公開**で `tools/vtprobe.m` で実測
+  ②**非対応ハードはエラーではなく警告+素通し**にする設計指針 ③Core Text の実測値
+  (英字34ptで1文字≒15px・行送り42px)と `Padl/Padr/Padt/Padb` で Transform 無しに配置できること
+- **td-apple-ops/wiring.md**: ①LLM節に**コンテキスト窓が小さい / ツール名を明示 /
+  Schema とチャット表示は両立しない**を追加(末尾の重複bulletは統合して削除)
+  ②「会話をチャット画面として描く」レシピを新設 ③Vision Face のランドマークを
+  **p0..p75 → p0..p84(85点)** に訂正し、鼻の描き方を追記
+- **td-apple-ops/troubleshooting.md**: ①「demo.toe の利用例が動かない/値が更新されない」=
+  allowCooking ②「警告は出るが映像は流れている(Metal Denoise)」を追加
+- リポジトリ外の個人skill **~/.claude/skills/touchdesigner-dev** にも、TD汎用の4点
+  (exec スコープ・カスタムOPのcreate・outputConnectors・allowCooking)を反映
