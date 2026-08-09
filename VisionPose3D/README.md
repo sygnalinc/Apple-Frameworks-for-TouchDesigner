@@ -99,12 +99,11 @@ term flips to ±178°. Taking the chest normal (shoulder vector × up) and an `a
 covering the full circle instead — measured +125…+138° on that back-facing clip, −6° when the actor
 faces the lens and ±89…91° when he turns to profile in the same shot.
 
-**`body:facing` flips by ~180° on profile views.** Measured over three clips at 10 fps, adjacent
-frames disagree by more than 90° on **16–18 % of frames**, with jumps as large as 179.6°. A body
-seen exactly side-on has nearly the same silhouette whichever way it faces, so a monocular
-estimator cannot resolve it — this is the data, not a bug in the channel. If you drive something
-visible with it, add a de-flip step (when the value jumps more than 90° between frames, add 180°
-and keep it continuous) or gate on frames where `|body:facing|` is away from 90°.
+**`body:facing` can flip by ~180° on profile views.** A body seen exactly side-on has nearly the
+same silhouette whichever way it faces. With `Camera FOV` at 0 the operator feeds Vision a
+*sequence*, which largely suppresses this (see below); set a FOV and the flips come back. If you drive something visible with it, add a de-flip step (when
+the value jumps more than 90° between frames, add 180° and keep it continuous) or gate on frames
+where `|body:facing|` is away from 90°.
 
 `body:pitch` and `body:roll` are measured in the performer's **own** frame (right = shoulder
 vector, forward = chest normal), so "bending forward" means the same thing whichever way they are
@@ -145,8 +144,21 @@ Give the operator the real lens angle and it passes proper intrinsics
 FOV — Vision estimates the body independently of the lens. What the FOV fixes is *where the body
 is placed relative to the camera*: `cam:distance` and all `camera`-space joint coordinates.
 
-So: leave it at 0 if you only use the skeleton's shape. Set it if you use distances, camera-space
-positions, or want the overlay to match a narrow lens.
+**Setting a FOV costs stability.** Only `VNImageRequestHandler` with an options dictionary accepts
+intrinsics — feeding them as a `CMSampleBuffer` attachment is silently ignored (measured: 40° and
+90° both come back as 98.824°). So the operator switches handlers:
+
+| Camera FOV | Handler | Detection rate | `body:facing` flips |
+|---|---|---|---|
+| **0 (default)** | `VNSequenceRequestHandler` — frames as a sequence | **60/60** | **0–8 %** |
+| > 0 | `VNImageRequestHandler` + intrinsics, frame by frame | 56–59/60 | 16–18 % |
+
+Measured over three clips at 10 fps (flips = adjacent frames disagreeing by more than 90°, which a
+real body cannot do in 0.1 s). Temporal context is what resolves the front/back ambiguity, and it
+is lost when each frame is handled alone.
+
+So: leave it at 0 unless you specifically need true distances — the skeleton, its shape and the
+overlay are all better without it.
 
 **Can you recover the FOV from `cam:distance`?** Not from Vision's own distance — the two are
 locked together, because the distance was derived from whatever FOV was assumed. Measured on one
@@ -287,11 +299,10 @@ Camera COMP を原点・回転0で置けば、実カメラの光軸をそのま�
 pitch が ±178° に振れた。胸の法線（肩ベクトル × 上方向）を `atan2` すれば1本の角度で全周を
 表せる。実測で 後ろ姿 +125〜138°、同一ショット内で 正面 −6° / 真横 ±89〜91°。
 
-**`body:facing` は横向き付近で約180度反転する。** 3クリップを 10fps で測ると、隣接フレームで
-90度を超える飛びが **16〜18%** のフレームで起き、最大 179.6度。真横のシルエットは前後で
-ほとんど同じなので、単眼では原理的に解けない。チャンネルの不具合ではなくデータがそうなっている。
-見えるものを駆動するなら、**飛んだら180度足して連続にする**後処理を入れるか、
-`|body:facing|` が 90度から離れたフレームだけを使う。
+**`body:facing` は横向き付近で約180度反転しうる。** 真横のシルエットは前後でほとんど同じなので、
+単眼では原理的に曖昧。`Camera FOV` が 0 なら連続フレームとして処理するので大幅に抑えられる（下記）が、
+FOV を設定すると戻ってくる。見えるものを駆動するなら、**飛んだら180度足して連続にする**後処理を
+入れるか、`|body:facing|` が 90度から離れたフレームだけを使う。
 
 `body:pitch` / `body:roll` は**演者自身の枠**（right=肩ベクトル、forward=胸の法線）で測るので、
 どちらを向いていても「前に曲げた」が同じ意味になる。直立時は ±3° 以内、お辞儀の素材で +31°。
@@ -329,8 +340,19 @@ Vision はそれを尊重する。TouchDesigner 上で同一フレームを測�
 レンズと無関係に体の形を推定している。画角が効くのは**体をカメラに対してどこに置くか**、
 つまり `cam:distance` と `camera` 空間の関節座標だけ。
 
-骨格の形しか使わないなら 0 のままでよい。距離やカメラ基準の座標を使うなら、あるいは望遠寄りの
-レンズで撮った映像に重ねたいなら設定する。
+**FOV を設定すると安定性を失う。** intrinsics を受け付けるのは `VNImageRequestHandler` の
+options だけで、`CMSampleBuffer` の attachment 経由は黙って無視される（40度・90度を渡しても
+復元値は 98.824度のまま・実測）。そのためハンドラを切り替えている:
+
+| Camera FOV | ハンドラ | 検出率 | `body:facing` の反転 |
+|---|---|---|---|
+| **0（既定）** | `VNSequenceRequestHandler`（連続フレームとして処理） | **60/60** | **0〜8%** |
+| > 0 | `VNImageRequestHandler` + intrinsics（1枚ずつ） | 56〜59/60 | 16〜18% |
+
+3クリップを 10fps で実測（反転＝隣接フレームで90度超の差。実際の人体は 0.1秒でそこまで回れない）。
+前後の曖昧さを解いているのは時間方向の文脈で、1枚ずつ処理するとそれが失われる。
+
+つまり**実距離が必要でない限り 0 のままがよい**。骨格の形も重ね合わせも 0 のほうが良い。
 
 **`cam:distance` から FOV を逆算できるか?** Vision が出す距離からは**できない**。距離は
 仮定した FOV から導かれた値なので循環する。同一フレームで測ると `distance × tan(FOV/2)` は

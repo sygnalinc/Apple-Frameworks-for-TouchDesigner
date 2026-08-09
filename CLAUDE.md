@@ -4398,3 +4398,33 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   演出で使うなら「飛んだら180度足して連続にする」後処理を入れる、と note と README に明記
 - **教訓**: 見た目がおかしいとき、描画側を疑う前に**値と素材を突き合わせる**。今回は
   頭部を拡大して顔の向きを確認 → 値のほうが誤りと確定できた
+
+### 2026-08-10 VNSequenceRequestHandler で安定性が大幅改善(ただし intrinsics と両立しない)
+
+- ユーザー「Swift の Mac アプリとして実装しても同じ精度?」→ モデルは同じなので基本は同じ、
+  ただし**入力の与え方**で差が出る。調べる過程で**プラグイン側の改善点が見つかった**
+- **連続フレームとして渡すと劇的に安定する**(3クリップ・10fps・60フレームで実測):
+
+  | | 検出率 | body:facing の180度反転 | 最大の飛び |
+  |---|---|---|---|
+  | 1枚ずつ `VNImageRequestHandler`(従来) | 56〜59/60 | 16〜18% | 179.6° |
+  | **`VNSequenceRequestHandler`** | **60/60** | **0〜8%** | 69.8〜176° |
+
+  単眼では真横の前後が原理的に曖昧なので、時間方向の文脈が効く。値の一致率は 3〜7% しかなく、
+  **別物の結果**が返る
+- **ただし intrinsics と両立しない**。実測で確定:
+
+  | 経路 | 40度/90度を渡したときの復元値 |
+  |---|---|
+  | `VNImageRequestHandler` + `options:VNImageOptionCameraIntrinsics` | **40.000 / 90.000**(効く) |
+  | `VNSequenceRequestHandler` + CMSampleBuffer attachment | 98.824 / 98.824(**無視**) |
+  | `VNImageRequestHandler` + CMSampleBuffer attachment | 98.824 / 98.824(**無視**) |
+
+  `VNSequenceRequestHandler` に `options:` 版は無い。**intrinsics を受け付けるのは
+  VNImageRequestHandler の options だけ**
+- **実装**: Camera FOV = 0 なら sequence(既定・安定重視)、> 0 なら image+intrinsics(距離重視)に
+  自動で切り替える。TD実測で Fov=0→cam:fov 98.824/dist 2.20、Fov=50→50.000/4.99 を確認
+- **Swift アプリとの比較の結論**: モデルもOSも同じなので**推定精度そのものは同じ**。差が出るのは
+  ①深度を渡せるか(AVDepthData・TOPには無い)②intrinsics をライブ撮影から自動取得できるか
+  ③入力画像がTDのチェーンで加工されていないか。**連続フレーム処理は今回プラグイン側にも入れた**ので
+  この点の差は解消した

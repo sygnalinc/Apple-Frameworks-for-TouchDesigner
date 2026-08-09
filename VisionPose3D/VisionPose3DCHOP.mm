@@ -395,23 +395,30 @@ private:
                     myRequest = [[VNDetectHumanBodyPose3DRequest alloc] init];
                 VNDetectHumanBodyPose3DRequest* request = myRequest;
 
-                // 実カメラの画角を渡す。渡さないと Vision は **水平98.8度の広角を仮定**し、
-                // 被写体との距離が大きく狂う（同一フレームで 40度指定なら root_z -7.21m、
-                // 未指定なら -2.20m と3倍以上違う・実測）。関節の角度そのものは画角に
-                // 依存しないので、影響するのは cam:* と camera 空間の座標だけ
-                NSDictionary* opts = @{};
+                // **連続フレームとして渡すか、1枚ずつ渡すか** — 両立できないので切り替える。
+                //
+                //  Camera FOV = 0 … VNSequenceRequestHandler。時間方向の手掛かりが効いて
+                //      検出率 56/60 → 60/60、体の向きが180度反転する頻度 18% → 2% になる（3クリップ実測）
+                //  Camera FOV > 0 … VNImageRequestHandler + options。**intrinsics を受け付けるのは
+                //      この経路だけ**（CMSampleBuffer の attachment 経由は両ハンドラとも無視される
+                //      ことを実測で確認: 40度/90度を渡しても復元値は 98.824 のまま）。
+                //      距離は正しくなるが、1枚ずつなので向きは不安定になる
                 const float fovDeg = myFov.load();
                 if (fovDeg > 1.0f) {
                     const float fx = (w * 0.5f) / tanf(fovDeg * (float)M_PI / 360.0f);
                     const simd_float3x3 K = simd_matrix(simd_make_float3(fx, 0, 0),
                                                         simd_make_float3(0, fx, 0),
                                                         simd_make_float3(w * 0.5f, h * 0.5f, 1));
-                    opts = @{ VNImageOptionCameraIntrinsics:
-                                  [NSData dataWithBytes:&K length:sizeof(K)] };
+                    VNImageRequestHandler* handler = [[VNImageRequestHandler alloc]
+                        initWithCVPixelBuffer:buffer
+                                      options:@{ VNImageOptionCameraIntrinsics:
+                                                     [NSData dataWithBytes:&K length:sizeof(K)] }];
+                    [handler performRequests:@[request] error:nil];
+                } else {
+                    if (!mySequence)
+                        mySequence = [[VNSequenceRequestHandler alloc] init];
+                    [mySequence performRequests:@[request] onCVPixelBuffer:buffer error:nil];
                 }
-                VNImageRequestHandler* handler =
-                    [[VNImageRequestHandler alloc] initWithCVPixelBuffer:buffer options:opts];
-                [handler performRequests:@[request] error:nil];
 
                 VNHumanBodyPose3DObservation* obs = request.results.firstObject;
                 if (obs) {
@@ -458,6 +465,7 @@ private:
 
     // ワーカー専用。使い回して初期化コストを避ける
     VNDetectHumanBodyPose3DRequest* myRequest API_AVAILABLE(macos(14.0)) = nil;
+    VNSequenceRequestHandler* mySequence = nil;   // 連続フレームとして扱うため常設
     std::atomic<float> myFov{0.0f};   // 実カメラの水平画角（0=Vision既定）
 };
 
