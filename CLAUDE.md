@@ -4020,3 +4020,25 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   ルートREADME(英日)の一覧も「約2fpsのじっくり系」→「毎秒6〜9回」に修正
 - **教訓**: 「遅い」と書いてある実測値は OS 更新で変わる。高速化を頼まれたら
   **まず現状を測り直す**(今回は半分が OS 側の改善、半分がコード側だった)
+
+### 2026-08-09 VisionPose の骨格線を「線」から「リボン(四角形)」へ + Wire Width は効かないと判明
+
+- ユーザー「VisionPoseの体の関節をlineで繋いで」。**骨格線自体は 2026-08-08 に実装済み**
+  (`geo2/skeleton` Script SOP・19本)で、5人ぶん92本が正しく生成されていた。見えなかった原因は
+  **① lineMAT が白のまま**(Hand=橙/Face=青/AnimalPose=黄 は色を付けたのに Pose だけ白が残っていた。
+  白い studio 背景+白い点スプライトに完全に埋もれる)**② 線が 1px**
+- **`Wire Width` はまったく効かないと実測で確定**: Constant MAT の Wire Width を **1 と 12** で
+  レンダして緑画素を数えたところ **どちらも 4171px で完全一致**。macOS/Metal は
+  ライン primitive の太さが常に 1px(Wireframe の on/off も無関係)。
+  2026-08-08 のログの「4例すべてで Wire Width を 3 に(見えにくかったので)」は**効果が無かった**
+- **修正**: skeleton を 2点の線ではなく **細長い四角形(リボン)** を出すよう書き換え。
+  進行方向に垂直なオフセット `n = (-dy, dx)/len * half` で4点を作り
+  `appendPoly(4, addPoints=False, closed=True)`。`Width` custom par(uv単位・既定 0.005)を追加。
+  **Aspect Correct UVs = On + Ortho Width = 1 では uv の1単位が縦横とも同じピクセル数**になるので、
+  太さを uv 単位で素直に指定できる(0.005 ≒ 1280px 幅で 6px)。四角形の継ぎ目は関節の点スプライトが隠す
+- lineMAT を緑(0.1, 1.0, 0.35)に。**実測**: 5人×19本=95プリム/380点、エラー・警告なし。
+  レンダを視認して全員の骨格がはっきり出ることを確認
+- skill `td-apple-ops/wiring.md` の「線が細いときは Wire Width を上げる」という**誤った助言を削除**し、
+  リボン方式のコード片に差し替え。demo.toe の note も更新(allowCooking は False に戻して保存)
+- **未着手**: VisionHand / VisionFace / VisionAnimalPose も同じ 1px のままなので、同じリボン方式に
+  するかはユーザー判断待ち(色は付いているので Pose ほど見えないわけではない)

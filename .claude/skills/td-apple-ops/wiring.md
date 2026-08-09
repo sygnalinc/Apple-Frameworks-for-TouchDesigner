@@ -88,7 +88,26 @@ Script SOP(骨を生成) → soptoPOP → outPOP → Geometry COMP → Render
    `appendPoly(0, ...)` + `line.append()` では1本しか生成されない
 4. **script で作った Geometry COMP には既定の `torus1` が入る。** 消さないと画面いっぱいの塗りになる
 
-線が細くて見えないときは Constant MAT の **Wire Width**(既定1px)を上げる。
+### 太い線は「線」では描けない — リボン(四角形)にする
+
+**macOS/Metal ではライン primitive の太さが常に 1px。Constant MAT の Wire Width を
+上げてもまったく効かない**(幅1と幅12でレンダ結果の描画ピクセル数が完全に一致することを実測)。
+
+太い骨・輪郭が要るなら、2点の線ではなく**細長い四角形**を出す:
+
+```python
+dx, dy = b[0]-a[0], b[1]-a[1]
+length = math.hypot(dx, dy)
+nx, ny = -dy/length*half, dx/length*half      # 進行方向に垂直なオフセット
+quad = scriptOp.appendPoly(4, addPoints=False, closed=True)
+for i, (x, y) in enumerate(((a[0]+nx, a[1]+ny), (b[0]+nx, b[1]+ny),
+                            (b[0]-nx, b[1]-ny), (a[0]-nx, a[1]-ny))):
+    p = scriptOp.appendPoint(); p.P = (x, y, 0); quad[i].point = p
+```
+
+**Aspect Correct UVs = On + Ortho Width = 1 なら uv の1単位は縦横とも同じピクセル数**なので、
+太さも uv 単位で素直に指定できる(0.005 ≒ 1280px幅で6px)。実例は demo.toe の
+`/project1/VisionPose/geo2/skeleton`。関節に点スプライトを重ねれば、四角形の継ぎ目も隠れる。
 
 ### Vision の関節名の `top` / `bottom` は「先端 / 付け根」
 
