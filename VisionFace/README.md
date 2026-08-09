@@ -1,10 +1,112 @@
-# Vision Face CHOP — 顔検出+ランドマーク（macOS）
+# Vision Face CHOP — face detection + landmarks (macOS)
+
+**English** | [日本語](#日本語)
+
+## English
+
+A TD-native custom CHOP that detects multiple faces (`VNDetectFaceLandmarksRequest`) in a TOP's
+image. Intended as the macOS answer to the Windows+NVIDIA-only Face Track CHOP (the channel layout
+is our own).
+
+### Output channels (Max Faces = N, 16 channels each; 168 with Landmarks on)
+
+| Channel | Description |
+|---|---|
+| `face{i}:valid` | Whether a face was detected (1/0) |
+| `face{i}/bbox:u,v,width,height` | Face bounding box (centre + size, 0–1) |
+| `face{i}/roll` `yaw` `pitch` | Face orientation in radians (**an axis that cannot be obtained is 0**) |
+| `face{i}/left_eye:u,v` `right_eye` `nose` `mouth` | Centres of the main landmarks (normalised image coordinates) |
+| `face{i}/p{0..84}:u,v` | Only with Landmarks on: all 85 landmark points. They are ordered **per region, in the correct order within that region**, so joining consecutive indices draws the contour |
+
+Faces are sorted left to right by the x of the bbox centre.
+
+### Parameters
+
+| Parameter | Default | Description |
+|---|---|---|
+| TOP | — | Path of the TOP to analyse |
+| Active | On | Enable/disable analysis |
+| Max Faces | 5 | Maximum faces to detect (**1–100**; the slider shows up to 10) |
+| All Landmark Points (85) | Off | Output all 85 points as p0..p84 (more channels) |
+| Flip Image Vertically | **On** | TD's TOP download is upside down, so this defaults to On |
+
+### Aspect Correct UVs
+
+`Aspect Correct UVs` (default **Off**) rescales uv so that one uv unit is the same pixel distance
+horizontally and vertically. Same role and same default as the parameter of the same name on TD's
+built-in **Body Track CHOP**.
+
+```
+aspect = input width / input height
+u' = u                             (stays 0..1)
+v' = 0.5 + (v - 0.5) / aspect      (shrunk to 1/aspect about the centre)
+the bbox height (a v distance) is also 1/aspect; the width is unchanged
+```
+
+Because `u` stays in 0..1, instancing with `tx = u - 0.5` / `ty = v - 0.5` lands exactly on the
+source video **with the camera's Ortho Width left at 1** (no manual scaling). Leave it Off when
+you want raw 0..1 image coordinates.
+
+### Landmark ordering (p0..p84)
+
+Vision's raw `allPoints` ordering is not usable for drawing, so the points are **repacked per
+region** before output. Joining consecutive indices gives you the contour, eyes, brows and lips
+directly (the nose has a caveat below).
+
+| Range | Region | Points | Closed |
+|---|---|---|---|
+| 0-16 | faceContour | 17 | open |
+| 17-22 / 23-28 | leftEye / rightEye | 6 / 6 | closed |
+| 29-34 / 35-40 | leftEyebrow / rightEyebrow | 6 / 6 | open |
+| 41-48 | nose | 8 | open |
+| 49-54 | noseCrest | 6 | open |
+| 55-64 | medianLine | 10 | open |
+| 65-78 | outerLips | 14 | closed |
+| 79-84 | innerLips | 6 | closed |
+
+The counts are measured on macOS 26 (constant across 288 samples: 12 faces × several frames), for
+**85 points** in total. `allPoints` only returns 76 because **medianLine overlaps other regions**.
+
+Unused slots are sentinels with `u = v = -1`, so skip them when drawing.
+
+**Joining the nose points consecutively looks asymmetric.** That is how Vision orders them, not a
+packing problem on our side (the same structure was confirmed across several faces):
+
+| Symptom | The actual data | How to draw it |
+|---|---|---|
+| A long diagonal from the midline to the left nostril | `nose`'s `p41` is the bottom of the bridge (on the midline), and `p42` jumps straight to the left nostril | Start the nostril sweep **at `p42`** |
+| A one-sided spur below the bridge | In `noseCrest`, `49→52` is the straight bridge and **`p53` / `p54` are the left and right nostrils** (a pair at the same height) | Draw the bridge **`49-52`** and the nostril bar **`53-54`** separately |
+| The bridge appears as a double line | `medianLine` (55-64) is the midline from the glabella to the chin and overlaps the bridge, nose and contour points | Do not draw `medianLine` |
+
+`demo.toe`'s `VisionFace/geo2/contour` is built along these lines and serves as the reference
+implementation.
+
+> **Before v0.9.2 the contour was allocated only 16 points, so the 17th was dropped, one side
+> ended short and the face looked asymmetric.** Allocating fewer slots than the real count
+> silently truncates the tail. Counting *used* slots **only reveals under-fill, never
+> truncation** — measure the region's `pointCount` directly.
+
+### Notes
+
+- **Face Capture Quality** (toggle, default Off): with it on, `face{i}/quality` (a 0–1 shot-quality
+  score from VNDetectFaceCaptureQualityRequest) is added after roll/yaw/pitch. Good for a photo
+  booth that picks the best expression automatically. With it off the channels are unchanged
+
+- Detection is unstable when faces are small (a wide full-body shot, say). A bust-up framing is
+  reliable
+- **Drawn faces (a print on a T-shirt, for instance) can also be detected as faces** (this is how
+  Vision works)
+- Measured: bbox and the relative positions of eyes/nose/mouth confirmed correct on a face photo
+
+Info CHOP: `executes / submits / analyzes`. Build with `./build.sh`.
+
+## 日本語
 
 TOP の映像から複数の顔（`VNDetectFaceLandmarksRequest`）を検出する
 TD ネイティブのカスタム CHOP。Windows+NVIDIA 専用 Face Track CHOP の macOS 代替を想定
 （チャンネル形式は独自）。
 
-## 出力チャンネル（Max Faces = N・各 16ch / Landmarks 有効時 168ch）
+### 出力チャンネル（Max Faces = N・各 16ch / Landmarks 有効時 168ch）
 
 | チャンネル | 内容 |
 |---|---|
@@ -16,7 +118,7 @@ TD ネイティブのカスタム CHOP。Windows+NVIDIA 専用 Face Track CHOP �
 
 face の並びは bbox 中心の x で左→右にソート。
 
-## パラメータ
+### パラメータ
 
 | パラメータ | 既定 | 内容 |
 |---|---|---|
@@ -25,7 +127,6 @@ face の並びは bbox 中心の x で左→右にソート。
 | Max Faces | 5 | 検出する顔の最大数（**1〜100**・スライダー表示は10まで） |
 | All Landmark Points (85) | Off | 全85点を p0..p84 として出力（チャンネル数が増える） |
 | Flip Image Vertically | **On** | TD の TOP ダウンロードは上下逆のため既定 On |
-
 
 ### Aspect Correct UVs（アスペクト比補正）
 
@@ -43,8 +144,7 @@ bbox の height（v方向の距離）も 1/aspect、width は不変
 **カメラの Ortho Width を 1 のまま**で元映像にぴったり重なる（手動スケール不要）。
 生の 0〜1 画像座標が欲しいときは Off のままにする。
 
-
-### ランドマークの並び（p0..p75）
+### ランドマークの並び（p0..p84）
 
 `allPoints` の生の並びは描画に使えないため、**領域ごとに詰め直して**出力している。
 連番で結べば輪郭・目・眉・唇がそのまま線になる（鼻だけは後述の注意あり）。
@@ -74,16 +174,14 @@ bbox の height（v方向の距離）も 1/aspect、width は不変
 | 鼻筋の下に片側だけ突起が出る | `noseCrest` は `49→52` が鼻筋の直線、**`p53` / `p54` は左右の小鼻**（同じ高さの対） | 鼻筋 **`49-52`** と 小鼻の横棒 **`53-54`** を分けて描く |
 | 鼻筋が二重線になる | `medianLine`(55-64) は眉間〜顎の正中線で、鼻筋・鼻・輪郭の点と重複する | `medianLine` は描かない |
 
-`demo.toe` の `VisionFace/geo2/contour` はこの方針で組んである。
+`demo.toe` の `VisionFace/geo2/contour` はこの方針で組んである（実装例）。
 
 > **以前は輪郭を16点で確保していたため17点目が落ち、片側だけ短く終わって左右非対称に
 > 見えていた**（v0.9.2 以前）。確保数を実測より小さくすると末尾が黙って切り捨てられる。
 > 「使用スロット数を数える」検証では**不足しか分からず超過は見えない**ので、
 > 領域の `pointCount` を直接計測すること。
 
-`demo.toe` の Vision Face 例（`geo2/contour`）が実装例。
-
-## 注意
+### 注意
 
 - **Face Capture Quality**(トグル・既定Off): Onで `face{i}/quality`(0〜1の顔写り
   スコア・VNDetectFaceCaptureQualityRequest)が roll/yaw/pitch の後に追加される。
