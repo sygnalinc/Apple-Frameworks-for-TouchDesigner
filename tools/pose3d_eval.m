@@ -27,6 +27,22 @@ typedef struct { const char* name; int idx3d; VNHumanBodyPoseObservationJointNam
 enum { ROOT, SPINE, CSHOULDER, CHEAD, THEAD, LSH, LEL, LWR, RSH, REL, RWR,
        LHIP, LKNEE, LANK, RHIP, RKNEE, RANK, NJOINTS };
 
+
+// ---- 幾何的に「正解が分かる」量を角度で見る -------------------------------
+// 正解データセットが無くても、こういう不変量なら検証できる:
+//   torso_pitch  : 体幹が鉛直から何度傾いているか。お辞儀・スクワットで 0→90 度付近まで動くはず
+//   head_tilt    : 体幹に対する頭の角度。首を傾げた分だけ動き、体幹の傾きには追従しないはず
+//   arm_elev_L/R : 腕が水平から何度か。T-pose なら 0 度・左右差 0 になるはず
+//   knee_flex_L/R: 膝の曲げ角（180=まっすぐ）
+static double angleBetween(simd_float3 a, simd_float3 b)
+{
+    const double la = simd_length(a), lb = simd_length(b);
+    if (la < 1e-9 || lb < 1e-9) return NAN;
+    double c = simd_dot(a, b) / (la * lb);
+    c = fmax(-1.0, fmin(1.0, c));
+    return acos(c) * 180.0 / M_PI;
+}
+
 int main(int argc, const char** argv)
 {
     @autoreleasepool {
@@ -61,6 +77,13 @@ int main(int argc, const char** argv)
         const int np = (int)(sizeof(pairs) / sizeof(pairs[0]));
 
         double sum[32] = {0}, worst[32] = {0}; int cnt[32] = {0};
+        double *pitch = (double*)calloc(argc, sizeof(double));
+        double *htilt = (double*)calloc(argc, sizeof(double));
+        double *armL  = (double*)calloc(argc, sizeof(double));
+        double *armR  = (double*)calloc(argc, sizeof(double));
+        double *kneeL = (double*)calloc(argc, sizeof(double));
+        double *kneeR = (double*)calloc(argc, sizeof(double));
+        int nang = 0;
         int frames = 0, both = 0;
         size_t W = 0, H = 0;
 
@@ -82,6 +105,34 @@ int main(int argc, const char** argv)
                 if (!o3 || !o2) continue;
                 both++;
 
+                {
+                    simd_float3 P[NJOINTS]; BOOL okall = YES;
+                    for (int j = 0; j < NJOINTS; j++) {
+                        VNHumanBodyRecognizedPoint3D* q = [o3 recognizedPointForJointName:jn[j] error:nil];
+                        if (!q) { okall = NO; break; }
+                        const simd_float4x4 m = q.position;
+                        // **カメラ空間で測る**。model 空間の +Y は体幹軸に沿っているらしく、
+                        // そのままだと torso_pitch が定義上ほぼ 0 になってお辞儀を検出できない
+                        // （スクワットで range 10.9 度しか出ずに気づいた）。
+                        // cameraOriginMatrix を掛けると Y がカメラの上方向になる
+                        const simd_float4 cp = simd_mul(o3.cameraOriginMatrix,
+                            simd_make_float4(m.columns[3].x, m.columns[3].y, m.columns[3].z, 1));
+                        P[j] = simd_make_float3(cp.x, cp.y, cp.z);
+                    }
+                    if (okall) {
+                        const simd_float3 up = simd_make_float3(0, 1, 0);
+                        const simd_float3 torso = P[CSHOULDER] - P[ROOT];
+                        pitch[nang] = angleBetween(torso, up);
+                        htilt[nang] = angleBetween(P[THEAD] - P[CHEAD], torso);
+                        // 腕が水平から何度か（+上 / -下）
+                        const simd_float3 aL = P[LWR] - P[LSH], aR = P[RWR] - P[RSH];
+                        armL[nang] = 90.0 - angleBetween(aL, up);
+                        armR[nang] = 90.0 - angleBetween(aR, up);
+                        kneeL[nang] = angleBetween(P[LHIP] - P[LKNEE], P[LANK] - P[LKNEE]);
+                        kneeR[nang] = angleBetween(P[RHIP] - P[RKNEE], P[RANK] - P[RKNEE]);
+                        nang++;
+                    }
+                }
                 for (int k = 0; k < np; k++) {
                     VNPoint* p3 = [o3 pointInImageForJointName:jn[pairs[k].idx3d] error:nil];
                     VNRecognizedPoint* p2 = [o2 recognizedPointForJointName:pairs[k].j2d error:nil];
@@ -109,6 +160,26 @@ int main(int argc, const char** argv)
             printf("  %-12s %8.1f %8.1f %6d\n", pairs[k].name, sum[k] / cnt[k], worst[k], cnt[k]);
             tot += sum[k]; totn += cnt[k];
         }
+        if (nang) {
+            printf("\n幾何的な不変量（正解データ無しで検証できる量）\n");
+            printf("  %-14s %8s %8s %8s\n", "measure", "min", "max", "range");
+            const char* an[6] = {"torso_pitch", "head_tilt", "arm_elev_L", "arm_elev_R",
+                                 "knee_flex_L", "knee_flex_R"};
+            double* ap[6] = {pitch, htilt, armL, armR, kneeL, kneeR};
+            for (int m = 0; m < 6; m++) {
+                double lo = 1e9, hi = -1e9;
+                for (int i = 0; i < nang; i++) {
+                    if (isnan(ap[m][i])) continue;
+                    if (ap[m][i] < lo) lo = ap[m][i];
+                    if (ap[m][i] > hi) hi = ap[m][i];
+                }
+                printf("  %-14s %8.1f %8.1f %8.1f\n", an[m], lo, hi, hi - lo);
+            }
+            printf("  ※ 度。お辞儀/スクワットなら torso_pitch の range が大きくなる。\n");
+            printf("     T-pose を含むクリップなら arm_elev の L/R が 0 付近で一致するはず\n");
+        }
+        free(pitch); free(htilt); free(armL); free(armR); free(kneeL); free(kneeR);
+
         printf("\n全関節平均 = %.1f px  ← クリップ比較用の総合スコア（小さいほど画像と整合）\n",
                totn ? tot / totn : 0.0);
     }
