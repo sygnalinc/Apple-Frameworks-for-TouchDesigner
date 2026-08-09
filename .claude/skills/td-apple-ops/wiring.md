@@ -115,6 +115,25 @@ Script SOP(骨を生成) → soptoPOP → outPOP → Geometry COMP → Render
 3. Composite(multiply)は **出力formatを rgba8fixed に固定**
    (Mono32Float 入力に引っ張られてモノクロ化する)
 
+## 検出した四隅に画像を貼り込む(corner pin)
+
+Vision Rect の `tl/tr/br/bl` へ別の映像を射影変換で貼る。実例は demo.toe の
+`/project1/VisionRect`(ノートPCの画面2枚に映像を流し込む)。
+
+- **Aspect Correct UVs は Off**。TOP空間のワープには**生の 0〜1 画像座標**が要る
+  (On にすると v が縮んで貼り込み位置がずれる)
+- CHOP を GLSL に渡すときは **Shuffle CHOP の `Sequence All Channels`** で
+  `Nch × 1sample` → `1ch × Nsample` にしてから GLSL TOP の
+  **Array(texture buffer)** へ。`texelFetch(uRects, i).r` で任意チャンネルを引ける。
+  **CHOPをそのまま texture buffer に繋ぐと texel 数 = サンプル数**になり、
+  1サンプルのCHOPでは 1 texel しか渡らない(必ず shuffle する)
+- 矩形数はシェーダ側で `textureSize(uRects) / 14` から決めれば `Max Rectangles` を
+  変えても壊れない(1矩形 = 14ch)
+- 貼り込みは**逆変換**で行う。単位正方形 → 四隅 の射影変換 M を作り、
+  出力画素 uv に `inverse(M)` を掛けて貼り込む画像側の st を求め、
+  `0..1` の内側だけ合成する
+- 検出は非同期なので、カメラが速く動くと貼り込みが**1〜2フレーム遅れる**
+
 ## Vision Flow が黒く見えるとき
 
 プラグインは正常。原因は2つ:

@@ -3735,3 +3735,32 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   上限超えの宣言に対し TD がクランプ後の幅でバッファを読むため斜めシアーになっていた)、
   **VisionFace のランドマーク切り捨てを解消**(76→85・輪郭17点目など)、
   Vision Contours に Aspect Correct UVs、CoreText の行送りで1行目が動く問題を修正
+
+### 2026-08-09 VisionRect 利用例: 検出した四隅に映像を貼り込む(corner pin)
+
+- ユーザーが VisionRect 用の素材2本を追加(`Assets/sample_laptops.mp4`(白画面のノートPC2台)
+  `sample_gallery.mp4`(壁の絵画3枚)・各2〜3MB・**コミットした**)。これに合わせて
+  `/project1/VisionRect` を「四隅を数値で見るだけ」から**実際に画像を合わせる例**へ拡張
+- 構成: `null4(元映像) → Visionrect1 → rectdata(Shuffle: Sequence All Channels) → warp(GLSL TOP)`。
+  GLSL の入力0=元映像 / 入力1=`art`(sample_ballet.mp4)。出力 `out1`
+- シェーダは **単位正方形→四隅 の射影変換(Heckbert)を作り `inverse(M)` で逆写像**し、
+  貼り込む画像側の st が 0〜1 の内側の画素だけ合成する。矩形数は
+  `textureSize(uRects)/14` から自分で求めるので Max Rectangles を変えても壊れない
+- **実測(M2・TD実機で視認)**: ノートPC2台の画面に同時にバレエ映像が**遠近つきで**貼り付く。
+  静止フレームでは画面枠とほぼ完全一致。gallery に差し替えると大きな絵画が映像に置き換わる
+- **踏んだ罠**:
+  ① **GLSL TOP の Array に CHOP を直結すると texel 数 = サンプル数**。70ch×1sample の CHOP は
+     **1 texel しか渡らない**(`textureSize` が 1)。**Shuffle CHOP の `Sequence All Channels`**
+     で `1ch×70sample` にしてから渡す
+  ② TOP空間のワープには**生の 0〜1 画像座標**が必要 → `Aspect Correct UVs` は **Off**
+     (On だと v が縮んで貼り込みが上下にずれる)
+  ③ `w.par.array = 1` では**シーケンスのブロックが増えない**。`w.seq.array.numBlocks = 1`
+     (ヘッダ par の値は「追加ブロック数」なので 0 のまま表示される)
+  ④ `par.pixeldat` / `par.array0chop` に **OPオブジェクトを代入すると効かないことがある**
+     (パス文字列で入れる)。glslmultiTOP を Python で create すると
+     `<name>_pixel/_info/_compute` が**自動でドック生成される**ので、自分で作った同名DATは
+     `_pixel1` にリネームされる(自動生成された方に書く)
+  ⑤ キーボード面が矩形として拾われていたので **Maximum Aspect Ratio を 0.8** に(画面は 0.66〜0.69)
+- 検出は非同期なのでカメラが速く動くと貼り込みが1〜2フレーム遅れる(note と README に明記)
+- VisionRect/README.md に「四隅に画像を貼り込む」節、skill `td-apple-ops/wiring.md` に
+  同名のレシピを追加。demo.toe 保存済み

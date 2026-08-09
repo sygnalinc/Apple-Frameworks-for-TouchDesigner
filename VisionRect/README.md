@@ -37,6 +37,25 @@ bbox の height（v方向の距離）も 1/aspect、width は不変
 **カメラの Ortho Width を 1 のまま**で元映像にぴったり重なる（手動スケール不要）。
 生の 0〜1 画像座標が欲しいときは Off のままにする。
 
+### 四隅に画像を貼り込む（corner pin）
+
+`tl/tr/br/bl` を使って、検出した矩形へ別の映像を射影変換で貼り込める。
+実例は `demo.toe` の `/project1/VisionRect`（ノートPCの画面2枚に映像を流し込む）。
+
+構成は `元映像 → Vision Rect → Shuffle(Sequence All Channels) → GLSL TOP` で、
+GLSL TOP の入力0が元映像、入力1が貼り込む画像。
+
+| 注意 | 内容 |
+|---|---|
+| Aspect Correct UVs | **Off**。TOP空間のワープには生の 0〜1 画像座標が要る（Onだと v が縮んで位置がずれる） |
+| CHOP の渡し方 | Shuffle CHOP の `Sequence All Channels` で `Nch×1sample` → `1ch×Nsample` にしてから GLSL の Array（texture buffer）へ。CHOPを直接繋ぐと **texel数=サンプル数**になり1 texel しか渡らない |
+| 矩形数 | シェーダ側で `textureSize(uRects) / 14` から求めれば Max Rectangles を変えても壊れない |
+| 遅れ | 検出は非同期なので、カメラが速く動くと貼り込みが1〜2フレーム遅れる |
+| 誤検出 | キーボード面などが拾われるときは `Maximum Aspect Ratio` を下げる（実例では 0.8） |
+
+貼り込みは逆変換で行う。単位正方形 → 四隅 の射影変換 `M` を作り、出力画素 `uv` に
+`inverse(M)` を掛けて貼り込む画像側の `st` を求め、`0〜1` の内側だけ合成する。
+
 ## ビルド
 
 ```sh
