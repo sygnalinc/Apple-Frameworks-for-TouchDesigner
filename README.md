@@ -24,6 +24,13 @@ caveats. `demo.toe` contains a **minimal usage example for every OP**, one conta
 All captured from `demo.toe` on an M2 MacBook Air — running live at 60 fps, except
 ImagePlayground, which is a generated result.
 
+Everything runs on-device. Where an external Core ML model is involved the caption names it
+(Depth Anything V2, YOLOv3); the rest use Apple's own frameworks, and the LLM demo uses Apple
+Intelligence's built-in on-device model (~3B). **The output is shown exactly as produced — no
+retouching — so model mistakes are visible**; the LLM demo contains a wrong answer on purpose,
+noted in its caption. A ~3B on-device model is good at short, general answers and unreliable on
+specifics, so treat its text as a starting point rather than a source of truth.
+
 The media lives in `docs/demo/`; regenerate it from the screen recordings with
 `./tools/make_demo_gifs.sh` (the sources stay local and are not committed).
 
@@ -39,6 +46,8 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | **[CoreML](CoreML/)** — monocular depth with Depth Anything V2 | **[Vision Subject](VisionSubject/)** — subject cutout, no green screen |
 | <img src="docs/demo/coretext.gif" width="400" alt="CoreText"> | <img src="docs/demo/imageplayground.jpg" width="400" alt="ImagePlayground"> |
 | **[CoreText](CoreText/)** — vertical Japanese typesetting, revealed a character at a time | **[ImagePlayground](ImagePlayground/)** — a face photo (left) turned into an illustration (right) |
+| <img src="docs/demo/llmafm-chat.gif" width="400" alt="LLM AFM"> | |
+| **[LLM AFM](LLMAFM/)** — Apple Intelligence's on-device model (~3B) answering in English and Japanese at once. Note the wrong answer: mixing red and blue gives *purple*, but the Japanese side says *blue* | |
 
 ## Table of contents
 

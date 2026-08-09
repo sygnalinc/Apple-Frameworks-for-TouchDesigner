@@ -23,6 +23,13 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 いずれも `demo.toe` を M2 MacBook Air で動かして収録したものです。ImagePlayground だけは
 生成結果の静止画で、それ以外は 60fps で動いているところをそのまま撮っています。
 
+すべてオンデバイスで動いています。外部の Core ML モデルを使うものはキャプションにモデル名を
+書いています(Depth Anything V2 / YOLOv3)。それ以外は Apple のフレームワーク、LLM のデモは
+Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は加工せずそのまま載せているので、
+モデルの間違いもそのまま映っています**(LLM のデモには意図的に誤答を残してあり、キャプションに
+明記しています)。~3B のオンデバイスモデルは短い一般的な問いには強い一方で固有の知識は当てに
+ならないので、出力は下書きとして扱うのが前提です。
+
 書き出し先は `docs/demo/`。作り直すときは `./tools/make_demo_gifs.sh`
 (元の収録ファイルはローカルのみでコミットしません)。
 
@@ -38,6 +45,8 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 | **[CoreML](CoreML/)** — Depth Anything V2 で単眼深度推定 | **[Vision Subject](VisionSubject/)** — グリーンバック無しの被写体切り抜き |
 | <img src="docs/demo/coretext.gif" width="400" alt="CoreText"> | <img src="docs/demo/imageplayground.jpg" width="400" alt="ImagePlayground"> |
 | **[CoreText](CoreText/)** — 日本語の縦組みを一文字ずつ表示 | **[ImagePlayground](ImagePlayground/)** — 顔写真(左)からイラスト(右)を生成 |
+| <img src="docs/demo/llmafm-chat.gif" width="400" alt="LLM AFM"> | |
+| **[LLM AFM](LLMAFM/)** — Apple Intelligence のオンデバイスモデル(~3B)が英語と日本語で同時に応答。日本語側の「赤と青を混ぜると青」は**誤答**(正しくは紫。英語側は purple と正答) | |
 
 ## 目次
 
