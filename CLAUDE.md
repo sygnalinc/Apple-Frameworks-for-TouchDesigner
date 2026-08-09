@@ -3872,3 +3872,29 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 参考: インストール済みの他62バンドルは 08-07〜08-08 のビルドで、リポジトリの
   v0.9.3 ビルド(08-09 07:46)とバイナリが異なる。ほとんどは同一ソースの焼き直しだが、
   開発環境をリリースと完全に揃えたい場合は全件再インストールする
+
+### 2026-08-09 LLM AFM の利用例に LINE 風チャットUIを追加(英語)
+
+- ユーザー要望。`/project1/LLMAFM/chat`(base COMP・720x1280 の縦画面)を新設し、
+  会話テーブルを吹き出しで描く。コンテナ直下に `out1` を追加してデモ一覧にも出るようにした
+- **構成**: 吹き出し1個 = `t{i}`(CoreText TOP・本文)+ `r{i}`(Rectangle TOP・角丸)を
+  `o{i}`(Over)で重ね、`comp1`(Composite・over)で全部を背景+ヘッダーに載せる。8スロット固定。
+  レイアウトは `chatui`(Execute DAT / **onFrameEnd**)が毎フレーム計算
+  (非同期な C++ DAT は onTableChange が安定して発火しないため。既存 handler と同じ理由)
+- **各吹き出しは画面全体(720x1280)のキャンバス**にして、位置は CoreText の
+  **Padl/Padr/Padt/Padb** と Rectangle の centerx/centery(pixels)で決める。
+  こうすると Transform TOP を挟まずに済み、ノード数が 1吹き出し=3個で収まる
+- 幅は文字数からの見積り(**34pt で 1文字≒15px・行送り 42px** が実測)。ずれても
+  CoreText の **Auto Fit** が縮めて収めるので破綻しない
+- **踏んだ罠**: ①`create(coretextTOP,…)` は不可 → カスタムOPは **`create('CoretextTOP', …)`**
+  (先頭大文字opType + FAMILY大文字)②base COMP を Out TOP に繋ぐのは
+  `connect(comp)` ではなく **`connect(comp.outputConnectors[0])`**
+  ③MCPの `run` は exec スコープなので、**全部を1つの関数に入れて呼ぶ**と変数が見える
+- **構造化出力(Schema)は解除した**。JSON が返るとチャットとして読めないため。
+  ツール呼び出しはそのまま
+- **実測(M2・実会話)**: 「What is the temperature on stage?」→ **ツールを使わず**
+  「取得できません」/「Use the get_sensor tool with name "temperature".」→ **ツールを呼び 42.0**。
+  ツール名を明示すべき、という既知の癖がそのままデモになった
+- **新しく分かった制約**: オンデバイスモデルは**コンテキスト窓が小さい**。40語程度の
+  Instructions + 3ターンで `error: Exceeded model context window size` になる。
+  Instructions を短くし、出たら Clear Conversation。LLMAFM/README(英日)に追記

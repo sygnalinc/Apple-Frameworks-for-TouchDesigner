@@ -68,7 +68,12 @@ reading and driving TD nodes to the LLM through an explicit tool schema.
 
 Note: the on-device model is small, so a vague question ("what is the temperature?") may make it
 answer "I have no sensor" instead of calling the tool. Naming the tool in the prompt makes it
-call reliably.
+call reliably. `demo.toe`'s `/project1/LLMAFM` shows both cases side by side in a chat view.
+
+**The context window is small too.** A long `Instructions` plus a few turns with Keep Context on
+is enough to produce `status: error: Exceeded model context window size` (measured with a
+~40-word Instructions and three turns). Keep the instructions short and pulse
+`Clear Conversation` when it happens.
 
 ### Where it fits (generation chains with other operators)
 
@@ -152,6 +157,11 @@ Select DAT で `field` 行だけ抜けばそのままショー制御に接続で
 
 注意: オンデバイスモデルは小さいので、「今の温度は?」のような曖昧な聞き方だと**ツールを使わず**
 「センサーがありません」と答えることがある。プロンプトでツール名を明示すると確実に呼ぶ。
+`demo.toe` の `/project1/LLMAFM` は、この両方をチャット画面で並べて見せている。
+
+**コンテキスト窓も小さい。** 長い `Instructions` + Keep Context で数ターン続けるだけで
+`status: error: Exceeded model context window size` になる(40語程度の Instructions と
+3ターンで実測)。Instructions は短くし、出たら `Clear Conversation` をパルスする。
 
 ### 使いどころ（他OPとの生成チェーン）
 
