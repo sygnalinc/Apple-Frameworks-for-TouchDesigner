@@ -19,6 +19,27 @@ M2 used for this repository**.
 
 The same applies below macOS 26: a warning plus passthrough, never an error.
 
+**Apple publishes no list of supported chips.** The SDK header only says to check `isSupported`
+"on the current platform", so the only reliable answer is to probe the machine you are on.
+`tools/vtprobe.m` does that for the whole VTFrameProcessor family:
+
+```sh
+clang -fobjc-arc -framework Foundation -framework VideoToolbox -framework CoreMedia \
+      -o /tmp/vtprobe tools/vtprobe.m && /tmp/vtprobe
+```
+
+Measured on this repo's machine (Mac14,2 / Apple M2 / macOS 26.6):
+
+| Processor | Supported |
+|---|---|
+| OpticalFlow / MotionBlur / FrameRateConversion / SuperResolutionScaler | YES |
+| LowLatencySuperResolutionScaler (96x96 .. 960x960) / LowLatencyFrameInterpolation | YES |
+| **TemporalNoiseFilter** | **no** (minimum/maximumDimensions both 0x0) |
+
+So it is not simply "Apple silicon" or "macOS 26" — every other processor in the family works on
+this M2 and only the temporal noise filter is gated. Which generation lifts that gate is not
+documented; run the probe on the machine in question.
+
 ### Parameters
 
 | Name | Description |
@@ -61,6 +82,27 @@ Apple の **ML テンポラルノイズフィルタ**(VTTemporalNoiseFilter・ma
 **本リポジトリのM2では実データ検証未実施**。
 
 macOS 26 未満でも同じく警告 + 素通しで、エラーにはしない。
+
+**Apple は対応チップの一覧を公開していない。** SDKヘッダも「current platform で `isSupported` を
+確認せよ」としか書いていないので、**動かすマシンで実測するしかない**。
+`tools/vtprobe.m` が VTFrameProcessor 一族をまとめて調べる:
+
+```sh
+clang -fobjc-arc -framework Foundation -framework VideoToolbox -framework CoreMedia \
+      -o /tmp/vtprobe tools/vtprobe.m && /tmp/vtprobe
+```
+
+本リポジトリの実機(Mac14,2 / Apple M2 / macOS 26.6)での実測:
+
+| プロセッサ | 対応 |
+|---|---|
+| OpticalFlow / MotionBlur / FrameRateConversion / SuperResolutionScaler | YES |
+| LowLatencySuperResolutionScaler(96x96 .. 960x960)/ LowLatencyFrameInterpolation | YES |
+| **TemporalNoiseFilter** | **no**(minimum/maximumDimensions とも 0x0) |
+
+つまり「Apple Silicon かどうか」「macOS 26 かどうか」の話ではない。**この M2 では一族の他の
+プロセッサは全部動き、テンポラルノイズフィルタだけが弾かれている**。どの世代で解禁されるかは
+非公開なので、対象マシンで上記プローブを走らせて確かめること。
 
 ### パラメータ
 
