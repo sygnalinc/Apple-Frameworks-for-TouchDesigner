@@ -3764,3 +3764,30 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 検出は非同期なのでカメラが速く動くと貼り込みが1〜2フレーム遅れる(note と README に明記)
 - VisionRect/README.md に「四隅に画像を貼り込む」節、skill `td-apple-ops/wiring.md` に
   同名のレシピを追加。demo.toe 保存済み
+
+### 2026-08-09 各opのREADMEを英日併記に統一(57件)
+
+- ユーザー指示「それぞれのopのREADMEを英語と日本語の併記にして」
+- **1ファイルに英語セクション + 日本語セクション**の形にした(`README.md` は各opの
+  `opHelpURL` の参照先なので、ルートのように `README.ja.md` へ分けるとHelpボタンから
+  英語版しか開けなくなる)。構成は `# タイトル` → `**English** | [日本語](#日本語)` →
+  `## English` → `## 日本語`。元のH2/H3は1段下げて格納
+- **ついでに直した実害のある古い記述**:
+  - タイトルが opLabel とずれていた: CoreAudioProcessTap(CoreAudio Tap → **CA Process Tap**)、
+    SpeechActivity(Voice Activity → **Speech Activity**)、CoreMLImageGen(Image Gen →
+    **CoreML ImageGen**)
+  - **ビルド手順の cd 先がリネーム前のフォルダ**: CoreAudioProcessTap(ProcessAudio)、
+    CoreWLAN(WiFiMonitor)、Spotlight(SemanticIndex)、MultipeerDAT(Multipeer)
+  - **成果物名が実際の build.sh と不一致**: CreateMLTrainingRecorder / LLMAFM / CoreMLDAT
+  - **消えたopへのリンク**: CoreMLCHOP→CoreMLDetect、CoreMLMotion→CreateMLMotion、
+    TextAnalyze→VisionSimilarity(develop送り)、VisionSubject→VisionSegment(同)
+  - VisionFace の見出しが `p0..p75` のまま(実体は85点)、VisionPose に存在しない
+    VisionPoseOSC アプリの節、CoreText の利用例パスが `sample.toe`
+- 補足を足した箇所: VisionPose3D は Aspect Correct が **u,v のみ**に効く(tx,ty,tz は
+  メートルなので不変)、VisionSaliency は **意図的に Aspect Correct を持たない**
+  (Crop TOP へ直接渡す前提で生uvが要る)、VisionTrajectory は放物線係数も補正される、
+  LLMMLX の Model が式モードだと裸のリポジトリIDで SyntaxError、
+  SpeechSynth の timeslice 修正、LLMAFM のツール呼び出しはプロンプトでツール名を明示する
+- 検証: 57件すべてで `## English` / `## 日本語` / ナビ行が各1個であることを機械チェック
+- **palette/README.md・models/README.md・Assets/ml_examples/README.md は対象外**
+  (opのREADMEではないため)。ルート README(英日)は従来どおり別ファイル
