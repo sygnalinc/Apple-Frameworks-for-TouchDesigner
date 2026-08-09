@@ -36,3 +36,7 @@ demo_capture/
 
 # 生成物（コミットしない・必要なときに tools/gen_ops_catalog.py で作る）
 ops_catalog.json
+
+# Codex 関連(ローカル専用・コミットしない)
+AGENTS.md
+.codex/
