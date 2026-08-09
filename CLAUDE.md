@@ -3816,3 +3816,20 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   リポジトリ内に palette への参照は履歴ログ(CLAUDE.md)以外に残っていないことを確認
 - ローカルの TD palette フォルダ(`~/Library/.../palette/sygnal/`)には3つとも残したまま。
   開発機では引き続き使える(消すかはユーザー判断)
+
+### 2026-08-09 VisionFace の素材を10人版に差し替え + デモGIF更新
+
+- ユーザーがカメラ固定・各人が個別に喋る/動く10人の映像を生成(2行×5人・正面向き)。
+  旧素材(12人・横顔と重なりが多く一部の顔でランドマークが崩れていた)を置き換え
+- ユーザーが置いた `Assets/smple_faces2.mp4` は**ファイル名のタイポ**だったので
+  `Assets/sample_faces.mp4` へリネーム(旧12人版を上書き)。TD側も
+  `/project1/VisionFace/smple_faces2` → `sample_faces` にリネームし file par を更新。
+  **旧 sample_faces.mp4 を参照するノードが他に無いことを全27 moviefilein の走査で確認**してから実施
+- **実測**: `Max Faces = 10` で **valid = 10**(全員検出)。コンテナ内エラー・警告なし
+- デモGIF を `demo_capture/VisionFace2.mp4` から作り直し(`make_demo_gifs.sh` の
+  visionface 行を VisionFace2.mp4 / 4.0秒に変更)。**2.0MB → 1.2MB と尺を伸ばして軽くなった**
+  — カメラ固定+無地背景で毎フレームの変化画素が減ったため(GIFはフレーム間差分でしか縮まない)
+- 素材自体も 5.3MB → 3.5MB
+- 注意: 検証中、**全27の moviefilein が 128x128 を返す**状態だった(TDが前面に無く
+  ムービーがロードされていないため。私のリネーム起因ではないことを、無関係な
+  sample_face 等でも同じだったことで確認)。前面に戻せばロードされる

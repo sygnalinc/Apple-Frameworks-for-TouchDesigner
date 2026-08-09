@@ -33,7 +33,7 @@ filter() {   # 幅 fps hqdn3d 色数
 CLIPS=(
     "visionpose|VisionPose.mp4|0|4.0|480|12|8:8:14:14|64"
     "visionhand|VisionHand.mp4|0|4.0|480|12|8:8:14:14|64"
-    "visionface|VisionFace.mp4|0|3.2|480|12|8:8:14:14|128"     # 顔のランドマークは線が細いので色数を上げる
+    "visionface|VisionFace2.mp4|0|4.0|480|12|8:8:14:14|128"    # 顔のランドマークは線が細いので色数を上げる
     "visiontext|VisionText.mp4|3.4|3.0|480|12|8:8:14:14|64"    # 認識枠が出るのは 3.4s から
     "visionanimalpose|VisionAnimalPose.mp4|2.6|3.0|480|12|8:8:14:14|64"  # 2.6s まで骨格だけで元動画が出ない
     # 人混みの街路はほぼ全画素が毎フレーム変わる。fps と尺を落として強めに除去する
