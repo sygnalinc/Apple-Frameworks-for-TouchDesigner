@@ -3924,3 +3924,18 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   allowCooking ②「警告は出るが映像は流れている(Metal Denoise)」を追加
 - リポジトリ外の個人skill **~/.claude/skills/touchdesigner-dev** にも、TD汎用の4点
   (exec スコープ・カスタムOPのcreate・outputConnectors・allowCooking)を反映
+
+### 2026-08-09 LLM AFM の例を2ノードに分離(Llmafm1=ツール / Llmafm2=チャット)
+
+- ユーザーが `Llmafm2` を追加。**Llmafm1 はツール呼び出しのデモのまま**、
+  **Llmafm2 を LINE 風チャットの表示元**にする、という分担にした
+- `chatui` の先頭に **`SRC = 'Llmafm2'`** を置いて描画対象を切り替えられるようにした
+  (以前は Llmafm1 をハードコードしていた)
+- Llmafm2: Instructions =「ショー前の舞台監督が VJ とテキストしている」設定(英語・1〜2文)、
+  Maxtokens 70、ツールOff、Schema 空。3往復の会話を実際に生成して吹き出し6個を確認
+- Llmafm1: Instructions をツール用に戻し、`get_sensor` の往復を1回実行して
+  「42.0 degrees」が出る状態にした
+- ユーザー側の調整はそのまま活かした: 背景を灰(0.7)に変更、`chat/out1 -> fit1 -> out1` で
+  720x1280 の縦画面を 1280x720 に収めてデモ一覧に載るようにしている
+- note を2ノードの役割分担で書き直し。**チャット表示側は Schema を空にする**
+  (JSON が返ると会話として読めない)ことも明記
