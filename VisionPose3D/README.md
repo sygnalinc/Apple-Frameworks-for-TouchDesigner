@@ -36,12 +36,14 @@ Things that do **not** help (all measured on M2):
 | An IOSurface-backed pixel buffer | No difference (158 ms either way) |
 | A different request revision | Only revision 1 exists |
 
-### Output channels (89)
+### Output channels (91)
 
 | Channel | Description |
 |---|---|
 | `valid` | Whether a person was detected (1/0) |
-| `cam:facing` | **Which way the performer faces** relative to the lens (degrees; 0 = facing you, ±90 = profile, ±180 = back to you) |
+| `body:facing` | **Which way the performer faces** (degrees; 0 = facing you, ±90 = profile, ±180 = back to you) |
+| `body:pitch` | Forward/back lean of the torso (degrees; + is bending forward, as in a bow) |
+| `body:roll` | Sideways lean of the torso (degrees) |
 | `cam:distance` | Lens-to-hips distance (metres) |
 | `cam:fov` | The horizontal FOV the reconstruction used (degrees) — drop it into a Camera COMP's FOV Angle and the 3D skeleton lands on the source video |
 | `{joint}:tx,ty,tz` | Joint 3D position (metres, y up; origin set by **Coordinate Space**) |
@@ -76,24 +78,36 @@ same convention as a TD camera: put a Camera COMP at the origin with default rot
 straight down the real camera's axis. Since TD's FOV Angle is horizontal, a full body at ~2.5 m
 needs the camera pulled back (the example uses `tz = 2.5`) or a wider FOV.
 
-### The `cam:` channels
+### The `body:` and `cam:` channels
 
 `cam:*` describes the **relationship between the performer's own frame and the camera** — nothing
 about the camera in absolute terms. Either side moving changes it: a locked-off tripod still
-produces a swinging `cam:facing` when the performer turns.
+produces a swinging `body:facing` when the performer turns.
 
 | Channel | Use it for |
 |---|---|
-| `cam:facing` | Trigger on "turns to face the audience", crossfade between front/side looks, drive a spatial-audio pan |
+| `body:facing` | Trigger on "turns to face the audience", crossfade between front/side looks, drive a spatial-audio pan |
+| `body:pitch` | Bows, crouches, leaning into the camera |
+| `body:roll` | Sideways lean, tilt-driven effects |
 | `cam:distance` | Proximity effects: brightness, reverb, particle density as someone walks in |
 | `cam:fov` | Feed a Camera COMP's FOV Angle to land the skeleton on the source video |
 
-**`cam:facing` is computed from the shoulders, not from an Euler decomposition.** The camera's
+**`body:facing` is computed from the shoulders, not from an Euler decomposition.** The camera's
 rotation as Euler angles splits the facing information across two axes: on footage where the
 subject is filmed entirely from behind, the yaw term sits at −35° the whole time while the *pitch*
 term flips to ±178°. Taking the chest normal (shoulder vector × up) and an `atan2` gives one angle
-covering the full circle instead — measured +125…+138° on that back-facing clip, +5…+10° when the
-dancer faces the lens, ±74…81° in profile.
+covering the full circle instead — measured +125…+138° on that back-facing clip, −6° when the actor
+faces the lens and ±89…91° when he turns to profile in the same shot.
+
+`body:pitch` and `body:roll` are measured in the performer's **own** frame (right = shoulder
+vector, forward = chest normal), so "bending forward" means the same thing whichever way they are
+facing. Standing still they sit within ±3°; the bow clip reaches +31°.
+
+**Per-joint rotations are not available.** `VNHumanBodyRecognizedPoint3D.position` and
+`localPosition` are `simd_float4x4`, which looks promising, but the 3×3 block is exactly the
+identity on every joint (off-diagonal sum 0.0000, det 1.0) — the matrices carry translation only.
+Bone *directions* can be derived from the positions, but the twist about each bone (forearm
+pronation, for instance) is not recoverable from points at all.
 
 Earlier versions also published `cam:tx,ty,tz`, `cam:rx,ry,rz`, `cam:azimuth` and `cam:elevation`.
 They were removed after checking what they actually added: the azimuth/elevation pair is `root:u,v`
@@ -210,12 +224,12 @@ TD 側のフレームレートは落ちず、チャンネル値が毎秒数回�
 | IOSurface 付きのピクセルバッファ | 差なし（どちらも158ms） |
 | 別のリビジョン | revision 1 しか存在しない |
 
-### 出力チャンネル（89ch）
+### 出力チャンネル（91ch）
 
 | チャンネル | 内容 |
 |---|---|
 | `valid` | 検出できたか（1/0） |
-| `cam:facing` | **演者がレンズに対してどちらを向いているか**（度・0=正面 / ±90=真横 / ±180=背面） |
+| `body:facing` | **演者がレンズに対してどちらを向いているか**（度・0=正面 / ±90=真横 / ±180=背面） |
 | `cam:distance` | レンズ〜腰の距離（メートル） |
 | `cam:fov` | 再構成に使われた水平画角（度）。Camera COMP の FOV Angle に入れると3D骨格が元映像に重なる |
 | `{joint}:tx,ty,tz` | 関節の3D位置（メートル・y上向き・原点は **Coordinate Space** で決まる） |
@@ -248,21 +262,31 @@ left_hip left_knee left_ankle right_hip right_knee right_ankle`
 Camera COMP を原点・回転0で置けば、実カメラの光軸をそのまま向く。ただし TD の FOV Angle は
 **水平**なので、2.5m 先の全身を入れるにはカメラを引くか（利用例は `tz = 2.5`）FOV を広げる必要がある。
 
-### cam: チャンネル
+### body: と cam: チャンネル
 
 `cam:*` は**演者自身の座標系とカメラの関係**を表す量で、カメラの絶対的な情報ではない。
-どちらが動いても変化するので、三脚で固定していても演者が振り向けば `cam:facing` は振れる。
+どちらが動いても変化するので、三脚で固定していても演者が振り向けば `body:facing` は振れる。
 
 | チャンネル | 使い道 |
 |---|---|
-| `cam:facing` | 「客席を向いた」をトリガに演出を切り替える、音を左右に振る |
+| `body:facing` | 「客席を向いた」をトリガに演出を切り替える、音を左右に振る |
+| `body:pitch` | お辞儀・しゃがみ・カメラへの前傾 |
+| `body:roll` | 横方向の傾き |
 | `cam:distance` | 近づくほど明るく/リバーブを減らす等の近接演出 |
 | `cam:fov` | Camera COMP の FOV Angle に入れて骨格を元映像に重ねる |
 
-**`cam:facing` は Euler 分解ではなく肩ベクトルから求めている。** カメラ回転を Euler 角で出すと
+**`body:facing` は Euler 分解ではなく肩ベクトルから求めている。** カメラ回転を Euler 角で出すと
 向きの情報が2軸に分裂する: 全編ずっと後ろ姿の映像で yaw は −35° 付近のまま動かず、代わりに
 pitch が ±178° に振れた。胸の法線（肩ベクトル × 上方向）を `atan2` すれば1本の角度で全周を
-表せる。実測で 後ろ姿 +125〜138° / 正面 +5〜10° / 真横 ±74〜81°。
+表せる。実測で 後ろ姿 +125〜138°、同一ショット内で 正面 −6° / 真横 ±89〜91°。
+
+`body:pitch` / `body:roll` は**演者自身の枠**（right=肩ベクトル、forward=胸の法線）で測るので、
+どちらを向いていても「前に曲げた」が同じ意味になる。直立時は ±3° 以内、お辞儀の素材で +31°。
+
+**関節ごとの回転は取得できない。** `VNHumanBodyRecognizedPoint3D.position` と `localPosition` は
+`simd_float4x4` だが、3x3 部分は全関節で**完全に単位行列**（非対角の合計 0.0000・det 1.0）で、
+中身は平行移動だけ。骨の**向き**は位置から作れるが、骨まわりのひねり（前腕の回内など）は
+点の位置からは原理的に復元できない。
 
 以前は `cam:tx,ty,tz` / `cam:rx,ry,rz` / `cam:azimuth` / `cam:elevation` も出していたが、
 実際に何が増えているのかを確認して削除した。azimuth・elevation は `root:u,v` を角度にしただけ

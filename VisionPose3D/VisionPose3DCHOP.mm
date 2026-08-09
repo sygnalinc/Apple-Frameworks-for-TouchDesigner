@@ -4,9 +4,11 @@
 // （VNDetectHumanBodyPose3DRequest・macOS 14+・17関節）を推定して出力する。
 // 2D複数人の VisionPose CHOP と対になる、単一人物・3D版。
 //
-// 出力チャンネル（89ch・1サンプル）:
+// 出力チャンネル（91ch・1サンプル）:
 //   valid                     検出できたか（1/0）
-//   cam:facing                演者がレンズに対してどちらを向いているか（度・0=正面/±180=背面）
+//   body:facing               体の向き（度・0=レンズを向く / ±90=真横 / ±180=背面）
+//   body:pitch                前後の傾き（度・+=前傾＝お辞儀）
+//   body:roll                 左右の傾き（度）
 //   cam:distance              レンズ〜腰の距離（メートル・Camera FOV を設定すれば実寸）
 //   cam:fov                   3D再構成に使われた水平画角（度）
 //   {joint}:tx,ty,tz          17関節の3D位置（Space パラメータ基準・メートル・y上向き）
@@ -68,7 +70,9 @@ constexpr int kNumJoints = 17;
 // 関節だけ欲しいときは Select CHOP の `^*cam*` 一発で落とせる
 static const char* kFixedNames[] = {
     "valid",
-    "cam:facing",     // 演者がレンズに対してどちらを向いているか（度・0=正面 / ±180=背面）
+    "body:facing",    // 体の向き（度・0=レンズを向く / ±90=真横 / ±180=背面）
+    "body:pitch",     // 前後の傾き（度・+=お辞儀の向きに前傾）
+    "body:roll",      // 左右の傾き（度・+=左肩側へ傾く）
     "cam:distance",   // レンズ〜腰の距離（メートル）
     "cam:fov",        // 3D再構成に使われた水平画角（度）
 };
@@ -135,49 +139,61 @@ public:
             myWorker.join();
     }
 
-    // cam:* の3ch（facing / distance / fov）を埋める。
-    // 以前は カメラ位置3+回転3+方位2 も出していたが、実測して整理した:
-    //   - 回転 rx,ry,rz は Euler 分解の都合で向きの情報が rx と ry に分裂する。
-    //     全編ずっと後ろ姿の映像で ry は -35 度付近のまま、代わりに rx が ±178 度に振れた。
-    //     **ry 単体では正面/背面を区別できない**ので、肩ベクトルから1本の facing に作り直した
-    //   - azimuth / elevation は root:u,v を角度にしただけ（fov 経由で完全に一致することを実測）
-    //   - カメラ位置 tx,ty,tz は root 空間で TD カメラを合わせる用途専用で、
-    //     それは camera 空間＋カメラ原点と同じ絵になるため落とした
-    static void fillCameraChannels(const Pose3D& pose, float* out)
+    // body:* と cam:* を埋める。
+    //
+    // **Vision は関節の回転を返さない**。`VNHumanBodyRecognizedPoint3D.position` /
+    // `localPosition` は simd_float4x4 だが、3x3 部分は実測で**完全に単位行列**
+    // （非対角成分の合計 0.0000・det 1.0）。つまり中身は平行移動だけ。
+    // そこで体幹の向きは関節位置から自前で組む。
+    //
+    // 体の座標系: right = 右肩→左肩 / fwd = right × up（胸の法線）/ up = 世界の上。
+    // pitch と roll をこの体自身の枠で測るので、**どちらを向いていても
+    // 「前に曲げた」「横に傾けた」が同じ意味**になる。
+    static void fillBodyChannels(const Pose3D& pose, float* out)
     {
         const simd_float4x4& M = pose.toCamera;
         const float deg = 180.0f / (float)M_PI;
 
-        // 腰をレンズから見た位置（= M * 原点）。被写体は -Z 側
-        const simd_float3 s = simd_make_float3(M.columns[3].x, M.columns[3].y, M.columns[3].z);
-        out[1] = simd_length(s);
-
-        // 体の向き: カメラ空間で「右肩→左肩」と上方向の外積が胸の正面。
-        // atan2 なので ±180 度まで表せる（asin ベースの Euler だと ±90 で頭打ちになる）
-        const simd_float3 up = simd_make_float3(0, 1, 0);
-        const simd_float4 l4 = simd_mul(M, simd_make_float4(pose.joints[5][0], pose.joints[5][1], pose.joints[5][2], 1.0f));
-        const simd_float4 r4 = simd_mul(M, simd_make_float4(pose.joints[8][0], pose.joints[8][1], pose.joints[8][2], 1.0f));
-        const simd_float3 sh = simd_make_float3(l4.x - r4.x, l4.y - r4.y, l4.z - r4.z);
-        const simd_float3 fwd = simd_cross(sh, up);
-        out[0] = (simd_length(fwd) > 1e-6f)
-                     ? atan2f(fwd.x, fwd.z) * deg
-                     : 0.0f;
-
-        // Vision が内部で使っている画角。u = 0.5 + fx*(x/-z) が厳密に成り立つので
-        // （残差 0.00000 を実測済み）、原点を通る最小二乗で fx を逆算して角度に直す。
-        // これを TD Camera COMP の FOV Angle に入れると、3D骨格が元映像にそのまま重なる
-        double num = 0.0, den = 0.0;
-        for (int j = 0; j < kNumJoints; j++) {
+        auto camPos = [&](int j) {
             const simd_float4 c = simd_mul(M, simd_make_float4(pose.joints[j][0],
                                                                pose.joints[j][1],
                                                                pose.joints[j][2], 1.0f));
+            return simd_make_float3(c.x, c.y, c.z);
+        };
+        const simd_float3 lsh = camPos(5), rsh = camPos(8);
+        const simd_float3 root = camPos(0), cshoulder = camPos(2);
+
+        const simd_float3 up = simd_make_float3(0, 1, 0);
+        const simd_float3 shoulder = lsh - rsh;
+        const simd_float3 fwd = simd_cross(shoulder, up);
+        const simd_float3 torso = cshoulder - root;
+
+        if (simd_length(shoulder) > 1e-6f && simd_length(fwd) > 1e-6f) {
+            const simd_float3 r = simd_normalize(shoulder);
+            const simd_float3 f = simd_normalize(fwd);
+            // atan2 なので ±180 度まで表せる（Euler 分解の asin だと ±90 で頭打ちになり、
+            // 実際に「全編後ろ姿」の映像で正面/背面を区別できなかった）
+            out[0] = atan2f(f.x, f.z) * deg;
+            out[1] = atan2f(simd_dot(torso, f), simd_dot(torso, up)) * deg;
+            out[2] = atan2f(simd_dot(torso, r), simd_dot(torso, up)) * deg;
+        }
+
+        // 腰をレンズから見た位置（= M * 原点）。被写体は -Z 側
+        const simd_float3 s = simd_make_float3(M.columns[3].x, M.columns[3].y, M.columns[3].z);
+        out[3] = simd_length(s);
+
+        // Vision が内部で使っている画角。u = 0.5 + fx*(x/-z) が厳密に成り立つので
+        // （残差 0.00000 を実測済み）、原点を通る最小二乗で fx を逆算して角度に直す
+        double num = 0.0, den = 0.0;
+        for (int j = 0; j < kNumJoints; j++) {
+            const simd_float3 c = camPos(j);
             if (fabsf(c.z) < 1e-6f)
                 continue;
             const double ratio = c.x / -c.z;
             num += (pose.joints[j][3] - 0.5) * ratio;
             den += ratio * ratio;
         }
-        out[2] = (den > 1e-9) ? (float)(2.0 * atan(0.5 / (num / den)) * 180.0 / M_PI) : 0.0f;
+        out[4] = (den > 1e-9) ? (float)(2.0 * atan(0.5 / (num / den)) * 180.0 / M_PI) : 0.0f;
     }
 
     void getGeneralInfo(CHOP_GeneralInfo* ginfo, const OP_Inputs*, void*) override
@@ -251,7 +267,7 @@ public:
         float fixed[kFixedChans] = {};
         fixed[0] = on ? 1.0f : 0.0f;
         if (on)
-            fillCameraChannels(pose, fixed + 1);
+            fillBodyChannels(pose, fixed + 1);
         for (int i = 0; i < kFixedChans; i++)
             output->channels[i][0] = fixed[i];
         for (int j = 0; j < kNumJoints; j++) {
