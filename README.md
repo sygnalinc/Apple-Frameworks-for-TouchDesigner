@@ -182,7 +182,7 @@ Open it and drag **only the `.plugin` bundles you actually need** into
 If you do want everything:
 
 ```sh
-cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.10.0/"*.plugin \
+cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.9.3/"*.plugin \
       ~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins/
 ```
 
@@ -235,11 +235,11 @@ For *writing* plugins rather than using them, see
 
 ## Versioning
 
-Current release: **0.10.0** (see [`VERSION`](VERSION))
+Current release: **0.9.3** (see [`VERSION`](VERSION))
 
 | Version | Date | Operators | Highlights |
 |---|---|---|---|
-| **[0.10.0](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.10.0)** | 2026-08-09 | 59 | Fixes garbled output under the Non-Commercial resolution cap (10 TOPs). **Vision Face landmarks 76 → 85** — the old layout truncated each region, so `p` indices shift (breaking for that operator). `Aspect Correct UVs` on Vision Contours. CoreText line-height fix. |
+| **[0.9.3](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.3)** | 2026-08-09 | 59 | Fixes garbled output under the Non-Commercial resolution cap (10 TOPs). **Vision Face landmarks 76 → 85** — the old layout truncated each region, so `p` indices shift (breaking for that operator). `Aspect Correct UVs` on Vision Contours. CoreText line-height fix. |
 | [0.9.2](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.2)** | 2026-08-08 | 59 | Fixes a TOP left black after bypass (all 17 CPUMem TOPs) and 6 plugins that had silently stopped building. Vision Face landmark order, Vision AnimalPose skeleton. `Aspect Correct UVs` on Vision Text. |
 | [0.9.1](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.1) | 2026-08-08 | 66 | `Aspect Correct UVs` across 10 Vision operators. Fixes the startup load error caused by an SDK version mismatch. |
 | [0.9.0](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.0) | 2026-08-07 | — | First Developer ID signed + notarized release. Its DMG was withdrawn; use 0.9.2. |

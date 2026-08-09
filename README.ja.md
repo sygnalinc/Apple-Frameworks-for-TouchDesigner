@@ -182,7 +182,7 @@ FoundationModels / ScreenCaptureKit / RealityKit ほか)を、**TouchDesigner �
 まとめて入れる場合は:
 
 ```sh
-cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.10.0/"*.plugin \
+cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.9.3/"*.plugin \
       ~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins/
 ```
 
@@ -233,11 +233,11 @@ ln -s "$PWD/.claude/skills/td-apple-ops" ~/.claude/skills/td-apple-ops
 
 ## バージョン
 
-現在のリリース: **0.10.0**([`VERSION`](VERSION))
+現在のリリース: **0.9.3**([`VERSION`](VERSION))
 
 | バージョン | 日付 | OP数 | 主な内容 |
 |---|---|---|---|
-| **[0.10.0](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.10.0)** | 2026-08-09 | 59 | Non-Commercial の解像度上限で絵が崩れる不具合を修正(10 TOP)。**Vision Face のランドマークを 76 → 85 点に**(旧レイアウトは各領域を切り捨てていた。`p` インデックスがずれる**後方非互換**)。Vision Contours に `Aspect Correct UVs`。CoreText の行送り修正 |
+| **[0.9.3](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.3)** | 2026-08-09 | 59 | Non-Commercial の解像度上限で絵が崩れる不具合を修正(10 TOP)。**Vision Face のランドマークを 76 → 85 点に**(旧レイアウトは各領域を切り捨てていた。`p` インデックスがずれる**後方非互換**)。Vision Contours に `Aspect Correct UVs`。CoreText の行送り修正 |
 | [0.9.2](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.2)** | 2026-08-08 | 59 | bypass から戻すと黒画像になる不具合を全17 TOP で修正、ビルド不能だった6件を修復。Vision Face のランドマーク並び、Vision AnimalPose の骨格接続。Vision Text に `Aspect Correct UVs` |
 | [0.9.1](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.1) | 2026-08-08 | 66 | Vision系10opに `Aspect Correct UVs`。SDKバージョン不一致による起動時ロードエラーを修正 |
 | [0.9.0](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.0) | 2026-08-07 | — | 最初の Developer ID 署名 + 公証リリース。DMGは取り下げ済み(0.9.2 を使ってください) |
