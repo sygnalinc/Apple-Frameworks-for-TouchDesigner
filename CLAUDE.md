@@ -4356,3 +4356,22 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   指標の検証には向かない素材だった(スコア 8.56% だったのも納得)
 - 実測: 直立で pitch/roll とも ±3° 以内、お辞儀で pitch +31°、
   facing は 後ろ姿 +125〜138° / 正面 -6° / 真横 ±89〜91°
+
+### 2026-08-10 深度入力の検証は失敗(Vision が落ちる)+ 深度で何が変わるかの整理
+
+- ユーザー「depthデータがあったら精度が上がる?」→ 手元に深度付き素材が残っていないので
+  **人物セグメンテーションから合成深度を作って**比較しようとしたが、**Vision 内部で落ちた**:
+  `Assertion failed: ... "Algebra after the logarithm map does not require normalization."`
+  `function enforce, file se3.hpp, line 270`
+- 階段状(2m→7m)が原因かと思い**3回ボックスぼかしで滑らかに**しても同じアサート。
+  原因はおそらく **`AVDepthData` に `cameraCalibrationData`(内部パラメータ)が無い**こと。
+  実機の深度は必ず持っているが、`depthDataFromDictionaryRepresentation:` で自作したものには無い
+- **これは実装上の地雷**: 将来 depth 入力を足すなら、**不正な AVDepthData で TD ごと落ちる**。
+  `getCameraRelativePosition:` のクラッシュと合わせ、**Vision の3D姿勢APIはクラッシュ経路が複数ある**
+- 合成では精度を測れないので、**深度で何が変わるかは未検証のまま**。分かっているのは:
+  - ドキュメント上 `heightEstimation` が `measured` になり `bodyHeight` が実身長になる
+    = **1.8m仮定が消えて絶対スケールが正しくなる**(Camera FOV と同じ種類の改善)
+  - 姿勢そのものが良くなるかは**不明**。FOV実験で「幾何的なカメラ情報を与えても model空間の
+    関節はビット一致」だったこと、固定プロポーションのモデルを角度だけ合わせていることから、
+    **スケールと配置が主で、関節角度への効果は限定的**と推測されるが**実測していない**
+- 実測するには iPhone のポートレート HEIC か深度付き動画が要る。`eval/` に置いてもらえれば検証可能
