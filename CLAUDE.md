@@ -3931,19 +3931,18 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   **Llmafm2 を LINE 風チャットの表示元**にする、という分担にした
 - `chatui` の先頭に **`SRC = 'Llmafm2'`** を置いて描画対象を切り替えられるようにした
   (以前は Llmafm1 をハードコードしていた)
-- Llmafm2: Instructions = `Answer in English in two short sentences.`(短くしないと
-  コンテキストが持たない)、Maxtokens 60、ツールOff、Schema 空。会話は**ChatGPTでよくする質問
-  5往復**(Python×2 / TouchDesigner / 一般用語 / コツ)。5往復まで通り status=ready のまま
+- Llmafm2: **1文で答えられる質問7往復**に差し替え(ユーザー指示「長い返答が必要のない質問で」)。
+  Instructions = `Answer in English in one short sentence.` / Max Tokens = **40**。
+  bit / GPU / Python の immutable 型 / FPS / API / TDの拡張子 / 色の混色。
+  **7往復通って status=ready のまま**(短い返答はコンテキストの伸びが遅い)
 - 吹き出しは下から積むので、**入り切らない古い往復は自然に画面外へ流れる**(実チャットと同じ挙動)
-- **3Bモデルの知識の限界がそのまま出た。誤答が2つある**:
-  ①「reverse a string」→ 実在しない `str.reverse()` / `re.sub(flags=-1)` を挙げる
-  ②「What is a CHOP?」→「値の並びを分割するコンポーネント」= 誤り(正しくは Channel Operator)
-  デモとして残すか差し替えるかはユーザー判断。**note には誤答である旨を明記**して、
-  「知識に依存しない用途(要約・言い換え)向き / 事実が要るならツール呼び出しで TD から値を渡す」
-  という読み方にした
-- **俳句の返答で明示改行(`\n`)が来た**ので、`wrap()` を**先に `\n` で段落分割してから
-  折り返す**よう修正。しないと1段落として数えて行数の見積りがずれる
-  (今回はたまたま合っていたが、箇条書きの返答で崩れる)
+- **傾向がはっきり出た: 一般的な用語は全問正解、TouchDesigner 固有の知識だけ誤答**。
+  拡張子を「.td」と答える(正しくは .toe)。前回の会話でも CHOP の説明と
+  `str.reverse()` のでっち上げで同じ傾向だった。ユーザー判断で**そのまま残し**、
+  note に「どれが誤りか」と「知識に依存しない用途向き / 事実はツール呼び出しで渡す」を明記
+- **Max Tokens を増やす必要はない**という結論: コンテキスト超過は Max Tokens ではなく
+  「Instructions + 履歴 + 生成」の合計で起きる。長く続けたいなら
+  **Instructions を短く・Max Tokens を小さく**が正解(40語+512で3往復 → 7語+40で7往復)
 - Llmafm1: Instructions をツール用に戻し、`get_sensor` の往復を1回実行して
   「42.0 degrees」が出る状態にした
 - ユーザー側の調整はそのまま活かした: 背景を灰(0.7)に変更、`chat/out1 -> fit1 -> out1` で
