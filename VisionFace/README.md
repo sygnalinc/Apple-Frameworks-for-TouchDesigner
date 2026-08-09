@@ -20,6 +20,28 @@ is our own).
 
 Faces are sorted left to right by the x of the bbox centre.
 
+### How far `yaw` actually reaches
+
+Measured against frames whose direction was confirmed by eye:
+
+| The subject | `yaw` | `body:facing` (Vision Pose 3D) |
+|---|---|---|
+| Facing the lens | −4.2° | −5.8° |
+| Turned 90° to the right | **+48.0°** | +90.7° |
+| Turned 90° to the right | **+41.1°** | +89.4° |
+| Turned 90° to the left | **no face detected** | −90.2° |
+| Back to the camera | **no face detected** | +136.9° |
+
+Two things to plan around. `yaw` **saturates near ±45–50°** — a full profile does not read as 90°,
+so treat it as "how far the head is turned", not as an absolute heading. And the face has to be
+findable at all: full profile is hit-and-miss and a back view returns nothing, so gate on the
+face's own `valid` before using the angle.
+
+Within that range the sign agrees with the body's facing, so the two can be combined: **Vision Pose
+3D's `body:facing` gives the torso through the full circle, `yaw` here gives the head relative to
+the camera.** That is how you tell "body square to the audience but looking off to the side" from
+"whole body turned".
+
 ### Parameters
 
 | Parameter | Default | Description |
@@ -117,6 +139,26 @@ TD ネイティブのカスタム CHOP。Windows+NVIDIA 専用 Face Track CHOP �
 | `face{i}/p{0..84}:u,v` | Landmarks オン時のみ・全85ランドマーク点。**領域ごとに、その領域内の正しい順序**で並ぶので連番で結べば輪郭が描ける |
 
 face の並びは bbox 中心の x で左→右にソート。
+
+### `yaw` が実際にどこまで出るか
+
+向きを目視で確認したフレームで実測:
+
+| 被写体 | `yaw` | `body:facing`（Vision Pose 3D） |
+|---|---|---|
+| レンズを向いている | −4.2° | −5.8° |
+| 右へ90度 | **+48.0°** | +90.7° |
+| 右へ90度 | **+41.1°** | +89.4° |
+| 左へ90度 | **顔が検出されない** | −90.2° |
+| 背中を向けている | **顔が検出されない** | +136.9° |
+
+見込んでおくべき点が2つ。`yaw` は **±45〜50度あたりで頭打ち**になり、真横を向いても 90度にはならない。
+絶対的な方位ではなく「頭をどれだけひねっているか」として扱う。そもそも顔が見つかる必要もあり、
+真横は当たり外れがあり背面では何も返らないので、**角度を使う前に顔側の `valid` で門番する**。
+
+その範囲内では体の向きと符号が一致するので、組み合わせて使える。**Vision Pose 3D の `body:facing`
+が全周の体の向きを、ここの `yaw` がカメラに対する頭の向きを与える。** 「体は客席に正対したまま
+顔だけ横を向いている」と「体ごと向きを変えた」を区別できるのはこの組み合わせ。
 
 ### パラメータ
 
