@@ -3791,3 +3791,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 検証: 57件すべてで `## English` / `## 日本語` / ナビ行が各1個であることを機械チェック
 - **palette/README.md・models/README.md・Assets/ml_examples/README.md は対象外**
   (opのREADMEではないため)。ルート README(英日)は従来どおり別ファイル
+
+### 2026-08-09 palette/README.md を現状に合わせて訂正
+
+- ユーザー質問「Paletteフォルダの中身はすでに古い?」→ **古かった**。README が主役として
+  説明していた `NativePanel.tox` / `SwiftUIButton.tox` は、依存する SwiftUI Panel CHOP と
+  UI Widget DAT を 2026-08-07 に develop へ移した際に main から削除済みで、
+  **main に残っているのは `WifiScanner.tox` だけ**だった(登録手順も NativePanel を置く指示のまま)
+- WifiScanner のみの内容に書き直し、登録手順を `WifiScanner.tox` に修正。
+  develop へ移した2件は「どこへ行ったか」を1節にして残した(消えた理由が分かるように)
+- ついでに op の README と同じ**英日併記**にした(CoreWLANScan の README からリンクされており、
+  そちらは併記済みのため)
+- **ローカルの TD palette フォルダには3つとも残っている**
+  (`~/Library/.../palette/sygnal/`)。開発機には全プラグインが入っているので動作はする。
+  リポジトリと揃えたい場合はユーザー側で削除する(今回は触っていない)

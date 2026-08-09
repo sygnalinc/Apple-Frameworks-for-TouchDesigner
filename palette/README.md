@@ -1,48 +1,66 @@
-# palette — TouchDesigner Palette 用 .tox テンプレート
+# palette — .tox templates for the TouchDesigner Palette
+
+**English** | [日本語](#日本語)
+
+## English
+
+Pre-wired Components you can drag and drop from **TD's Palette (My Components / sygnal)**.
+The custom operators (.plugin) they contain **must be installed separately** (see below).
+
+> **Two layers: .plugin (the engine) + .tox (the template).** The plugin does the real work; the
+> .tox is just a reusable, pre-wired, parameter-exposed arrangement of it. **A .tox alone does
+> nothing** — the plugin is required.
+
+### WifiScanner.tox
+
+A Component with the **CoreWLAN Scan CHOP and its SSID Info DAT already wired up**, for when you
+want to turn Get SSID on and see the SSID table without building an Info DAT by hand.
+
+> **Note**: the CoreWLAN Scan CHOP itself now also **creates the Info DAT automatically via a
+> Callbacks DAT** (press `Add` on the Custom page, then turning Get SSID ON creates the Info DAT
+> next to it — see that operator's README). This .tox is for when you want it done in one drop
+> without even pressing Add. There is no SDK hook for creating nodes unconditionally on placement,
+> so it is either the callback (which needs a Callbacks DAT) or a .tox.
+
+- Contents: `scan` (CoreWLAN Scan CHOP) / `congestion` (null CHOP, congestion) / `ssid` (Info DAT,
+  the SSID list)
+- **Parameters exposed on the COMP**: `Get SSID Names` (default On) / `Scan Interval` /
+  `Rescan Now` (bound to the inner scan; Rescan is propagated by a Parameter Execute)
+- `congestion` is per-channel congestion and the free channel (**no permission needed**); `ssid`
+  is the list of surrounding networks (populated with Get SSID on plus location permission)
+
+**Required plugin**: [CoreWLANScan](../CoreWLANScan/) → `CoreWLANScanCHOP.plugin` (bundles the SSID
+helper)
+
+**Measured**: dropping in WifiScanner filled the `ssid` Info DAT with the surrounding SSIDs
+automatically (24 rows — SYGNAL, SCC_JBFES, …).
+
+### Registering with the Palette
+
+Put the `.tox` in TD's user palette folder:
+
+```
+~/Library/Application Support/Derivative/TouchDesigner099/palette/sygnal/WifiScanner.tox
+```
+
+It appears in TD's **Palette Browser** (the Palette panel on the left) as
+`My Components > sygnal > WifiScanner`. Drag it into any network from there.
+
+### Components that moved to the develop branch
+
+`NativePanel.tox` and `SwiftUIButton.tox` (native macOS window UI) depend on the SwiftUI Panel CHOP
+and UI Widget DAT, which were moved to the non-public `develop` branch on 2026-08-07, so they are
+no longer here. They live on `develop` together with those plugins.
+
+## 日本語
 
 配線済みの Component を **TD の Palette(My Components / sygnal)** にドラッグ&ドロップで
 使えるようにした .tox。中身の**カスタムOP(.plugin)は別途インストールが必要**(下記)。
 
-> **.plugin(エンジン)+ .tox(テンプレート)の二層**: ネイティブUIのレンダリングは .plugin が担い、
-> .tox は「配線済み・パラメータ露出済み」の再利用テンプレート。.tox 単体では動かない(プラグイン必須)。
+> **.plugin(エンジン)+ .tox(テンプレート)の二層**: 実際の処理は .plugin が担い、
+> .tox は「配線済み・パラメータ露出済み」の再利用テンプレート。**.tox 単体では動かない**(プラグイン必須)。
 
-## NativePanel.tox
-
-**本物の操作可能なネイティブmacOSウインドウUI**を1ドロップで使える Component。
-中身は `UI Widget DAT ×4 → Merge → SwiftUI Panel CHOP → out`(= [UIWidget](../UIWidget/) +
-[SwiftUIPanel](../SwiftUIPanel/) の構成)。
-
-- **COMP に露出したパラメータ**: `Show Window`(窓の表示)/ `Window Title`
-- **`out`**(null CHOP)にウインドウ操作値が id 別チャンネルで出る(`level` / `enable` / `trigger`)
-- 中に入って UI Widget DAT を足す/編集すればコントロールを増やせる
-
-### 必要なプラグイン(先にインストール)
-
-- [UIWidget](../UIWidget/) → `UIWidgetDAT.plugin`
-- [SwiftUIPanel](../SwiftUIPanel/) → `SwiftUIPanelCHOP.plugin`
-
-各フォルダで `./build.sh` → `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/` へ
-コピー → TD再起動。
-
-## SwiftUIButton.tox
-
-**TD の Button COMP の "ネイティブUI版"**。Button COMP の基本機能(クリックで `state` を出力・
-既定 Momentary)はそのままに、**ボタンの見た目が本物のネイティブ macOS ボタン**になっている。
-
-- **COMP に露出したパラメータ**: `Label`(ボタン文字)/ `Show Window` / `Window Title`
-- **`out`**(null CHOP)に `state` チャンネル: **クリックした瞬間だけ 1**(モーメンタリ)。
-  Button COMP の出力と同じ感覚で配線できる(Panel Execute の代わりに CHOP 監視 / Trigger 等)
-- 中身は `UI Widget DAT(button)→ SwiftUI Panel CHOP → out`
-
-> **重要(できる/できない)**: TD標準 Button COMP の**UI描画そのものをSwiftUIに差し替えることは不可**
-> (TDにフックが無い)。これは「Button COMP と同じ出力仕様を持つ、UIがネイティブSwiftUIな**別COMP**」。
-> Toggle 動作は現状フラつく(モーメンタリ信号のCount取りこぼし)ため v1 は Momentary のみ。将来
-> ヘルパ側で toggle ボタンを堅牢化予定。
-
-**実測**: ネイティブ「Button」ウインドウを表示 → クリック → `out` の `state` が1フレームだけ 1
-(次フレーム 0)を実操作で確認。
-
-## WifiScanner.tox
+### WifiScanner.tox
 
 **CoreWLAN Scan CHOP + SSID Info DAT を配線済み**にした Component。
 「Get SSID を ON にしたら SSID表(Info DAT)を手で作らずに見たい」に応える。
@@ -62,18 +80,19 @@
 
 **実測**: WifiScanner を置くと `ssid` Info DAT に周辺SSID(24行・SYGNAL/SCC_JBFES等)が自動で出た。
 
-## Palette への登録
+### Palette への登録
 
-`NativePanel.tox` を TD のユーザーpaletteフォルダへ置く:
+`.tox` を TD のユーザーpaletteフォルダへ置く:
 
 ```
-~/Library/Application Support/Derivative/TouchDesigner099/palette/sygnal/NativePanel.tox
+~/Library/Application Support/Derivative/TouchDesigner099/palette/sygnal/WifiScanner.tox
 ```
 
-TD の **Palette Browser**(左の Palette パネル)に `My Components > sygnal > NativePanel` として現れる。
-そこから任意のネットワークへドラッグ&ドロップ → `Show Window` をオンにするとネイティブウインドウが出る。
+TD の **Palette Browser**(左の Palette パネル)に `My Components > sygnal > WifiScanner` として
+現れる。そこから任意のネットワークへドラッグ&ドロップする。
 
-## 実測(M2)
+### develop ブランチへ移した Component
 
-- NativePanel.tox(1.2KB)をフレッシュにロード → Show/Title カスタムパラメータ・全部品・
-  out の3チャンネル(level/enable/trigger)を復元、ウインドウ表示を確認
+ネイティブ macOS ウインドウUIの `NativePanel.tox` / `SwiftUIButton.tox` は、依存する
+SwiftUI Panel CHOP と UI Widget DAT を 2026-08-07 に非公開の `develop` ブランチへ移したため、
+ここには無い。両プラグインと一緒に `develop` にある。
