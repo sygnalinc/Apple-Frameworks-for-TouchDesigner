@@ -43,3 +43,8 @@ AGENTS.md
 
 # After Effects の作業ファイル(ローカル専用・33MB)
 AfterEffects/
+
+# モーション評価用の動画置き場。中身はライセンス上コミットできないものが多いので
+# README だけ共有する(models/ と同じ方式・詳細は eval/README.md)
+eval/*
+!eval/README.md

@@ -4220,3 +4220,21 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 実測(Wikimedia CC BY のスクワット映像・[FitnessScape](https://commons.wikimedia.org/wiki/File:Squat_-_exercise_demonstration_video.webm)):
   膝の曲げ 40→158°(正しい)・体幹 8.8→38.1°(正しい)。2D比較スコアは 34.6px
   (ダンス素材 21.3px より悪い = 後ろ姿+バーベル遮蔽の難しさが数字に出ている)
+
+### 2026-08-09 モーション評価用素材の置き場を eval/ に決定(git 同期しない)
+
+- ユーザー「gitに同期しないモーション評価用動画を入れるフォルダを決めて」
+- **`eval/`** を新設。`models/` と同じ「中身は除外・README だけ共有」方式
+  (`.gitignore` に `eval/*` + `!eval/README.md`)
+- **分離する理由は容量ではなくライセンス**。評価に使いたい素材は再配布できないものが多く
+  (Pexels/Pixabay/Mixkit は再配布禁止、研究用データセットは商用不可)、**コミットされる
+  `Assets/` に置いてしまう事故**を防ぐのが目的。README に「ここに置いてよい/`Assets/` に
+  置いてよい」の対応表を書いた
+- README には評価の手順(ffmpeg で 6fps 展開 → `tools/pose3d_eval.m`)、**比較用ベースライン**
+  (sample_pose3d 21.3px / sample_ballet 21.6px / Wikimediaスクワット 34.6px)、
+  撮るべきポーズと「そのポーズで何の正解が分かるか」の対応、既知の落とし穴
+  (角度はカメラ空間で測る・骨の長さは使えない・メートルは1.8m仮定)をまとめた
+- 手元の Wikimedia CC BY スクワット映像を
+  `eval/wikimedia_squat_CC-BY_FitnessScape.webm` として配置(**ファイル名に出典と
+  ライセンスを入れる**運用にした。後から素性が分からなくなるのを防ぐ)。
+  `git check-ignore` で除外されていることを確認済み
