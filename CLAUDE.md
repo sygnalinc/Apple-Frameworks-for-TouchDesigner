@@ -4452,3 +4452,23 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - なお **顔検出が失敗するのは真横〜背面**で、これは body:facing の180度反転が起きる領域と重なる。
   つまり**顔で反転を解消する用途には期待しすぎない**ほうがよい
 - VisionFace/README(英日)に実測表と使い方の注意を追記
+
+### 2026-08-10 v0.9.4 リリース
+
+- ユーザー指示でリリース。**57プラグインを全て再ビルド**(並列・全件成功)してから
+  `tools/release.sh sign → verify → dmg → notarize`。59バンドル・全数verify通過
+  (署名/Hardened Runtime/Developer ID/APIバージョン/版一致)。DMG 18MB →
+  公証 **Accepted**(c8be18e9-5dca-4f61-bed5-c39deed44464)→ staple → spctl accepted
+- 0.9.3 からの中身は **VisionPose3D の全面的な見直し**が中心:
+  連続フレーム処理(検出率 56〜59/60 → 60/60・向きの反転 16〜18% → 0〜8%)、
+  リクエスト使い回しで約2倍速、`Coordinate Space`(root/camera)・`Camera FOV`・
+  `body:facing/pitch/roll`・`cam:distance/fov` を追加、`bodyheight`/`heightestimation` と
+  旧 `camera:*` 6ch を削除(**このopに関して後方非互換**)。
+  ほかに Metal Denoise の警告+素通し化、**07-23 から黙ってビルドされていなかった6プラグインの修復**、
+  READMEの英日併記化、評価ツール2本(`tools/pose3d_eval.m` / `tools/eval_video.sh`)、
+  ループ探索(`tools/find_loop.py`)、VisionPose/3D の骨格線と向き矢印
+- **patch にした理由**: `opType` の追加・削除・リネームは無く、影響は VisionPose3D の
+  チャンネル構成のみ。op 単位の `majorVersion` も据え置き
+- **申し送り**: demo.toe はユーザーが作業中の状態でコミットした。VisionPose3D コンテナに
+  `eval/`(gitignore)の映像を参照する Movie File In が4本残っている可能性がある。
+  clone しただけの人はその4ノードがファイル無しになる。次回整理する
