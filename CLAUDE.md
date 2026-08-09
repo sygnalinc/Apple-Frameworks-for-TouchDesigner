@@ -4085,3 +4085,25 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 使い方: `python3 tools/find_loop.py <video> --min 4.0 [--out <cut.mp4>]`
 - **注意**: `sample_ballet.mp4` は VisionPose3D だけでなく **VisionRect の `art`**
   (ノートPC画面に貼り込む映像)でも使っている。差し替えではなく新規ファイルにすること
+
+### 2026-08-09 VisionPose3D に Coordinate Space(root / camera)を追加
+
+- ユーザー「VisionPose3Dにはカメラを原点にそこからの相対座標にする機能はない?」→ **無かった**ので追加。
+  `Coordinate Space` メニュー(root=既定・従来どおり / camera)。既定が従来値なので後方互換
+- 実装: 観測時に `out.toCamera = simd_inverse(obs.cameraOriginMatrix)` を保存し、cook で
+  Space=camera のとき各関節に掛ける。**cookでの切替なので再解析不要**(同じフレームで両モードを
+  厳密比較できる)
+- **TD側の引き算では代用できないことを実測で確認**: `camera:tx,ty,tz` はプラグインが
+  `cameraOriginMatrix` の**平行移動列だけ**を出しており、回転は落ちている。同一フレームで比較すると
+  引き算だと腰が `(0.006, -0.144, 2.420)`、正しい `inverse(matrix)` では `(-0.434, -0.573, 2.315)`。
+  **0.62m ずれる**(カメラからの距離はどちらも 2.424m で一致 = 純粋に回転ぶんの向き違い)。
+  これが「TDでやらずプラグインに入れる」根拠
+- `camera:tx,ty,tz` は両モードとも root 基準のまま(カメラ基準では定義上ゼロで情報が無い)。
+  カメラ空間では被写体が **+Z 側**に来る
+- **TD再起動なしで検証**: 新バンドルを `/tmp/.../vp3_<epoch>/` にコピー(cp -R 後は要再署名)し、
+  素の cplusplusCHOP の Plugin Path で読ませた。稼働中のTDを止めずに新パラメータを確認できる
+- README(英日)にモードの表と 0.62m の実測を追記。バンドルはインストール済み
+  (**demo.toe の `Visionpose3d1` に Space par が出るのは TD再起動後**。既定=root なので
+  それまでの挙動は変わらない)
+- 未着手: demo をカメラ空間に切り替えるかは新素材(前後移動あり)が来てから。切り替えると図が
+  z≈+2.3・中心から 0.4〜0.6m ずれた位置に出るので、表示カメラの再フレーミングが要る

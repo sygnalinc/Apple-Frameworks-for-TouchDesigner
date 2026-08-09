@@ -9,8 +9,16 @@
 //   bodyheight                推定身長（メートル）
 //   heightestimation          0=reference（既定身長で推定）/ 1=measured（実測）
 //   camera:tx,ty,tz           カメラ位置（シーン原点=人物 root 基準・メートル）
-//   {joint}:tx,ty,tz          17関節の3D位置（シーン原点基準・メートル・y上向き）
+//   {joint}:tx,ty,tz          17関節の3D位置（Space パラメータ基準・メートル・y上向き）
 //   {joint}:u,v               17関節の入力画像への2D投影（0〜1・左下原点）
+//
+// Space パラメータ:
+//   root（既定）  Vision そのまま。人物の腰が原点。人が跳んでも近づいても図は動かず、
+//                 手足の形だけが変わる
+//   camera        カメラを原点にした座標。人物が跳ぶ・前後に動くと図もそのまま動く。
+//                 `inverse(cameraOriginMatrix)` を掛けるので **カメラの回転（見下ろし
+//                 角など）も正しく入る**。TD側で camera:tx,ty,tz を引き算しても
+//                 平行移動しか打ち消せず、傾いたカメラでは合わないのでここで変換する
 //
 // 実装: cook のたびに TOP を非同期ダウンロードし、ワーカースレッドが
 // Vision 推定 → 結果を保存。cook は最新結果を出力するだけ（1〜2フレーム遅れ）。
@@ -75,8 +83,11 @@ struct Pose3D
     bool valid = false;
     float bodyHeight = 0;
     float heightMeasured = 0;      // 1=measured / 0=reference
-    float camera[3] = {};          // カメラ位置（tx,ty,tz）
-    float joints[kNumJoints][5] = {};   // tx, ty, tz, u, v
+    float camera[3] = {};          // カメラ位置（tx,ty,tz・root 基準）
+    float joints[kNumJoints][5] = {};   // tx, ty, tz（root 基準）, u, v
+    // root 基準 → カメラ基準 に移す行列（= inverse(cameraOriginMatrix)）。
+    // Space=camera のときだけ使う。回転も含むので単なる引き算では代用できない
+    simd_float4x4 toCamera = matrix_identity_float4x4;
 };
 
 class VisionPose3DCHOP : public CHOP_CPlusPlusBase
@@ -165,6 +176,9 @@ public:
         const tdaspect::Mapper map{ inputs->getParInt("Aspectcorrectuv") != 0,
                                     top ? (float)top->textureDesc.width  : 0.0f,
                                     top ? (float)top->textureDesc.height : 0.0f };
+        // camera を選ぶと関節をカメラ基準へ移す。camera:tx,ty,tz は常に root 基準の
+        // カメラ位置のまま（カメラ基準では定義上ゼロになって情報が無いため）
+        const bool toCam = inputs->getParInt("Space") != 0;
         const bool on = active && pose.valid;
         output->channels[0][0] = on ? 1.0f : 0.0f;
         output->channels[1][0] = on ? pose.bodyHeight : 0.0f;
@@ -172,9 +186,14 @@ public:
         for (int c = 0; c < 3; c++)
             output->channels[3 + c][0] = on ? pose.camera[c] : 0.0f;
         for (int j = 0; j < kNumJoints; j++) {
+            simd_float3 p = simd_make_float3(pose.joints[j][0], pose.joints[j][1], pose.joints[j][2]);
+            if (toCam) {
+                const simd_float4 q = simd_mul(pose.toCamera, simd_make_float4(p.x, p.y, p.z, 1.0f));
+                p = simd_make_float3(q.x, q.y, q.z);
+            }
             // tx,ty,tz はメートル単位なので変換しない。u,v（投影座標）のみ再スケール
             for (int c = 0; c < 3; c++)
-                output->channels[6 + j * 5 + c][0] = on ? pose.joints[j][c] : 0.0f;
+                output->channels[6 + j * 5 + c][0] = on ? p[c] : 0.0f;
             output->channels[6 + j * 5 + 3][0] = on ? map.x(pose.joints[j][3]) : 0.0f;
             output->channels[6 + j * 5 + 4][0] = on ? map.y(pose.joints[j][4]) : 0.0f;
         }
@@ -196,6 +215,16 @@ public:
             p.page = "Vision Pose 3D";
             p.defaultValues[0] = 1;
             manager->appendToggle(p);
+        }
+        {
+            // 関節座標の基準。root=Vision そのまま（腰が原点）/ camera=カメラが原点
+            OP_StringParameter p("Space");
+            p.label = "Coordinate Space";
+            p.page = "Vision Pose 3D";
+            p.defaultValue = "root";
+            const char* names[2]  = {"root", "camera"};
+            const char* labels[2] = {"Root (hips at origin)", "Camera at origin"};
+            manager->appendMenu(p, 2, const_cast<const char**>(names), const_cast<const char**>(labels));
         }
         {
             // TD の TOP ダウンロードは GL 系の上下逆（bottom-up）なので既定でフリップする
@@ -284,6 +313,7 @@ private:
                     out.camera[0] = cam.columns[3].x;
                     out.camera[1] = cam.columns[3].y;
                     out.camera[2] = cam.columns[3].z;
+                    out.toCamera = simd_inverse(cam);
 
                     for (int j = 0; j < kNumJoints; j++) {
                         VNHumanBodyRecognizedPoint3D* pt =

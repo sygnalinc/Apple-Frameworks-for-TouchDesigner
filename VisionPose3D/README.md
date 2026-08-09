@@ -44,16 +44,30 @@ Things that do **not** help (all measured on M2):
 | `bodyheight` | Estimated height (metres) |
 | `heightestimation` | 0 = reference (estimated from a default height) / 1 = measured (real, when depth such as LiDAR is available) |
 | `camera:tx,ty,tz` | Camera position (metres, relative to the scene origin) |
-| `{joint}:tx,ty,tz` | Joint 3D position (metres, **scene origin = the person's root**, y up) |
+| `{joint}:tx,ty,tz` | Joint 3D position (metres, y up; origin set by **Coordinate Space**) |
 | `{joint}:u,v` | The joint's 2D projection into the input image (0–1, bottom-left origin) |
 
 The 17 joints: `root spine center_shoulder center_head top_head
 left_shoulder left_elbow left_wrist right_shoulder right_elbow right_wrist
 left_hip left_knee left_ankle right_hip right_knee right_ankle`
 
-Coordinate system: the person's root (hips) is the scene origin. Standing upright, for example,
-`top_head:ty ≈ +0.77` and `right_ankle:ty ≈ -0.87` (with an estimated height of 1.8 m). Distance
-and direction relative to the camera come from `camera:*`.
+### Coordinate Space
+
+| Value | Origin | What it looks like |
+|---|---|---|
+| `root` (default) | The person's hips | Vision's native output. Standing upright, `top_head:ty ≈ +0.77` and `right_ankle:ty ≈ -0.87` (estimated height 1.8 m). **The figure never translates** — jumping or walking toward the camera only changes the shape of the limbs |
+| `camera` | The camera | The figure moves as the person does: jumps lift it, walking toward the camera brings it closer (measured: `root:tz` ≈ +2.3 for a subject about 2.4 m away) |
+
+`camera` multiplies each joint by `inverse(cameraOriginMatrix)`, so **the camera's rotation is
+included**. Subtracting `camera:tx,ty,tz` downstream in TD is *not* equivalent — that only cancels
+the translation. Measured on real footage the two disagree by **0.62 m**: the naive subtraction
+puts the hips at `(0.006, -0.144, 2.420)` while the correct transform gives
+`(-0.434, -0.573, 2.315)`. Both are 2.424 m from the camera — the distance is right, the direction
+is not, because the camera is tilted.
+
+`camera:tx,ty,tz` always stays the camera position in root space, in both modes (in camera space it
+would be the origin by definition, which carries no information). To place the skeleton in front of
+a TD camera, note the subject sits at **positive Z**.
 
 ### Parameters
 
@@ -61,6 +75,7 @@ and direction relative to the camera come from `camera:*`.
 |---|---|---|
 | TOP | — | Path of the TOP to analyse |
 | Active | On | Enable/disable analysis |
+| Coordinate Space | root | Origin for `{joint}:tx,ty,tz` — see above |
 | Flip Image Vertically | **On** | TD's TOP download is upside down (bottom-up), so this defaults to On |
 
 Info CHOP (diagnostics): `executes / submits / analyzes / analyze_ms` (ms per analysis).
@@ -129,15 +144,29 @@ TD 側のフレームレートは落ちず、チャンネル値が毎秒数回�
 | `bodyheight` | 推定身長（メートル） |
 | `heightestimation` | 0=reference（既定身長から推定）/ 1=measured（実測。LiDAR等の深度がある場合） |
 | `camera:tx,ty,tz` | カメラ位置（メートル・シーン原点基準） |
-| `{joint}:tx,ty,tz` | 関節の3D位置（メートル・**シーン原点=人物root**・y上向き） |
+| `{joint}:tx,ty,tz` | 関節の3D位置（メートル・y上向き・原点は **Coordinate Space** で決まる） |
 | `{joint}:u,v` | 関節の入力画像への2D投影（0〜1・左下原点） |
 
 17関節: `root spine center_shoulder center_head top_head
 left_shoulder left_elbow left_wrist right_shoulder right_elbow right_wrist
 left_hip left_knee left_ankle right_hip right_knee right_ankle`
 
-座標系: 人物の root（腰）がシーン原点。例: 直立時は `top_head:ty ≈ +0.77`、
-`right_ankle:ty ≈ -0.87`（身長1.8m推定時）。カメラとの距離・向きは `camera:*` から分かる。
+### Coordinate Space（座標の基準）
+
+| 値 | 原点 | 見え方 |
+|---|---|---|
+| `root`（既定） | 人物の腰 | Vision そのまま。直立時は `top_head:ty ≈ +0.77`、`right_ankle:ty ≈ -0.87`（身長1.8m推定時）。**図は決して平行移動しない** — 跳んでも近づいても、変わるのは手足の形だけ |
+| `camera` | カメラ | 人の動きがそのまま図の動きになる。跳べば持ち上がり、近づけば手前に来る（実測: 約2.4m 先の被写体で `root:tz` ≈ +2.3） |
+
+`camera` は各関節に `inverse(cameraOriginMatrix)` を掛けるので、**カメラの回転（見下ろし角など）も
+正しく入る**。TD側で `camera:tx,ty,tz` を引き算しても**等価にはならない** — 打ち消せるのは平行移動だけ。
+実素材での実測では **0.62m ずれた**: 引き算だと腰が `(0.006, -0.144, 2.420)`、正しい変換では
+`(-0.434, -0.573, 2.315)`。カメラからの距離はどちらも 2.424m で合っているが、
+カメラが傾いているぶん**向きが違う**。
+
+`camera:tx,ty,tz` はどちらのモードでも常に root 基準のカメラ位置のまま
+（カメラ基準では定義上ゼロになり情報が無いため）。TDのカメラの前に置くときは、
+被写体が **+Z 側**に来ることに注意。
 
 ### パラメータ
 
@@ -145,6 +174,7 @@ left_hip left_knee left_ankle right_hip right_knee right_ankle`
 |---|---|---|
 | TOP | — | 解析する映像の TOP パス |
 | Active | On | 解析の有効/無効 |
+| Coordinate Space | root | `{joint}:tx,ty,tz` の原点。上記参照 |
 | Flip Image Vertically | **On** | TD の TOP ダウンロードは上下逆（bottom-up）のため既定 On |
 
 Info CHOP（動作診断）: `executes / submits / analyzes / analyze_ms`（1解析の所要ms）。
