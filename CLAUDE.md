@@ -4482,3 +4482,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - `tools/sound_classes.m` を追加(この一覧を吐くだけの小さなCLI)。**一覧は OS バージョンに
   紐づく**ので、README に貼ったのはスナップショットである旨を明記し、再生成手順も併記
 - SoundClass/README(英日)に `<details>` で全303件を収録
+
+### 2026-08-10 SoundClass デモに Info DAT が無く「上位10件が出ていない」ように見えていた
+
+- ユーザー「infoDATが自動で上位10件を出している様には見えない。Classes に書いたものしか出ていない」
+- **プラグインは正常。デモに Info DAT ノードが無かっただけ**。`/project1/SoundClass` にあったのは
+  `chopto1`(CHOP to DAT)で、これは**チャンネル**=`Classes` に列挙したIDしか表にしない
+- 一時的に Info DAT を繋いで確認すると、`Classes`(applause/cheering/laughter/music/speech)に
+  無い **synthesizer 0.739 / keyboard_musical 0.725 / disc_scratching 0.285** 等がちゃんと出た。
+  SDK も `classifications` は「sorted with highest confidence first」と保証しており、実装は
+  先頭から `kRankRows = 10` 件を取るので確かに上位10件
+- デモに **`top10`(Info DAT・Operator=Soundclass1)** を追加し、両方にノードコメントを付けた。
+  note と README(英日)にも「Info DAT ノードのことであって CHOP to DAT とは別物」と明記
+- **教訓**: 機能を実装しても**利用例に置いていないと存在しないのと同じ**。今回は
+  「Classes を知らなくても探せる」という設計意図そのものが見えなくなっていた
