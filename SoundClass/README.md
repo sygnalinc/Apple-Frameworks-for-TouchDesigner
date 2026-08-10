@@ -20,6 +20,9 @@ Measured (M2, TD's stock music sample): classified accurately as `music 0.83 / s
   Note this is the operator's **Info DAT** (an Info DAT node with its Operator set to this CHOP),
   not a CHOP to DAT of its channels — the latter only ever shows what is already in `Classes`.
   `demo.toe`'s `/project1/SoundClass` has both side by side (`top10` and `chopto1`).
+  You do not have to wire it up yourself: turn on the **Info DAT (top 10)** toggle and the operator
+  creates the Info DAT next to itself (a Callbacks DAT is docked to the node automatically on
+  placement, as a closed chip).
 - Results update every `Window (sec) × (1 - Overlap)` (by default 1 s × 0.5 = every 0.5 s). The
   channels hold the latest value (add a Lag/Filter CHOP downstream to smooth them)
 
@@ -105,6 +108,7 @@ scuba_diving            skiing                  silence
 | Parameter | Default | Description |
 |---|---|---|
 | Active | On | Enable/disable analysis |
+| Info DAT (top 10) | Off | Turning it on creates an Info DAT next to the operator showing the top 10 across all classes |
 | Classes | applause cheering laughter music speech | Class IDs to output (space separated) |
 | Custom Core ML Model | — | A custom sound classification model. `.mlmodel` is compiled automatically on load |
 | Window (sec) | 1.0 | Analysis window length (shorter reacts faster, less accurately) |
@@ -144,7 +148,9 @@ For how to load it, see the [root README](../README.md) (a CPlusPlus CHOP, or th
   実際に音を鳴らして Info DAT を見ながら欲しいIDを拾って `Classes` に足せばよい。
   ここで言う Info DAT は**このCHOPを Operator に指定した Info DAT ノード**のこと。
   CHOP to DAT でチャンネルを表にしたものは `Classes` に書いたIDしか出ないので別物。
-  `demo.toe` の `/project1/SoundClass` に両方並べてある(`top10` と `chopto1`)
+  `demo.toe` の `/project1/SoundClass` に両方並べてある(`top10` と `chopto1`)。
+  自分で繋がなくてもよく、**Info DAT (top 10)** トグルを on にすれば隣に Info DAT が自動生成される
+  (Callbacks DAT は配置しただけで閉じたチップとしてドック接続される)
 - 結果の更新間隔は `Window (sec) × (1 - Overlap)`（既定 1秒×0.5 = 0.5秒ごと）。
   チャンネルは最新値を保持する（滑らかにしたい場合は後段に Lag/Filter CHOP）
 
@@ -230,6 +236,7 @@ scuba_diving            skiing                  silence
 | パラメータ | 既定 | 内容 |
 |---|---|---|
 | Active | On | 解析の有効/無効 |
+| Info DAT (top 10) | Off | on にすると隣に Info DAT を自動生成し、全クラスの上位10件を表示する |
 | Classes | applause cheering laughter music speech | 出力するクラスID（空白区切り） |
 | Custom Core ML Model | — | 独自の音響分類モデル。`.mlmodel` はロード時に自動コンパイル |
 | Window (sec) | 1.0 | 解析ウィンドウ長（短いほど反応が速く精度は下がる） |

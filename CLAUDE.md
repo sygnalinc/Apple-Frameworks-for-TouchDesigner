@@ -4496,3 +4496,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   note と README(英日)にも「Info DAT ノードのことであって CHOP to DAT とは別物」と明記
 - **教訓**: 機能を実装しても**利用例に置いていないと存在しないのと同じ**。今回は
   「Classes を知らなくても探せる」という設計意図そのものが見えなくなっていた
+
+### 2026-08-10 SoundClass CHOP に Info DAT 自動生成を追加(pythonCallbacksDAT の横展開)
+
+- ユーザー「soundclass chop から infoDAT を出せる様にして」
+- `common/PyCallbacksBootstrap.h` を使い、CoreWLANScan / Cinematic Video / Spatial Video / PDFKit と
+  同じ仕組みを SoundClass CHOP へ横展開。**配置しただけで Callbacks DAT が閉じたチップとして
+  ドック接続**され、**`Info DAT (top 10)` トグル off→on で `<node名>_info` を自動生成**
+- build.sh に `TD_EXTRA_CFLAGS`(Python.h + `-undefined dynamic_lookup`)を追加。
+  共通ヘルパは `TD_EXTRA_CFLAGS` を読むので1行足すだけで済む
+- **検証で一度ハマった**: 生成直後は `sc_callbacks` も `sc_info` も出ず「効いていない」と見えたが、
+  原因は**CHOP が cook されていなかった**だけ(bootstrap も callback 発火も execute の中にある)。
+  `out.cook(force=True)` を数回回したら両方生成された。実測 sc_info 11x2、
+  synthesizer 0.846 / keyboard_musical 0.781 / music 0.748、callbacks は
+  dock=sc / expose=True / viewer=True / showDocked=False
