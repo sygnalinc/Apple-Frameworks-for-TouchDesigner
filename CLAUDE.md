@@ -4560,3 +4560,18 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   (ImageGen で同じことを踏んでおり、CLAUDE.md にも既出)
 - TD再起動後、demo の該当ノードは **`Speechtranscribe1` として型もパラメータも正常に復帰**し
   errors なし。コンテナ名も `SpeechTranscribe` に変更して保存
+
+### 2026-08-10 デモ用の英語音声を追加(Assets/sample_speech_en.aiff)
+
+- ユーザー「demo用に英語の音声ファイルがほしい」。`say -v Samantha` で生成(19秒・818KB・
+  合成音声なので第三者の権利なし)。既存の日本語は `sample_speech.aiff` → **`sample_speech_ja.aiff`**
+  に改名して対を明示
+- **デモの既定を英語に変更**。`en-*` のモデルは多くの Mac に最初から入っているが `ja-JP` は
+  初回にダウンロードが走るため、初見の体験がよい。`repeat=on` でループ再生
+- **原稿を2回書き直した**: 最初の版は `on-device` が **`undevised`** に、`in TouchDesigner` が
+  `and touch designer` に化けた(合成音声の発音と相性が悪い)。**素直な英文に書き換えたら
+  誤りゼロ**になった。デモに載せる音声は、認識器が転ぶ語を避けたほうがよい
+- **先頭に 0.8 秒の無音を足した**。無いと再生開始と同時に認識が始まるので **冒頭の "This is" を
+  取りこぼす**。無音を入れたら拾えるようになった
+- 検証の注意: `Clear` パルス直後や `reloadpulse` 直後は数秒空振りする。**audio CHOP の peak と
+  Info DAT の status を見てから**表を読むこと(空を見て「動いていない」と誤診しかけた)

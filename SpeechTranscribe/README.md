@@ -31,6 +31,20 @@ index | text                     | final
 - Finalisation happens at speech boundaries (pauses). Continuous speech keeps extending the
   volatile row
 
+### Sample audio
+
+`Assets/sample_speech_en.aiff` — 19 s of English, generated with `say -v Samantha`, so it carries no
+third-party rights. `demo.toe`'s `/project1/SpeechTranscribe` loops it with `Locale = en-US`.
+`Assets/sample_speech_ja.aiff` is the Japanese equivalent; swap the file and set `Locale = ja-JP`.
+
+English is the default because `en-*` models ship on most Macs, while `ja-JP` downloads on first
+use. Measured on this clip: "Hello." / "This is a live speech transcription test." /
+"Everything runs on the Mac itself, with no network connection and no API key." — transcribed
+without errors.
+
+There is **0.8 s of silence at the head**. Without it the recognizer misses the opening words,
+because it starts listening at the same moment playback begins.
+
 ### Parameters
 
 | Parameter | Default | Description |
@@ -101,6 +115,20 @@ index | text                     | final
 - 確定行が積み上がり、最終行に認識途中のテキスト（final=0）が出る
 - `Max Rows` を超えた古い確定行は捨てられる
 - 確定は発話の区切り（ポーズ）で起きる。連続音声は途中結果のまま伸びていく
+
+### サンプル音声
+
+`Assets/sample_speech_en.aiff` — `say -v Samantha` で生成した英語19秒。合成音声なので第三者の権利は無い。
+`demo.toe` の `/project1/SpeechTranscribe` がこれをループ再生する（`Locale = en-US`）。
+日本語は `Assets/sample_speech_ja.aiff`。差し替えて `Locale = ja-JP` にする。
+
+英語を既定にしているのは、`en-*` のモデルが多くの Mac に最初から入っているのに対し
+`ja-JP` は初回にダウンロードが走るため。このクリップでの実測は
+「Hello.」「This is a live speech transcription test.」
+「Everything runs on the Mac itself, with no network connection and no API key.」で、誤りなく認識された。
+
+**先頭に 0.8 秒の無音を入れてある。** 入れないと、再生開始と同時に認識が始まるせいで
+冒頭の数語を取りこぼす。
 
 ### パラメータ
 
