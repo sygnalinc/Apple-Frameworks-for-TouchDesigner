@@ -13,13 +13,34 @@ iPhone (13 and later), using Apple's `Cinematic` framework (macOS 26+).
   (the former **Cinematic Data CHOP** is merged in — point an Info CHOP at this node to get the
   same data)
 
-### Automatic Info DAT (no setup)
+### Playback
+
+**It plays on its own, like a Movie File In.** `Play` is On by default and the position advances
+with the TouchDesigner timeline (`deltaMS`), so pausing the timeline pauses the clip.
+
+| Parameter | |
+|---|---|
+| `Play` | On (default) = play automatically. Off = scrub by hand with `Position` |
+| `Speed` | 1 = real time. Negative values play backwards |
+| `Loop` | On (default) = wrap to the start. Off = hold on the last frame |
+| `Cue` | Hold at `Cue Point` while this is On |
+| `Cue Point` / `Cue Pulse` | Jump to that time in seconds |
+| `Position (0..1)` | Manual scrub — **only used while `Play` is Off** |
+
+The requested time is snapped to the source frame grid, otherwise the same frame would be decoded
+over and over. The current time is published as the Info CHOP channels `position` (seconds) and
+`playing`.
+
+### Automatic Info CHOP (no setup)
 
 **Just place the operator** and a pre-filled Callbacks DAT (`<node>_callbacks`) is created and
 docked to it as a **closed ↓ chip**, exactly like the shader DAT of a GLSL TOP.
-**The moment you turn the `Info DAT` toggle ON, an Info DAT (`<node>_info`) is created next to
-it** (nothing happens if one already exists — there is a duplicate guard). Edit `onInfoDAT`
+**The moment you turn the `Info CHOP` toggle ON, an Info CHOP (`<node>_info`) is created next to
+it** (nothing happens if one already exists — there is a duplicate guard). Edit `onInfoCHOP`
 inside the chip to change the name or placement.
+
+Everything this operator publishes is numeric — duration, focus distance, subject slots — so it is
+an Info **CHOP**, not an Info DAT.
 
 ### Image output (Mode)
 
@@ -45,9 +66,10 @@ Wire a **subject depth into the Focus parameter to rack focus live from TD**.
 
 ### Parameters
 
-`Cinematic Video (iPhone)` (file) / `Mode` / `Position (0..1)` (playback position, converted to
-seconds internally) / `Aperture (f-number)` / `Focus Disparity Override` (0 = follow the script) /
-`Normalize Depth` / `Flip` / `Max Subjects (Info CHOP)`
+`Cinematic Video (iPhone)` (file) / `Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
+`Cue Pulse` / `Position (0..1, when Play is off)` / `Aperture (f-number)` /
+`Focus Disparity Override` (0 = follow the script) / `Normalize Depth` / `Flip` /
+`Max Subjects (Info CHOP)` / `Info CHOP`
 
 ### Status (M2 — every feature verified on real Cinematic footage)
 
@@ -106,12 +128,32 @@ Apple の `Cinematic` framework(macOS 26+)を使う。
 - **メタデータ出力**: フォーカス深度・被写体スロットを **Info CHOP チャンネル**で出す
   (旧 **Cinematic Data CHOP** を統合。Info CHOP をこのノードに向けるだけで同じデータが得られる)
 
-### Info DAT の自動生成(操作不要)
+### 再生
+
+**Movie File In と同じく、置くだけで勝手に再生される。** `Play` は既定 On で、位置は
+TouchDesigner のタイムライン(`deltaMS`)に従って進む。タイムラインを止めれば再生も止まる。
+
+| パラメータ | |
+|---|---|
+| `Play` | On(既定)=自動再生 / Off=`Position` で手動スクラブ |
+| `Speed` | 1=実時間。負値で逆再生 |
+| `Loop` | On(既定)=先頭へ折り返す / Off=終端で停止 |
+| `Cue` | On の間は `Cue Point` で保持 |
+| `Cue Point` / `Cue Pulse` | 指定秒へジャンプ |
+| `Position (0..1)` | 手動スクラブ。**`Play` が Off のときだけ効く** |
+
+要求時刻はソースのフレーム境界へ量子化している(しないと同じ絵を何度もデコードし直すことになる)。
+現在位置は Info CHOP の `position`(秒)と `playing` で読める。
+
+### Info CHOP の自動生成(操作不要)
 
 **OPを配置するだけ**で雛形入りの Callbacks DAT(`<node名>_callbacks`)が自動生成され、
 GLSL TOP のシェーダDATと同じ**閉じた↓チップ**としてノードにドックされる。
-**`Info DAT` トグルを ON にした瞬間、隣に Info DAT(`<node名>_info`)が自動生成**される
-(既にあれば何もしない=二重生成ガード)。生成位置や名前はチップ内の `onInfoDAT` を編集して変えられる。
+**`Info CHOP` トグルを ON にした瞬間、隣に Info CHOP(`<node名>_info`)が自動生成**される
+(既にあれば何もしない=二重生成ガード)。生成位置や名前はチップ内の `onInfoCHOP` を編集して変えられる。
+
+このOPが出すのは尺・フォーカス距離・被写体スロットなど**全て数値**なので、Info DAT ではなく
+Info **CHOP** が正しい。
 
 ### 映像出力(Mode)
 
@@ -136,9 +178,10 @@ GLSL TOP のシェーダDATと同じ**閉じた↓チップ**としてノード�
 
 ### パラメータ
 
-`Cinematic Video (iPhone)`(ファイル)/ `Mode` / `Position (0..1)`(再生位置。内部で秒に変換)/
-`Aperture (f-number)` / `Focus Disparity Override`(0=script準拠)/ `Normalize Depth` / `Flip` /
-`Max Subjects (Info CHOP)`
+`Cinematic Video (iPhone)`(ファイル)/ `Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
+`Cue Pulse` / `Position (0..1, when Play is off)` / `Aperture (f-number)` /
+`Focus Disparity Override`(0=script準拠)/ `Normalize Depth` / `Flip` /
+`Max Subjects (Info CHOP)` / `Info CHOP`
 
 ### 検証状況(M2・実Cinematic動画で全機能確認済み)
 

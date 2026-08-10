@@ -7,6 +7,8 @@
 // 取得は CNScript(ピクセルデコード不要)なので低コスト。Info CHOP をこのノードに
 // 向けるだけで旧CHOPと同じデータが得られる。
 #import <Foundation/Foundation.h>
+#include <cmath>
+#include <cstring>
 #include <string>
 #include <atomic>
 #include <condition_variable>
@@ -20,24 +22,25 @@
 using namespace TD;
 
 // Callbacks DAT 雛形(配置時に自動生成・ドックチップ接続)。
-// Info DAT トグル ON で隣にメタデータの Info DAT を自動生成する(二重生成ガード付き)。
+// Info CHOP トグル ON で隣にメタデータの Info CHOP を自動生成する(二重生成ガード付き)。
+// このOPが出すのは全て数値(尺・フォーカス距離・被写体スロット)なので DAT ではなく CHOP。
 static const char* PythonCallbacksDATStubs =
 "# Cinematic Video TOP callbacks\n"
 "#\n"
-"# onInfoDAT: 'Info DAT' トグルを on にした瞬間に呼ばれる。\n"
-"# 隣にメタデータ表示用の Info DAT を自動生成する(既にあれば何もしない)。\n"
-"def onInfoDAT(op, enabled):\n"
+"# onInfoCHOP: 'Info CHOP' トグルを on にした瞬間に呼ばれる。\n"
+"# 隣にメタデータ表示用の Info CHOP を自動生成する(既にあれば何もしない)。\n"
+"def onInfoCHOP(op, enabled):\n"
 "\tif not enabled:\n"
 "\t\treturn\n"
 "\tp = op.parent()\n"
 "\tname = op.name + '_info'\n"
 "\tif p.op(name):\n"
 "\t\treturn\n"
-"\td = p.create(infoDAT, name)\n"
-"\td.par.op = op.name\n"
-"\td.nodeX = op.nodeX + 200\n"
-"\td.nodeY = op.nodeY\n"
-"\td.viewer = True\n"
+"\tc = p.create(infoCHOP, name)\n"
+"\tc.par.op = op.name\n"
+"\tc.nodeX = op.nodeX + 200\n"
+"\tc.nodeY = op.nodeY\n"
+"\tc.viewer = True\n"
 "\treturn\n";
 
 extern "C" {
@@ -82,18 +85,19 @@ public:
     ~CinematicVideoTOP() override { { std::lock_guard<std::mutex> l(myMutex); myQuit = true; } myCond.notify_all(); if (myThread.joinable()) myThread.join(); if (myState) cn_destroy(myState); }
 
     void getGeneralInfo(TOP_GeneralInfo* g, const OP_Inputs*, void*) override { g->cookEveryFrameIfAsked = true; }
+    void pulsePressed(const char* name, void*) override { if (!strcmp(name, "Cuepulse")) myCuePulse = true; }
 
     void execute(TOP_Output* out, const OP_Inputs* in, void*) override {
         myExec++;
         // 配置後の cook で雛形入り Callbacks DAT を自動生成・ドック接続(成功するまでリトライ)
         if (!myBootstrapped) myBootstrapped = tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);
-        // Info DAT トグル off→on で隣に Info DAT を自動生成
-        bool infoDat = in->getParInt("Infodat") != 0;
-        if (infoDat && !myPrevInfoDat) {
+        // Info CHOP トグル off→on で隣に Info CHOP を自動生成
+        bool infoChop = in->getParInt("Infochop") != 0;
+        if (infoChop && !myPrevInfoChop) {
             tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);   // 消されていたら再生成
-            tdpycb::firePythonCallback(myNode, "onInfoDAT", true);
+            tdpycb::firePythonCallback(myNode, "onInfoCHOP", true);
         }
-        myPrevInfoDat = infoDat;
+        myPrevInfoChop = infoChop;
         if (!myState) return;
         Job j;
         j.file = in->getParFilePath("File") ? in->getParFilePath("File") : "";
@@ -103,19 +107,38 @@ public:
         j.flip = in->getParInt("Flip") != 0;
         j.norm = in->getParInt("Normalize") != 0;
         myMax = std::clamp((int)in->getParInt("Maxsubjects"), 1, kMaxSub);
-        if (j.file != myFile) { myFile = j.file; if (!j.file.empty()) cn_open(myState, j.file.c_str()); }
+        if (j.file != myFile) { myFile = j.file; myTime = 0; if (!j.file.empty()) cn_open(myState, j.file.c_str()); }
 
         // status(status|duration|fps|error)
-        std::string st, err; double dur = 0;
+        std::string st, err; double dur = 0, fps = 0;
         { const char* s = cn_status(myState); if (s) { std::string all(s); free((void*)s);
             size_t a=all.find('|'), b=all.find('|',a+1), c=all.rfind('|');
             if(a!=std::string::npos&&b!=std::string::npos&&c!=std::string::npos){
-                st=all.substr(0,a); dur=atof(all.substr(a+1,b-a-1).c_str()); err=all.substr(c+1);} } }
+                st=all.substr(0,a); dur=atof(all.substr(a+1,b-a-1).c_str());
+                fps=atof(all.substr(b+1,c-b-1).c_str()); err=all.substr(c+1);} } }
         myStatus = st; myErr = err; myDur = dur;
 
-        // Position(0..1)→秒。ヘルパは秒指定(旧実装は0..1を秒として渡していて全尺スクラブ不可だった)
-        double pos = std::clamp((double)in->getParDouble("Position"), 0.0, 1.0);
-        j.time = pos * (dur > 0 ? dur : 0);
+        // 再生位置(秒)。Movie File In と同じくタイムライン駆動で、
+        // deltaMS ぶんだけ進める(TDのタイムラインを止めれば止まる)
+        bool play = in->getParInt("Play") != 0;
+        double cuePoint = in->getParDouble("Cuepoint");
+        if (myCuePulse.exchange(false)) myTime = cuePoint;
+        if (in->getParInt("Cue") != 0) {
+            myTime = cuePoint;                       // Cue On の間はキュー点で保持
+        } else if (play) {
+            const OP_TimeInfo* ti = in->getTimeInfo();
+            myTime += (ti ? ti->deltaMS / 1000.0 : 0.0) * in->getParDouble("Speed");
+            if (dur > 0) {
+                if (in->getParInt("Loop") != 0) { myTime = std::fmod(myTime, dur); if (myTime < 0) myTime += dur; }
+                else myTime = std::clamp(myTime, 0.0, dur);
+            }
+        } else {
+            // Play が Off のときは Position(0..1)で手動スクラブ(Movie File In の Index と同じ役割)
+            myTime = std::clamp((double)in->getParDouble("Position"), 0.0, 1.0) * (dur > 0 ? dur : 0);
+        }
+        // ソースのフレーム境界へ量子化する。しないと同じ絵を何度もデコードし直すことになる
+        j.time = (fps > 0) ? std::round(myTime * fps) / fps : myTime;
+        myPlaying = play && in->getParInt("Cue") == 0;
 
         // ジョブ投入(ready時・変化時)
         char b[256]; snprintf(b,sizeof b,"%d|%.5f|%.3f|%.4f|%d|%d",j.mode,j.time,j.fnum,j.focus,j.flip?1:0,j.norm?1:0);
@@ -171,24 +194,33 @@ public:
         { OP_StringParameter p("Mode"); p.label = "Mode"; p.page = PAGE;
           const char* n[] = {"Depth","Rendered"}; const char* l[] = {"Depth (disparity map)","Rendered (change focus/aperture)"};
           std::vector<const char*> nv(n,n+2), lv(l,l+2); p.defaultValue="Rendered"; m->appendMenu(p,2,nv.data(),lv.data()); }
-        { OP_NumericParameter p("Position"); p.label="Position (0..1)"; p.page=PAGE; p.defaultValues[0]=0; p.minSliders[0]=0; p.maxSliders[0]=1; p.minValues[0]=0; p.maxValues[0]=1; p.clampMins[0]=p.clampMaxes[0]=true; m->appendFloat(p); }
+        // 再生系(Movie File In と同じ考え方: Play On で自動再生、Off のとき Position で手動スクラブ)
+        { OP_NumericParameter p("Play"); p.label="Play"; p.page=PAGE; p.defaultValues[0]=1; m->appendToggle(p); }
+        { OP_NumericParameter p("Speed"); p.label="Speed"; p.page=PAGE; p.defaultValues[0]=1; p.minSliders[0]=-2; p.maxSliders[0]=2; m->appendFloat(p); }
+        { OP_NumericParameter p("Loop"); p.label="Loop"; p.page=PAGE; p.defaultValues[0]=1; m->appendToggle(p); }
+        { OP_NumericParameter p("Cue"); p.label="Cue"; p.page=PAGE; p.defaultValues[0]=0; m->appendToggle(p); }
+        { OP_NumericParameter p("Cuepoint"); p.label="Cue Point (sec)"; p.page=PAGE; p.defaultValues[0]=0; p.minSliders[0]=0; p.maxSliders[0]=60; m->appendFloat(p); }
+        { OP_NumericParameter p("Cuepulse"); p.label="Cue Pulse"; p.page=PAGE; m->appendPulse(p); }
+        { OP_NumericParameter p("Position"); p.label="Position (0..1, when Play is off)"; p.page=PAGE; p.defaultValues[0]=0; p.minSliders[0]=0; p.maxSliders[0]=1; p.minValues[0]=0; p.maxValues[0]=1; p.clampMins[0]=p.clampMaxes[0]=true; m->appendFloat(p); }
         { OP_NumericParameter p("Fnumber"); p.label="Aperture (f-number)"; p.page=PAGE; p.defaultValues[0]=4.0; p.minSliders[0]=2; p.maxSliders[0]=16; m->appendFloat(p); }
         { OP_NumericParameter p("Focus"); p.label="Focus Disparity Override (0=use script)"; p.page=PAGE; p.defaultValues[0]=0; p.minSliders[0]=0; p.maxSliders[0]=1; m->appendFloat(p); }
         { OP_NumericParameter p("Normalize"); p.label="Normalize Depth (0..1)"; p.page=PAGE; p.defaultValues[0]=1; m->appendToggle(p); }
         { OP_NumericParameter p("Flip"); p.label="Flip Vertically"; p.page=PAGE; p.defaultValues[0]=1; m->appendToggle(p); }
         { OP_NumericParameter p("Maxsubjects"); p.label="Max Subjects (Info CHOP)"; p.page=PAGE; p.defaultValues[0]=10; p.minSliders[0]=1; p.maxSliders[0]=20; p.minValues[0]=1; p.maxValues[0]=kMaxSub; p.clampMins[0]=p.clampMaxes[0]=true; m->appendInt(p); }
-        { OP_NumericParameter p("Infodat"); p.label="Info DAT"; p.page=PAGE; p.defaultValues[0]=0; m->appendToggle(p); }
+        { OP_NumericParameter p("Infochop"); p.label="Info CHOP"; p.page=PAGE; p.defaultValues[0]=0; m->appendToggle(p); }
     }
 
     // Info CHOP: 診断 + 旧 Cinematic Data CHOP のメタデータチャンネル
-    static constexpr int kFixedChans = 8;   // executes,submits,frames,ready,duration,focus_disparity,focus_strong,subjects
+    static constexpr int kFixedChans = 10;  // executes,submits,frames,ready,duration,position,playing,focus_disparity,focus_strong,subjects
     int32_t getNumInfoCHOPChans(void*) override { return kFixedChans + myMax * 8; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override {
         if (i < kFixedChans) {
             int ready = (myStatus == "ready") ? 1 : 0;
-            const char* n[] = {"executes","submits","frames","ready","duration","focus_disparity","focus_strong","subjects"};
+            const char* n[] = {"executes","submits","frames","ready","duration","position","playing",
+                               "focus_disparity","focus_strong","subjects"};
             float v[] = {(float)myExec.load(),(float)mySubmit.load(),(float)myFrames.load(),(float)ready,
-                         (float)myDur, myMetaSnap.focus, myMetaSnap.strong, (float)myMetaSnap.count};
+                         (float)myDur, (float)myTime, myPlaying ? 1.f : 0.f,
+                         myMetaSnap.focus, myMetaSnap.strong, (float)myMetaSnap.count};
             c->name->setString(n[i]); c->value = v[i];
             return;
         }
@@ -249,12 +281,15 @@ private:
     }
 
     const OP_NodeInfo* myNode = nullptr;   // Python コールバック用
-    bool myBootstrapped = false, myPrevInfoDat = false;
+    bool myBootstrapped = false, myPrevInfoChop = false;
     TOP_Context* myContext; void* myState = nullptr;
     std::thread myThread; std::condition_variable myCond; std::mutex myMutex;
     bool myQuit=false, myPending=false, myBusy=false;
     Job myJob; std::string myFile, mySig, myStatus, myErr; unsigned long long myUploaded=0;
     double myDur = 0; int myMax = 10;
+    double myTime = 0;                 // 再生位置(秒)。Play On のとき deltaMS ぶん進む
+    bool myPlaying = false;
+    std::atomic<bool> myCuePulse{false};
     Meta myMeta, myMetaSnap;   // myMeta=worker書き込み(要mutex) / myMetaSnap=cookスレッド専用
     std::atomic<uint64_t> myExec{0}, mySubmit{0}, myFrames{0};
 };

@@ -4674,3 +4674,32 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   VisionDocument ベースに差し替え、naming.md の opLabel 例は `Speech Transcribe` に
 - ローカルの常設Pluginsには SpeechActivityCHOP.plugin を残置(開発環境は不変・従来と同じ扱い)
 - demo.toe の利用例削除はユーザーが実施
+
+### 2026-08-10 Cinematic Video TOP を Movie File In 相当の自動再生に + Info DAT → Info CHOP
+
+- ユーザー「CinematicVideo を MovieFileIn の様に自動で再生可能な仕様にしたい」。従来は
+  `Position`(0..1)を外から動かさないと止まったままだった
+- **`OP_Inputs::getTimeInfo()->deltaMS` でタイムライン駆動**にした(Movie File In と同じ考え方。
+  TDのタイムラインを止めれば再生も止まる)。追加パラメータ: `Play`(既定On)/ `Speed`(負値で逆再生)/
+  `Loop`(既定On)/ `Cue` / `Cue Point` / `Cue Pulse`。`Position` は **Play が Off のときだけ**
+  効く手動スクラブ(Movie File In の Index と同じ役割)に。Info CHOP へ `position`(秒)と
+  `playing` を追加(kFixedChans 8→10)
+- **要求時刻はソースのfpsでフレーム量子化**する。しないと同じ絵を何度もデコードし直す
+- **実測(M2・実Cinematic動画 57.1秒)**: Depth 512x288 で **実時間の 0.98倍・59描画/秒**、
+  Speed=0.5 → 0.50x、Speed=-1 → -1.00x(逆再生)、Rendered 1920x1080 でも **1.00x・59.8描画/秒**。
+  Loop On=先頭へ折り返し / Off=終端で停止、Cue On=キュー点で保持、Cue Pulse=ジャンプ、
+  Play Off + Position=0.5 → 28.55秒(=dur×0.5)を全て確認
+- **ユーザー指摘「infoDATよりinfoCHOPの方が良いのでは」→ そのとおりだった**: このOPには
+  **`getInfoDATSize` の実装がそもそも無く**、出しているデータは全て数値。`Info DAT` トグルは
+  中身の無いDATを作るだけだった(demo.toe にも自動生成された空の `_info`(infoDAT)と、
+  ユーザーが手で置いた `info1`(infoCHOP)が並んでいた)。トグルを **`Info CHOP`** に変更し、
+  stub も `onInfoCHOP` → `p.create(infoCHOP, ...)` に。**PDFKit(本文/アウトライン)と
+  Spatial Video(codec/hero_eye 等の文字列)は DAT のままが正しい**
+- **検証の制約**: `pythonCallbacksDAT` は **Plugin Path で読ませた素の cplusplusTOP では効かない**
+  (`callbacks` パラメータ自体が生成されない)ため、バージョン付きパス方式では bootstrap を検証
+  できない。stub 関数を取り出して直接実行し、`_info` が **infoCHOP** として生成され op が
+  自ノードを指し二重生成もしないことを確認した。トグル経由の一連の流れは**TD再起動後に要確認**
+- **罠(再確認)**: TD内Pythonで `time.sleep` を呼ぶと **TD本体が止まる**ので、再生の経過を測る
+  ときはシェル側で待つ。これで一度「Loopが折り返さない」と誤診した
+- 常設インストール済み。**TD再起動で `Play` 等の新パラメータと `Info CHOP` トグルが出る**。
+  demo.toe に残っている `Cinematicvideo1_info`(infoDAT)は用済みになる(ユーザー側で整理)
