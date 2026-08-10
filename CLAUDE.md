@@ -4628,3 +4628,33 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   「リーダーと読み上げ」で開くことを確認。errors/warnings なし。検証ノードは削除済み
 - **罠**: cplusplusCHOP のプラグインパラメータは **`customPars` / `isCustom` では取れない**(0件)。
   `n.pars('*')` で名前を見ること。これで一度「パラメータが生成されていない」と誤診した
+
+### 2026-08-10 Speech Activity CHOP は動作しないと判明(SpeechDetector が結果を返さない)
+
+- ユーザー「SpeechActivity の使い道を教えて」→ README に「実発話での onset/offset は未検証」と
+  残っていたので、答える前に `Assets/sample_speech_en.aiff`(Speech Transcribe で誤りゼロだった
+  19秒の英語ナレーション)で検証したところ、**このオペレータは全く動いていなかった**
+- **TD実測**: Execute DAT の onFrameEnd で毎フレーム駆動して729フレーム観測し、
+  `speaking` が一度も1にならない。22050Hz / 48000Hz、感度 medium / high の4通りとも0。
+  Info DAT は `listening`、errors/warnings なし(=静かに死んでいる)
+- **単体Swiftハーネスで原因を特定**:
+  1. `SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith:[detector])` が
+     **0 Hz / 0 ch** を返す(`availableCompatibleAudioFormats` もこの1件だけ)
+  2. helper はこれを変換先にするので `AVAudioConverter` が **nil** → `feed()` が早期return
+     → **音声が1サンプルも解析器へ届かない**
+  3. `status="listening"` は `analyzer.start()` の**前**にセットしているので起動の証拠にならない
+  4. detector 単体で `prepareToAnalyze` すると Apple自身の致命的エラー
+     **"Cannot create SpeechDetector-only worker; use with a transcriber module"**
+  5. `SpeechTranscriber` と組み合わせると format は 16kHz になり19秒投入できるが、
+     **`detector.results` は0件**(同じ実行で transcriber は正しい認識結果を4件返すので音声経路は正常)
+- **結論**: `SpeechDetector` はユーザー向けVADではなく transcriber の内部ゲート用モジュールとして
+  振る舞う。macOS 26.6 では「単体VAD CHOP」という設計自体が成立しない
+- **代替**: 発話ゲートは **Sound Class CHOP**(303クラスに `speech` がある)を閾値処理する。
+  レベルだけでよければ SoundFeatures の RMS(ただし物音でも立つ)。字幕の区切りは
+  Speech Transcribe が無音で確定行に落とす仕組みを既に持っている
+- README(SpeechActivity 英日 + ルート英日一覧)を実測に合わせて訂正。**develop へ退避するかは
+  ユーザー判断待ち**(公開は検証済みのみ、という方針からは退避が筋)
+- **教訓**: 「実測」と書く対象を間違えていた。正弦波で `speaking=0` を確認して「非音声として正しい」
+  と読んでいたが、**実際は入力が何であれ0**だった。**陰性の確認は、陽性が出ることを先に示してから**
+- **教訓**: 状態文字列は**処理が実際に始まってから**立てる。開始前に立てると、失敗しても
+  「動いているように見える」表示が残る

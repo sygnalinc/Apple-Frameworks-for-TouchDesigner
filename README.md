@@ -140,7 +140,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | [Sound Features](SoundFeatures/) | CHOP | Audio features (RMS / peak / centroid / onset / beat / BPM / 16 bands) |
 | [Speech Transcribe](SpeechTranscribe/) | DAT | **Live transcription.** Apple SpeechAnalyzer (macOS 26+) / WhisperKit (macOS 14+, multilingual, translate) |
 | [Speech Synth](SpeechSynth/) | CHOP | On-device **speech synthesis** → PCM stereo |
-| [Speech Activity](SpeechActivity/) | CHOP | **Voice activity detection** (speaking / onset / offset). Start/stop trigger for transcription |
+| [Speech Activity](SpeechActivity/) | CHOP | Voice activity detection (speaking / onset / offset). **Does not work** — `SpeechDetector` yields no results; use Sound Class for speech gating |
 
 ### Language & text
 
