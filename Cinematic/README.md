@@ -46,12 +46,13 @@ they are **frame-locked by construction**.
 
 | | Output |
 |---|---|
-| **Color buffer 0** | **Rendered** — bokeh applied at the chosen `Aperture` / focus (RGBA16Float) |
-| **Color buffer 1** | **Color** — the original video track, before any bokeh (RGBA16Float) |
-| **Color buffer 2** | **Depth** — disparity map (Mono32Float, its own resolution) |
+| **Color buffer 0** | **Color** — the original video track, before any bokeh (RGBA16Float) |
+| **Color buffer 1** | **Depth** — disparity map (Mono32Float, its own resolution) |
+| **Color buffer 2** | **Rendered** — bokeh applied at the chosen `Aperture` / focus (RGBA16Float) |
 
-`Color + Depth` is the cheaper two-buffer variant (buffer 0 colour, buffer 1 depth): it skips the
-Metal re-render entirely, so use it when you only need the plate and the depth.
+`Color + Depth` emits **the first two of those buffers only** — same indices, so switching between
+the two modes never renumbers anything downstream. It skips the Metal re-render entirely, so use it
+when you only need the plate and the depth.
 
 Buffers 1 and 2 are read with a **Render Select TOP** (`Buffer Index` 1 or 2). Buffers may differ
 in resolution and pixel format; that is explicitly supported. `Depth` / `Rendered` / `Color` are
@@ -96,6 +97,21 @@ inside the chip to change the name or placement.
 Everything this operator publishes is numeric — duration, focus distance, subject slots — so it is
 an Info **CHOP**, not an Info DAT.
 
+
+### Metadata on the Info DAT
+
+Turning on `Info DAT` creates `<node>_meta` next to the operator and fills it with what the file
+says about itself — one `key | value` row each. Measured on an iPhone 17 Pro clip (20 rows):
+
+| | |
+|---|---|
+| Media | `duration` `rotation` `video_size` `video_codec` `video_fps` `video_mbps` `disparity_size` `disparity_codec` `audio_codec` |
+| Cinematic | `is_cinematic` `cinematic_intent` |
+| Capture | `make` `model` `software` `creationDate` `location` |
+
+It is read once when the file opens, not per frame. **`location` is the GPS coordinate the phone
+recorded** — worth knowing before you put this table on a stream or a screenshot.
+
 ### Image output (Mode)
 
 | Mode | Output | Description |
@@ -120,7 +136,7 @@ Wire a **subject depth into the Focus parameter to rack focus live from TD**.
 
 ### Parameters
 
-`Cinematic Video (iPhone)` (file) / `Mode` (Depth / Rendered / Color / Color+Depth / All) / `Play Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
+`Cinematic Video (iPhone)` (file) / `Mode` (Depth / Rendered / Color / Color+Depth / All) / `Play Mode` / `Info CHOP` / `Info DAT` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
 `Cue Pulse` / `Position (0..1, when Play is off)` / `Aperture (f-number)` /
 `Focus Disparity Override` (0 = follow the script) / `Normalize Depth` / `Flip` /
 `Max Subjects (Info CHOP)` / `Info CHOP`
@@ -214,12 +230,12 @@ TouchDesigner のタイムライン(`deltaMS`)に従って進む。タイムラ�
 
 | | 出力 |
 |---|---|
-| **色バッファ 0** | **Rendered** — `Aperture` とピントを反映した再レンダ(RGBA16Float) |
-| **色バッファ 1** | **Color** — ボケを付ける前の元の映像トラック(RGBA16Float) |
-| **色バッファ 2** | **Depth** — 視差マップ(Mono32Float・別解像度) |
+| **色バッファ 0** | **Color** — ボケを付ける前の元の映像トラック(RGBA16Float) |
+| **色バッファ 1** | **Depth** — 視差マップ(Mono32Float・別解像度) |
+| **色バッファ 2** | **Rendered** — `Aperture` とピントを反映した再レンダ(RGBA16Float) |
 
-`Color + Depth` は2バッファの軽い版(0=色 / 1=深度)。**Metal の再レンダを通さない**ので、
-素材そのままの絵と深度だけあればよいときはこちらを使う。
+`Color + Depth` は**この先頭2枚だけ**を出す。番号が同じなので、2つのモードを切り替えても
+下流の Render Select を振り直す必要がない。**Metal の再レンダを通さない**ぶん軽い。
 
 バッファ1・2は **Render Select TOP**(`Buffer Index` を 1 か 2)で取る。バッファごとに解像度も
 ピクセル形式も別で構わない(SDKが明示的に許している)。1枚だけでよければ
@@ -262,6 +278,22 @@ GLSL TOP のシェーダDATと同じ**閉じた↓チップ**としてノード�
 このOPが出すのは尺・フォーカス距離・被写体スロットなど**全て数値**なので、Info DAT ではなく
 Info **CHOP** が正しい。
 
+
+### Info DAT で素材のメタデータを見る
+
+`Info DAT` をオンにすると隣に `<ノード名>_meta` が自動生成され、そのファイルが自分について
+持っている情報が `key | value` で並ぶ。iPhone 17 Pro のクリップでの実測は20行:
+
+| | |
+|---|---|
+| メディア | `duration` `rotation` `video_size` `video_codec` `video_fps` `video_mbps` `disparity_size` `disparity_codec` `audio_codec` |
+| Cinematic | `is_cinematic` `cinematic_intent` |
+| 撮影 | `make` `model` `software` `creationDate` `location` |
+
+読み取りはファイルを開いたときの1回だけで、毎フレームではない。
+**`location` は端末が記録した GPS 座標**なので、配信や公開するスクリーンショットに
+この表を映すときは注意すること。
+
 ### 映像出力(Mode)
 
 | Mode | 出力 | 内容 |
@@ -285,7 +317,7 @@ Info **CHOP** が正しい。
 
 ### パラメータ
 
-`Cinematic Video (iPhone)`(ファイル)/ `Mode`(Depth / Rendered / Color / Color+Depth / All)/ `Play Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
+`Cinematic Video (iPhone)`(ファイル)/ `Mode`(Depth / Rendered / Color / Color+Depth / All)/ `Play Mode` / `Info CHOP` / `Info DAT` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
 `Cue Pulse` / `Position (0..1, when Play is off)` / `Aperture (f-number)` /
 `Focus Disparity Override`(0=script準拠)/ `Normalize Depth` / `Flip` /
 `Max Subjects (Info CHOP)` / `Info CHOP`

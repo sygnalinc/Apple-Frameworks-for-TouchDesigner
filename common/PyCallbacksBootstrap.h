@@ -48,6 +48,16 @@ inline bool bootstrapCallbacksDAT(const TD::OP_NodeInfo* node, const char* stubs
     py += "\t\t\t\td.viewer = True\n";      // 開いた時にテキストが見える
     py += "\t\t\t\td.showDocked = False\n"; // 既定は閉じた↓チップ(開閉の実体はこのフラグ)
     py += "\t\t\tn.par.callbacks = nm\n";
+    // 既に自動生成済みの DAT には、後から増えたコールバックが入っていない。
+    // (stub は生成時にしか書かれないため、プラグインを更新しても古い DAT のままになる)
+    // 自動生成した名前のものに限り、不足している def だけを追記する。
+    // 注意: par.callbacks.eval() は **文字列ではなく DAT オブジェクト**を返す(実測)
+    py += "\t\t__tdcb_d = n.par.callbacks.eval()\n";
+    py += "\t\tif __tdcb_d is not None and __tdcb_d.name == n.name + '_callbacks':\n";
+    py += "\t\t\tfor __blk in ('\\n' + __tdcb_stub).split('\\ndef ')[1:]:\n";
+    py += "\t\t\t\t__nm = __blk.split('(')[0].strip()\n";
+    py += "\t\t\t\tif ('def ' + __nm) not in __tdcb_d.text:\n";
+    py += "\t\t\t\t\t__tdcb_d.text = __tdcb_d.text.rstrip() + '\\n\\ndef ' + __blk.rstrip() + '\\n'\n";
     py += "\t\t__tdcb_ok = bool(n.par.callbacks.eval())\n";
     py += "except Exception:\n";
     py += "\timport traceback as __tdcb_tb\n";
@@ -58,11 +68,14 @@ inline bool bootstrapCallbacksDAT(const TD::OP_NodeInfo* node, const char* stubs
     PyObject* args = node->context->createArgumentsTuple(0, nullptr); // [0]=op
     if (dict && args) {
         PyDict_SetItemString(dict, "__tdcb_node", PyTuple_GET_ITEM(args, 0));
+        PyObject* stubStr = PyUnicode_FromString(stubs);
+        if (stubStr) { PyDict_SetItemString(dict, "__tdcb_stub", stubStr); Py_DECREF(stubStr); }
         PyObject* r = PyRun_String(py.c_str(), Py_file_input, dict, dict);
         if (r) Py_DECREF(r); else PyErr_Clear();
         PyObject* v = PyDict_GetItemString(dict, "__tdcb_ok");     // borrowed
         ok = v && PyObject_IsTrue(v) == 1;
         PyDict_DelItemString(dict, "__tdcb_node");
+        if (PyDict_GetItemString(dict, "__tdcb_stub")) PyDict_DelItemString(dict, "__tdcb_stub");
     }
     if (args) Py_DECREF(args);
     PyGILState_Release(g);

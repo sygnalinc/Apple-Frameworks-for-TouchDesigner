@@ -19,6 +19,7 @@ final class CNState: @unchecked Sendable {
     var duration: Double = 0
     var fps: Double = 30
     var metaJSON = "{}"        // 直近 cn_meta の結果
+    var fileJSON = "{}"        // ファイル全体のメタデータ(cn_open 時に1回だけ作る)
 
     // ロード済み資産(ready後のみ・メインでなくても参照する)
     var asset: AVAsset?
@@ -96,12 +97,70 @@ public func cn_open(_ h: UnsafeMutableRawPointer?, _ path: UnsafePointer<CChar>?
             s.asset = asset; s.info = info; s.attrs = attrs; s.session = session; s.script = script
             s.device = dev; s.queue = q; s.duration = dur; s.fps = fps > 0 ? fps : 30; s.timeScale = ts
             s.rotDeg = rot
+            s.fileJSON = await buildFileInfo(asset, info, script, rot)
             s.status = "ready"; s.error = ""
             s.lock.unlock()
         } catch {
             s.lock.lock(); s.status = "error"; s.error = "\(error)"; s.lock.unlock()
         }
     }
+}
+
+// ファイル全体のメタデータを key/value の JSON にする(cn_open 時に1回だけ)。
+// Info DAT で「この素材は何か」を見るためのもの。
+@available(macOS 26.0, *)
+private func buildFileInfo(_ asset: AVURLAsset, _ info: CNAssetInfo,
+                           _ script: CNScript, _ rot: Int) async -> String {
+    var kv: [(String, String)] = []
+    func fourCC(_ c: FourCharCode) -> String {
+        String(format: "%c%c%c%c", (c >> 24) & 255, (c >> 16) & 255, (c >> 8) & 255, c & 255)
+    }
+    func track(_ t: AVAssetTrack?, _ prefix: String) async {
+        guard let t = t else { return }
+        let sz = (try? await t.load(.naturalSize)) ?? .zero
+        let fr = (try? await t.load(.nominalFrameRate)) ?? 0
+        let br = (try? await t.load(.estimatedDataRate)) ?? 0
+        if let fds = try? await t.load(.formatDescriptions), let f = fds.first {
+            kv.append((prefix + "_codec", fourCC(CMFormatDescriptionGetMediaSubType(f))))
+        }
+        if sz.width > 0 { kv.append((prefix + "_size", "\(Int(sz.width))x\(Int(sz.height))")) }
+        if fr > 0 { kv.append((prefix + "_fps", String(format: "%.3f", fr))) }
+        if br > 0 { kv.append((prefix + "_mbps", String(format: "%.1f", br / 1e6))) }
+    }
+    kv.append(("duration", String(format: "%.3f", script.timeRange.duration.seconds)))
+    kv.append(("rotation", "\(rot)"))
+    await track(info.cinematicVideoTrack, "video")
+    await track(info.cinematicDisparityTrack, "disparity")
+    let audio = (try? await asset.loadTracks(withMediaType: .audio))?.first
+    await track(audio, "audio")
+    // 撮影情報(Apple / iPhone / iOS / 日時 / GPS など)
+    for item in (try? await asset.load(.commonMetadata)) ?? [] {
+        guard let k = item.commonKey?.rawValue else { continue }
+        guard let v = (try? await item.load(.stringValue)) ?? nil else { continue }
+        kv.append((k, v))
+    }
+    // Cinematic 撮影フラグ
+    for fmt in (try? await asset.load(.availableMetadataFormats)) ?? [] {
+        for item in (try? await asset.loadMetadata(for: fmt)) ?? [] {
+            guard let id = item.identifier?.rawValue else { continue }
+            if id.hasSuffix("cinematic-video") { kv.append(("is_cinematic", "1")) }
+            else if id.hasSuffix("cinematic-video-intent") {
+                let v = (try? await item.load(.stringValue)) ?? nil
+                kv.append(("cinematic_intent", v ?? "1"))
+            }
+        }
+    }
+    let body = kv.map { "\"\($0.0)\":\"\($0.1.replacingOccurrences(of: "\"", with: ""))\"" }
+                 .joined(separator: ",")
+    return "{" + body + "}"
+}
+
+@_cdecl("cn_fileinfo")
+public func cn_fileinfo(_ h: UnsafeMutableRawPointer?) -> UnsafeMutablePointer<CChar>? {
+    guard let h = h else { return nil }
+    let s = Unmanaged<CNState>.fromOpaque(h).takeUnretainedValue()
+    s.lock.lock(); let j = s.fileJSON; s.lock.unlock()
+    return strdup(j)
 }
 
 @_cdecl("cn_status")

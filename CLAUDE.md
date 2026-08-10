@@ -4887,3 +4887,28 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
     2枚渡すので、ビューア / Layout / Composite TOP に載せるとそれだけで重い。
     Color+Depth で半減、ノード直後の Resolution TOP が最も効く、と README に明記
 - README(各+ルート英日)更新。検証ノードは削除済み
+
+### 2026-08-10 Cinematic Video: バッファ番号を統一 + Info DAT で素材メタデータ
+
+- ユーザー「Color+Depth と All でバッファ番号が変わるので揃えたい。0=color 1=depth 2=rendered では?」
+  → そのとおりなので統一。**Color+Depth が All の先頭2枚と同じ並び**になり、モードを切り替えても
+  下流の Render Select を振り直さなくてよくなった
+  - 副作用: **All のバッファ0(ノード自身の出力)が再レンダ→原版の色に変わる**。再レンダをワイヤで
+    受けたい場合は Render Select で 2 を取る
+  - demo の `renderselect_color`/`renderselect_depth` は既に 0/1 だったので、**今回の変更で
+    名前と中身が一致した**(従来は名前と逆のものが出ていた)
+- **Info DAT を追加**(`cn_fileinfo`): ファイルが自分について持っている情報を key/value で。
+  実測20行 — duration / rotation / is_cinematic / cinematic_intent / video_size(3840x2160) /
+  video_codec(hvc1) / video_fps(23.990) / video_mbps(20.4) / disparity_size(512x288) /
+  disparity_codec(dish) / audio_codec / make(Apple) / model(iPhone 17 Pro) / software(26.6) /
+  creationDate / **location(GPS)**。cn_open 時に1回だけ作るので毎フレームの負荷は無い
+  - GPS が入る点は README と demo の note に注意書きを入れた
+- **踏んだ罠2つ(共通ヘッダを修正)**:
+  1. **stub は Callbacks DAT を作るときにしか書かれない**。既に自動生成済みのノードには
+     後から増えたコールバック(`onInfoDAT`)が入らず、トグルを押しても何も起きない。
+     → `bootstrapCallbacksDAT` に「自動生成した名前の DAT に限り、**不足している def だけ追記**」を追加
+  2. **`par.callbacks.eval()` は文字列ではなく DAT オブジェクトを返す**(実測)。
+     `== n.name + '_callbacks'` の比較が常に False で、上の追記処理が動かなかった。
+     `.name` で比較する
+- 実測: 再起動後の初回cookで callbacks に `onInfoDAT` が追記され、Infodat=On で
+  `Cinematicvideo1_meta`(20x2)が生成された

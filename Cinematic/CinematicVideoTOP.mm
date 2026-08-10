@@ -23,7 +23,8 @@ using namespace TD;
 
 // Callbacks DAT 雛形(配置時に自動生成・ドックチップ接続)。
 // Info CHOP トグル ON で隣にメタデータの Info CHOP を自動生成する(二重生成ガード付き)。
-// このOPが出すのは全て数値(尺・フォーカス距離・被写体スロット)なので DAT ではなく CHOP。
+// 数値(尺・フォーカス距離・被写体スロット)は Info CHOP、
+// ファイルのメタデータ(機種・撮影日時・コーデック等の文字列)は Info DAT。
 static const char* PythonCallbacksDATStubs =
 "# Cinematic Video TOP callbacks\n"
 "#\n"
@@ -38,6 +39,18 @@ static const char* PythonCallbacksDATStubs =
 "\t\treturn\n"
 "\tc = p.create(infoCHOP, name)\n"
 "\tc.par.op = op.name\n"
+"\n"
+"# onInfoDAT: 'Info DAT' トグルを on にした瞬間に呼ばれる。\n"
+"# 隣に素材のメタデータ(機種・撮影日時・コーデック等)を出す Info DAT を作る。\n"
+"def onInfoDAT(op, enabled):\n"
+"\tif not enabled:\n"
+"\t\treturn\n"
+"\tp = op.parent()\n"
+"\tname = op.name + '_meta'\n"
+"\tif p.op(name):\n"
+"\t\treturn\n"
+"\td = p.create(infoDAT, name)\n"
+"\td.par.op = op.name\n"
 "\tc.nodeX = op.nodeX + 200\n"
 "\tc.nodeY = op.nodeY\n"
 "\tc.viewer = True\n"
@@ -57,13 +70,16 @@ extern "C" {
     int   cn_latest_render_info(void*, int* w, int* h, unsigned long long* serial);
     void  cn_copy_render(void*, void* dst);
     const char* cn_meta(void*, double timeSec);
+    const char* cn_fileinfo(void*);
 }
 
 namespace {
 struct Job { std::string file; int mode; double time; float fnum, focus; bool flip, norm; };
 
 // Mode: 0=Depth 1=Rendered 2=Color 3=Color+Depth 4=All(3枚同時)
-// 出力する面。複数出すときは色バッファ 0,1,2 に順に載せる
+// 複数出すときの色バッファの並びは **0=Color / 1=Depth / 2=Rendered** で統一する。
+// こうすると Color+Depth が All の先頭2枚と同じ並びになり、
+// モードを切り替えても下流の Render Select のインデックスがずれない。
 enum Plane { kRendered = 0, kDepth = 1, kColor = 2 };
 enum { kModeDepth = 0, kModeRendered = 1, kModeColor = 2, kModeColorDepth = 3, kModeAll = 4 };
 
@@ -106,6 +122,12 @@ public:
             tdpycb::firePythonCallback(myNode, "onInfoCHOP", true);
         }
         myPrevInfoChop = infoChop;
+        bool infoDat = in->getParInt("Infodat") != 0;
+        if (infoDat && !myPrevInfoDat) {
+            tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);
+            tdpycb::firePythonCallback(myNode, "onInfoDAT", true);
+        }
+        myPrevInfoDat = infoDat;
         if (!myState) return;
         Job j;
         j.file = in->getParFilePath("File") ? in->getParFilePath("File") : "";
@@ -180,9 +202,9 @@ public:
         myNCScaled = false;
         bool ok = false;
         if (j.mode == kModeAll) {                           // 3色バッファ
-            ok  = uploadPlane(out, kRendered, 0);
-            ok |= uploadPlane(out, kColor,    1);
-            ok |= uploadPlane(out, kDepth,    2);
+            ok  = uploadPlane(out, kColor,    0);
+            ok |= uploadPlane(out, kDepth,    1);
+            ok |= uploadPlane(out, kRendered, 2);
         } else if (j.mode == kModeColorDepth) {             // 2色バッファ(再レンダなし)
             ok  = uploadPlane(out, kColor, 0);
             ok |= uploadPlane(out, kDepth, 1);
@@ -242,7 +264,7 @@ public:
                              "Rendered (change focus/aperture)",
                              "Color (original, no bokeh)",
                              "Color + Depth (buffer 0 color / 1 depth)",
-                             "All (buffer 0 rendered / 1 color / 2 depth)"};
+                             "All (buffer 0 color / 1 depth / 2 rendered)"};
           std::vector<const char*> nv(n,n+5), lv(l,l+5); p.defaultValue="Rendered"; m->appendMenu(p,5,nv.data(),lv.data()); }
         // 再生系(Movie File In と同じ考え方)
         { OP_StringParameter p("Playmode"); p.label="Play Mode"; p.page=PAGE;
@@ -263,10 +285,26 @@ public:
         { OP_NumericParameter p("Flip"); p.label="Flip Vertically"; p.page=PAGE; p.defaultValues[0]=1; m->appendToggle(p); }
         { OP_NumericParameter p("Maxsubjects"); p.label="Max Subjects (Info CHOP)"; p.page=PAGE; p.defaultValues[0]=10; p.minSliders[0]=1; p.maxSliders[0]=20; p.minValues[0]=1; p.maxValues[0]=kMaxSub; p.clampMins[0]=p.clampMaxes[0]=true; m->appendInt(p); }
         { OP_NumericParameter p("Infochop"); p.label="Info CHOP"; p.page=PAGE; p.defaultValues[0]=0; m->appendToggle(p); }
+        { OP_NumericParameter p("Infodat"); p.label="Info DAT"; p.page=PAGE; p.defaultValues[0]=0; m->appendToggle(p); }
     }
 
     // Info CHOP: 診断 + 旧 Cinematic Data CHOP のメタデータチャンネル
     static constexpr int kFixedChans = 10;  // executes,submits,frames,ready,duration,position,playing,focus_disparity,focus_strong,subjects
+    // Info DAT: 素材のメタデータ(機種・撮影日時・コーデック・回転など)を key/value で出す。
+    // 中身は cn_open 時にヘルパーが1回だけ作った JSON。
+    bool getInfoDATSize(OP_InfoDATSize* i, void*) override {
+        std::lock_guard<std::mutex> l(myMutex);
+        i->rows = (int32_t)myFileMeta.size();
+        i->cols = 2; i->byColumn = false;
+        return i->rows > 0;
+    }
+    void getInfoDATEntries(int32_t row, int32_t, OP_InfoDATEntries* e, void*) override {
+        std::lock_guard<std::mutex> l(myMutex);
+        if (row < 0 || row >= (int32_t)myFileMeta.size()) return;
+        e->values[0]->setString(myFileMeta[row].first.c_str());
+        e->values[1]->setString(myFileMeta[row].second.c_str());
+    }
+
     int32_t getNumInfoCHOPChans(void*) override { return kFixedChans + myMax * 8; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override {
         if (i < kFixedChans) {
@@ -307,9 +345,46 @@ private:
                 else if (j.mode == kModeColor || j.mode == kModeColorDepth)
                     cn_color(myState, j.time, j.flip?1:0);
                 fetchMeta(j.time);   // 同一worker上でCNScriptメタも更新(ヘルパ呼び出しを直列化)
+                if (!myFileMetaDone) fetchFileMeta();   // ファイル全体のメタは1回だけ
             }
             { std::lock_guard<std::mutex> l(myMutex); myBusy = false; }
         }
+    }
+
+    // worker: cn_fileinfo の JSON(素材のメタデータ)を key/value 表に変換。ファイルごとに1回
+    void fetchFileMeta() {
+        const char* j = cn_fileinfo(myState);
+        if (!j) return;
+        std::string js(j); free((void*)j);
+        if (js.size() < 3) return;   // "{}" = まだ ready でない
+        std::vector<std::pair<std::string,std::string>> rows;
+        @autoreleasepool {
+            NSData* d = [NSData dataWithBytes:js.data() length:js.size()];
+            NSDictionary* m = [NSJSONSerialization JSONObjectWithData:d options:0 error:nil];
+            if (![m isKindOfClass:[NSDictionary class]]) return;
+            // 読みやすい順に並べる。ここに無いキーは後ろへ回す
+            const char* order[] = {"duration","rotation","is_cinematic","cinematic_intent",
+                                   "video_size","video_codec","video_fps","video_mbps",
+                                   "disparity_size","disparity_codec","disparity_fps","disparity_mbps",
+                                   "audio_codec","audio_mbps",
+                                   "make","model","software","creationDate","location"};
+            NSMutableSet* used = [NSMutableSet set];
+            for (const char* k : order) {
+                NSString* key = [NSString stringWithUTF8String:k];
+                id v = m[key];
+                if (!v) continue;
+                rows.emplace_back(k, [[v description] UTF8String]);
+                [used addObject:key];
+            }
+            for (NSString* key in m) {
+                if ([used containsObject:key]) continue;
+                rows.emplace_back([key UTF8String], [[m[key] description] UTF8String]);
+            }
+        }
+        if (rows.empty()) return;
+        std::lock_guard<std::mutex> l(myMutex);
+        myFileMeta = std::move(rows);
+        myFileMetaDone = true;
     }
 
     // worker: cn_meta の JSON をパースして Meta を更新(旧 Cinematic Data CHOP のロジック)
@@ -344,7 +419,9 @@ private:
     }
 
     const OP_NodeInfo* myNode = nullptr;   // Python コールバック用
-    bool myBootstrapped = false, myPrevInfoChop = false;
+    bool myBootstrapped = false, myPrevInfoChop = false, myPrevInfoDat = false;
+    std::vector<std::pair<std::string,std::string>> myFileMeta;   // myMutex 保護(Info DAT 用)
+    bool myFileMetaDone = false;
     TOP_Context* myContext; void* myState = nullptr;
     std::thread myThread; std::condition_variable myCond; std::mutex myMutex;
     bool myQuit=false, myPending=false, myBusy=false;
