@@ -175,6 +175,27 @@ FOV = 2 × atan(K / distance_real)
 
 For the frame above (K = 2.59): a real distance of 5 m implies a 55° lens, 3 m implies 82°.
 
+### Feeding depth (why it is not supported)
+
+`VNDetectHumanBodyPose3DRequest` does accept an `AVDepthData` — with it, `heightEstimation` becomes
+`measured` and `bodyHeight` is real instead of the 1.8 m assumption. Two measured findings close
+this off for now:
+
+- **Vision hard-crashes on depth without camera calibration.** Handed an `AVDepthData` whose
+  `cameraCalibrationData` is nil, it fails an internal assertion (`se3.hpp:270`, "Algebra after the
+  logarithm map does not require normalization") and **takes the whole process down** — in
+  TouchDesigner that means TD dies, not an error on the node. Reproduced with both a synthetic
+  depth map and a real one taken from a Cinematic video's disparity track.
+- **You cannot attach calibration to a depth map you build yourself.** `AVCameraCalibrationData`
+  has no initializer, and Apple documents `replacingDepthDataMap(with:)` as always returning an
+  object whose `cameraCalibrationData` is nil. Calibration only survives when the depth comes
+  straight out of a capture — e.g. `CGImageSourceCopyAuxiliaryDataInfoAtIndex` on an iPhone
+  portrait HEIC, or a live `AVCaptureDepthDataOutput`.
+
+So Cinematic video depth cannot be used here: the Cinematic framework exposes no calibration, and
+its disparity is relative rather than metric. A TOP input could not carry it either — TOPs carry
+colour only, so depth would need its own input path.
+
 ### Parameters
 
 | Parameter | Default | Description |
@@ -368,6 +389,25 @@ FOV = 2 × atan(K / 実距離)
 ```
 
 上のフレーム（K = 2.59）なら、実距離 5m で 55°、3m で 82° のレンズということになる。
+
+### 深度を入力する話（対応していない理由）
+
+`VNDetectHumanBodyPose3DRequest` は `AVDepthData` を受け取れる。渡せば `heightEstimation` が
+`measured` になり、`bodyHeight` が 1.8m 仮定ではなく実測値になる。ただし実測で2つの壁が確定している。
+
+- **較正情報の無い深度を渡すと Vision がプロセスごと落ちる。** `cameraCalibrationData` が nil の
+  `AVDepthData` を渡すと内部アサーション（`se3.hpp:270` "Algebra after the logarithm map does not
+  require normalization"）で落ちる。**TouchDesigner ではノードのエラーではなく TD 本体が落ちる**。
+  合成した深度でも、Cinematic 動画の視差トラックから作った実データでも同じく再現した。
+- **自分で作った深度マップに較正情報を付ける手段が無い。** `AVCameraCalibrationData` には
+  イニシャライザが存在せず、`replacingDepthDataMap(with:)` は「返るオブジェクトの
+  `cameraCalibrationData` は常に nil」と Apple が明記している。較正が残るのは撮影経路から
+  そのまま来た深度だけ（iPhone のポートレート HEIC を `CGImageSourceCopyAuxiliaryDataInfoAtIndex`
+  で読む、あるいは `AVCaptureDepthDataOutput` のライブ深度）。
+
+したがって Cinematic 動画の深度は使えない。Cinematic フレームワークは較正情報を公開しておらず、
+視差もメートル単位ではなく相対値である。TOP 入力でも運べない（TOP は色しか運ばないので、
+深度には別の入力経路が要る）。
 
 ### パラメータ
 

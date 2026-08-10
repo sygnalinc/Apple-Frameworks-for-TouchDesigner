@@ -4779,3 +4779,29 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **踏んだ罠(2回)**: 非同期ワーカーの完了を待たずに `.save()` すると**1つ前のモードの絵が保存される**。
   実際に「color と f/2 が完全一致(差0.02)」という誤った結果を得て誤診しかけた。
   モードやパラメータを変えたら**シェル側で数秒待ってから**保存する(TD内 `time.sleep` はTDが止まる)
+
+### 2026-08-10 VisionPose3D に深度を渡す件の結論(Cinematic の深度は使えない・TDが落ちる)
+
+- ユーザー「VisionPose3D の input に Cinematic Video で撮影した depth を入れて精度を上げられないか?」
+  → 以前「深度素材が用意できたら相談」としていた宿題。**実測して不可と確定**
+- **単体ハーネス(`scratchpad/p3d.swift`)で検証**(Vision が落ちる可能性があるので必ず別プロセスで):
+  Cinematic 動画から color(1920x1080)と disparity(512x288)をデコードし、
+  `AVDepthData(fromDictionaryRepresentation:)` で深度を組んで `VNDetectHumanBodyPose3DRequest` に渡した
+- **結果**:
+  - AVDepthData の**生成自体は成功**する(以前の合成データ特有の問題ではなかった)。ただし
+    `cameraCalibrationData = nil`
+  - 深度**なし**なら検出できる(orientation は down/left/right。up は検出0=向きの問題)
+  - 深度**あり**で **`se3.hpp:270` のアサーションでプロセスごと即死**。以前 synthetic depth で
+    踏んだのと**同じクラッシュ**で、原因は合成かどうかではなく**較正情報の欠落**だった
+- **回避不能な理由(SDKで確認)**: `AVCameraCalibrationData` に**イニシャライザが存在しない**
+  (ヘッダにインスタンスメソッド1つのみ)。`replacingDepthDataMap(with:)` も Apple自身が
+  「返るオブジェクトの cameraCalibrationData は**常に nil**」と明記。=**自作の深度マップに較正を
+  付ける公開手段が無い**。較正が残るのは撮影経路そのままの深度だけ
+  (ポートレートHEICの `CGImageSourceCopyAuxiliaryDataInfoAtIndex` / `AVCaptureDepthDataOutput`)
+- **Cinematic 固有の追加の壁**: Cinematic フレームワークに較正/内部パラメータのAPIが無い
+  (`calibration|intrinsic|focal|baseline` で swiftinterface を走査して0件)。視差もメートルでなく相対値
+- **設計上の壁**: TOP は色しか運ばないので、そもそも深度用の入力経路が別途要る
+- **危険度が高いので README(英日)に明記**した。「エラーになる」ではなく**TD本体が落ちる**ので、
+  安易に試させないことが重要
+- 将来やるなら: iPhone ポートレート HEIC(較正付き)を **ファイルパスで**受ける専用経路。
+  ただし静止画なので用途は狭い。ライブ深度は Mac に深度カメラが無いので対象外
