@@ -15,26 +15,42 @@ on each cook.
 
 ### Voice
 
-A dropdown built at runtime from `AVSpeechSynthesisVoice.speechVoices()` — 180 voices across 49
+A dropdown built at runtime from `AVSpeechSynthesisVoice.speechVoices()` — 183 voices across 49
 languages on the machine this was measured on. Labelled `en-US  Samantha  (Default)` so the
 language is visible while you scroll. Leave it on **System Default** to follow the system voice.
 
-**Nothing here needs downloading.** `speechVoices()` only reports voices already installed, so
-every entry is usable immediately (verified by instantiating several). This is the opposite of
+**Every entry is usable immediately — nothing here needs downloading.** This is the opposite of
 Speech Transcribe's `Locale`, where the list includes locales whose model downloads on first use.
-
-Higher-quality **Enhanced / Premium** voices are an opt-in download in System Settings →
-Accessibility → Spoken Content → System Voice → Manage Voices. Once installed they appear in this
-dropdown automatically, since it is rebuilt at runtime.
 
 **No separate locale parameter is needed** — the identifier carries the language
 (`com.apple.voice.compact.ja-JP.Kyoko` is Japanese). It is a string parameter, so an identifier
 that is not in the list can also be typed.
 
+### Adding higher-quality voices
+
+Most installed voices are the compact **Default** quality. **Enhanced / Premium** voices are an
+opt-in download, and **only the user can start that download** — see the table below.
+
+| | |
+|---|---|
+| List installed voices | `AVSpeechSynthesisVoice.speechVoices()` |
+| List voices *not* installed | **no public API** |
+| Start a download | **no public API** — `AVSpeechSynthesisVoice` exposes only `speechVoices` / `currentLanguageCode` / `voiceWithLanguage` / `voiceWithIdentifier` |
+
+`voiceWithIdentifier:` is documented to return `nil` for a valid identifier that has not been
+downloaded, so the framework is aware of such voices but never offers to fetch them.
+
+So the flow is: press **Open Voice Settings** → System Settings opens straight on *Accessibility →
+Spoken Content* → *System Voice* → *Manage Voices* → download → the dropdown picks the new voice
+up on its own (the operator listens for `AVSpeechSynthesisAvailableVoicesDidChangeNotification`).
+**Refresh Voice List** rebuilds it by hand if it ever looks stale. **No TouchDesigner restart is
+needed.** Measured on this Mac: 183 voices, of which 2 are Enhanced (`ja-JP` Kyoko and Otoya) —
+both downloaded through Settings and both listed here automatically.
+
 ### Parameters
 
-Text, Voice Identifier (blank = the default voice), Rate, Pitch, Volume, Block Samples,
-Speak When Text Changes, Speak, Stop.
+Text, Voice, Rate, Pitch, Volume, Block Samples, Speak When Text Changes, Speak, Stop,
+Refresh Voice List, Open Voice Settings.
 
 ### Notes
 
@@ -59,25 +75,42 @@ AVSpeechSynthesizerのmacOS標準音声をPCM Audio CHOPへ出力する。ネッ
 
 ### Voice
 
-`AVSpeechSynthesisVoice.speechVoices()` から実行時に組むプルダウン（計測機では 180音声 / 49言語）。
+`AVSpeechSynthesisVoice.speechVoices()` から実行時に組むプルダウン（計測機では 183音声 / 49言語）。
 `en-US  Samantha  (Default)` の形で言語が見えるようにしてある。**System Default** のままなら
 システムの声に従う。
 
-**ここに出るものはダウンロード不要。** `speechVoices()` は端末にインストール済みの音声しか
-返さないので、並んでいる時点で全部すぐ使える（いくつか実際にインスタンス化して確認）。
-Speech Transcribe の `Locale` とはここが逆で、あちらは未インストールのものも並び初回にDLが走る。
-
-より高品質な **Enhanced / Premium** は、システム設定 > アクセシビリティ > 読み上げコンテンツ >
-システムの声 > 声を管理 からダウンロードする。入れればこのプルダウンに自動で加わる（実行時に
-組み直しているため）。
+**並んでいるものは全部すぐ使える（ダウンロード不要）。** Speech Transcribe の `Locale` とは
+ここが逆で、あちらは未インストールのものも並び初回にDLが走る。
 
 **Locale パラメータは別途要らない** — 識別子が言語を含んでいる
 （`com.apple.voice.compact.ja-JP.Kyoko` は日本語）。文字列パラメータなので、一覧に無い識別子を
 直接打ち込むこともできる。
 
+### 高品質な音声を追加する
+
+インストール済みのほとんどは compact な **Default** 品質。**Enhanced / Premium** は任意DLで、
+**ダウンロードを開始できるのはユーザーだけ**。
+
+| | |
+|---|---|
+| インストール済みの列挙 | `AVSpeechSynthesisVoice.speechVoices()` |
+| **未**インストールの列挙 | **公開APIなし** |
+| ダウンロードの開始 | **公開APIなし** — `AVSpeechSynthesisVoice` のクラスメソッドは `speechVoices` / `currentLanguageCode` / `voiceWithLanguage` / `voiceWithIdentifier` の4つだけ |
+
+`voiceWithIdentifier:` は「識別子は正しいがまだDLされていない場合 nil を返す」と明記されており、
+フレームワーク自身は未DL音声の存在を認識しているが、取得する手段は提供していない。
+
+したがって手順は、**Open Voice Settings** を押す → システム設定の *アクセシビリティ > 読み上げ
+コンテンツ* が直接開く → *システムの声 > 声を管理* でDL → プルダウンが自動で拾う
+（`AVSpeechSynthesisAvailableVoicesDidChangeNotification` を監視している）。
+おかしいときは **Refresh Voice List** で手動再取得。**TouchDesignerの再起動は不要**。
+実測: この Mac は 183音声で、うち Enhanced が2つ（`ja-JP` Kyoko / Otoya）。
+どちらも設定からDLしたもので、自動で一覧に出ている。
+
 ### パラメータ
 
-Text、Voice Identifier（空欄は既定音声）、Rate、Pitch、Volume、Block Samples、Speak When Text Changes、Speak、Stop。
+Text、Voice、Rate、Pitch、Volume、Block Samples、Speak When Text Changes、Speak、Stop、
+Refresh Voice List、Open Voice Settings。
 
 ### 注意
 

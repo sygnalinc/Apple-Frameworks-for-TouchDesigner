@@ -4595,3 +4595,36 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   「空欄=既定音声」の挙動を保つため、`default` という番兵値を既定にして
   speak 側で「空 or default なら音声指定なし」と解釈するようにした
 - demo の Voice が `Trinoids`(ネタ音声)だったので Samantha に変更。実際に発話して peak 0.36〜0.63 を確認
+
+### 2026-08-10 Speech Synth: 未インストール音声のDLは不可と確定 → 設定への導線+自動再取得を追加
+
+- ユーザー「Voice で未インストールも表示して、選択時にダウンロードする挙動は可能?」→ **SDKを実測して
+  結論: ダウンロードの起動は不可能、列挙も公開APIでは不可能**
+  - `AVSpeechSynthesisVoice` のクラスメソッドは **`speechVoices` / `currentLanguageCode` /
+    `voiceWithLanguage` / `voiceWithIdentifier` の4つだけ**(ヘッダを全走査)。DL系は皆無
+  - ヘッダのコメントに「`voiceWithIdentifier:` は識別子が正しくても**まだユーザーがDLしていない場合は
+    nil**」と明記 = フレームワークは未DL音声の存在を認識しているが取得手段を出していない
+  - `AVSpeechSynthesisProvider.h` にも download 系0件。`MobileAssetCLI` 相当のCLIも無い
+  - **列挙だけなら抜け道はあるが採用しない**: `/System/Library/AssetsV2/
+    com_apple_MobileAsset_VoiceServices_CombinedVocalizerVoices/*.xml`(43件)と
+    `MacinTalkVoiceAssets`(22件)に Name/VoiceId/Languages/DLサイズが載っている。ただし
+    **これは `/System/Volumes/Data` 上にあり assetd が更新するキャッシュ**(OS同梱ではない)で、
+    識別子も `com.apple.ttsbundle.Allison` 形式で AV 側の `com.apple.voice.enhanced.*` と別体系。
+    列挙できてもDLできない以上、選べない項目が並ぶだけなので見送った
+- **実装した現実解**(SpeechSynth CHOP):
+  - **`Open Voice Settings` パルス**: `x-apple.systempreferences:
+    com.apple.Accessibility-Settings.extension?SpokenContent` を NSWorkspace で開く。
+    **実測でシステム設定の「リーダーと読み上げ」に直行**(声を管理 がある画面)。
+    旧アンカー `com.apple.preference.universalaccess?Speech` はアクセシビリティのトップ止まりだった
+  - **`AVSpeechSynthesisAvailableVoicesDidChangeNotification` を監視**してメニューを自動再取得。
+    DL後にTD再起動もノード作り直しも不要。手動用に **`Refresh Voice List`** パルスも用意
+  - AppKit をリンク追加(NSWorkspace のため)
+- **前回の「Enhanced 0件」は誤り。訂正**: 設定画面が「システムの声 = Kyoko(拡張)」と表示していたので
+  測り直したところ **183音声・うち Enhanced 2件**(`com.apple.voice.enhanced.ja-JP.Kyoko` /
+  `.Otoya`・quality=2)。Premium は0。**DL済み音声は speechVoices に自動で出る**ことの実証でもある
+- ラベルの `(Enhanced)` 重複を修正(`v.name` が既に "Kyoko (Enhanced)" なので品質を足すと二重になる)
+- **検証(TD再起動なし・バージョン付きパス方式)**: `Refreshvoices`/`Voicesettings` の両パルス生成、
+  メニュー184件(System Default + 183)、Refresh後も184、TDからのパルスで設定が
+  「リーダーと読み上げ」で開くことを確認。errors/warnings なし。検証ノードは削除済み
+- **罠**: cplusplusCHOP のプラグインパラメータは **`customPars` / `isCustom` では取れない**(0件)。
+  `n.pars('*')` で名前を見ること。これで一度「パラメータが生成されていない」と誤診した
