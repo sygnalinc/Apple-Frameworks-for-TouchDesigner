@@ -23,6 +23,12 @@ the gain map and the HDR expansion (EDR) and output it as an RGBA16Float TOP.
   Whether the HDR expansion is visible depends on the display's headroom — on an SDR display the
   HDR and SDR modes look alike even though the values differ
 
+### Apply EXIF Orientation
+
+On by default. Without it the image comes out in the sensor's own orientation, so a photo shot in
+portrait lands sideways — measured on an `orientation = 6` HEIC: **4032x3024 with the toggle off,
+3024x4032 with it on**. It maps to `kCIImageApplyOrientationProperty` on the `CIImage` load.
+
 ### Output
 
 - TOP: **RGBA16Float** (extended linear sRGB)
@@ -74,6 +80,12 @@ HEIC等に埋め込まれた **HDRゲインマップ** を扱う。SDRベース 
   3モードとも実サイズで現像される(HDR/SDR 4032x3024、Gain Map 2016x1512、RGBA16Float)。
   HDR の伸びが見えるかは表示側の headroom 次第で、SDRディスプレイでは値が違っても
   HDR と SDR は同じに見える
+
+### Apply EXIF Orientation
+
+既定 On。適用しないとセンサーそのままの向きで出るので、縦位置で撮った写真は横倒しになる。
+実測(`orientation = 6` の HEIC): **Off で 4032×3024、On で 3024×4032**。
+実体は `CIImage` 読み込み時の `kCIImageApplyOrientationProperty`。
 
 ### 出力仕様
 

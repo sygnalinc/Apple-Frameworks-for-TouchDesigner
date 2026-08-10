@@ -15,7 +15,7 @@
 using namespace TD;
 
 namespace {
-struct Params { std::string file; float exposure, boost, temp, tint, lumaNR, colorNR, sharpen, contrast, scale; bool flip; };
+struct Params { std::string file; float exposure, boost, temp, tint, lumaNR, colorNR, sharpen, contrast, scale; bool flip; bool applyOri = true; };
 struct Result { std::vector<uint16_t> p; uint32_t w = 0, h = 0; uint64_t serial = 0; };
 
 class CoreImageRAWTOP final : public TOP_CPlusPlusBase {
@@ -39,8 +39,9 @@ public:
         p.contrast = (float)in->getParDouble("Contrast");
         p.scale = (float)in->getParDouble("Scale");
         p.flip = in->getParInt("Flip") != 0;
-        char buf[256]; snprintf(buf, sizeof buf, "%s|%.3f|%.3f|%.1f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%d",
-            p.file.c_str(), p.exposure, p.boost, p.temp, p.tint, p.lumaNR, p.colorNR, p.sharpen, p.contrast, p.scale, p.flip ? 1 : 0);
+        p.applyOri = in->getParInt("Applyorientation") != 0;
+        char buf[256]; snprintf(buf, sizeof buf, "%s|%.3f|%.3f|%.1f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d",
+            p.file.c_str(), p.exposure, p.boost, p.temp, p.tint, p.lumaNR, p.colorNR, p.sharpen, p.contrast, p.scale, p.flip ? 1 : 0, p.applyOri ? 1 : 0);
         std::string sig = buf;
         if (sig != mySig) {
             mySig = sig;
@@ -78,6 +79,7 @@ public:
         f("Contrast", "Contrast", 1.0, 0.0, 2.0);
         f("Scale", "Scale Factor", 1.0, 0.1, 1.0);
         { OP_NumericParameter p("Flip"); p.label = "Flip Vertically"; p.page = PAGE; p.defaultValues[0] = 1; m->appendToggle(p); }
+        { OP_NumericParameter p("Applyorientation"); p.label = "Apply EXIF Orientation"; p.page = PAGE; p.defaultValues[0] = 1; m->appendToggle(p); }
     }
 
     int32_t getNumInfoCHOPChans(void*) override { return 4; }
@@ -115,6 +117,9 @@ private:
                 if (f.sharpnessSupported) f.sharpnessAmount = p.sharpen;
                 f.contrastAmount = p.contrast;
                 f.scaleFactor = p.scale;
+                // 撮影時のカメラの向き(EXIF Orientation)。CIRAWFilter は既定でファイルの値を
+                // 持っているので、off のときだけ .up にしてセンサーそのままの向きで出す
+                if (!p.applyOri) f.orientation = kCGImagePropertyOrientationUp;
                 CIImage* img = f.outputImage;
                 if (!img) { w = "RAW develop produced no image"; return false; }
                 CGRect e = img.extent;

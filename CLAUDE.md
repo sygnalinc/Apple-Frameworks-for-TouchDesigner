@@ -4928,3 +4928,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   **自動生成された `_callbacks` DAT を消せば次のcookで作り直される**
 - 教訓: 文字列連結で作る stub は**挿入位置を間違えても構文は通る**。
   生成結果を実際に compile し、変数の定義/参照まで確認すること
+
+### 2026-08-10 CI HDR / CI RAW に Apply EXIF Orientation を追加(既定On)
+
+- ユーザー要望。**CI HDR は向きを一切適用していなかった**(実測: `orientation=6` の HEIC で
+  4032x3024 の横倒しのまま)。`CIImage` 読み込みの `kCIImageApplyOrientationProperty` を追加し、
+  On で 3024x4032(正立)になることを確認
+- **CI RAW は既定で適用済み**だった(`CIRAWFilter.orientation` がファイルの値を持っている)。
+  トグルは **Off のときだけ `.up` にする**実装。実測(iPhone ProRAW・orientation=3):
+  On で正立 / Off で180度反転(180°なので寸法は変わらない)
+- 素材: ユーザーが `Assets/sample_heic/` を `Assets/sample_heic.HEIC`(1.3MB)へ整理し、
+  **`sample_raw.DNG` は除外**(画面の写り込みのため)。CIRAW の利用例は素材同梱なしにして、
+  note に「自分で ProRAW を撮って指定する」手順を書いた
+- **検証時の注意**: 非同期なので**トグルを変えた直後の読みは1手前の値**。実際に
+  「On→4032x3024(前の値)」を見て誤診しかけた。設定→数秒待つ→読む、を守る

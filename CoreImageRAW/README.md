@@ -79,6 +79,12 @@ DNG / Apple ProRAW / カメラRAW を `CIRAWFilter` で**リアルタイム現�
 - CIRAWFilter は JPEG/TIFF も受け付けるが、非RAW入力はセンサーデータ前提の現像とずれる
   (白飛びする)ため視覚評価には使えない
 
+### Apply EXIF Orientation
+
+既定 On。撮影時のカメラの向き(EXIF Orientation)を反映する。`CIRAWFilter.orientation` は
+既定でファイルの値を持っているので、**Off にしたときだけ** `.up` にしてセンサーそのままの
+向きで出す。実測(iPhone ProRAW・orientation=3): On で正立、Off で180度反転。
+
 ### 出力仕様
 
 - TOP: **RGBA16Float**(拡張リニアsRGB)

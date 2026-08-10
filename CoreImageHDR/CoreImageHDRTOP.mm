@@ -29,11 +29,12 @@ public:
         std::string file = in->getParFilePath("File") ? in->getParFilePath("File") : "";
         int mode = (int)in->getParInt("Mode");
         bool flip = in->getParInt("Flip") != 0;
-        std::string sig = file + "|" + std::to_string(mode) + "|" + (flip ? "1" : "0");
+        bool applyOri = in->getParInt("Applyorientation") != 0;
+        std::string sig = file + "|" + std::to_string(mode) + "|" + (flip ? "1" : "0") + (applyOri ? "1" : "0");
         if (sig != mySig) {
             mySig = sig;
             std::unique_lock<std::mutex> l(myMutex, std::try_to_lock);
-            if (l.owns_lock() && !myPending && !myBusy) { myFile = file; myMode = mode; myFlip = flip; myPending = true; mySubmit++; l.unlock(); myCond.notify_one(); }
+            if (l.owns_lock() && !myPending && !myBusy) { myFile = file; myMode = mode; myFlip = flip; myApplyOri = applyOri; myPending = true; mySubmit++; l.unlock(); myCond.notify_one(); }
             else mySig.clear();
         }
         Result r;
@@ -60,6 +61,7 @@ public:
           const char* n[] = {"Sdr","Gainmap","Hdr"}; const char* l[] = {"SDR base","Gain Map","HDR (expand / EDR)"};
           std::vector<const char*> nv(n,n+3), lv(l,l+3); p.defaultValue = "Hdr"; m->appendMenu(p, 3, nv.data(), lv.data()); }
         { OP_NumericParameter p("Flip"); p.label = "Flip Vertically"; p.page = PAGE; p.defaultValues[0] = 1; m->appendToggle(p); }
+        { OP_NumericParameter p("Applyorientation"); p.label = "Apply EXIF Orientation"; p.page = PAGE; p.defaultValues[0] = 1; m->appendToggle(p); }
     }
 
     int32_t getNumInfoCHOPChans(void*) override { return 5; }
@@ -73,22 +75,26 @@ public:
 private:
     void worker() {
         while (true) {
-            std::string file; int mode; bool flip;
-            { std::unique_lock<std::mutex> l(myMutex); myCond.wait(l, [this]{ return myQuit || myPending; }); if (myQuit) return; file = myFile; mode = myMode; flip = myFlip; myPending = false; myBusy = true; }
-            Result r; std::string w; bool ok = load(file, mode, flip, r, w);
+            std::string file; int mode; bool flip, applyOri;
+            { std::unique_lock<std::mutex> l(myMutex); myCond.wait(l, [this]{ return myQuit || myPending; }); if (myQuit) return; file = myFile; mode = myMode; flip = myFlip; applyOri = myApplyOri; myPending = false; myBusy = true; }
+            Result r; std::string w; bool ok = load(file, mode, flip, applyOri, r, w);
             myLoad++; myValid = ok;
             { std::lock_guard<std::mutex> l(myMutex); if (ok) { r.serial = ++mySerial; myResult = std::move(r); } myWarning = std::move(w); myBusy = false; }
         }
     }
 
-    static bool load(const std::string& file, int mode, bool flip, Result& r, std::string& w) {
+    static bool load(const std::string& file, int mode, bool flip, bool applyOrientation, Result& r, std::string& w) {
         @autoreleasepool {
             @synchronized([CIFilter class]) {
                 if (file.empty()) { w = "No file"; return false; }
                 NSURL* url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:file.c_str()]];
-                NSDictionary* opts = nil;
-                if (mode == 1) opts = @{ kCIImageAuxiliaryHDRGainMap : @YES };
-                else if (mode == 2) opts = @{ kCIImageExpandToHDR : @YES };
+                // 撮影時のカメラの向き(EXIF Orientation)を反映する。off だとセンサーそのままの
+                // 向きで出るので、縦位置で撮った写真は横倒しになる(実測: orientation=6 の HEIC で
+                // 4032x3024 のまま。適用すると 3024x4032)
+                NSMutableDictionary* opts = [NSMutableDictionary dictionary];
+                opts[kCIImageApplyOrientationProperty] = applyOrientation ? @YES : @NO;
+                if (mode == 1) opts[kCIImageAuxiliaryHDRGainMap] = @YES;
+                else if (mode == 2) opts[kCIImageExpandToHDR] = @YES;
                 CIImage* img = [CIImage imageWithContentsOfURL:url options:opts];
                 if (!img && mode == 1) { w = "No HDR gain map in this file"; return false; }
                 if (!img) { w = "Cannot open image"; return false; }
@@ -120,7 +126,7 @@ private:
     }
 
     TOP_Context* myContext; std::thread myThread; std::condition_variable myCond; std::mutex myMutex;
-    bool myQuit = false, myPending = false, myBusy = false, myFlip = true;
+    bool myQuit = false, myPending = false, myBusy = false, myFlip = true, myApplyOri = true;
     std::string myFile, mySig, myWarning; int myMode = 2;
     Result myResult; uint64_t mySerial = 0, myUploaded = 0;
     std::atomic<uint64_t> myExec{0}, mySubmit{0}, myLoad{0}; std::atomic<bool> myValid{false}; std::atomic<float> myMax{0};
