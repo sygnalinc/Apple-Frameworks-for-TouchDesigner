@@ -50,6 +50,9 @@ they are **frame-locked by construction**.
 | **Color buffer 1** | **Color** — the original video track, before any bokeh (RGBA16Float) |
 | **Color buffer 2** | **Depth** — disparity map (Mono32Float, its own resolution) |
 
+`Color + Depth` is the cheaper two-buffer variant (buffer 0 colour, buffer 1 depth): it skips the
+Metal re-render entirely, so use it when you only need the plate and the depth.
+
 Buffers 1 and 2 are read with a **Render Select TOP** (`Buffer Index` 1 or 2). Buffers may differ
 in resolution and pixel format; that is explicitly supported. `Depth` / `Rendered` / `Color` are
 also available as single-output modes when you only need one.
@@ -59,9 +62,23 @@ bit-identical to Color in the sampled region, while at f/2 the background loses 
 (high-frequency energy 282 vs 365). Use it as a clean plate, or to feed Vision / Core ML with a
 sharp image while the rendered version goes to screen.
 
-Measured on M2 with real footage (1920x1080 + 1920x1080 + 512x288): **60 frames per second in
-every mode** — `All` costs no more than `Rendered` here, because the colour is taken from the
-decode the renderer already did rather than reading the file again.
+Measured on M2. At 1920x1080 every mode produces 60 frames per second. On a 3840x2160 clip the
+decode is the limit:
+
+| Mode | frames produced / sec (3840x2160) |
+|---|---|
+| Depth | 59.9 |
+| Color | 49.2 |
+| **Color + Depth** | **46.7** |
+| Rendered | 44.8 |
+| All | 41.7 |
+
+**All of these are still above a 24 or 30 fps source**, so 1x playback stays smooth in every mode —
+the numbers only matter if you scrub fast or run `Speed` above 1. If TouchDesigner's own frame rate
+drops when you switch to `All`, the cost is usually downstream rather than in the decode: `All`
+hands you **two 3840x2160 RGBA16Float textures**, and viewers, Layout and Composite TOPs on those
+are expensive. `Color + Depth` halves that, and a Resolution TOP right after the node helps more
+than anything else.
 
 > **Wire buffer 0 into your chain.** A Render Select TOP reads by *reference*, and a reference
 > does **not** pull a cook out of the source. If the only things downstream are Render Select
@@ -103,7 +120,7 @@ Wire a **subject depth into the Focus parameter to rack focus live from TD**.
 
 ### Parameters
 
-`Cinematic Video (iPhone)` (file) / `Mode` (Depth / Rendered / Color / All) / `Play Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
+`Cinematic Video (iPhone)` (file) / `Mode` (Depth / Rendered / Color / Color+Depth / All) / `Play Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
 `Cue Pulse` / `Position (0..1, when Play is off)` / `Aperture (f-number)` /
 `Focus Disparity Override` (0 = follow the script) / `Normalize Depth` / `Flip` /
 `Max Subjects (Info CHOP)` / `Info CHOP`
@@ -201,6 +218,9 @@ TouchDesigner のタイムライン(`deltaMS`)に従って進む。タイムラ�
 | **色バッファ 1** | **Color** — ボケを付ける前の元の映像トラック(RGBA16Float) |
 | **色バッファ 2** | **Depth** — 視差マップ(Mono32Float・別解像度) |
 
+`Color + Depth` は2バッファの軽い版(0=色 / 1=深度)。**Metal の再レンダを通さない**ので、
+素材そのままの絵と深度だけあればよいときはこちらを使う。
+
 バッファ1・2は **Render Select TOP**(`Buffer Index` を 1 か 2)で取る。バッファごとに解像度も
 ピクセル形式も別で構わない(SDKが明示的に許している)。1枚だけでよければ
 `Depth` / `Rendered` / `Color` の単体モードもある。
@@ -209,9 +229,23 @@ TouchDesigner のタイムライン(`deltaMS`)に従って進む。タイムラ�
 f/2 では背景のディテールが落ちる(高周波エネルギー 282 対 365)。素材そのままのプレートとして使う、
 あるいは画面には再レンダを出しつつ Vision / Core ML にはシャープな絵を渡す、といった使い分けができる。
 
-実測(M2・実素材 1920×1080 + 1920×1080 + 512×288): **どのモードも 60 フレーム/秒**。
-All が Rendered と同じ速度なのは、色を**再レンダが既に行ったデコード結果から取り出していて**
-ファイルを読み直していないため。
+実測(M2)。1920×1080 ではどのモードも 60 フレーム/秒。3840×2160 になるとデコードが頭打ちになる:
+
+| Mode | 生成フレーム数/秒(3840×2160) |
+|---|---|
+| Depth | 59.9 |
+| Color | 49.2 |
+| **Color + Depth** | **46.7** |
+| Rendered | 44.8 |
+| All | 41.7 |
+
+**いずれも 24fps / 30fps の素材より速い**ので、1倍速の再生はどのモードでも滑らかなまま。
+この数字が効いてくるのは速くスクラブしたり `Speed` を1より上げたときだけ。
+
+`All` にすると TouchDesigner 自体の fps が落ちる場合、原因はデコードではなく**下流**のことが多い。
+`All` は **3840×2160 の RGBA16Float を2枚**渡すので、ビューアや Layout / Composite TOP に載せると
+それだけで重い。`Color + Depth` はこれを半分にできるし、**ノードの直後に Resolution TOP を入れる**
+のが一番効く。
 
 > **バッファ0はワイヤで下流に繋ぐこと。** Render Select TOP は**参照**で読むため、
 > **参照は cook を引っ張らない**。下流が Render Select TOP だけだとこのOPはほとんど cook されず、
@@ -251,7 +285,7 @@ Info **CHOP** が正しい。
 
 ### パラメータ
 
-`Cinematic Video (iPhone)`(ファイル)/ `Mode`(Depth / Rendered / Color / All)/ `Play Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
+`Cinematic Video (iPhone)`(ファイル)/ `Mode`(Depth / Rendered / Color / Color+Depth / All)/ `Play Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
 `Cue Pulse` / `Position (0..1, when Play is off)` / `Aperture (f-number)` /
 `Focus Disparity Override`(0=script準拠)/ `Normalize Depth` / `Flip` /
 `Max Subjects (Info CHOP)` / `Info CHOP`

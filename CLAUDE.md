@@ -4867,3 +4867,23 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **開発時の注意**: 常設Pluginsへ `codesign -f -s - --deep` で入れ直すと **Developer ID 署名が壊れる**。
   そのため開発機の状態はリリース版と Gatekeeper 的に別物になる。配布の検証は必ず**DMGの中身**で行う
 - README(CoreWLANScan 英日)に「SSID一覧が空のままのとき」の症状別表と Gatekeeper の説明を追加
+
+### 2026-08-10 Cinematic Video に Color + Depth モードを追加(All が重い件の実測含む)
+
+- ユーザー「All だと fps が落ちる。color と depth だけの選択肢も欲しい」
+- **`Color + Depth`(2色バッファ: 0=色 / 1=深度)を追加**。`cn_render`(Metal 再レンダ)を通さず
+  `cn_color` だけを使うので All より軽い。Mode は **Depth / Rendered / Color / Color+Depth / All**
+- **文字列メニュー(`OP_StringParameter`+`appendMenu`)は .toe に「値の文字列」が保存される**ので、
+  途中に項目を挿しても既存の .toe は壊れない(インデックスではないため)。今回 All の前に挿入した
+- **実測(M2)で分かったこと**:
+  - 1920×1080 ではどのモードも 60 フレーム/秒。**差が出るのは 4K から**
+  - 3840×2160(demo の `Assets/sample_cinematic.MOV`)での生成フレーム数/秒:
+    Depth 59.9 / Color 49.2 / **Color+Depth 46.7** / Rendered 44.8 / **All 41.7**
+  - ただし**この素材は 23.976fps**なので、All の 41.7 でも 1倍速再生には十分足りている。
+    数字が効くのは速いスクラブや `Speed`>1 のとき
+  - **TD 自体の実fps はどのモードでも 59.8〜60.0 で落ちなかった**(検証チェーン上では)。
+    デコードはワーカースレッドなので cook は 0.4〜9.5ms と軽い
+  - → **`All` で fps が落ちるのは下流の負荷**と考えられる。All は 3840×2160 の RGBA16Float を
+    2枚渡すので、ビューア / Layout / Composite TOP に載せるとそれだけで重い。
+    Color+Depth で半減、ノード直後の Resolution TOP が最も効く、と README に明記
+- README(各+ルート英日)更新。検証ノードは削除済み

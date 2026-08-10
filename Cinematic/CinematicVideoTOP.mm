@@ -62,9 +62,10 @@ extern "C" {
 namespace {
 struct Job { std::string file; int mode; double time; float fnum, focus; bool flip, norm; };
 
-// Mode: 0=Depth 1=Rendered 2=Color 3=All(3枚同時)
-// 出力する面。All のときは 0=Rendered / 1=Color / 2=Depth の3色バッファに出す
+// Mode: 0=Depth 1=Rendered 2=Color 3=Color+Depth 4=All(3枚同時)
+// 出力する面。複数出すときは色バッファ 0,1,2 に順に載せる
 enum Plane { kRendered = 0, kDepth = 1, kColor = 2 };
+enum { kModeDepth = 0, kModeRendered = 1, kModeColor = 2, kModeColorDepth = 3, kModeAll = 4 };
 
 static constexpr int kMaxSub = 20;   // Info CHOP の被写体スロット上限(旧CHOPのスライダー上限)
 
@@ -178,12 +179,16 @@ public:
         // (SDK上、色バッファごとに解像度もピクセル形式も別でよい。1以降は Render Select TOP で取る)
         myNCScaled = false;
         bool ok = false;
-        if (j.mode == 3) {                                  // All: 3色バッファ
+        if (j.mode == kModeAll) {                           // 3色バッファ
             ok  = uploadPlane(out, kRendered, 0);
             ok |= uploadPlane(out, kColor,    1);
             ok |= uploadPlane(out, kDepth,    2);
+        } else if (j.mode == kModeColorDepth) {             // 2色バッファ(再レンダなし)
+            ok  = uploadPlane(out, kColor, 0);
+            ok |= uploadPlane(out, kDepth, 1);
         } else {
-            ok  = uploadPlane(out, j.mode == 0 ? kDepth : (j.mode == 2 ? kColor : kRendered), 0);
+            ok  = uploadPlane(out, j.mode == kModeDepth ? kDepth
+                                 : (j.mode == kModeColor ? kColor : kRendered), 0);
         }
         if (ok) myFrames++;
     }
@@ -232,12 +237,13 @@ public:
         const char* PAGE = "Cinematic";
         { OP_StringParameter p("File"); p.label = "Cinematic Video (iPhone)"; p.page = PAGE; m->appendFile(p); }
         { OP_StringParameter p("Mode"); p.label = "Mode"; p.page = PAGE;
-          const char* n[] = {"Depth","Rendered","Color","All"};
+          const char* n[] = {"Depth","Rendered","Color","Colordepth","All"};
           const char* l[] = {"Depth (disparity map)",
                              "Rendered (change focus/aperture)",
                              "Color (original, no bokeh)",
+                             "Color + Depth (buffer 0 color / 1 depth)",
                              "All (buffer 0 rendered / 1 color / 2 depth)"};
-          std::vector<const char*> nv(n,n+4), lv(l,l+4); p.defaultValue="Rendered"; m->appendMenu(p,4,nv.data(),lv.data()); }
+          std::vector<const char*> nv(n,n+5), lv(l,l+5); p.defaultValue="Rendered"; m->appendMenu(p,5,nv.data(),lv.data()); }
         // 再生系(Movie File In と同じ考え方)
         { OP_StringParameter p("Playmode"); p.label="Play Mode"; p.page=PAGE;
           const char* n[] = {"Sequential","Locktotimeline","Specifyindex"};
@@ -292,10 +298,14 @@ private:
             Job j;
             { std::unique_lock<std::mutex> l(myMutex); myCond.wait(l, [this]{ return myQuit || myPending; }); if (myQuit) return; j = myJob; myPending = false; myBusy = true; }
             @autoreleasepool {   // 常駐スレッドなので1ジョブごとに必ず排出する
-                if (j.mode == 0 || j.mode == 3) cn_depth(myState, j.time, j.flip?1:0, j.norm?1:0);
-                // All は再レンダのデコード結果から色も取り出す(keepColor=1)のでファイル読みが1回減る
-                if (j.mode == 1 || j.mode == 3) cn_render(myState, j.time, j.fnum, j.focus, j.flip?1:0, j.mode == 3);
-                else if (j.mode == 2)           cn_color(myState, j.time, j.flip?1:0);
+                if (j.mode == kModeDepth || j.mode == kModeColorDepth || j.mode == kModeAll)
+                    cn_depth(myState, j.time, j.flip?1:0, j.norm?1:0);
+                // All は再レンダのデコード結果から色も取り出す(keepColor=1)のでファイル読みが1回減る。
+                // Color+Depth は再レンダ(Metal)を通さないぶん All より軽い
+                if (j.mode == kModeRendered || j.mode == kModeAll)
+                    cn_render(myState, j.time, j.fnum, j.focus, j.flip?1:0, j.mode == kModeAll);
+                else if (j.mode == kModeColor || j.mode == kModeColorDepth)
+                    cn_color(myState, j.time, j.flip?1:0);
                 fetchMeta(j.time);   // 同一worker上でCNScriptメタも更新(ヘルパ呼び出しを直列化)
             }
             { std::lock_guard<std::mutex> l(myMutex); myBusy = false; }
