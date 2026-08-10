@@ -123,7 +123,10 @@ private:
                 r.w = W; r.h = H; r.p.resize((size_t)W * H * 4);
                 CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearSRGB);
                 CIContext* ctx = [CIContext contextWithOptions:@{ kCIContextWorkingColorSpace : (__bridge id)cs }];
-                [ctx render:img toBitmap:r.p.data() rowBytes:(size_t)W * 4 * sizeof(uint16_t) bounds:e format:kCIFormatRGBA16 colorSpace:cs];
+                // kCIFormatRGBA16 は **16bit符号なし整数**。RGBA16Float(半精度浮動小数)として上げるので
+                // 形式が一致せず、ビット列が別物として解釈されて NaN や負の巨大値になる(実RAWで実測)。
+                // 半精度で描く kCIFormatRGBAh が正しい対。
+                [ctx render:img toBitmap:r.p.data() rowBytes:(size_t)W * 4 * sizeof(uint16_t) bounds:e format:kCIFormatRGBAh colorSpace:cs];
                 CGColorSpaceRelease(cs);
                 if (p.flip) { // Core Image出力(top-down) → TD正立へ行反転
                     size_t rb = (size_t)W * 4; std::vector<uint16_t> tmp(rb);

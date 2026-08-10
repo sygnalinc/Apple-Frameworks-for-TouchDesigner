@@ -4805,3 +4805,32 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   安易に試させないことが重要
 - 将来やるなら: iPhone ポートレート HEIC(較正付き)を **ファイルパスで**受ける専用経路。
   ただし静止画なので用途は狭い。ライブ深度は Mac に深度カメラが無いので対象外
+
+### 2026-08-10 CI RAW の出力が壊れていたのを実RAWで発見・修正 + 4件の利用例を追加
+
+- ユーザーが実素材を追加: `Assets/sample_heic/IMG_3095.HEIC`(iPhone・**較正付き視差**+
+  **HDRゲインマップ**)と `Assets/sample_raw.DNG`(iPhone 17 Pro の Apple ProRAW・8064x6048・**52.9MB**)。
+  これで CI RAW / CI HDR の「実素材未入手で未検証」が解消できるようになった
+- **CI RAW の実バグを発見**: `[CIContext render:... format:kCIFormatRGBA16 ...]`
+  (**16bit符号なし整数**)で描いた結果を、TOPへは `RGBA16Float`(**半精度浮動小数**)として
+  アップロードしていた。ビット列が別物として解釈され、実RAWで **NaN / -4696.0** のような値になり
+  画面は真っ白。**`kCIFormatRGBAh` に修正**して正常な現像結果を視認確認
+  - **非RAWのJPEG等では気づきにくく、実RAWを入れて初めて露見した**。READMEに「実RAW視覚検証は未実施」と
+    書いてあった箇所がまさにそれ
+  - 横断監査: `kCIFormat` を使う3件のうち **CoreImageHDR は正しい**
+    (RGBAf で描いてから明示的に float32→float16 変換している)。CoreImageCode も BGRA8→BGRA8Fixed で一致。
+    壊れていたのは CI RAW だけ
+- **利用例4件を demo.toe に追加**(ユーザー要望): CIRAW / CIHDR(y=-1400 描画の行)、
+  CoreWLAN / CoreWLANScan(y=-2400 その他の行)。既存の型どおり `<Optype>1` + note + out1
+  - **CI RAW**: Scale=0.25(2016x1512)。Scale=1.0 のフル現像は初回約10秒
+  - **CI HDR**: HDR / Gain Map / SDR の3ノードを並べた。実測 4032x3024・2016x1512・RGBA16Float
+  - **CoreWLAN**: 9ch(rssi -50 / snr 43 / channel 104)+ Info DAT。SSID/BSSID は位置情報許可が要り空欄
+  - **CoreWLAN Scan**: 126ch・39ネットワーク検出・best_ch_24=14 / best_ch_5=64。
+    配置しただけで Callbacks DAT が自動ドックされることも確認
+- **素材はまだコミットしていない(ユーザー判断待ち)**。理由は下記の privacy/容量:
+  - **DNG に写り込んだノートPC画面が全部読める**。表示されていたのは作業中の会話と、
+    サイドバーの**他案件名**(業務情報)。1/4解像度でも判読可能で、実ファイルはその4倍精細
+  - **GPS が両方に入っている**(HEIC 35.3381467,139.4899300 / DNG 35.3381783,139.490005)。
+    撮影日時も入る
+  - **DNG 52.9MB**(現在の Assets 合計 85.4MB に対して大きい)。git履歴は消せないので慎重に
+- demo.toe も未コミット(素材の扱いが決まってから)

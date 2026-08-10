@@ -17,8 +17,11 @@ the gain map and the HDR expansion (EDR) and output it as an RGBA16Float TOP.
   - **Gain Map**: the embedded gain map (a left→right luminance ramp) is extracted exactly
   - **SDR base**: outputs the base image
   - **HDR**: the `expandToHDR` path works (valid=1). The synthetic asset has no headroom
-    metadata so max = 1.0. **A real HDR photo gives EDR values above 1.0** (not yet verified on a
-    real HDR photo — no sample on hand)
+    metadata so max = 1.0
+- **Verified on a real iPhone HDR photo** (HEIC, gain map 2016x1512, `contentHeadroom` 2.616):
+  all three modes develop at full size (HDR / SDR 4032x3024, Gain Map 2016x1512, RGBA16Float).
+  Whether the HDR expansion is visible depends on the display's headroom — on an SDR display the
+  HDR and SDR modes look alike even though the values differ
 
 ### Output
 
@@ -66,7 +69,11 @@ HEIC等に埋め込まれた **HDRゲインマップ** を扱う。SDRベース 
   - **Gain Map**: 埋め込みゲインマップ(左→右の輝度勾配)を正確に抽出・表示
   - **SDR base**: ベース画像を出力
   - **HDR**: `expandToHDR` パスが動作(valid=1)。合成アセットはheadroomメタが無いため max=1.0。
-    **実HDR写真では 1.0超のEDR値**になる(実HDR写真での>1確認はサンプル未入手のため未実施)
+    合成素材には headroom メタデータが無いので max=1.0
+- **実iPhone HDR写真で確認**(HEIC・ゲインマップ 2016x1512・`contentHeadroom` 2.616):
+  3モードとも実サイズで現像される(HDR/SDR 4032x3024、Gain Map 2016x1512、RGBA16Float)。
+  HDR の伸びが見えるかは表示側の headroom 次第で、SDRディスプレイでは値が違っても
+  HDR と SDR は同じに見える
 
 ### 出力仕様
 

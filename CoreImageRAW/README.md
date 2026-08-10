@@ -69,11 +69,15 @@ DNG / Apple ProRAW / カメラRAW を `CIRAWFilter` で**リアルタイム現�
 
 ### 実測(M2)
 
-- プラグインのロード・パラメータ生成・現像パイプライン実行・パラメータ反映(Exposure等)・
-  出力アップロードを確認
-- **実RAW(DNG/ProRAW)での視覚検証はサンプルRAW未入手のため未実施**。CIRAWFilter は JPEG/TIFF も
-  受け付けるが、非RAW入力はセンサーデータ前提の現像とずれる(白飛びする)ため視覚評価には使えない。
-  実DNG/ProRAWを File に指定すれば正しく現像される
+- **実 ProRAW(iPhone 17 Pro・8064x6048 DNG)で現像結果を視認確認**。Scale=1.0 のフル現像は
+  初回に約10秒(48MP)。Scale=0.25 なら 2016x1512 で軽い
+- **かつて出力が壊れていた(修正済み)**: `[CIContext render:...]` の format が
+  `kCIFormatRGBA16`(**16bit符号なし整数**)なのに、TOP へは `RGBA16Float`(**半精度浮動小数**)として
+  上げていた。ビット列が別物として解釈され、実RAWで NaN や -4696 のような値になっていた
+  (画面は真っ白)。`kCIFormatRGBAh` に修正。**非RAWのJPEG等では気づきにくく、実RAWを入れて初めて
+  露見した**
+- CIRAWFilter は JPEG/TIFF も受け付けるが、非RAW入力はセンサーデータ前提の現像とずれる
+  (白飛びする)ため視覚評価には使えない
 
 ### 出力仕様
 
