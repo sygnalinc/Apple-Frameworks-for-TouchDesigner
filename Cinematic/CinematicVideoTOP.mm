@@ -39,6 +39,10 @@ static const char* PythonCallbacksDATStubs =
 "\t\treturn\n"
 "\tc = p.create(infoCHOP, name)\n"
 "\tc.par.op = op.name\n"
+"\tc.nodeX = op.nodeX + 200\n"
+"\tc.nodeY = op.nodeY\n"
+"\tc.viewer = True\n"
+"\treturn\n"
 "\n"
 "# onInfoDAT: 'Info DAT' トグルを on にした瞬間に呼ばれる。\n"
 "# 隣に素材のメタデータ(機種・撮影日時・コーデック等)を出す Info DAT を作る。\n"
@@ -51,9 +55,9 @@ static const char* PythonCallbacksDATStubs =
 "\t\treturn\n"
 "\td = p.create(infoDAT, name)\n"
 "\td.par.op = op.name\n"
-"\tc.nodeX = op.nodeX + 200\n"
-"\tc.nodeY = op.nodeY\n"
-"\tc.viewer = True\n"
+"\td.nodeX = op.nodeX + 200\n"
+"\td.nodeY = op.nodeY - 150\n"
+"\td.viewer = True\n"
 "\treturn\n";
 
 extern "C" {

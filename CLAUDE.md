@@ -4912,3 +4912,19 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
      `.name` で比較する
 - 実測: 再起動後の初回cookで callbacks に `onInfoDAT` が追記され、Infodat=On で
   `Cinematicvideo1_meta`(20x2)が生成された
+
+### 2026-08-10 Info DAT の Callbacks stub が壊れていた(script error)
+
+- ユーザー「scriptError が出てる」→ 自動生成された Callbacks DAT の `onInfoDAT` が
+  **`d` で作ったのに末尾で `c` を参照**しており NameError になっていた
+- 原因: stub へ `onInfoDAT` を挿入した位置が悪く、**`onInfoCHOP` の末尾3行
+  (`c.nodeX` / `c.nodeY` / `c.viewer`)が `onInfoDAT` の中に移ってしまった**。
+  構文エラーにはならないので、コンパイルチェックだけでは見つからない
+- 修正: 各関数が自分の変数の末尾処理を持つように stub を直した。
+  **検証方法も追加**: .mm の stub 文字列を復元して `compile()` に通し、
+  さらに関数ごとに「代入した変数」と「参照した変数」を突き合わせる
+  (未定義参照を機械的に検出できる)
+- 既に生成済みの壊れた DAT は追記ロジックでは直らない(`onInfoDAT` は既に存在するため)。
+  **自動生成された `_callbacks` DAT を消せば次のcookで作り直される**
+- 教訓: 文字列連結で作る stub は**挿入位置を間違えても構文は通る**。
+  生成結果を実際に compile し、変数の定義/参照まで確認すること
