@@ -213,3 +213,40 @@ public func sp_destroy(_ handle: UnsafeMutableRawPointer?) {
     guard #available(macOS 26.0, *), let handle else { return }
     Unmanaged<SpeechSession>.fromOpaque(handle).release()
 }
+
+// 対応ロケール一覧を "bcp47\t英語名\t0|1(端末にインストール済みか)" の改行区切りで返す。
+// TD 側の Locale プルダウンを組むために使う。**OSのバージョンで中身が変わる**ので
+// ハードコードせず実行時に取る（macOS 26.6 実測で 30 件・うち10件がインストール済み）。
+//
+// 呼び出しは cook スレッドなので、初回だけ待って以後はキャッシュを返す。
+// supportedLocales は静的な一覧なので実測では即返る。
+private var localeCache: String? = nil
+private let localeCacheLock = NSLock()
+
+@_cdecl("sp_locales")
+public func sp_locales() -> UnsafePointer<CChar>? {
+    localeCacheLock.lock()
+    defer { localeCacheLock.unlock() }
+    if localeCache == nil {
+        var text = ""
+        if #available(macOS 26.0, *) {
+            let sem = DispatchSemaphore(value: 0)
+            Task {
+                let supported = await SpeechTranscriber.supportedLocales
+                let installed = Set(await SpeechTranscriber.installedLocales.map { $0.identifier(.bcp47) })
+                let en = Locale(identifier: "en_US")
+                for l in supported.sorted(by: { $0.identifier(.bcp47) < $1.identifier(.bcp47) }) {
+                    let id = l.identifier(.bcp47)
+                    // TD のUIラベルは非ASCIIが化けるので英語名から ASCII 以外を落とす
+                    let name = (en.localizedString(forIdentifier: l.identifier) ?? id)
+                        .unicodeScalars.filter { $0.isASCII }.map(String.init).joined()
+                    text += "\(id)\t\(name)\t\(installed.contains(id) ? 1 : 0)\n"
+                }
+                sem.signal()
+            }
+            _ = sem.wait(timeout: .now() + 5)
+        }
+        localeCache = text
+    }
+    return UnsafePointer(strdup(localeCache!))   // TD側は使い捨てで読むだけ
+}

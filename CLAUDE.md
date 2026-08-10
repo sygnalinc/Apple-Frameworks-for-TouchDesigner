@@ -4526,3 +4526,19 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - あわせて調査した結果: リポジトリは **PUBLIC・星4・説明文あり**だが **Topics が空**。
   `touchdesigner` トピックには 426リポジトリあり、そこの導線から完全に外れている(要 Topics 設定)。
   awesome-touchdesigner(163★)への PR も有効
+
+### 2026-08-10 SpeechText の Locale をプルダウン化(実行時に supportedLocales から生成)
+
+- ユーザー「SpeechText の locale をプルダウンからの選択にしたい」
+- **対応ロケールは OS のバージョンで変わる**ので静的メニューにせず、helper に
+  `sp_locales()`(C ABI)を足して `SpeechTranscriber.supportedLocales` から実行時に取る。
+  **macOS 26.6 実測で 30件**、うち **10件がこの Mac にインストール済み**
+- ラベルは `en-US - English (United States) (installed)` の形。**インストール済みかを出す**のは、
+  未インストールだと初回に数分のダウンロードが走るため(選ぶ前に分かるようにした)。
+  **UIラベルは ASCII のみ**の規約があるので、英語名から非ASCIIを落としている
+- **文字列パラメータ + `appendDynamicStringMenu` なので、一覧に無いコードも打ち込める**
+  (実測: `sv-SE` を代入でき、値として保持された)。WhisperKit は99言語対応なので、
+  30件のリストに縛られないこの挙動が要る
+- macOS 26 未満で一覧が空になる場合に備え、en-US/ja-JP など7件のフォールバックを持たせた
+- helper のキャッシュは初回だけ semaphore で待つ(5秒上限)。`supportedLocales` は静的な
+  一覧なので実測では即返る

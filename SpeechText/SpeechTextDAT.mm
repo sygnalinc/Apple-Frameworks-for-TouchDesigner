@@ -25,6 +25,7 @@ using namespace TD;
 // libSpeechHelper.dylib（Swift）の C API
 extern "C" {
 void* sp_create(const char* locale);
+const char* sp_locales(void);
 void sp_feed(void* handle, const float* samples, int32_t count, double rate);
 int32_t sp_poll(void* handle, char* buffer, int32_t capacity);
 void sp_clear(void* handle);
@@ -60,6 +61,42 @@ public:
     void getGeneralInfo(DAT_GeneralInfo* ginfo, const OP_Inputs*, void*) override
     {
         ginfo->cookEveryFrameIfAsked = true;
+    }
+
+    // Locale プルダウンの中身。helper が返す "bcp47\t英語名\t0|1" を並べる。
+    // 端末に言語モデルが入っているものは (installed) を付ける — 入っていないものは
+    // 初回に数分のダウンロードが走るので、選ぶ前に分かるようにしておく
+    void buildDynamicMenu(const OP_Inputs*, OP_BuildDynamicMenuInfo* info, void*) override
+    {
+        if (strcmp(info->name, "Locale") != 0)
+            return;
+        if (myLocaleNames.empty()) {
+            const char* raw = sp_locales();
+            if (raw) {
+                std::string all(raw);
+                free((void*)raw);
+                size_t pos = 0;
+                while (pos < all.size()) {
+                    const size_t eol = all.find('\n', pos);
+                    const std::string line = all.substr(pos, eol == std::string::npos ? eol : eol - pos);
+                    pos = (eol == std::string::npos) ? all.size() : eol + 1;
+                    const size_t t1 = line.find('\t');
+                    if (t1 == std::string::npos) continue;
+                    const size_t t2 = line.find('\t', t1 + 1);
+                    const std::string id = line.substr(0, t1);
+                    const std::string name = line.substr(t1 + 1, t2 == std::string::npos ? t2 : t2 - t1 - 1);
+                    const bool installed = (t2 != std::string::npos && line.size() > t2 + 1 && line[t2 + 1] == '1');
+                    myLocaleNames.push_back(id);
+                    myLocaleLabels.push_back(id + " - " + name + (installed ? " (installed)" : ""));
+                }
+            }
+            if (myLocaleNames.empty()) {   // macOS 26 未満など。Whisper 用に最低限は出す
+                const char* fallback[] = {"en-US", "ja-JP", "zh-CN", "ko-KR", "de-DE", "fr-FR", "es-ES"};
+                for (const char* f : fallback) { myLocaleNames.push_back(f); myLocaleLabels.push_back(f); }
+            }
+        }
+        for (size_t i = 0; i < myLocaleNames.size(); i++)
+            info->addMenuEntry(myLocaleNames[i].c_str(), myLocaleLabels[i].c_str());
     }
 
     void execute(DAT_Output* output, const OP_Inputs* inputs, void*) override
@@ -160,11 +197,14 @@ public:
             manager->appendToggle(p);
         }
         {
+            // 対応ロケールは OS のバージョンで変わるので、実行時に helper から取って
+            // プルダウンにする(macOS 26.6 実測で30件)。文字列パラメータなので、
+            // 一覧に無いコードを直接打ち込むこともできる(Whisper は99言語対応のため)
             OP_StringParameter p("Locale");
             p.label = "Locale";
             p.page = "Speech";
-            p.defaultValue = "ja-JP";
-            manager->appendString(p);
+            p.defaultValue = "ja-JP";     // 動的メニューは非空の既定値が必要
+            manager->appendDynamicStringMenu(p);
         }
         {
             // apple: SpeechAnalyzer(macOS 26+・低遅延ストリーミング)
@@ -278,6 +318,7 @@ private:
     bool myIsWhisper = false;
     std::string mySignature;
     std::string myStatus = "inactive";
+    std::vector<std::string> myLocaleNames, myLocaleLabels;   // Locale プルダウン用
     std::atomic<int> myExecCount{0};
     int myFinalCount = 0;
 };

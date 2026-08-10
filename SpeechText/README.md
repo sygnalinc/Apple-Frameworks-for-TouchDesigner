@@ -37,7 +37,7 @@ index | text                     | final
 |---|---|---|
 | Audio CHOP | — | The audio CHOP to transcribe (channel 0 is used) |
 | Active | On | Enable/disable analysis |
-| Locale | ja-JP | Language (BCP-47; unsupported ones show `unsupported` in the Info DAT) |
+| Locale | ja-JP | Recognition locale, as a dropdown built at runtime from `SpeechTranscriber.supportedLocales` (30 on macOS 26.6). Locales whose model is already on the machine are marked `(installed)`; the rest download on first use. **A code that is not in the list can also be typed**, which is how you reach WhisperKit's wider language set |
 | Max Rows | 50 | Finalised rows to keep |
 | Clear Transcript | — | Pulse to clear the finalised text |
 
@@ -108,7 +108,7 @@ index | text                     | final
 |---|---|---|
 | Audio CHOP | — | 文字起こしするオーディオ CHOP（ch0 を使用） |
 | Active | On | 解析の有効/無効 |
-| Locale | ja-JP | 言語（BCP-47。対応外なら Info DAT に unsupported と出る） |
+| Locale | ja-JP | 認識ロケール。`SpeechTranscriber.supportedLocales` から実行時に組むプルダウン（macOS 26.6 で30件）。端末に言語モデルが入っているものは `(installed)` 表示、無いものは初回にダウンロードが走る。**一覧に無いコードを直接打ち込むこともできる**（WhisperKit のより広い言語セット用） |
 | Max Rows | 50 | 保持する確定行数 |
 | Clear Transcript | — | パルスで確定済みテキストをクリア |
 
