@@ -50,7 +50,10 @@ extern "C" {
     int   cn_depth(void*, double timeSec, int flip, int normalize);
     int   cn_latest_depth_info(void*, int* w, int* h, unsigned long long* serial);
     void  cn_copy_depth(void*, void* dst);
-    int   cn_render(void*, double timeSec, float fNumber, float focusOverride, int flip);
+    int   cn_render(void*, double timeSec, float fNumber, float focusOverride, int flip, int keepColor);
+    int   cn_color(void*, double timeSec, int flip);
+    int   cn_latest_color_info(void*, int* w, int* h, unsigned long long* serial);
+    void  cn_copy_color(void*, void* dst);
     int   cn_latest_render_info(void*, int* w, int* h, unsigned long long* serial);
     void  cn_copy_render(void*, void* dst);
     const char* cn_meta(void*, double timeSec);
@@ -58,6 +61,10 @@ extern "C" {
 
 namespace {
 struct Job { std::string file; int mode; double time; float fnum, focus; bool flip, norm; };
+
+// Mode: 0=Depth 1=Rendered 2=Color 3=All(3枚同時)
+// 出力する面。All のときは 0=Rendered / 1=Color / 2=Depth の3色バッファに出す
+enum Plane { kRendered = 0, kDepth = 1, kColor = 2 };
 
 static constexpr int kMaxSub = 20;   // Info CHOP の被写体スロット上限(旧CHOPのスライダー上限)
 
@@ -171,17 +178,23 @@ public:
         // (SDK上、色バッファごとに解像度もピクセル形式も別でよい。1以降は Render Select TOP で取る)
         myNCScaled = false;
         bool ok = false;
-        if (j.mode == 2) { ok  = uploadPlane(out, false, 0);
-                           ok |= uploadPlane(out, true,  1); }
-        else               ok  = uploadPlane(out, j.mode == 0, 0);
+        if (j.mode == 3) {                                  // All: 3色バッファ
+            ok  = uploadPlane(out, kRendered, 0);
+            ok |= uploadPlane(out, kColor,    1);
+            ok |= uploadPlane(out, kDepth,    2);
+        } else {
+            ok  = uploadPlane(out, j.mode == 0 ? kDepth : (j.mode == 2 ? kColor : kRendered), 0);
+        }
         if (ok) myFrames++;
     }
 
-    // 1面ぶんのアップロード。depth=true で視差マップ、false で再レンダ映像
-    bool uploadPlane(TOP_Output* out, bool depth, uint32_t bufIndex) {
+    // 1面ぶんのアップロード
+    bool uploadPlane(TOP_Output* out, Plane plane, uint32_t bufIndex) {
+        const bool depth = (plane == kDepth);
         int lw=0, lh=0; unsigned long long serial=0;
         bool has = depth ? cn_latest_depth_info(myState,&lw,&lh,&serial)
-                         : cn_latest_render_info(myState,&lw,&lh,&serial);
+                 : plane == kColor ? cn_latest_color_info(myState,&lw,&lh,&serial)
+                                   : cn_latest_render_info(myState,&lw,&lh,&serial);
         if (!has || lw <= 0 || lh <= 0) return false;
         const OP_PixelFormat pf = depth ? OP_PixelFormat::Mono32Float
                                         : OP_PixelFormat::RGBA16Float;
@@ -192,8 +205,9 @@ public:
             // バッファを読み絵が崩れるので、いったん自前バッファへ出して縮小する。
             // (上限内のときは下の直接コピー経路のままで、余計なコピーはしない)
             std::vector<uint8_t> tmp(bytes);
-            if (depth) cn_copy_depth(myState, tmp.data());
-            else       cn_copy_render(myState, tmp.data());
+            if (depth)                cn_copy_depth(myState, tmp.data());
+            else if (plane == kColor) cn_copy_color(myState, tmp.data());
+            else                      cn_copy_render(myState, tmp.data());
             uint32_t cw = (uint32_t)lw, ch = (uint32_t)lh;
             if (tdnc::fit(tmp, cw, ch, pf)) myNCScaled = true;
             TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D; ui.colorBufferIndex=bufIndex;
@@ -205,8 +219,9 @@ public:
             TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D; ui.colorBufferIndex=bufIndex;
             ui.textureDesc.width=lw; ui.textureDesc.height=lh; ui.textureDesc.pixelFormat=pf;
             auto buf = myContext->createOutputBuffer(bytes, TOP_BufferFlags::None, nullptr); if(!buf) return false;
-            if (depth) cn_copy_depth(myState, buf->data);
-            else       cn_copy_render(myState, buf->data);
+            if (depth)                cn_copy_depth(myState, buf->data);
+            else if (plane == kColor) cn_copy_color(myState, buf->data);
+            else                      cn_copy_render(myState, buf->data);
             out->uploadBuffer(&buf, ui, nullptr);
         }
         myUploaded = serial;
@@ -217,10 +232,12 @@ public:
         const char* PAGE = "Cinematic";
         { OP_StringParameter p("File"); p.label = "Cinematic Video (iPhone)"; p.page = PAGE; m->appendFile(p); }
         { OP_StringParameter p("Mode"); p.label = "Mode"; p.page = PAGE;
-          const char* n[] = {"Depth","Rendered","Both"};
-          const char* l[] = {"Depth (disparity map)","Rendered (change focus/aperture)",
-                             "Both (0 = rendered, 1 = depth)"};
-          std::vector<const char*> nv(n,n+3), lv(l,l+3); p.defaultValue="Rendered"; m->appendMenu(p,3,nv.data(),lv.data()); }
+          const char* n[] = {"Depth","Rendered","Color","All"};
+          const char* l[] = {"Depth (disparity map)",
+                             "Rendered (change focus/aperture)",
+                             "Color (original, no bokeh)",
+                             "All (buffer 0 rendered / 1 color / 2 depth)"};
+          std::vector<const char*> nv(n,n+4), lv(l,l+4); p.defaultValue="Rendered"; m->appendMenu(p,4,nv.data(),lv.data()); }
         // 再生系(Movie File In と同じ考え方)
         { OP_StringParameter p("Playmode"); p.label="Play Mode"; p.page=PAGE;
           const char* n[] = {"Sequential","Locktotimeline","Specifyindex"};
@@ -275,8 +292,10 @@ private:
             Job j;
             { std::unique_lock<std::mutex> l(myMutex); myCond.wait(l, [this]{ return myQuit || myPending; }); if (myQuit) return; j = myJob; myPending = false; myBusy = true; }
             @autoreleasepool {   // 常駐スレッドなので1ジョブごとに必ず排出する
-                if (j.mode != 1) cn_depth(myState, j.time, j.flip?1:0, j.norm?1:0);
-                if (j.mode != 0) cn_render(myState, j.time, j.fnum, j.focus, j.flip?1:0);
+                if (j.mode == 0 || j.mode == 3) cn_depth(myState, j.time, j.flip?1:0, j.norm?1:0);
+                // All は再レンダのデコード結果から色も取り出す(keepColor=1)のでファイル読みが1回減る
+                if (j.mode == 1 || j.mode == 3) cn_render(myState, j.time, j.fnum, j.focus, j.flip?1:0, j.mode == 3);
+                else if (j.mode == 2)           cn_color(myState, j.time, j.flip?1:0);
                 fetchMeta(j.time);   // 同一worker上でCNScriptメタも更新(ヘルパ呼び出しを直列化)
             }
             { std::lock_guard<std::mutex> l(myMutex); myBusy = false; }

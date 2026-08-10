@@ -155,7 +155,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 |---|---|---|
 | [RealityKit Capture](RealityKitCapture/) | SOP | **写真フォルダ→3Dメッシュ**(RealityKit Object Capture)。テクスチャ付きOBJ出力 |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **写真の深度→3Dポイントクラウド**(カメラ較正/画角で逆投影)。RGBから色サンプル |
-| [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic動画**(macOS 26+): 深度(視差)マップ/**f値・ピント差し替え再レンダ**。**Movie File In と同じく自動再生**(Play Mode: Sequential / Locked to Timeline / Specify Index、Speed/Loop/Cue)。`Mode = Both` で**色と深度を2色バッファ同時出力**。メタデータ(フォーカス深度・被写体)は**Info CHOP**で出力 |
+| [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic動画**(macOS 26+): 深度(視差)マップ/**f値・ピント差し替え再レンダ**。**Movie File In と同じく自動再生**(Play Mode: Sequential / Locked to Timeline / Specify Index、Speed/Loop/Cue)。`Mode = All` で**再レンダ・原版の色・深度を3色バッファ同時出力**。メタデータ(フォーカス深度・被写体)は**Info CHOP**で出力 |
 | [Vision Contours](VisionContours/) | SOP | 画像の輪郭を**閉じたLineジオメトリ**へ(Sweep/Extrude/Particle 直結) |
 | [Screen Capture](ScreenCapture/) | TOP | ディスプレイ/**名前で選べる単一ウインドウ**の**画面収録**(最大120fps) |
 | [CA Process Tap](CoreAudioProcessTap/) | CHOP | **指定アプリの音だけ**をタップ(Core Audio Process Tap・macOS 14.4+)or 全システム音→48kHz stereo。Screen Captureより粒度が細かい |

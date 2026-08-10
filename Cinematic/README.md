@@ -39,29 +39,34 @@ over and over. The current time is published as the Info CHOP channels `position
 `playing`. Measured: `Locked to Timeline` at timeline 2.00 / 5.00 / 9.00 s gives position 2.02 /
 5.02 / 9.02 s.
 
-### Color and depth at the same time (`Mode = Both`)
+### Three images at once (`Mode = All`)
 
-One node, one decode, **frame-locked by construction** — both images come from the same job, so
-they can never drift apart.
+The file holds three things, and this mode emits all of them from one node, from the same job, so
+they are **frame-locked by construction**.
 
 | | Output |
 |---|---|
-| **Color buffer 0** | Rendered image (RGBA16Float, full resolution) — the node's normal output |
-| **Color buffer 1** | Depth / disparity (Mono32Float, its own resolution) — read it with a **Render Select TOP** (`Buffer Index` = 1) |
+| **Color buffer 0** | **Rendered** — bokeh applied at the chosen `Aperture` / focus (RGBA16Float) |
+| **Color buffer 1** | **Color** — the original video track, before any bokeh (RGBA16Float) |
+| **Color buffer 2** | **Depth** — disparity map (Mono32Float, its own resolution) |
 
-The two buffers may have different resolutions and pixel formats; that is explicitly supported.
-Measured on M2 with real footage: **1.00x real time, 60 pairs per second** (1920x1080 colour +
-512x288 depth).
+Buffers 1 and 2 are read with a **Render Select TOP** (`Buffer Index` 1 or 2). Buffers may differ
+in resolution and pixel format; that is explicitly supported. `Depth` / `Rendered` / `Color` are
+also available as single-output modes when you only need one.
+
+**Color is the un-blurred original.** Measured: at `Aperture` f/16 the rendered output is
+bit-identical to Color in the sampled region, while at f/2 the background loses detail
+(high-frequency energy 282 vs 365). Use it as a clean plate, or to feed Vision / Core ML with a
+sharp image while the rendered version goes to screen.
+
+Measured on M2 with real footage (1920x1080 + 1920x1080 + 512x288): **60 frames per second in
+every mode** — `All` costs no more than `Rendered` here, because the colour is taken from the
+decode the renderer already did rather than reading the file again.
 
 > **Wire buffer 0 into your chain.** A Render Select TOP reads by *reference*, and a reference
 > does **not** pull a cook out of the source. If the only things downstream are Render Select
 > TOPs, this operator barely cooks and playback crawls (measured: 4408 cooks on the Render Select
-> versus 29 on the source). Connect the node's own output to something — a Null TOP is enough —
-> and both buffers update at full rate.
-
-Two separate nodes on the same file also work, but that decodes the file twice and the two
-playheads drift; if you do that, set `Play` Off on the second one and drive its `Position` from
-the first one's `position` Info CHOP channel.
+> versus 29 on the source). Connect the node's own output to something — a Null TOP is enough.
 
 ### Automatic Info CHOP (no setup)
 
@@ -98,7 +103,7 @@ Wire a **subject depth into the Focus parameter to rack focus live from TD**.
 
 ### Parameters
 
-`Cinematic Video (iPhone)` (file) / `Mode` (Depth / Rendered / Both) / `Play Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
+`Cinematic Video (iPhone)` (file) / `Mode` (Depth / Rendered / Color / All) / `Play Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
 `Cue Pulse` / `Position (0..1, when Play is off)` / `Aperture (f-number)` /
 `Focus Disparity Override` (0 = follow the script) / `Normalize Depth` / `Flip` /
 `Max Subjects (Info CHOP)` / `Info CHOP`
@@ -185,25 +190,33 @@ TouchDesigner のタイムライン(`deltaMS`)に従って進む。タイムラ�
 現在位置は Info CHOP の `position`(秒)と `playing` で読める。
 実測: Locked to Timeline でタイムライン 2.00 / 5.00 / 9.00 秒 → position 2.02 / 5.02 / 9.02 秒。
 
-### 色と深度を同時に出す(`Mode = Both`)
+### 3枚を同時に出す(`Mode = All`)
 
-1ノード・1回のデコードで、**構造上フレームがずれない**(同じジョブから両方を出しているため)。
+素材には3つの絵が入っていて、このモードは**同じジョブから**まとめて出す。
+したがって**構造上フレームがずれない**。
 
 | | 出力 |
 |---|---|
-| **色バッファ 0** | 再レンダ映像(RGBA16Float・フル解像度)= ノードの通常の出力 |
-| **色バッファ 1** | 深度/視差(Mono32Float・別解像度)= **Render Select TOP** の `Buffer Index` を 1 にして取る |
+| **色バッファ 0** | **Rendered** — `Aperture` とピントを反映した再レンダ(RGBA16Float) |
+| **色バッファ 1** | **Color** — ボケを付ける前の元の映像トラック(RGBA16Float) |
+| **色バッファ 2** | **Depth** — 視差マップ(Mono32Float・別解像度) |
 
-2つのバッファは解像度もピクセル形式も別で構わない(SDKが明示的に許している)。
-実測(M2・実素材): **実時間の1.00倍・60組/秒**(色1920×1080 + 深度512×288)。
+バッファ1・2は **Render Select TOP**(`Buffer Index` を 1 か 2)で取る。バッファごとに解像度も
+ピクセル形式も別で構わない(SDKが明示的に許している)。1枚だけでよければ
+`Depth` / `Rendered` / `Color` の単体モードもある。
+
+**Color はボケを付ける前の原版。** 実測: `Aperture` f/16 の再レンダ結果とサンプル領域で完全一致し、
+f/2 では背景のディテールが落ちる(高周波エネルギー 282 対 365)。素材そのままのプレートとして使う、
+あるいは画面には再レンダを出しつつ Vision / Core ML にはシャープな絵を渡す、といった使い分けができる。
+
+実測(M2・実素材 1920×1080 + 1920×1080 + 512×288): **どのモードも 60 フレーム/秒**。
+All が Rendered と同じ速度なのは、色を**再レンダが既に行ったデコード結果から取り出していて**
+ファイルを読み直していないため。
 
 > **バッファ0はワイヤで下流に繋ぐこと。** Render Select TOP は**参照**で読むため、
 > **参照は cook を引っ張らない**。下流が Render Select TOP だけだとこのOPはほとんど cook されず、
-> 再生が這うように遅くなる(実測: Render Select が4408 cook に対し、参照元は29 cook)。
-> ノード自身の出力を何か(Null TOP で十分)に繋げば、両バッファとも全速で更新される。
-
-同じファイルに2ノード当てても出せるが、デコードが2回走り、再生位置も別々に進んでずれる。
-やるなら2つ目は `Play` を Off にして、1つ目の Info CHOP `position` から `Position` を駆動する。
+> 再生が這うように遅くなる(実測: Render Select が4408 cook に対し参照元は29 cook)。
+> ノード自身の出力を何か(Null TOP で十分)に繋ぐこと。
 
 ### Info CHOP の自動生成(操作不要)
 
@@ -238,7 +251,7 @@ Info **CHOP** が正しい。
 
 ### パラメータ
 
-`Cinematic Video (iPhone)`(ファイル)/ `Mode`(Depth / Rendered / Both)/ `Play Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
+`Cinematic Video (iPhone)`(ファイル)/ `Mode`(Depth / Rendered / Color / All)/ `Play Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
 `Cue Pulse` / `Position (0..1, when Play is off)` / `Aperture (f-number)` /
 `Focus Disparity Override`(0=script準拠)/ `Normalize Depth` / `Flip` /
 `Max Subjects (Info CHOP)` / `Info CHOP`

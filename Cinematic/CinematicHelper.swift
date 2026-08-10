@@ -38,6 +38,10 @@ final class CNState: @unchecked Sendable {
     var rgbaBuf: [UInt16] = []
     var rgbaW = 0, rgbaH = 0
     var rgbaSerial: UInt64 = 0
+    // 原版(ボケを付ける前)の色。再レンダとは別に持つので3枚同時に出せる
+    var colorBuf: [UInt16] = []
+    var colorW = 0, colorH = 0
+    var colorSerial: UInt64 = 0
     // 再レンダ先は毎フレーム作らず使い回す(IOSurface を毎秒数十枚作ると
     // 解放が追いつかずメモリが際限なく増える)
     var renderDst: CVPixelBuffer?
@@ -211,6 +215,31 @@ private func rotateDisparity(_ src: [Float], _ W: Int, _ H: Int, _ deg: Int) -> 
     return (out, dW, dH)
 }
 
+// RGBA16(1画素=UInt16×4)の回転。rotateDisparity と同じ写像を stride 4 で行う
+private func rotateRGBA16(_ src: [UInt16], _ W: Int, _ H: Int, _ deg: Int) -> ([UInt16], Int, Int) {
+    let d = ((deg % 360) + 360) % 360
+    if d == 0 { return (src, W, H) }
+    let swap = (d == 90 || d == 270)
+    let dW = swap ? H : W, dH = swap ? W : H
+    var out = [UInt16](repeating: 0, count: W * H * 4)
+    src.withUnsafeBufferPointer { s in
+        out.withUnsafeMutableBufferPointer { o in
+            for dy in 0..<dH { for dx in 0..<dW {
+                var sx = 0, sy = 0
+                switch d {
+                case 90:  sx = dy;         sy = H - 1 - dx
+                case 180: sx = W - 1 - dx; sy = H - 1 - dy
+                case 270: sx = W - 1 - dy; sy = dx
+                default:  sx = dx;         sy = dy
+                }
+                let si = (sy * W + sx) * 4, di = (dy * dW + dx) * 4
+                o[di] = s[si]; o[di+1] = s[si+1]; o[di+2] = s[si+2]; o[di+3] = s[si+3]
+            } }
+        }
+    }
+    return (out, dW, dH)
+}
+
 // float16 disparity CVPixelBuffer → Float 配列(preferredTransform適用+TD正立の上下反転)
 private func disparityToFloat(_ pb: CVPixelBuffer, flip: Bool, normalize: Bool, rotDeg: Int, out: inout [Float], outW: inout Int, outH: inout Int) {
     CVPixelBufferLockBaseAddress(pb, .readOnly); defer { CVPixelBufferUnlockBaseAddress(pb, .readOnly) }
@@ -297,7 +326,7 @@ public func cn_copy_depth(_ h: UnsafeMutableRawPointer?, _ dst: UnsafeMutableRaw
 
 // Render: f値/ピント差し替えで再レンダ → RGBA16Float バッファへ
 @_cdecl("cn_render")
-public func cn_render(_ h: UnsafeMutableRawPointer?, _ timeSec: Double, _ fNumber: Float, _ focusOverride: Float, _ flip: Int32) -> Int32 {
+public func cn_render(_ h: UnsafeMutableRawPointer?, _ timeSec: Double, _ fNumber: Float, _ focusOverride: Float, _ flip: Int32, _ keepColor: Int32) -> Int32 {
     // ワーカースレッドには autorelease プールが無く、AVFoundation/CoreVideo が返す
     // autorelease オブジェクトが解放されずに溜まり続ける(再生中にメモリが際限なく増える)。
     // 1回の呼び出しごとに必ずプールを張って排出する。
@@ -318,6 +347,8 @@ public func cn_render(_ h: UnsafeMutableRawPointer?, _ timeSec: Double, _ fNumbe
     if focusOverride.isFinite && focusOverride != 0 { fa.focusDisparity = focusOverride }
     else if let f = script.frame(at: t, tolerance: tol) { fa.focusDisparity = f.focusDisparity }
 
+    // All モードでは同じデコード結果から原版の色も取る(ファイル読みを1回節約できる)
+    if keepColor != 0 { storeColor(s, img, flip: flip != 0) }
     let W = CVPixelBufferGetWidth(img), H = CVPixelBufferGetHeight(img)
     s.lock.lock()
     if s.renderDst == nil || s.renderDstW != W || s.renderDstH != H {
@@ -348,6 +379,71 @@ public func cn_render(_ h: UnsafeMutableRawPointer?, _ timeSec: Double, _ fNumbe
     s.lock.lock(); s.rgbaBuf = buf; s.rgbaW = W; s.rgbaH = H; s.serialCtr += 1; s.rgbaSerial = s.serialCtr; s.lock.unlock()
     return 1
 }
+}
+
+// 映像トラックの CVPixelBuffer(64RGBAHalf)を回転+上下反転して colorBuf へ入れる。
+// cn_color(単体)と cn_render(keepColor=1)の両方から使う。
+@available(macOS 26.0, *)
+private func storeColor(_ s: CNState, _ img: CVPixelBuffer, flip: Bool) {
+    s.lock.lock(); let rot = s.rotDeg; s.lock.unlock()
+    CVPixelBufferLockBaseAddress(img, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(img, .readOnly) }
+    let W = CVPixelBufferGetWidth(img), H = CVPixelBufferGetHeight(img)
+    let bpr = CVPixelBufferGetBytesPerRow(img)
+    guard let base = CVPixelBufferGetBaseAddress(img) else { return }
+    let rowBytes = W * 4 * 2
+    var tmp = [UInt16](repeating: 0, count: W * H * 4)
+    tmp.withUnsafeMutableBytes { d in
+        for y in 0..<H { memcpy(d.baseAddress!.advanced(by: y * rowBytes), base.advanced(by: y * bpr), rowBytes) }
+    }
+    let (rtmp, rW, rH) = rotateRGBA16(tmp, W, H, rot)
+    let rRow = rW * 4 * 2
+    var result = [UInt16](repeating: 0, count: rW * rH * 4)
+    result.withUnsafeMutableBytes { o in
+        rtmp.withUnsafeBytes { t in
+            for y in 0..<rH {
+                let sy = flip ? (rH - 1 - y) : y
+                memcpy(o.baseAddress!.advanced(by: y * rRow), t.baseAddress!.advanced(by: sy * rRow), rRow)
+            }
+        }
+    }
+    s.lock.lock(); s.colorBuf = result; s.colorW = rW; s.colorH = rH
+    s.serialCtr += 1; s.colorSerial = s.serialCtr; s.lock.unlock()
+}
+
+@_cdecl("cn_latest_color_info")
+public func cn_latest_color_info(_ h: UnsafeMutableRawPointer?, _ w: UnsafeMutablePointer<Int32>?, _ ht: UnsafeMutablePointer<Int32>?, _ serial: UnsafeMutablePointer<UInt64>?) -> Int32 {
+    guard let h = h else { return 0 }
+    let s = Unmanaged<CNState>.fromOpaque(h).takeUnretainedValue()
+    s.lock.lock(); defer { s.lock.unlock() }
+    if s.colorBuf.isEmpty { return 0 }
+    w?.pointee = Int32(s.colorW); ht?.pointee = Int32(s.colorH); serial?.pointee = s.colorSerial; return 1
+}
+
+@_cdecl("cn_copy_color")
+public func cn_copy_color(_ h: UnsafeMutableRawPointer?, _ dst: UnsafeMutableRawPointer?) {
+    guard let h = h, let dst = dst else { return }
+    let s = Unmanaged<CNState>.fromOpaque(h).takeUnretainedValue()
+    s.lock.lock(); let buf = s.colorBuf; s.lock.unlock()
+    if !buf.isEmpty { buf.withUnsafeBytes { memcpy(dst, $0.baseAddress!, $0.count) } }
+}
+
+// Color: 元の映像トラック(ボケを付ける前=全体にピントが合った絵)をそのまま RGBA16Float へ。
+// 再レンダを通さないので Metal を使わず軽い。Rendered と同じ rgbaBuf に入れるので
+// 取り出しは cn_latest_render_info / cn_copy_render を共用する。
+// 回転は render(CNRenderingSession が preferredTransform を適用)と揃えるため自前で掛ける。
+@_cdecl("cn_color")
+public func cn_color(_ h: UnsafeMutableRawPointer?, _ timeSec: Double, _ flip: Int32) -> Int32 {
+    guard let h = h else { return 0 }
+    let s = Unmanaged<CNState>.fromOpaque(h).takeUnretainedValue()
+    guard #available(macOS 26.0, *) else { return 0 }
+    return autoreleasepool {
+        guard let frames = readFrames(s, timeSec: timeSec, wantRender: true) else { return 0 }
+        defer { frames.reader.cancelReading() }
+        guard let imgSB = frames.image, let img = CMSampleBufferGetImageBuffer(imgSB) else { return 0 }
+        storeColor(s, img, flip: flip != 0)
+        return 1
+    }
 }
 
 @_cdecl("cn_latest_render_info")
