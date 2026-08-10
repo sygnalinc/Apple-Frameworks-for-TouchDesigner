@@ -23,6 +23,80 @@ Measured (M2, TD's stock music sample): classified accurately as `music 0.83 / s
 Example class IDs: `applause cheering laughter music speech singing shout whistling
 finger_snapping dog cat siren car_horn knock door telephone_bell ...`
 
+### The full class list (303)
+
+The Info DAT only shows the top 10 for whatever is playing, which is enough to discover IDs by ear.
+For the complete set, the authority is the API itself — `SNClassifySoundRequest.knownClassifications`.
+Regenerate it on your own machine with:
+
+```sh
+clang -fobjc-arc -framework Foundation -framework SoundAnalysis \
+      -o /tmp/sound_classes tools/sound_classes.m && /tmp/sound_classes
+```
+
+**The list belongs to the OS version.** These 303 are what `com.apple.SoundAnalysis.classifier.v1`
+reports on macOS 26.6; a future release may add or drop entries, so treat a hardcoded list as a
+snapshot.
+
+<details>
+<summary>303 class IDs (macOS 26.6)</summary>
+
+```
+speech                  shout                   yell                    battle_cry              children_shouting       screaming
+whispering              laughter                baby_laughter           giggling                snicker                 belly_laugh
+chuckle_chortle         crying_sobbing          baby_crying             sigh                    singing                 choir_singing
+yodeling                rapping                 humming                 whistling               breathing               snoring
+gasp                    cough                   sneeze                  nose_blowing            person_running          person_shuffling
+person_walking          chewing                 biting                  gargling                burp                    hiccup
+slurp                   finger_snapping         clapping                cheering                applause                booing
+chatter                 crowd                   babble                  dog                     dog_bark                dog_howl
+dog_bow_wow             dog_growl               dog_whimper             cat                     cat_purr                cat_meow
+horse_clip_clop         horse_neigh             cow_moo                 pig_oink                sheep_bleat             fowl
+chicken                 chicken_cluck           rooster_crow            turkey_gobble           duck_quack              goose_honk
+lion_roar               bird                    bird_vocalization       bird_chirp_tweet        bird_squawk             pigeon_dove_coo
+crow_caw                owl_hoot                bird_flapping           insect                  cricket_chirp           mosquito_buzz
+fly_buzz                bee_buzz                frog                    frog_croak              snake_hiss              snake_rattle
+whale_vocalization      coyote_howl             elk_bugle               music                   plucked_string_instrument  guitar
+electric_guitar         bass_guitar             acoustic_guitar         steel_guitar_slide_guitar  guitar_tapping          guitar_strum
+banjo                   sitar                   mandolin                zither                  ukulele                 keyboard_musical
+piano                   electric_piano          organ                   electronic_organ        hammond_organ           synthesizer
+harpsichord             percussion              drum_kit                drum                    snare_drum              bass_drum
+timpani                 tabla                   cymbal                  hi_hat                  tambourine              rattle_instrument
+gong                    mallet_percussion       marimba_xylophone       glockenspiel            vibraphone              steelpan
+orchestra               brass_instrument        french_horn             trumpet                 trombone                bowed_string_instrument
+violin_fiddle           cello                   double_bass             wind_instrument         flute                   saxophone
+clarinet                oboe                    bassoon                 harp                    bell                    church_bell
+bicycle_bell            cowbell                 tuning_fork             chime                   wind_chime              harmonica
+accordion               bagpipes                didgeridoo              shofar                  theremin                singing_bowl
+disc_scratching         wind                    wind_rustling_leaves    wind_noise_microphone   thunderstorm            thunder
+water                   rain                    raindrop                stream_burbling         waterfall               ocean
+sea_waves               gurgling                fire                    fire_crackle            boat_water_vehicle      sailing
+rowboat_canoe_kayak     motorboat_speedboat     car_horn                power_windows           vehicle_skidding        car_passing_by
+race_car                truck                   air_horn                reverse_beeps           bus                     emergency_vehicle
+police_siren            ambulance_siren         fire_engine_siren       motorcycle              traffic_noise           rail_transport
+train                   train_whistle           train_horn              railroad_car            train_wheels_squealing  subway_metro
+aircraft                helicopter              airplane                bicycle                 skateboard              engine
+lawn_mower              chainsaw                engine_knocking         engine_starting         engine_idling           engine_accelerating_revving
+door                    door_bell               door_sliding            door_slam               knock                   tap
+squeak                  drawer_open_close       dishes_pots_pans        cutlery_silverware      chopping_food           frying_food
+microwave_oven          blender                 water_tap_faucet        sink_filling_washing    bathtub_filling_washing  hair_dryer
+toilet_flush            toothbrush              vacuum_cleaner          zipper                  keys_jangling           coin_dropping
+scissors                electric_shaver         typing                  typewriter              typing_computer_keyboard  writing
+telephone               telephone_bell_ringing  ringtone                alarm_clock             siren                   civil_defense_siren
+smoke_detector          foghorn                 ratchet_and_pawl        clock                   tick                    tick_tock
+sewing_machine          mechanical_fan          air_conditioner         printer                 camera                  hammer
+saw                     power_tool              drill                   hedge_trimmer           gunshot_gunfire         artillery_fire
+fireworks               firecracker             eruption                boom                    chopping_wood           wood_cracking
+glass_clink             glass_breaking          liquid_splashing        liquid_sloshing         liquid_squishing        liquid_dripping
+liquid_pouring          liquid_trickle_dribble  liquid_filling_container  liquid_spraying         water_pump              boiling
+underwater_bubbling     whoosh_swoosh_swish     thump_thud              basketball_bounce       slap_smack              crushing
+crumpling_crinkling     tearing                 beep                    click                   bowling_impact          playing_badminton
+playing_hockey          playing_squash          playing_table_tennis    playing_tennis          playing_volleyball      rope_skipping
+scuba_diving            skiing                  silence
+```
+
+</details>
+
 ### Parameters
 
 | Parameter | Default | Description |
@@ -70,6 +144,80 @@ For how to load it, see the [root README](../README.md) (a CPlusPlus CHOP, or th
 
 クラスIDの例: `applause cheering laughter music speech singing shout whistling
 finger_snapping dog cat siren car_horn knock door telephone_bell ...`
+
+### クラスID全一覧（303件）
+
+Info DAT に出るのは今鳴っている音の上位10件だけで、耳で探す用途にはそれで足りる。
+全部を知りたいときの正は API そのもの（`SNClassifySoundRequest.knownClassifications`）。
+手元で再生成するには:
+
+```sh
+clang -fobjc-arc -framework Foundation -framework SoundAnalysis \
+      -o /tmp/sound_classes tools/sound_classes.m && /tmp/sound_classes
+```
+
+**一覧は OS のバージョンに紐づく。** 下の303件は macOS 26.6 の
+`com.apple.SoundAnalysis.classifier.v1` が返したもので、将来増減しうる。
+貼ってある一覧はスナップショットとして扱うこと。
+
+<details>
+<summary>303件のクラスID（macOS 26.6）</summary>
+
+```
+speech                  shout                   yell                    battle_cry              children_shouting       screaming
+whispering              laughter                baby_laughter           giggling                snicker                 belly_laugh
+chuckle_chortle         crying_sobbing          baby_crying             sigh                    singing                 choir_singing
+yodeling                rapping                 humming                 whistling               breathing               snoring
+gasp                    cough                   sneeze                  nose_blowing            person_running          person_shuffling
+person_walking          chewing                 biting                  gargling                burp                    hiccup
+slurp                   finger_snapping         clapping                cheering                applause                booing
+chatter                 crowd                   babble                  dog                     dog_bark                dog_howl
+dog_bow_wow             dog_growl               dog_whimper             cat                     cat_purr                cat_meow
+horse_clip_clop         horse_neigh             cow_moo                 pig_oink                sheep_bleat             fowl
+chicken                 chicken_cluck           rooster_crow            turkey_gobble           duck_quack              goose_honk
+lion_roar               bird                    bird_vocalization       bird_chirp_tweet        bird_squawk             pigeon_dove_coo
+crow_caw                owl_hoot                bird_flapping           insect                  cricket_chirp           mosquito_buzz
+fly_buzz                bee_buzz                frog                    frog_croak              snake_hiss              snake_rattle
+whale_vocalization      coyote_howl             elk_bugle               music                   plucked_string_instrument  guitar
+electric_guitar         bass_guitar             acoustic_guitar         steel_guitar_slide_guitar  guitar_tapping          guitar_strum
+banjo                   sitar                   mandolin                zither                  ukulele                 keyboard_musical
+piano                   electric_piano          organ                   electronic_organ        hammond_organ           synthesizer
+harpsichord             percussion              drum_kit                drum                    snare_drum              bass_drum
+timpani                 tabla                   cymbal                  hi_hat                  tambourine              rattle_instrument
+gong                    mallet_percussion       marimba_xylophone       glockenspiel            vibraphone              steelpan
+orchestra               brass_instrument        french_horn             trumpet                 trombone                bowed_string_instrument
+violin_fiddle           cello                   double_bass             wind_instrument         flute                   saxophone
+clarinet                oboe                    bassoon                 harp                    bell                    church_bell
+bicycle_bell            cowbell                 tuning_fork             chime                   wind_chime              harmonica
+accordion               bagpipes                didgeridoo              shofar                  theremin                singing_bowl
+disc_scratching         wind                    wind_rustling_leaves    wind_noise_microphone   thunderstorm            thunder
+water                   rain                    raindrop                stream_burbling         waterfall               ocean
+sea_waves               gurgling                fire                    fire_crackle            boat_water_vehicle      sailing
+rowboat_canoe_kayak     motorboat_speedboat     car_horn                power_windows           vehicle_skidding        car_passing_by
+race_car                truck                   air_horn                reverse_beeps           bus                     emergency_vehicle
+police_siren            ambulance_siren         fire_engine_siren       motorcycle              traffic_noise           rail_transport
+train                   train_whistle           train_horn              railroad_car            train_wheels_squealing  subway_metro
+aircraft                helicopter              airplane                bicycle                 skateboard              engine
+lawn_mower              chainsaw                engine_knocking         engine_starting         engine_idling           engine_accelerating_revving
+door                    door_bell               door_sliding            door_slam               knock                   tap
+squeak                  drawer_open_close       dishes_pots_pans        cutlery_silverware      chopping_food           frying_food
+microwave_oven          blender                 water_tap_faucet        sink_filling_washing    bathtub_filling_washing  hair_dryer
+toilet_flush            toothbrush              vacuum_cleaner          zipper                  keys_jangling           coin_dropping
+scissors                electric_shaver         typing                  typewriter              typing_computer_keyboard  writing
+telephone               telephone_bell_ringing  ringtone                alarm_clock             siren                   civil_defense_siren
+smoke_detector          foghorn                 ratchet_and_pawl        clock                   tick                    tick_tock
+sewing_machine          mechanical_fan          air_conditioner         printer                 camera                  hammer
+saw                     power_tool              drill                   hedge_trimmer           gunshot_gunfire         artillery_fire
+fireworks               firecracker             eruption                boom                    chopping_wood           wood_cracking
+glass_clink             glass_breaking          liquid_splashing        liquid_sloshing         liquid_squishing        liquid_dripping
+liquid_pouring          liquid_trickle_dribble  liquid_filling_container  liquid_spraying         water_pump              boiling
+underwater_bubbling     whoosh_swoosh_swish     thump_thud              basketball_bounce       slap_smack              crushing
+crumpling_crinkling     tearing                 beep                    click                   bowling_impact          playing_badminton
+playing_hockey          playing_squash          playing_table_tennis    playing_tennis          playing_volleyball      rope_skipping
+scuba_diving            skiing                  silence
+```
+
+</details>
 
 ### パラメータ
 

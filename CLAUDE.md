@@ -4472,3 +4472,13 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **申し送り**: demo.toe はユーザーが作業中の状態でコミットした。VisionPose3D コンテナに
   `eval/`(gitignore)の映像を参照する Movie File In が4本残っている可能性がある。
   clone しただけの人はその4ノードがファイル無しになる。次回整理する
+
+### 2026-08-10 SoundClass のクラスID全一覧を README に収録(303件)
+
+- ユーザー「SoundClass の Class 名一覧はどこにある?」→ **リポジトリには無かった**。
+  Info DAT は「今鳴っている音の上位10件」しか出しておらず、全体を知る手段が無かった
+- 正は API の `SNClassifySoundRequest.knownClassifications`。macOS 26.6 の
+  `com.apple.SoundAnalysis.classifier.v1` で **303件**
+- `tools/sound_classes.m` を追加(この一覧を吐くだけの小さなCLI)。**一覧は OS バージョンに
+  紐づく**ので、README に貼ったのはスナップショットである旨を明記し、再生成手順も併記
+- SoundClass/README(英日)に `<details>` で全303件を収録
