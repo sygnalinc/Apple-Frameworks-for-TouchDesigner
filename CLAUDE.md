@@ -4575,3 +4575,23 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   取りこぼす**。無音を入れたら拾えるようになった
 - 検証の注意: `Clear` パルス直後や `reloadpulse` 直後は数秒空振りする。**audio CHOP の peak と
   Info DAT の status を見てから**表を読むこと(空を見て「動いていない」と誤診しかけた)
+
+### 2026-08-10 SpeechSynth の Voice もプルダウン化(こちらはDL不要)
+
+- ユーザー「SpeechSynth の VoiceIdentifier は何？これも選択式にできるならしたい」
+  「locale を選ぶ必要はない?」「この音声モデルはダウンロードが必要?」
+- `Voice` は `com.apple.voice.compact.en-US.Samantha` のような **AVSpeechSynthesisVoice の識別子**を
+  手打ちする欄だった。`AVSpeechSynthesisVoice.speechVoices()` から実行時にプルダウンを組むよう変更。
+  **この Mac で 180音声 / 49言語**。言語→名前でソートし `en-US  Samantha  (Default)` 形式のラベル
+- **Locale パラメータは不要**(ユーザー質問への回答): 識別子が言語を内包している
+  (`com.apple.voice.compact.ja-JP.Kyoko` は日本語)。認識と違い、合成は声を決めれば言語も決まる
+- **ダウンロードも不要**(同): `speechVoices()` は**インストール済みのものしか返さない**ので、
+  一覧に出ている時点で全部使える(3件を `voiceWithIdentifier` で実際にインスタンス化して確認)。
+  **SpeechTranscribe の Locale とは逆の性質** — あちらは未インストールも並ぶので `(installed)` を
+  付けている。この Mac は 180件すべて Default(compact)で、Enhanced/Premium は0件だった
+  (欲しい場合はシステム設定 > アクセシビリティ > 読み上げコンテンツ > 声を管理 でDL。
+  実行時に組み直すので自動で一覧に加わる)
+- **罠**: 動的メニューは**空文字の既定値だとパラメータ自体が生成されない**(既出)。
+  「空欄=既定音声」の挙動を保つため、`default` という番兵値を既定にして
+  speak 側で「空 or default なら音声指定なし」と解釈するようにした
+- demo の Voice が `Trinoids`(ネタ音声)だったので Samantha に変更。実際に発話して peak 0.36〜0.63 を確認
