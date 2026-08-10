@@ -137,12 +137,39 @@ EOF
     echo "== dmg done: $DMG ($(du -h "$DMG" | cut -f1))"
 }
 
+# 各 .plugin に公証チケットを貼ってから DMG を作り直す。
+# **これをしないと、DMGから取り出した .plugin にはチケットが無く**、
+# 中の wifiscan-helper.app のような入れ子のアプリを起動しようとした瞬間に
+# Gatekeeper が「マルウェアが含まれていないことを検証できませんでした」で止める(実測)。
+# DMG に貼ったチケットはコピーすると失われるので、バンドル個別に貼る必要がある。
+cmd_staple_plugins() {
+    local zip="$REPO/dist/plugins-v$VERSION.zip"
+    echo "== notarize plugins (チケットを各 .plugin に貼るため)"
+    rm -f "$zip"
+    ( cd "$DIST" && /usr/bin/ditto -c -k --keepParent --sequesterRsrc . "$zip" )
+    xcrun notarytool submit "$zip" --keychain-profile "$NOTARY_PROFILE" --wait
+    rm -f "$zip"
+    local n=0
+    for b in "$DIST"/*.plugin; do
+        xcrun stapler staple "$b" >/dev/null || { echo "  ステープル失敗: $(basename "$b")"; exit 1; }
+        n=$((n+1))
+    done
+    echo "== $n 個の .plugin にステープル済み"
+}
+
 cmd_notarize() {
+    cmd_staple_plugins          # 先にバンドル個別へチケットを貼る
+    cmd_dmg                     # 貼った状態で DMG を作り直す
     echo "== notarize: $DMG (profile: $NOTARY_PROFILE)"
     xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
     xcrun stapler staple "$DMG"
     echo "== notarize done. Gatekeeper check:"
     spctl -a -vv -t open --context context:primary-signature "$DMG" 2>&1 || true
+    echo "== 各 .plugin のチケット確認:"
+    for b in "$DIST"/*.plugin; do
+        xcrun stapler validate "$b" >/dev/null 2>&1 || echo "  チケット無し: $(basename "$b")"
+    done
+    echo "   (何も出なければ全て貼れている)"
 }
 
 case "${1:-}" in

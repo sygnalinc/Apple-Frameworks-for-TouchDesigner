@@ -189,6 +189,22 @@ public:
 
     void getWarningString(OP_String* s, void*) override
     {
+        // SSID 一覧が空のとき、ヘルパーが返した理由をそのまま伝える。
+        // 黙って空の表を出すと「取れない」としか分からない(実際に詰まった)
+        {
+            std::lock_guard<std::mutex> l(myMx);
+            if (!mySsidStatus.empty() && mySsidStatus != "ok") {
+                if (mySsidStatus == "denied" || mySsidStatus == "timeout") {
+                    s->setString("SSID names need Location permission for the bundled helper. "
+                                 "System Settings > Privacy & Security > Location Services > "
+                                 "turn on \"wifiscan-helper\". (Congestion channels work without it.)");
+                    return;
+                }
+                if (mySsidStatus == "no_interface") { s->setString("No Wi-Fi interface found."); return; }
+                s->setString(("Wi-Fi scan helper: " + mySsidStatus).c_str());
+                return;
+            }
+        }
         if (myScans.load() > 0 && mySnap.networks == 0)
             s->setString("Scan returned 0 networks (Wi-Fi off, or no interface).");
     }
@@ -289,6 +305,8 @@ private:
             if (!d) return;
             NSDictionary* o = [NSJSONSerialization JSONObjectWithData:d options:0 error:nil];
             if (![o isKindOfClass:[NSDictionary class]]) return;
+            std::string st;
+            if ([o[@"status"] isKindOfClass:[NSString class]]) st = [o[@"status"] UTF8String];
             std::vector<std::vector<std::string>> rows;
             NSArray* nets = o[@"networks"];
             if ([nets isKindOfClass:[NSArray class]]) {
@@ -305,6 +323,7 @@ private:
             }
             std::lock_guard<std::mutex> l(myMx);
             mySsidRows = std::move(rows);
+            mySsidStatus = st;
         }
     }
 
@@ -440,6 +459,7 @@ private:
     double myInterval = 10;
     Snapshot mySnap;
     std::vector<std::vector<std::string>> mySsidRows;   // myMx 保護(SSID一覧)
+    std::string mySsidStatus;   // myMx 保護。ヘルパーの status(ok/denied/timeout/no_interface)
     std::atomic<uint64_t> myExec{0}, myScans{0};
     std::atomic<bool> myScanning{false};
 };

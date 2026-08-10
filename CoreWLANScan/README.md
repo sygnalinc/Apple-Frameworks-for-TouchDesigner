@@ -61,6 +61,27 @@ Get SSID Names ON → <node>_ssid (Info DAT) appears → the SSID list shows up 
 > location permission) and has been corrected. The problem that the responsible process (TD) has
 > no usage string is worked around by the helper `.app` above.
 
+
+#### If the SSID list stays empty
+
+The congestion channels keep working — only the names are missing. Causes, measured:
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `_ssid` table has only its header | Location permission for the helper is off | System Settings > Privacy & Security > Location Services > turn on **wifiscan-helper**. The operator now says this in its warning |
+| Nothing happens at all, no prompt | The helper is blocked by Gatekeeper | See below |
+| Was working, then stopped | The permission toggle was switched off, or LaunchServices still points at a since-unmounted DMG volume. `lsregister -f <helper.app>` re-registers the real path |
+
+**Installing is not enough — someone has to allow the location prompt once.** There is no way
+around that: the OS asks the user, not the app.
+
+**Gatekeeper**: a `.plugin` copied out of a downloaded DMG carries a quarantine flag, and the
+notarization ticket stapled to the DMG does **not** travel with it. Launching the nested helper
+then trips *"Apple could not verify ... free of malware"* and the helper never starts (reproduced).
+Release builds staple a ticket to **each `.plugin`** so the copy stays verifiable
+(`tools/release.sh` does this before building the DMG). If you hit it anyway:
+`xattr -dr com.apple.quarantine <the .plugin>`.
+
 ### Congestion model
 
 Each AP's occupied band (centre frequency ± channel width / 2) is **apportioned by how much it
@@ -130,6 +151,7 @@ The helper `.app` is Swift (CoreWLAN + CoreLocation). `build.sh` bundles and sig
 `CWInterface.scanForNetworks` を使う。RSSI・帯域(2.4/5GHz)・チャンネル幅は権限なしで取れる。
 **SSID名/BSSID は位置情報の許可があれば取得できる**(`Get SSID Names` トグル・下記)。
 
+
 ### SSID名の取得(Get SSID Names)
 
 macOS 14.4+ では **scanForNetworks の SSID は「位置情報の許可(Location)」でゲート**されている。
@@ -174,6 +196,25 @@ Get SSID Names ON → 隣に <node名>_ssid(Info DAT)が出現 → SSID一覧が
 
 > 補足: 以前このREADMEは「SSIDは取得不可」としていたが**誤り**だった(位置情報の許可で取れる)。
 > 訂正済み。責任プロセス(TD本体)に用途文字列が無い問題は、上記のヘルパー .app 方式で回避している。
+
+#### SSID一覧が空のままのとき
+
+混雑度のチャンネルは動き続ける(名前だけが出ない)。実測した原因は次のとおり:
+
+| 症状 | 原因 | 対処 |
+|---|---|---|
+| `_ssid` 表がヘッダ行だけ | ヘルパーの位置情報許可がオフ | システム設定 > プライバシーとセキュリティ > 位置情報サービス > **wifiscan-helper** をオン。今は警告にもこの案内を出す |
+| 何も起きず、ダイアログも出ない | Gatekeeper にブロックされている | 下記 |
+| 前は動いていたのに止まった | 許可トグルが切れた、または LaunchServices が既にアンマウントされた DMG 上のパスを掴んだまま。`lsregister -f <helper.app>` で実パスを登録し直す |
+
+**インストールしただけでは取得できない。誰かが一度、位置情報の許可を出す必要がある。**
+これは回避できない(OS がユーザーに尋ねる仕組みであり、アプリ側からは決められない)。
+
+**Gatekeeper**: ダウンロードした DMG から取り出した `.plugin` には quarantine が付き、
+DMG に貼った公証チケットは**一緒には付いてこない**。その状態で入れ子のヘルパーを起動すると
+*「マルウェアが含まれていないことを検証できませんでした」*で止まり、ヘルパーは起動しない(再現済み)。
+リリースビルドは**各 `.plugin` にもチケットを貼る**ようにしてある(`tools/release.sh` が DMG を
+作る前に実施)。それでも出た場合は `xattr -dr com.apple.quarantine <その .plugin>`。
 
 ### 混雑度モデル
 

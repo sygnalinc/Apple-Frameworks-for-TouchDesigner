@@ -4834,3 +4834,36 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
     撮影日時も入る
   - **DNG 52.9MB**(現在の Assets 合計 85.4MB に対して大きい)。git履歴は消せないので慎重に
 - demo.toe も未コミット(素材の扱いが決まってから)
+
+### 2026-08-10 CoreWLAN Scan の SSID が取れない件 → 原因3つ + 配布物のGatekeeper問題を修正
+
+- ユーザー「Corewlanscan ssid一覧が取れない」→ **プラグインの不具合ではなく位置情報の許可が切れていた**。
+  ただし調べる過程で**配布に関わる実害のある問題**が2つ出てきた
+- **原因1(直接原因)**: システム設定 > プライバシーとセキュリティ > 位置情報サービス の
+  `wifiscan-helper.app` が **OFF** になっていた(8/7 に許可した後に切れた)。オンにしたら
+  **69ネットワーク**取得、demo の `_ssid` Info DAT にも **46件**表示された
+- **原因2(LaunchServices のゴースト)**: `open` が **-1712** で失敗していた。
+  `lsregister -dump` を見ると、bundle id `tokyo.sygnal.wifiscan-helper` が
+  **既にアンマウントされた `/Volumes/Apple Frameworks for TouchDesigner v0.9.0` 上のパス**に
+  紐づいたままだった(リリースDMGを一度マウントしたため)。`lsregister -f <helper.app>` で実パスを
+  再登録し、DMG由来の `com.apple.quarantine` も外して解消
+- **原因3(プラグイン側の実装不備・修正済み)**: ヘルパーは `{"status":"timeout"|"denied"|...}` を
+  返しているのに、**CHOP がその status を完全に無視**して空の表を出すだけだった。だから理由が
+  分からず詰まった。status を読んで**警告に直し方を出す**ようにした
+  (「位置情報サービスで wifiscan-helper をオンに。混雑度は許可なしで動く」)
+- **配布物の問題(重要・release.sh を修正)**: ユーザー質問「他の人もインストールしただけで取れる?」を
+  実測で検証した結果、**取れない**:
+  - DMG にはチケットが貼られているが、**取り出した .plugin にはチケットが無い**
+    (`stapler validate` → "does not have a ticket stapled to it")
+  - quarantine 付きのコピーから入れ子のヘルパーを起動すると、**「マルウェアが含まれていないことを
+    検証できませんでした」でブロック**され、プロセスが起動しない(実際にダイアログを再現)
+  - **`xcrun stapler staple` は .plugin にも貼れる**ことを確認 → `tools/release.sh` の notarize を
+    「①dist の全pluginをzipで公証してバンドル個別にステープル ②その状態でDMGを作り直す
+    ③DMGを公証・ステープル」に変更した
+  - なお**チケットを貼っても「インストールしただけ」では不十分**で、位置情報の許可は必ず一度
+    ユーザーが出す必要がある(OSがユーザーに尋ねる仕組みなのでアプリ側からは決められない)
+- **自分のミス**: 検証で `/tmp` のコピーに quarantine を付けて起動したところ、ユーザーの画面に
+  Gatekeeper のブロックダイアログを出してしまった。テストコピーは削除済み・実インストールは無傷
+- **開発時の注意**: 常設Pluginsへ `codesign -f -s - --deep` で入れ直すと **Developer ID 署名が壊れる**。
+  そのため開発機の状態はリリース版と Gatekeeper 的に別物になる。配布の検証は必ず**DMGの中身**で行う
+- README(CoreWLANScan 英日)に「SSID一覧が空のままのとき」の症状別表と Gatekeeper の説明を追加
