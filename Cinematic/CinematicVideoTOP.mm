@@ -118,27 +118,41 @@ public:
                 fps=atof(all.substr(b+1,c-b-1).c_str()); err=all.substr(c+1);} } }
         myStatus = st; myErr = err; myDur = dur;
 
-        // 再生位置(秒)。Movie File In と同じくタイムライン駆動で、
-        // deltaMS ぶんだけ進める(TDのタイムラインを止めれば止まる)
+        // 再生位置(秒)。Movie File In の Play Mode と同じ3種:
+        //   Sequential        … deltaMS ぶんだけ自前で進める(TDのタイムラインを止めれば止まる)
+        //   Locked to Timeline… タイムライン位置をそのまま尺へ写す(スクラブに追従する)
+        //   Specify Index     … Position(0..1)で手動指定
+        const int playMode = (int)in->getParInt("Playmode");   // 0=Sequential 1=Locked 2=Specify
+        const double speed = in->getParDouble("Speed");
+        const bool loop = in->getParInt("Loop") != 0;
         bool play = in->getParInt("Play") != 0;
         double cuePoint = in->getParDouble("Cuepoint");
+        auto wrap = [&](double t) {
+            if (dur <= 0) return t;
+            if (loop) { t = std::fmod(t, dur); if (t < 0) t += dur; return t; }
+            return std::clamp(t, 0.0, dur);
+        };
         if (myCuePulse.exchange(false)) myTime = cuePoint;
-        if (in->getParInt("Cue") != 0) {
+        if (playMode == 2) {
+            myTime = std::clamp((double)in->getParDouble("Position"), 0.0, 1.0) * (dur > 0 ? dur : 0);
+            play = false;
+        } else if (in->getParInt("Cue") != 0) {
             myTime = cuePoint;                       // Cue On の間はキュー点で保持
+            play = false;
+        } else if (playMode == 1) {
+            const OP_TimeInfo* ti = in->getTimeInfo();
+            double sec = (ti && ti->rate > 0) ? ti->frame / ti->rate : 0.0;
+            myTime = wrap(sec * speed + cuePoint);
         } else if (play) {
             const OP_TimeInfo* ti = in->getTimeInfo();
-            myTime += (ti ? ti->deltaMS / 1000.0 : 0.0) * in->getParDouble("Speed");
-            if (dur > 0) {
-                if (in->getParInt("Loop") != 0) { myTime = std::fmod(myTime, dur); if (myTime < 0) myTime += dur; }
-                else myTime = std::clamp(myTime, 0.0, dur);
-            }
+            myTime = wrap(myTime + (ti ? ti->deltaMS / 1000.0 : 0.0) * speed);
         } else {
-            // Play が Off のときは Position(0..1)で手動スクラブ(Movie File In の Index と同じ役割)
+            // Sequential で Play Off のときは Position(0..1)で手動スクラブ
             myTime = std::clamp((double)in->getParDouble("Position"), 0.0, 1.0) * (dur > 0 ? dur : 0);
         }
         // ソースのフレーム境界へ量子化する。しないと同じ絵を何度もデコードし直すことになる
         j.time = (fps > 0) ? std::round(myTime * fps) / fps : myTime;
-        myPlaying = play && in->getParInt("Cue") == 0;
+        myPlaying = (playMode == 1) || (play && in->getParInt("Cue") == 0);
 
         // ジョブ投入(ready時・変化時)
         char b[256]; snprintf(b,sizeof b,"%d|%.5f|%.3f|%.4f|%d|%d",j.mode,j.time,j.fnum,j.focus,j.flip?1:0,j.norm?1:0);
@@ -207,7 +221,12 @@ public:
           const char* l[] = {"Depth (disparity map)","Rendered (change focus/aperture)",
                              "Both (0 = rendered, 1 = depth)"};
           std::vector<const char*> nv(n,n+3), lv(l,l+3); p.defaultValue="Rendered"; m->appendMenu(p,3,nv.data(),lv.data()); }
-        // 再生系(Movie File In と同じ考え方: Play On で自動再生、Off のとき Position で手動スクラブ)
+        // 再生系(Movie File In と同じ考え方)
+        { OP_StringParameter p("Playmode"); p.label="Play Mode"; p.page=PAGE;
+          const char* n[] = {"Sequential","Locktotimeline","Specifyindex"};
+          const char* l[] = {"Sequential","Locked to Timeline","Specify Index"};
+          std::vector<const char*> nv(n,n+3), lv(l,l+3); p.defaultValue="Sequential";
+          m->appendMenu(p,3,nv.data(),lv.data()); }
         { OP_NumericParameter p("Play"); p.label="Play"; p.page=PAGE; p.defaultValues[0]=1; m->appendToggle(p); }
         { OP_NumericParameter p("Speed"); p.label="Speed"; p.page=PAGE; p.defaultValues[0]=1; p.minSliders[0]=-2; p.maxSliders[0]=2; m->appendFloat(p); }
         { OP_NumericParameter p("Loop"); p.label="Loop"; p.page=PAGE; p.defaultValues[0]=1; m->appendToggle(p); }
@@ -255,9 +274,11 @@ private:
         while (true) {
             Job j;
             { std::unique_lock<std::mutex> l(myMutex); myCond.wait(l, [this]{ return myQuit || myPending; }); if (myQuit) return; j = myJob; myPending = false; myBusy = true; }
-            if (j.mode != 1) cn_depth(myState, j.time, j.flip?1:0, j.norm?1:0);
-            if (j.mode != 0) cn_render(myState, j.time, j.fnum, j.focus, j.flip?1:0);
-            fetchMeta(j.time);   // 同一worker上でCNScriptメタも更新(ヘルパ呼び出しを直列化)
+            @autoreleasepool {   // 常駐スレッドなので1ジョブごとに必ず排出する
+                if (j.mode != 1) cn_depth(myState, j.time, j.flip?1:0, j.norm?1:0);
+                if (j.mode != 0) cn_render(myState, j.time, j.fnum, j.focus, j.flip?1:0);
+                fetchMeta(j.time);   // 同一worker上でCNScriptメタも更新(ヘルパ呼び出しを直列化)
+            }
             { std::lock_guard<std::mutex> l(myMutex); myBusy = false; }
         }
     }

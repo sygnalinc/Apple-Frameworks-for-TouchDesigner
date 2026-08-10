@@ -38,6 +38,10 @@ final class CNState: @unchecked Sendable {
     var rgbaBuf: [UInt16] = []
     var rgbaW = 0, rgbaH = 0
     var rgbaSerial: UInt64 = 0
+    // 再レンダ先は毎フレーム作らず使い回す(IOSurface を毎秒数十枚作ると
+    // 解放が追いつかずメモリが際限なく増える)
+    var renderDst: CVPixelBuffer?
+    var renderDstW = 0, renderDstH = 0
     var serialCtr: UInt64 = 0
 }
 
@@ -107,6 +111,10 @@ public func cn_status(_ h: UnsafeMutableRawPointer?) -> UnsafePointer<CChar>? {
 // 指定秒の CNScript フレームからメタデータJSONを作る(ピクセルデコード不要)
 @_cdecl("cn_meta")
 public func cn_meta(_ h: UnsafeMutableRawPointer?, _ timeSec: Double) -> UnsafePointer<CChar>? {
+    // ワーカースレッドには autorelease プールが無く、AVFoundation/CoreVideo が返す
+    // autorelease オブジェクトが解放されずに溜まり続ける(再生中にメモリが際限なく増える)。
+    // 1回の呼び出しごとに必ずプールを張って排出する。
+    return autoreleasepool {
     guard let h = h else { return nil }
     let s = Unmanaged<CNState>.fromOpaque(h).takeUnretainedValue()
     guard #available(macOS 26.0, *) else { return UnsafePointer(strdup("{}")) }
@@ -132,12 +140,16 @@ public func cn_meta(_ h: UnsafeMutableRawPointer?, _ timeSec: Double) -> UnsafeP
     let json = "{\"focus\":\(focus),\"strong\":\(strong),\"count\":\(subjects.count),\"subjects\":[\(subjects.joined(separator: ","))]}"
     return UnsafePointer(strdup(json))
 }
+}
 
 // ---- 時刻指定デコード(depth / render 用) ----
 
 @available(macOS 26.0, *)
-// reader と CMSampleBuffer を返す(呼び出し側が保持している間だけ CVImageBuffer が有効。
-// reader を cancel/破棄すると読み出しデータが無効化されるため、変換完了まで reader を生かす)
+// reader と CMSampleBuffer を返す(呼び出し側が保持している間だけ CVImageBuffer が有効)。
+// **呼び出し側は変換が終わったら必ず reader.cancelReading() すること**。
+// startReading したまま捨てるとデコードパイプラインが解放されず、
+// 毎秒数十本作る再生中にメモリが際限なく増える(実測: TDが固まる)。
+// 逆に変換前に cancel すると読み出したバッファが無効になるので、順序が重要。
 private func readFrames(_ s: CNState, timeSec: Double, wantRender: Bool)
     -> (reader: AVAssetReader, image: CMSampleBuffer?, disparity: CMSampleBuffer?, meta: AVTimedMetadataGroup?)? {
     s.lock.lock(); let asset = s.asset; let info = s.info; let ts = s.timeScale; let fps = s.fps; s.lock.unlock()
@@ -246,11 +258,16 @@ private func disparityToFloat(_ pb: CVPixelBuffer, flip: Bool, normalize: Bool, 
 // Depth: disparity を Float バッファへ。戻り 1=ok 0=fail(cn_latest_depth で取得)
 @_cdecl("cn_depth")
 public func cn_depth(_ h: UnsafeMutableRawPointer?, _ timeSec: Double, _ flip: Int32, _ normalize: Int32) -> Int32 {
+    // ワーカースレッドには autorelease プールが無く、AVFoundation/CoreVideo が返す
+    // autorelease オブジェクトが解放されずに溜まり続ける(再生中にメモリが際限なく増える)。
+    // 1回の呼び出しごとに必ずプールを張って排出する。
+    return autoreleasepool {
     guard let h = h else { return 0 }
     let s = Unmanaged<CNState>.fromOpaque(h).takeUnretainedValue()
     guard #available(macOS 26.0, *) else { return 0 }
     guard let frames = readFrames(s, timeSec: timeSec, wantRender: false),
           let disSB = frames.disparity, let dis = CMSampleBufferGetImageBuffer(disSB) else { return 0 }
+    defer { frames.reader.cancelReading() }   // 変換完了後に解放(関数末尾で走る)
     s.lock.lock(); let rot = s.rotDeg; s.lock.unlock()
     var buf: [Float] = []; var W = 0, H = 0
     disparityToFloat(dis, flip: flip != 0, normalize: normalize != 0, rotDeg: rot, out: &buf, outW: &W, outH: &H)
@@ -258,6 +275,7 @@ public func cn_depth(_ h: UnsafeMutableRawPointer?, _ timeSec: Double, _ flip: I
     if buf.isEmpty { return 0 }
     s.lock.lock(); s.depthBuf = buf; s.depthW = W; s.depthH = H; s.serialCtr += 1; s.depthSerial = s.serialCtr; s.lock.unlock()
     return 1
+}
 }
 
 @_cdecl("cn_latest_depth_info")
@@ -280,12 +298,17 @@ public func cn_copy_depth(_ h: UnsafeMutableRawPointer?, _ dst: UnsafeMutableRaw
 // Render: f値/ピント差し替えで再レンダ → RGBA16Float バッファへ
 @_cdecl("cn_render")
 public func cn_render(_ h: UnsafeMutableRawPointer?, _ timeSec: Double, _ fNumber: Float, _ focusOverride: Float, _ flip: Int32) -> Int32 {
+    // ワーカースレッドには autorelease プールが無く、AVFoundation/CoreVideo が返す
+    // autorelease オブジェクトが解放されずに溜まり続ける(再生中にメモリが際限なく増える)。
+    // 1回の呼び出しごとに必ずプールを張って排出する。
+    return autoreleasepool {
     guard let h = h else { return 0 }
     let s = Unmanaged<CNState>.fromOpaque(h).takeUnretainedValue()
     guard #available(macOS 26.0, *) else { return 0 }
     s.lock.lock(); let session = s.session; let script = s.script; let dev = s.device; let q = s.queue; let ts = s.timeScale; let fps = s.fps; s.lock.unlock()
     guard let session = session, let script = script, let dev = dev, let q = q else { return 0 }
     guard let frames = readFrames(s, timeSec: timeSec, wantRender: true) else { return 0 }
+    defer { frames.reader.cancelReading() }   // 変換完了後に解放(関数末尾で走る)
     guard let imgSB = frames.image, let disSB = frames.disparity, let metaGroup = frames.meta,
           let img = CMSampleBufferGetImageBuffer(imgSB), let dis = CMSampleBufferGetImageBuffer(disSB) else { return 0 }
     guard var fa = CNRenderingSession.FrameAttributes(timedMetadataGroup: metaGroup, sessionAttributes: session.sessionAttributes) else { return 0 }
@@ -296,10 +319,16 @@ public func cn_render(_ h: UnsafeMutableRawPointer?, _ timeSec: Double, _ fNumbe
     else if let f = script.frame(at: t, tolerance: tol) { fa.focusDisparity = f.focusDisparity }
 
     let W = CVPixelBufferGetWidth(img), H = CVPixelBufferGetHeight(img)
-    var outPB: CVPixelBuffer?
-    CVPixelBufferCreate(nil, W, H, kCVPixelFormatType_64RGBAHalf,
-        [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &outPB)
-    guard let dst = outPB, let cb = q.makeCommandBuffer() else { return 0 }
+    s.lock.lock()
+    if s.renderDst == nil || s.renderDstW != W || s.renderDstH != H {
+        var pb: CVPixelBuffer?
+        CVPixelBufferCreate(nil, W, H, kCVPixelFormatType_64RGBAHalf,
+            [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &pb)
+        s.renderDst = pb; s.renderDstW = W; s.renderDstH = H
+    }
+    let reuse = s.renderDst
+    s.lock.unlock()
+    guard let dst = reuse, let cb = q.makeCommandBuffer() else { return 0 }
     let ok = session.encodeRender(to: cb, frameAttributes: fa, sourceImage: img, sourceDisparity: dis, destinationImage: dst)
     if !ok { return 0 }
     cb.commit(); cb.waitUntilCompleted()
@@ -318,6 +347,7 @@ public func cn_render(_ h: UnsafeMutableRawPointer?, _ timeSec: Double, _ fNumbe
     }
     s.lock.lock(); s.rgbaBuf = buf; s.rgbaW = W; s.rgbaH = H; s.serialCtr += 1; s.rgbaSerial = s.serialCtr; s.lock.unlock()
     return 1
+}
 }
 
 @_cdecl("cn_latest_render_info")

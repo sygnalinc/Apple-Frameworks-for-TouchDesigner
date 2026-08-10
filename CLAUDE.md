@@ -4730,3 +4730,30 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   そういう変更は常設インストール+TD再起動で検証する
 - TD再起動時に「New Plugin Detected」ダイアログが出るので computer-use で承認して起動を完了させた。
   クラッシュ時の `CrashAutoSave.demo.toe`(17:24)がリポジトリ直下に残っている(demo.toe 本体は無事)
+
+### 2026-08-10 Cinematic Video: 再生中のメモリ暴走を修正(TDが固まる)+ Play Mode 追加
+
+- ユーザー報告「再生していると動画が止まる」→「TDがメモリを極端に使って固まったので強制終了した」
+  →「ループ再生でまた固まった」。**自動再生化(前エントリ)で初めて毎秒数十回デコードするように
+  なり、元からあった資源リークが表面化した**。自分が入れた退行なので最優先で修正
+- **原因3つ(単体ハーネス `scratchpad/mem.c` で RSS を測って特定。TDを巻き込まずに測れる)**:
+  1. **`AVAssetReader` を毎回作って `cancelReading()` せずに捨てていた**。`startReading()` した
+     readerはデコードパイプラインを抱えたままで、毎秒数十本作ると解放が追いつかない。
+     **変換が終わってから** `defer { frames.reader.cancelReading() }` で解放(変換**前**に
+     cancel すると読み出したバッファが無効になるので順序が重要)
+  2. **再レンダ先の `CVPixelBuffer`(IOSurface付き)を毎フレーム新規作成**していた →
+     `CNState` に持って使い回す
+  3. **ワーカースレッドに autorelease プールが無い**。AVFoundation/CoreVideo の autorelease
+     オブジェクトが永久に溜まる。**これが最大**で、helper の `cn_render`/`cn_depth`/`cn_meta` を
+     `autoreleasepool { }` で包み、C++ 側 worker のジョブ1件ごとにも `@autoreleasepool` を入れた
+- **実測**: 単体ハーネス 修正前 400回で RSS 23→324MB(増加中) / 修正後 **1000回で 93MB 横ばい**。
+  TD実機で Speed=8 のループ再生を2分(5451フレーム描画)して **RSS 1575MB のまま完全に横ばい**
+- **Play Mode 追加**(Movie File In と同じ3種): `Sequential`(既定・自前の時計)/
+  `Locked to Timeline`(タイムライン秒×Speed+Cue Point。スクラブに追従しフレーム単位で再現するので
+  書き出し向き)/ `Specify Index`(Position のみ)。実測: Locked でタイムライン 2.00/5.00/9.00秒 →
+  position 2.02/5.02/9.02秒、Specify で Position 0.25/0.75 → 14.28/42.83秒(=尺×比)
+- **教訓**: **常駐ワーカースレッドから ObjC/Swift のフレームワークを叩くなら autorelease プールを
+  必ず張る**。1回あたりは小さくても、毎フレーム呼ぶ設計にした瞬間に破綻する。
+  「今まで動いていたコード」でも、**呼ぶ頻度を上げる変更は資源管理の前提を壊す**
+- **教訓**: メモリの増え方は **TD の外の小さなハーネスで測る**のが速くて安全(TDを固めずに済む)。
+  `mach_task_basic_info` の resident_size を数十回ごとに出すだけでよい

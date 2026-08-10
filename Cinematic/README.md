@@ -20,16 +20,24 @@ with the TouchDesigner timeline (`deltaMS`), so pausing the timeline pauses the 
 
 | Parameter | |
 |---|---|
-| `Play` | On (default) = play automatically. Off = scrub by hand with `Position` |
+| `Play Mode` | `Sequential` (default) / `Locked to Timeline` / `Specify Index` — same three as a Movie File In |
+| `Play` | On (default) = play automatically. Off = scrub by hand with `Position`. Sequential only |
 | `Speed` | 1 = real time. Negative values play backwards |
 | `Loop` | On (default) = wrap to the start. Off = hold on the last frame |
 | `Cue` | Hold at `Cue Point` while this is On |
 | `Cue Point` / `Cue Pulse` | Jump to that time in seconds |
 | `Position (0..1)` | Manual scrub — **only used while `Play` is Off** |
 
+| Play Mode | Position comes from |
+|---|---|
+| **Sequential** | Its own clock, advanced by `deltaMS` x `Speed`. `Play` / `Cue` / `Cue Pulse` apply |
+| **Locked to Timeline** | The timeline itself — `timeline seconds` x `Speed` + `Cue Point`. Scrubbing the timeline scrubs the clip, and it is reproducible frame by frame (good for rendering out) |
+| **Specify Index** | `Position` (0..1) only |
+
 The requested time is snapped to the source frame grid, otherwise the same frame would be decoded
 over and over. The current time is published as the Info CHOP channels `position` (seconds) and
-`playing`.
+`playing`. Measured: `Locked to Timeline` at timeline 2.00 / 5.00 / 9.00 s gives position 2.02 /
+5.02 / 9.02 s.
 
 ### Color and depth at the same time (`Mode = Both`)
 
@@ -90,7 +98,7 @@ Wire a **subject depth into the Focus parameter to rack focus live from TD**.
 
 ### Parameters
 
-`Cinematic Video (iPhone)` (file) / `Mode` (Depth / Rendered / Both) / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
+`Cinematic Video (iPhone)` (file) / `Mode` (Depth / Rendered / Both) / `Play Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
 `Cue Pulse` / `Position (0..1, when Play is off)` / `Aperture (f-number)` /
 `Focus Disparity Override` (0 = follow the script) / `Normalize Depth` / `Flip` /
 `Max Subjects (Info CHOP)` / `Info CHOP`
@@ -159,15 +167,23 @@ TouchDesigner のタイムライン(`deltaMS`)に従って進む。タイムラ�
 
 | パラメータ | |
 |---|---|
-| `Play` | On(既定)=自動再生 / Off=`Position` で手動スクラブ |
+| `Play Mode` | `Sequential`(既定)/ `Locked to Timeline` / `Specify Index` — Movie File In と同じ3種 |
+| `Play` | On(既定)=自動再生 / Off=`Position` で手動スクラブ。Sequential のときのみ有効 |
 | `Speed` | 1=実時間。負値で逆再生 |
 | `Loop` | On(既定)=先頭へ折り返す / Off=終端で停止 |
 | `Cue` | On の間は `Cue Point` で保持 |
 | `Cue Point` / `Cue Pulse` | 指定秒へジャンプ |
 | `Position (0..1)` | 手動スクラブ。**`Play` が Off のときだけ効く** |
 
+| Play Mode | 位置の決まり方 |
+|---|---|
+| **Sequential** | 自前の時計。`deltaMS` × `Speed` で進む。`Play` / `Cue` / `Cue Pulse` が効く |
+| **Locked to Timeline** | タイムラインそのもの。`タイムライン秒 × Speed + Cue Point`。タイムラインをスクラブすればクリップもスクラブされ、フレーム単位で再現するので書き出し向き |
+| **Specify Index** | `Position`(0..1)のみ |
+
 要求時刻はソースのフレーム境界へ量子化している(しないと同じ絵を何度もデコードし直すことになる)。
 現在位置は Info CHOP の `position`(秒)と `playing` で読める。
+実測: Locked to Timeline でタイムライン 2.00 / 5.00 / 9.00 秒 → position 2.02 / 5.02 / 9.02 秒。
 
 ### 色と深度を同時に出す(`Mode = Both`)
 
@@ -222,7 +238,7 @@ Info **CHOP** が正しい。
 
 ### パラメータ
 
-`Cinematic Video (iPhone)`(ファイル)/ `Mode`(Depth / Rendered / Both)/ `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
+`Cinematic Video (iPhone)`(ファイル)/ `Mode`(Depth / Rendered / Both)/ `Play Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
 `Cue Pulse` / `Position (0..1, when Play is off)` / `Aperture (f-number)` /
 `Focus Disparity Override`(0=script準拠)/ `Normalize Depth` / `Flip` /
 `Max Subjects (Info CHOP)` / `Info CHOP`
