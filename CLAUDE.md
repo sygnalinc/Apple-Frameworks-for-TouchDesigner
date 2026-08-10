@@ -4658,3 +4658,19 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   と読んでいたが、**実際は入力が何であれ0**だった。**陰性の確認は、陽性が出ることを先に示してから**
 - **教訓**: 状態文字列は**処理が実際に始まってから**立てる。開始前に立てると、失敗しても
   「動いているように見える」表示が残る
+
+### 2026-08-10 Speech Activity CHOP を develop へ退避(動作しないため)
+
+- 直前の調査で「`SpeechDetector` は結果を返さず、単体VADという設計自体が現行APIで成立しない」と
+  確定したため、ユーザー判断で main から外した。「公開は検証済みのみ」の方針どおり
+- 手順は従来どおり: worktree で develop をチェックアウト → `git checkout main -- SpeechActivity`
+  で **先に develop を main の最新(診断入りREADME)へ同期**(56ad1c0)→ main で `git rm -r`。
+  **main→develop の wholesale merge は厳禁**(main の削除コミットが伝播する)
+- ルートREADME(英日)の該当行を削除。**公開は 56フォルダ / 58オペレータ**
+  (Multipeer と PDFKit/Cinematic 等で1フォルダ複数バンドルがあるため数が一致しない)
+- **skill 側の参照も付け替えた**(退避すると死んだポインタになるため):
+  SKILL.md の「Swiftヘルパが要る → `SpeechActivity/`」→ **`VisionDocument/`**(swiftc直の単一
+  ヘルパ + epoch名dylib で、スキルが推奨する形そのもの)、build.md の手書きbuild.sh骨格も
+  VisionDocument ベースに差し替え、naming.md の opLabel 例は `Speech Transcribe` に
+- ローカルの常設Pluginsには SpeechActivityCHOP.plugin を残置(開発環境は不変・従来と同じ扱い)
+- demo.toe の利用例削除はユーザーが実施

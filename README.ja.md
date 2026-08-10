@@ -139,7 +139,6 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [Sound Features](SoundFeatures/) | CHOP | 音響特徴(RMS/peak/centroid/onset/beat/BPM/16帯域) |
 | [Speech Transcribe](SpeechTranscribe/) | DAT | **ライブ文字起こし**。Apple SpeechAnalyzer(macOS26+)/ WhisperKit(macOS14+・多言語・英訳) |
 | [Speech Synth](SpeechSynth/) | CHOP | オンデバイス**音声合成**→ PCM stereo |
-| [Speech Activity](SpeechActivity/) | CHOP | 発話区間検出(speaking/onset/offset)。**動作しない** — `SpeechDetector` が結果を返さない。発話ゲートは Sound Class を使う |
 
 ### 言語・テキスト
 

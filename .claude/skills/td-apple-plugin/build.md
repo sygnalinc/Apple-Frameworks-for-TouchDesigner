@@ -38,19 +38,20 @@ ObjC++から呼べないSwift専用APIは、helperを dylib 化して C ABI で�
   helper/ を Swift Package にして `swift build -c release`
 - dylibは `.plugin/Contents/Frameworks/` に同梱し、リンク時 `-rpath @loader_path/../Frameworks`
 
-手書きbuild.shの骨格(SpeechActivity 参照):
+手書きbuild.shの骨格(VisionDocument 参照。dylib名は下記のとおり epoch 付き):
 
 ```zsh
-NAME=SpeechActivityCHOP
+NAME=VisionDocumentDAT
 OUT="build/$NAME.plugin/Contents"
+DYLIB="libVisionDocumentHelper_$(date +%s).dylib"
 mkdir -p "$OUT/MacOS" "$OUT/Frameworks"
-swiftc -O -emit-library -module-name VoiceActivityHelper \
-  -target arm64-apple-macos14.0 VoiceActivityHelper.swift \
-  -framework Speech -framework AVFAudio \
-  -Xlinker -install_name -Xlinker @rpath/libVoiceActivityHelper.dylib \
-  -o "$OUT/Frameworks/libVoiceActivityHelper.dylib"
-clang++ -std=c++17 -fobjc-arc -O2 -bundle -I "$SDK" SpeechActivityCHOP.mm \
-  -framework Foundation -L "$OUT/Frameworks" -lVoiceActivityHelper \
+swiftc -O -emit-library -module-name VisionDocumentHelper \
+  -target arm64-apple-macos26.0 VisionDocumentHelper.swift \
+  -framework Vision \
+  -Xlinker -install_name -Xlinker "@rpath/$DYLIB" \
+  -o "$OUT/Frameworks/$DYLIB"
+clang++ -std=c++17 -fobjc-arc -O2 -bundle -I "$SDK" VisionDocumentDAT.mm \
+  -framework Foundation -L "$OUT/Frameworks" -l"${DYLIB:3:-6}" \
   -Xlinker -rpath -Xlinker @loader_path/../Frameworks -o "$OUT/MacOS/$NAME"
 # Info.plist を PlistBuddy で生成 → codesign --force --deep -s -
 ```

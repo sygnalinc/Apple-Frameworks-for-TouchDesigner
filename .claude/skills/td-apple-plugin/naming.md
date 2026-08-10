@@ -16,7 +16,7 @@ TDは起動時にカスタムOPの名前を検証する。規約違反は**起�
 ## opLabel(OP Create Dialog の表示名)
 
 - **`Framework Feature` 形式**にする(例 `Vision Pose` / `CoreImage Bokeh` / `Metal Upscale` /
-  `RealityKit Capture` / `Speech Activity`)
+  `RealityKit Capture` / `Speech Transcribe`)
 - **接頭辞は実装フレームワーク名**。「Apple」等の共通接頭辞は
   **OP Create Dialog のタイルで折り返して読めなくなる**(1タイル約20文字)ため使わない
 - ラベルはフレームワークの粒度に合わせる:

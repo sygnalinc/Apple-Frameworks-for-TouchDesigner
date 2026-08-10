@@ -12,7 +12,7 @@ macOS / Apple Silicon のオンデバイスML/メディアAPIを、TouchDesigner
 > このリポジトリ(TDAppleOps)には約50個の実装済みプラグインがある。**新規実装や改修の前に、
 > 近い family(CHOP/TOP/DAT/SOP)・近いフレームワークの既存プラグインを1つ読む**のが最短。
 > 例: 新しいVision CHOP → `VisionPose/`、新しいCore Image TOP → `CoreImageBokeh/`、
-> Swiftヘルパが要る → `SpeechActivity/` か `CoreMLImageGen/`。
+> Swiftヘルパが要る → `VisionDocument/`(swiftc直) か `CoreMLImageGen/`(SPM依存)。
 
 ## トピック別リファレンス
 
