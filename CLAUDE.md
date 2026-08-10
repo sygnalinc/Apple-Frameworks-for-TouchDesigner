@@ -4703,3 +4703,30 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   ときはシェル側で待つ。これで一度「Loopが折り返さない」と誤診した
 - 常設インストール済み。**TD再起動で `Play` 等の新パラメータと `Info CHOP` トグルが出る**。
   demo.toe に残っている `Cinematicvideo1_info`(infoDAT)は用済みになる(ユーザー側で整理)
+
+### 2026-08-10 Cinematic Video に Both モード(色+深度を2色バッファ同時出力)
+
+- ユーザー「同じ動画ファイルから color と depth を同時に出したい」
+- **C++ TOP は複数の色バッファへ出せる**(SDK の `TOP_UploadInfo::colorBufferIndex`。
+  ヘッダに「**色バッファごとに解像度もピクセル形式も別でよい**」「0以降は Render Select TOP で取る」
+  と明記)。これを使い `Mode = Both` を追加: **バッファ0=Rendered(RGBA16Float) / バッファ1=Depth
+  (Mono32Float)**。同じジョブから両方を出すので**構造上フレームがずれない**
+- 実装: アップロードを `uploadPlane(out, depth, bufIndex)` に切り出し、Both は2回呼ぶ。
+  worker は `if(mode!=1) cn_depth; if(mode!=0) cn_render;`
+- **実測(M2・実素材)**: 色 1920x1080 RGBA16F + 深度 512x288 Mono32F を**同時取得**、
+  **実時間1.00倍・60組/秒**。両バッファの絵が同一フレーム(キッチンの色と対応する視差)であることを視認
+- **重要な使い方の罠**: **Render Select TOP は参照で読むので、参照元の cook を引っ張らない**。
+  下流が Render Select だけだと参照元がほとんど cook されず再生が這う
+  (実測: Render Select 4408 cook に対し参照元 29 cook)。**バッファ0はワイヤで下流に繋ぐ**
+  (Null TOP で十分)。READMEに明記
+- **検証中に TD がクラッシュ**(EXC_BAD_ACCESS)。**クラッシュスタックに自作プラグインのフレームは
+  1つも無く**、Python からのパラメータ設定 → libOP → libPRM → libC_TOP → libUT で落ちていた。
+  状況(常設の旧ビルド=Mode 2項目 と 一時パスの新ビルド=3項目 が**同じ opType `Cinematic` で
+  同時にロード**されており、そこへ `Mode='Both'` を設定した)から、**古いメニュー定義に無い値を
+  入れたのが原因**と考えられる。新ビルドを常設へ入れ、一時パスのコピーを消して TD を再起動したら
+  同じ操作でクラッシュせず動いた
+- **教訓**: バージョン付きパス方式は「パラメータの追加」までは安全だが、**メニュー項目の増減など
+  定義そのものが変わる変更には使えない**(同じ opType の定義が2つ同時に存在するため)。
+  そういう変更は常設インストール+TD再起動で検証する
+- TD再起動時に「New Plugin Detected」ダイアログが出るので computer-use で承認して起動を完了させた。
+  クラッシュ時の `CrashAutoSave.demo.toe`(17:24)がリポジトリ直下に残っている(demo.toe 本体は無事)

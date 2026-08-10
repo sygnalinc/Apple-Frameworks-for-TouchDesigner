@@ -31,6 +31,30 @@ The requested time is snapped to the source frame grid, otherwise the same frame
 over and over. The current time is published as the Info CHOP channels `position` (seconds) and
 `playing`.
 
+### Color and depth at the same time (`Mode = Both`)
+
+One node, one decode, **frame-locked by construction** — both images come from the same job, so
+they can never drift apart.
+
+| | Output |
+|---|---|
+| **Color buffer 0** | Rendered image (RGBA16Float, full resolution) — the node's normal output |
+| **Color buffer 1** | Depth / disparity (Mono32Float, its own resolution) — read it with a **Render Select TOP** (`Buffer Index` = 1) |
+
+The two buffers may have different resolutions and pixel formats; that is explicitly supported.
+Measured on M2 with real footage: **1.00x real time, 60 pairs per second** (1920x1080 colour +
+512x288 depth).
+
+> **Wire buffer 0 into your chain.** A Render Select TOP reads by *reference*, and a reference
+> does **not** pull a cook out of the source. If the only things downstream are Render Select
+> TOPs, this operator barely cooks and playback crawls (measured: 4408 cooks on the Render Select
+> versus 29 on the source). Connect the node's own output to something — a Null TOP is enough —
+> and both buffers update at full rate.
+
+Two separate nodes on the same file also work, but that decodes the file twice and the two
+playheads drift; if you do that, set `Play` Off on the second one and drive its `Position` from
+the first one's `position` Info CHOP channel.
+
 ### Automatic Info CHOP (no setup)
 
 **Just place the operator** and a pre-filled Callbacks DAT (`<node>_callbacks`) is created and
@@ -66,7 +90,7 @@ Wire a **subject depth into the Focus parameter to rack focus live from TD**.
 
 ### Parameters
 
-`Cinematic Video (iPhone)` (file) / `Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
+`Cinematic Video (iPhone)` (file) / `Mode` (Depth / Rendered / Both) / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
 `Cue Pulse` / `Position (0..1, when Play is off)` / `Aperture (f-number)` /
 `Focus Disparity Override` (0 = follow the script) / `Normalize Depth` / `Flip` /
 `Max Subjects (Info CHOP)` / `Info CHOP`
@@ -145,6 +169,26 @@ TouchDesigner のタイムライン(`deltaMS`)に従って進む。タイムラ�
 要求時刻はソースのフレーム境界へ量子化している(しないと同じ絵を何度もデコードし直すことになる)。
 現在位置は Info CHOP の `position`(秒)と `playing` で読める。
 
+### 色と深度を同時に出す(`Mode = Both`)
+
+1ノード・1回のデコードで、**構造上フレームがずれない**(同じジョブから両方を出しているため)。
+
+| | 出力 |
+|---|---|
+| **色バッファ 0** | 再レンダ映像(RGBA16Float・フル解像度)= ノードの通常の出力 |
+| **色バッファ 1** | 深度/視差(Mono32Float・別解像度)= **Render Select TOP** の `Buffer Index` を 1 にして取る |
+
+2つのバッファは解像度もピクセル形式も別で構わない(SDKが明示的に許している)。
+実測(M2・実素材): **実時間の1.00倍・60組/秒**(色1920×1080 + 深度512×288)。
+
+> **バッファ0はワイヤで下流に繋ぐこと。** Render Select TOP は**参照**で読むため、
+> **参照は cook を引っ張らない**。下流が Render Select TOP だけだとこのOPはほとんど cook されず、
+> 再生が這うように遅くなる(実測: Render Select が4408 cook に対し、参照元は29 cook)。
+> ノード自身の出力を何か(Null TOP で十分)に繋げば、両バッファとも全速で更新される。
+
+同じファイルに2ノード当てても出せるが、デコードが2回走り、再生位置も別々に進んでずれる。
+やるなら2つ目は `Play` を Off にして、1つ目の Info CHOP `position` から `Position` を駆動する。
+
 ### Info CHOP の自動生成(操作不要)
 
 **OPを配置するだけ**で雛形入りの Callbacks DAT(`<node名>_callbacks`)が自動生成され、
@@ -178,7 +222,7 @@ Info **CHOP** が正しい。
 
 ### パラメータ
 
-`Cinematic Video (iPhone)`(ファイル)/ `Mode` / `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
+`Cinematic Video (iPhone)`(ファイル)/ `Mode`(Depth / Rendered / Both)/ `Play` / `Speed` / `Loop` / `Cue` / `Cue Point` /
 `Cue Pulse` / `Position (0..1, when Play is off)` / `Aperture (f-number)` /
 `Focus Disparity Override`(0=script準拠)/ `Normalize Depth` / `Flip` /
 `Max Subjects (Info CHOP)` / `Info CHOP`

@@ -153,47 +153,60 @@ public:
         // メタデータの最新スナップショットを Info CHOP 用にコピー
         { std::lock_guard<std::mutex> l(myMutex); myMetaSnap = myMeta; }
 
-        // 最新結果をアップロード
-        int mode = j.mode;
+        // 最新結果をアップロード。Both は 0=Rendered / 1=Depth の2色バッファに出す
+        // (SDK上、色バッファごとに解像度もピクセル形式も別でよい。1以降は Render Select TOP で取る)
+        myNCScaled = false;
+        bool ok = false;
+        if (j.mode == 2) { ok  = uploadPlane(out, false, 0);
+                           ok |= uploadPlane(out, true,  1); }
+        else               ok  = uploadPlane(out, j.mode == 0, 0);
+        if (ok) myFrames++;
+    }
+
+    // 1面ぶんのアップロード。depth=true で視差マップ、false で再レンダ映像
+    bool uploadPlane(TOP_Output* out, bool depth, uint32_t bufIndex) {
         int lw=0, lh=0; unsigned long long serial=0;
-        bool has = mode == 0 ? cn_latest_depth_info(myState,&lw,&lh,&serial) : cn_latest_render_info(myState,&lw,&lh,&serial);
-        if (!has || lw <= 0 || lh <= 0) return;
-        const OP_PixelFormat pf = (mode == 0) ? OP_PixelFormat::Mono32Float
-                                              : OP_PixelFormat::RGBA16Float;
-        const size_t bytes = (size_t)lw * lh * ((mode == 0) ? sizeof(float) : 4 * sizeof(uint16_t));
+        bool has = depth ? cn_latest_depth_info(myState,&lw,&lh,&serial)
+                         : cn_latest_render_info(myState,&lw,&lh,&serial);
+        if (!has || lw <= 0 || lh <= 0) return false;
+        const OP_PixelFormat pf = depth ? OP_PixelFormat::Mono32Float
+                                        : OP_PixelFormat::RGBA16Float;
+        const size_t bytes = (size_t)lw * lh * (depth ? sizeof(float) : 4 * sizeof(uint16_t));
 
         if ((uint32_t)lw > tdnc::kMaxDim || (uint32_t)lh > tdnc::kMaxDim) {
             // NC の 1280x1280 上限を超える。超えたまま渡すと TD がクランプ後の幅で
             // バッファを読み絵が崩れるので、いったん自前バッファへ出して縮小する。
             // (上限内のときは下の直接コピー経路のままで、余計なコピーはしない)
             std::vector<uint8_t> tmp(bytes);
-            if (mode == 0) cn_copy_depth(myState, tmp.data());
-            else           cn_copy_render(myState, tmp.data());
+            if (depth) cn_copy_depth(myState, tmp.data());
+            else       cn_copy_render(myState, tmp.data());
             uint32_t cw = (uint32_t)lw, ch = (uint32_t)lh;
-            myNCScaled = tdnc::fit(tmp, cw, ch, pf);
-            TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D;
+            if (tdnc::fit(tmp, cw, ch, pf)) myNCScaled = true;
+            TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D; ui.colorBufferIndex=bufIndex;
             ui.textureDesc.width=cw; ui.textureDesc.height=ch; ui.textureDesc.pixelFormat=pf;
-            auto buf = myContext->createOutputBuffer(tmp.size(), TOP_BufferFlags::None, nullptr); if(!buf) return;
+            auto buf = myContext->createOutputBuffer(tmp.size(), TOP_BufferFlags::None, nullptr); if(!buf) return false;
             memcpy(buf->data, tmp.data(), tmp.size());
             out->uploadBuffer(&buf, ui, nullptr);
         } else {
-            myNCScaled = false;
-            TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D;
+            TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D; ui.colorBufferIndex=bufIndex;
             ui.textureDesc.width=lw; ui.textureDesc.height=lh; ui.textureDesc.pixelFormat=pf;
-            auto buf = myContext->createOutputBuffer(bytes, TOP_BufferFlags::None, nullptr); if(!buf) return;
-            if (mode == 0) cn_copy_depth(myState, buf->data);
-            else           cn_copy_render(myState, buf->data);
+            auto buf = myContext->createOutputBuffer(bytes, TOP_BufferFlags::None, nullptr); if(!buf) return false;
+            if (depth) cn_copy_depth(myState, buf->data);
+            else       cn_copy_render(myState, buf->data);
             out->uploadBuffer(&buf, ui, nullptr);
         }
-        myUploaded = serial; myFrames++;
+        myUploaded = serial;
+        return true;
     }
 
     void setupParameters(OP_ParameterManager* m, void*) override {
         const char* PAGE = "Cinematic";
         { OP_StringParameter p("File"); p.label = "Cinematic Video (iPhone)"; p.page = PAGE; m->appendFile(p); }
         { OP_StringParameter p("Mode"); p.label = "Mode"; p.page = PAGE;
-          const char* n[] = {"Depth","Rendered"}; const char* l[] = {"Depth (disparity map)","Rendered (change focus/aperture)"};
-          std::vector<const char*> nv(n,n+2), lv(l,l+2); p.defaultValue="Rendered"; m->appendMenu(p,2,nv.data(),lv.data()); }
+          const char* n[] = {"Depth","Rendered","Both"};
+          const char* l[] = {"Depth (disparity map)","Rendered (change focus/aperture)",
+                             "Both (0 = rendered, 1 = depth)"};
+          std::vector<const char*> nv(n,n+3), lv(l,l+3); p.defaultValue="Rendered"; m->appendMenu(p,3,nv.data(),lv.data()); }
         // 再生系(Movie File In と同じ考え方: Play On で自動再生、Off のとき Position で手動スクラブ)
         { OP_NumericParameter p("Play"); p.label="Play"; p.page=PAGE; p.defaultValues[0]=1; m->appendToggle(p); }
         { OP_NumericParameter p("Speed"); p.label="Speed"; p.page=PAGE; p.defaultValues[0]=1; p.minSliders[0]=-2; p.maxSliders[0]=2; m->appendFloat(p); }
@@ -242,8 +255,8 @@ private:
         while (true) {
             Job j;
             { std::unique_lock<std::mutex> l(myMutex); myCond.wait(l, [this]{ return myQuit || myPending; }); if (myQuit) return; j = myJob; myPending = false; myBusy = true; }
-            if (j.mode == 0) cn_depth(myState, j.time, j.flip?1:0, j.norm?1:0);
-            else cn_render(myState, j.time, j.fnum, j.focus, j.flip?1:0);
+            if (j.mode != 1) cn_depth(myState, j.time, j.flip?1:0, j.norm?1:0);
+            if (j.mode != 0) cn_render(myState, j.time, j.fnum, j.focus, j.flip?1:0);
             fetchMeta(j.time);   // 同一worker上でCNScriptメタも更新(ヘルパ呼び出しを直列化)
             { std::lock_guard<std::mutex> l(myMutex); myBusy = false; }
         }
