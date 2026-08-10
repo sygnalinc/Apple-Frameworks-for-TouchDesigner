@@ -4942,3 +4942,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   note に「自分で ProRAW を撮って指定する」手順を書いた
 - **検証時の注意**: 非同期なので**トグルを変えた直後の読みは1手前の値**。実際に
   「On→4032x3024(前の値)」を見て誤診しかけた。設定→数秒待つ→読む、を守る
+
+### 2026-08-10 v0.9.5 リリース
+
+- VERSION を 0.9.5 へ。**56プラグインを全て再ビルド**(並列・全件成功)してから
+  `release.sh sign → verify → dmg → notarize`。58バンドル・全数verify通過
+- **今回から各 .plugin にも公証チケットを貼る**(release.sh の notarize を改修)。
+  DMG 内の3件を抜き取って `stapler validate` OK、quarantine 付きコピーでも
+  `spctl` が accepted(以前はここでブロックダイアログが出ていた)
+- 0.9.4 からの中身: **Cinematic Video の刷新**(自動再生 + Play Mode、Color モード、
+  `All`/`Color + Depth` の複数色バッファ出力、Info DAT でファイルのメタデータ、
+  **再生中のメモリ暴走を修正**)、**CI RAW のピクセル形式不一致を修正**(実RAWで NaN だった)、
+  CI RAW / CI HDR に **Apply EXIF Orientation**、CoreWLAN Scan の空振り理由を警告に、
+  Speech Activity を develop へ退避、利用例4件追加(CIRAW / CIHDR / CoreWLAN / CoreWLANScan)
+- 公開は **58オペレータ**(Speech Activity を外し、Cinematic/PDFKit 等で1フォルダ複数バンドル)

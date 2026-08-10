@@ -190,7 +190,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 まとめて入れる場合は:
 
 ```sh
-cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.9.4/"*.plugin \
+cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.9.5/"*.plugin \
       ~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins/
 ```
 

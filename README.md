@@ -190,7 +190,7 @@ Open it and drag **only the `.plugin` bundles you actually need** into
 If you do want everything:
 
 ```sh
-cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.9.4/"*.plugin \
+cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.9.5/"*.plugin \
       ~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins/
 ```
 
