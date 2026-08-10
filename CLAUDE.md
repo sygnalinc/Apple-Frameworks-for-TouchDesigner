@@ -4510,3 +4510,19 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   `out.cook(force=True)` を数回回したら両方生成された。実測 sc_info 11x2、
   synthesizer 0.846 / keyboard_musical 0.781 / music 0.748、callbacks は
   dock=sc / expose=True / viewer=True / showDocked=False
+
+### 2026-08-10 social preview 画像を作成(docs/social-preview.jpg)
+
+- ユーザー「この動画を social preview にできない?」→ **動画は不可**。GitHub の social preview は
+  **PNG / JPG / GIF・1MB未満**(推奨 1280×640)。しかも GIF にしても X は静止画にするので労力に見合わない
+- **1MB制限が厳しい**のは尺ではなく「毎フレーム何割の画素が変わるか」。手元の GIF は
+  llmafm-chat(16秒)が 648KB、visionface(4秒)が 1.5MB。1280×640 に上げると実写の動きものは無理
+- 静止画で作成。素材は `AfterEffects/AppleFrameworksForTD_demos.mp4`(gitignore・24秒/1280x720)の
+  **t=2.4s**(5人の骨格オーバーレイが一番読める)。1280×720 → 上80pxを落として 1280×640。
+  下に指数 0.75 のグラデーションスクリムを敷いて可読性を確保し、Helvetica Bold 58 / Regular 32 で
+  「Apple Frameworks for TouchDesigner」「50+ native operators · macOS」。**115KB**
+- **social preview は API から設定できない**(Settings → General → Social preview の Web UI のみ)。
+  画像は `docs/social-preview.jpg` に置いたのでユーザーがアップロードする
+- あわせて調査した結果: リポジトリは **PUBLIC・星4・説明文あり**だが **Topics が空**。
+  `touchdesigner` トピックには 426リポジトリあり、そこの導線から完全に外れている(要 Topics 設定)。
+  awesome-touchdesigner(163★)への PR も有効
