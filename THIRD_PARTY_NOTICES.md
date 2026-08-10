@@ -87,7 +87,7 @@ Derivative 社のライセンスに従います。
 | Package | Used by | License |
 |---|---|---|
 | [apple/ml-stable-diffusion](https://github.com/apple/ml-stable-diffusion) | CoreML ImageGen | MIT |
-| [argmaxinc/WhisperKit](https://github.com/argmaxinc/WhisperKit) | Speech Text (Whisper backend) | MIT |
+| [argmaxinc/WhisperKit](https://github.com/argmaxinc/WhisperKit) | Speech Transcribe (Whisper backend) | MIT |
 
 These are declared in each helper's `Package.swift` and downloaded by SPM at build time;
 their source is **not** committed here. Their transitive dependencies carry their own

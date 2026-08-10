@@ -1,6 +1,6 @@
 ---
 name: td-apple-ops
-description: Apple Frameworks for TouchDesigner のカスタムOP(Vision Pose / Vision Face / Vision Hand / CoreML / LLM AFM / LLM MLX / Speech Text / Metal Upscale / Screen Capture 等)を**使って**TouchDesignerのプロジェクトを組むときに使う。導入手順、OPの選び方、非同期OP特有の配線ルール(cookを回す・Info CHOPの読み方・Flip・Aspect Correct UVs)、インスタンシングで映像に重ねる型、モデルの入手、症状別トラブルシュートを網羅。プラグイン自体の実装・改修は td-apple-plugin を使う。
+description: Apple Frameworks for TouchDesigner のカスタムOP(Vision Pose / Vision Face / Vision Hand / CoreML / LLM AFM / LLM MLX / Speech Transcribe / Metal Upscale / Screen Capture 等)を**使って**TouchDesignerのプロジェクトを組むときに使う。導入手順、OPの選び方、非同期OP特有の配線ルール(cookを回す・Info CHOPの読み方・Flip・Aspect Correct UVs)、インスタンシングで映像に重ねる型、モデルの入手、症状別トラブルシュートを網羅。プラグイン自体の実装・改修は td-apple-plugin を使う。
 ---
 
 # Apple Frameworks for TouchDesigner を使う

@@ -50,7 +50,7 @@ TDは起動時にカスタムOPの名前を検証する。規約違反は**起�
 | CoreImage Bokeh / Keystone / Enhance / Code | Coreimagebokeh 等 | Core Image |
 | Metal Upscale / Denoise / FrameInterp / MPSAnalyze | Metalupscale 等 | VideoToolbox/MetalFX/MPS |
 | Sound Class / Features | Soundclass 等 | SoundAnalysis |
-| Speech Text / Synth / Activity | Speechtext 等 | SpeechAnalyzer/AVSpeech |
+| Speech Transcribe / Synth / Activity | Speechtranscribe 等 | SpeechAnalyzer/AVSpeech |
 | Foundation Model | Foundationmodel | FoundationModels(汎用"LLM"は他統合と衝突回避で避けた) |
 | Translate | Translate | Translation |
 | RealityKit Capture | Realitykitcapture | RealityKit Object Capture |

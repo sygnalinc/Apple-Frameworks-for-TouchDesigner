@@ -1,4 +1,4 @@
-// SpeechText DAT — TouchDesigner カスタムオペレータ（macOS / Speech）
+// SpeechTranscribe DAT — TouchDesigner カスタムオペレータ（macOS / Speech）
 //
 // Audio パラメータで指定したオーディオ CHOP をライブ文字起こしし、テーブルで出力する。
 // 認識エンジンは新しい SpeechAnalyzer / SpeechTranscriber（macOS 26+・完全オンデバイス・
@@ -40,12 +40,12 @@ void wk_destroy(void* handle);
 
 namespace {
 
-class SpeechTextDAT : public DAT_CPlusPlusBase
+class SpeechTranscribeDAT : public DAT_CPlusPlusBase
 {
 public:
-    explicit SpeechTextDAT(const OP_NodeInfo*) {}
+    explicit SpeechTranscribeDAT(const OP_NodeInfo*) {}
 
-    ~SpeechTextDAT() override { destroySession(); }
+    ~SpeechTranscribeDAT() override { destroySession(); }
 
     void destroySession()
     {
@@ -334,12 +334,13 @@ FillDATPluginInfo(DAT_PluginInfo* info)
 {
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
-    info->customOPInfo.opType->setString("Speechtext");
-    info->customOPInfo.opLabel->setString("Speech Text");
+    info->customOPInfo.opType->setString("Speechtranscribe");
+    info->customOPInfo.opLabel->setString("Speech Transcribe");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
-    info->customOPInfo.majorVersion = 0;
-    info->customOPInfo.minorVersion = 9;
-    info->customOPInfo.opIcon->setString("SPT");
+    // opType を Speechtext から変えた破壊的変更なので major を上げる
+    info->customOPInfo.majorVersion = 1;
+    info->customOPInfo.minorVersion = 0;
+    info->customOPInfo.opIcon->setString("STR");
     if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/SpeechText/README.md");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
@@ -348,13 +349,13 @@ FillDATPluginInfo(DAT_PluginInfo* info)
 DLLEXPORT DAT_CPlusPlusBase*
 CreateDATInstance(const OP_NodeInfo* info)
 {
-    return new SpeechTextDAT(info);
+    return new SpeechTranscribeDAT(info);
 }
 
 DLLEXPORT void
 DestroyDATInstance(DAT_CPlusPlusBase* instance)
 {
-    delete (SpeechTextDAT*)instance;
+    delete (SpeechTranscribeDAT*)instance;
 }
 
 }   // extern "C"

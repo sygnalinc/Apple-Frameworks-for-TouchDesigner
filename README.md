@@ -138,7 +138,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 |---|---|---|
 | [Sound Class](SoundClass/) | CHOP | **Sound classification** (applause / cheering / alarms… 300+ classes). Custom Core ML acoustic models too |
 | [Sound Features](SoundFeatures/) | CHOP | Audio features (RMS / peak / centroid / onset / beat / BPM / 16 bands) |
-| [Speech Text](SpeechText/) | DAT | **Live transcription.** Apple SpeechAnalyzer (macOS 26+) / WhisperKit (macOS 14+, multilingual, translate) |
+| [Speech Transcribe](SpeechTranscribe/) | DAT | **Live transcription.** Apple SpeechAnalyzer (macOS 26+) / WhisperKit (macOS 14+, multilingual, translate) |
 | [Speech Synth](SpeechSynth/) | CHOP | On-device **speech synthesis** → PCM stereo |
 | [Speech Activity](SpeechActivity/) | CHOP | **Voice activity detection** (speaking / onset / offset). Start/stop trigger for transcription |
 
@@ -148,7 +148,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 |---|---|---|
 | [LLM AFM](LLMAFM/) | DAT | **Apple Intelligence on-device LLM** (macOS 26+). **Structured output (JSON schema)** + **Tool Calling** (the LLM calls a tool, TouchDesigner executes it and returns the result) straight into show control |
 | [LLM MLX](LLMMLX/) | DAT | **Local LLM via Apple MLX** (mlx-swift-lm). Runs any mlx-community model (Gemma 4 / Qwen / Llama) fully on-device with token streaming. No API key; model auto-downloads from Hugging Face on first use |
-| [Translate](Translate/) | DAT | **On-device translation.** Wire to Speech Text for real-time subtitle translation |
+| [Translate](Translate/) | DAT | **On-device translation.** Wire to Speech Transcribe for real-time subtitle translation |
 | [Text Analyze](TextAnalyze/) | DAT | Sentiment / language ID / named entities / semantic similarity (JA supported) + **tokens (token / POS / lemma)** and **embedding vectors** (numeric). "Drive visuals from speech mood/topic" |
 
 ### 3D, screen, input devices & connectivity

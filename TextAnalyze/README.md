@@ -5,7 +5,7 @@
 ## English
 
 Analyses the text of an input DAT on-device with the **NaturalLanguage framework**. Wire it
-straight to Speech Text (transcription) and you can **drive visuals from the sentiment or topic of
+straight to Speech Transcribe and you can **drive visuals from the sentiment or topic of
 what is being said**.
 
 ### Measured (M2)
@@ -52,7 +52,7 @@ The `Output` menu switches what the table contains:
 | Max Tokens | Maximum tokens in tokens mode |
 
 If the input DAT has a column named `text` that column is read; otherwise the last column is
-(so Speech Text's output table connects directly).
+(so Speech Transcribe's output table connects directly).
 
 ### Notes
 
@@ -78,7 +78,7 @@ cd TextAnalyze && ./build.sh   # → build/TextAnalyzeDAT.plugin
 ## 日本語
 
 入力 DAT のテキストを **NaturalLanguage フレームワーク**でオンデバイス解析する。
-SpeechText(文字起こし)と直結して「**発話の感情・話題でビジュアルを制御**」できる。
+Speech Transcribe(文字起こし)と直結して「**発話の感情・話題でビジュアルを制御**」できる。
 
 ### 実測(M2)
 
@@ -123,7 +123,7 @@ SpeechText(文字起こし)と直結して「**発話の感情・話題でビジ
 | Max Tokens | tokens モードの最大トークン数 |
 
 入力DATに `text` という名前の列があればその列、無ければ最終列を読む
-(SpeechText の出力テーブルにそのまま繋がる)。
+(Speech Transcribe の出力テーブルにそのまま繋がる)。
 
 ### 注意
 

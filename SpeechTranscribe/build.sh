@@ -1,13 +1,13 @@
 #!/bin/zsh
-# Speech Text DAT のビルド → build/SpeechTextDAT.plugin
-# 3段構成: SpeechHelper.swift(swiftc直) + whisper/(SPM・WhisperKit) + SpeechTextDAT.mm
+# Speech Transcribe DAT のビルド → build/SpeechTranscribeDAT.plugin
+# 3段構成: SpeechHelper.swift(swiftc直) + whisper/(SPM・WhisperKit) + SpeechTranscribeDAT.mm
 # dylib はビルド毎に名前を変える(TD/dyld の install name キャッシュ対策)
 set -e
 cd "$(dirname "$0")"
 
 source ../common/version.sh
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
-NAME=SpeechTextDAT
+NAME=SpeechTranscribeDAT
 OUT="build/$NAME.plugin/Contents"
 EPOCH=$(date +%s)
 SPDYLIB="libSpeechHelper_$EPOCH.dylib"
@@ -31,7 +31,7 @@ install_name_tool -id "@rpath/$WKDYLIB" "$OUT/Frameworks/$WKDYLIB"
 # ③ プラグイン本体
 clang++ -std=c++17 -fobjc-arc -O2 -bundle \
   -I "$SDK" \
-  SpeechTextDAT.mm \
+  SpeechTranscribeDAT.mm \
   -framework Foundation \
   "$OUT/Frameworks/$SPDYLIB" \
   "$OUT/Frameworks/$WKDYLIB" \
@@ -43,9 +43,9 @@ cat > "$OUT/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleExecutable</key><string>SpeechTextDAT</string>
-    <key>CFBundleIdentifier</key><string>tokyo.sygnal.speechtext-dat</string>
-    <key>CFBundleName</key><string>SpeechTextDAT</string>
+    <key>CFBundleExecutable</key><string>SpeechTranscribeDAT</string>
+    <key>CFBundleIdentifier</key><string>tokyo.sygnal.speechtranscribe-dat</string>
+    <key>CFBundleName</key><string>SpeechTranscribeDAT</string>
     <key>CFBundlePackageType</key><string>BNDL</string>
     <key>CFBundleVersion</key><string>0.2.0</string>
 </dict>

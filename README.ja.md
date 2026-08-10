@@ -137,7 +137,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 |---|---|---|
 | [Sound Class](SoundClass/) | CHOP | **音の分類**(拍手/歓声/警報音等 300種類+)。独自 Core ML 音響モデルも可 |
 | [Sound Features](SoundFeatures/) | CHOP | 音響特徴(RMS/peak/centroid/onset/beat/BPM/16帯域) |
-| [Speech Text](SpeechText/) | DAT | **ライブ文字起こし**。Apple SpeechAnalyzer(macOS26+)/ WhisperKit(macOS14+・多言語・英訳) |
+| [Speech Transcribe](SpeechTranscribe/) | DAT | **ライブ文字起こし**。Apple SpeechAnalyzer(macOS26+)/ WhisperKit(macOS14+・多言語・英訳) |
 | [Speech Synth](SpeechSynth/) | CHOP | オンデバイス**音声合成**→ PCM stereo |
 | [Speech Activity](SpeechActivity/) | CHOP | **発話区間検出**(speaking/onset/offset)。文字起こしの開始・終了トリガーに |
 
@@ -147,7 +147,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 |---|---|---|
 | [LLM AFM](LLMAFM/) | DAT | **Apple Intelligence オンデバイスLLM**(macOS26+)。**構造化出力(JSONスキーマ)**+**ツール呼び出し**(LLMがツールを要求→TouchDesignerが実行して結果を返す)でショー制御へ直結 |
 | [LLM MLX](LLMMLX/) | DAT | **Apple MLX によるローカルLLM**(mlx-swift-lm)。任意の mlx-community モデル(Gemma 4 / Qwen / Llama)を完全オンデバイスで実行しトークンをストリーミング。APIキー不要・モデルは初回にHFから自動DL |
-| [Translate](Translate/) | DAT | **オンデバイス翻訳**。Speech Text 直結でリアルタイム字幕翻訳 |
+| [Translate](Translate/) | DAT | **オンデバイス翻訳**。Speech Transcribe 直結でリアルタイム字幕翻訳 |
 | [Text Analyze](TextAnalyze/) | DAT | 感情スコア・言語判定・固有表現・意味的類似度(日本語対応)+**トークン(token / 品詞 / 見出し語)**と**埋め込みベクトル**(数値)。「発話の感情/話題でビジュアル制御」 |
 
 ### 3D・画面・入力デバイス・外部連携

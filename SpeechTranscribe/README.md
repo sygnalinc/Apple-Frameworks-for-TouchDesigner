@@ -1,4 +1,4 @@
-# Speech Text DAT — live transcription (macOS 26+ / SpeechAnalyzer)
+# Speech Transcribe DAT — live transcription (macOS 26+ / SpeechAnalyzer)
 
 **English** | [日本語](#日本語)
 
@@ -73,7 +73,7 @@ The Backend menu can switch to **WhisperKit (Core ML Whisper)**:
 ### Build
 
 ```
-./build.sh    # → build/SpeechTextDAT.plugin (bundles the Swift helper dylib)
+./build.sh    # → build/SpeechTranscribeDAT.plugin (bundles the Swift helper dylib)
 ```
 
 ## 日本語
@@ -143,5 +143,5 @@ Backend メニューで **WhisperKit(Core ML版Whisper)** に切替できる:
 ### ビルド
 
 ```
-./build.sh    # → build/SpeechTextDAT.plugin（Swift ヘルパ dylib を同梱）
+./build.sh    # → build/SpeechTranscribeDAT.plugin（Swift ヘルパ dylib を同梱）
 ```

@@ -5,7 +5,7 @@
 ## English
 
 A TD custom DAT that **translates the text of an input DAT on-device with Apple's Translation
-framework**. **Connect a Speech Text DAT to its input and you get real-time subtitle
+framework**. **Connect a Speech Transcribe DAT to its input and you get real-time subtitle
 translation** (transcription through translation, entirely local).
 
 Measured: a three-row table translated ja→en ("こんにちは、エアバンドへようこそ。" →
@@ -16,7 +16,7 @@ re-translated.
 
 - **With an input DAT**: translates the `text` column if the header has one (otherwise column 0)
   and outputs **a table of the same shape** with that column replaced by the translation (rows
-  still translating are empty). A drop-in design for Speech Text's `index | text | final`
+  still translating are empty). A drop-in design for Speech Transcribe's `index | text | final`
 - **Without an input DAT**: translates the `Text` parameter and outputs one `source | target` row
 
 ### Parameters
@@ -64,7 +64,7 @@ languages' models are needed.
 ## 日本語
 
 入力 DAT のテキストを **Apple の Translation framework でオンデバイス翻訳**する
-TD カスタム DAT。**SpeechText DAT を入力に繋ぐとリアルタイム字幕翻訳**になる
+TD カスタム DAT。**Speech Transcribe DAT を入力に繋ぐとリアルタイム字幕翻訳**になる
 （文字起こし→翻訳まで完全ローカル）。
 
 実測: ja→en で3行テーブルを翻訳（"こんにちは、エアバンドへようこそ。"
@@ -74,7 +74,7 @@ TD カスタム DAT。**SpeechText DAT を入力に繋ぐとリアルタイム�
 
 - **入力 DAT あり**: ヘッダに `text` 列があればその列（無ければ列0）を翻訳し、
   **同じ形のテーブル**で出力（対象列を訳文に差し替え。翻訳中の行は空文字）。
-  SpeechText の `index | text | final` をそのまま流せるドロップイン設計
+  Speech Transcribe の `index | text | final` をそのまま流せるドロップイン設計
 - **入力 DAT なし**: `Text` パラメータを翻訳して `source | target` の1行を出力
 
 ### パラメータ

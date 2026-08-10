@@ -31,7 +31,7 @@ build_td_plugin CoreImageBokehTOP coreimagebokeh-top CoreImageBokehTOP.mm -- Cor
 ObjC++から呼べないSwift専用APIは、helperを dylib 化して C ABI で繋ぐ。共通ヘルパは使わず手書き。
 
 - **Cプレフィックスをプラグインごとに分ける**: `sd_`/`pg_`(ImageGen)・`fm_`(FoundationModel)・
-  `tr_`(Translate)・`sp_`(SpeechText)・`wk_`(WhisperKit)・`sh_`(Shazam)・`ph_`(Photogrammetry)
+  `tr_`(Translate)・`sp_`(SpeechTranscribe)・`wk_`(WhisperKit)・`sh_`(Shazam)・`ph_`(Photogrammetry)
 - helperは `@_cdecl` でエクスポート、ハンドルは `Unmanaged.passRetained().toOpaque()`
 - 状態受け渡しは **poll方式のJSON**(status/busy/…)+ 必要ならバイト列コピー関数
 - 依存が単純なら `swiftc -emit-library` 直、SPM依存(ml-stable-diffusion/WhisperKit)なら

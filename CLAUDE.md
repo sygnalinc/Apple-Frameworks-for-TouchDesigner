@@ -4542,3 +4542,21 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - macOS 26 未満で一覧が空になる場合に備え、en-US/ja-JP など7件のフォールバックを持たせた
 - helper のキャッシュは初回だけ semaphore で待つ(5秒上限)。`supportedLocales` は静的な
   一覧なので実測では即返る
+
+### 2026-08-10 Speech Text → Speech Transcribe に改名(破壊的変更)
+
+- ユーザー「SpeechText という名前が機能をわかりづらくしている」→ 確かに紛らわしい。
+  リポジトリには **Speech Synth(テキスト→音声)** があり、**Speech Text(音声→テキスト)** と
+  並ぶと**どちらの向きか名前から読めない**
+- ユーザー選択で **Speech Transcribe**(opType `Speechtranscribe` / icon `STR`)に。
+  「フレームワーク名 + 機能」の規約に合い、Speech Synth と *transcribe / synth* の動詞ペアになる
+- 手順は既存の改名と同じ: `git mv` でフォルダ・ソース → opType/opLabel/opIcon/クラス名/
+  バンドル名を置換 → README(各 + ルート英日)・THIRD_PARTY_NOTICES・Translate/TextAnalyze の
+  相互参照・skill 2ファイルを更新 → 旧バンドル削除 → 新バンドル設置
+- **Swiftヘルパは内部名を保持**(module `SpeechHelper` / C ABI `sp_` / `libSpeechHelper`)。規約どおり
+- **opType 変更は破壊的**なので、このopの `majorVersion` を 0→1(minor 9→0)に上げた
+- **SPM の罠を再度踏んだ**: フォルダ移動で `whisper/.build` の ModuleCache パスがずれて
+  `could not build module '_DarwinFoundation1'`。`rm -rf whisper/.build` してから再ビルドで解決
+  (ImageGen で同じことを踏んでおり、CLAUDE.md にも既出)
+- TD再起動後、demo の該当ノードは **`Speechtranscribe1` として型もパラメータも正常に復帰**し
+  errors なし。コンテナ名も `SpeechTranscribe` に変更して保存
