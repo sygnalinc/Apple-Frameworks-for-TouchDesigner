@@ -89,6 +89,14 @@ def onFrameEnd(frame):
         d[c.name] = max(d.get(c.name, 0.0), abs(c.eval()))
 ```
 
+**モーションは Nintendo Switch モードで確認済み**: `hasmotion` = 1 になり、パッドを傾けると
+`accel*` と `rot*` が反応する。同じパッドでも Xbox モードではセンサー自体が無い
+(`hasmotion` = 0)ので、値が出ないときはまずモード切替を試す。
+
+**Motion is confirmed in Nintendo Switch mode**: `hasmotion` = 1, and `accel*` and `rot*` both
+respond to tilting the pad. In Xbox mode the same pad has no sensors at all (`hasmotion` = 0),
+which is why switching modes is the first thing to try.
+
 Rumble and Pulse are both confirmed on a pad in Xbox mode — including `Double Tap` reading as two
 hits, and no crash when the pad switches modes. Rumble **only runs while the CHOP cooks**: a short
 pattern is re-armed on each cook, so setting `Rumble` back to 0 — or the node simply not cooking —
