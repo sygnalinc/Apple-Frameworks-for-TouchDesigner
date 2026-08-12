@@ -259,7 +259,7 @@ ln -s "$PWD/.claude/skills/td-apple-ops" ~/.claude/skills/td-apple-ops
 
 | 層 | 値 | ルール |
 |---|---|---|
-| リポジトリ(gitタグ) | `v0.9.4` | op追加・機能追加で **minor**、修正で **patch**。`opType` のリネーム/削除は**破壊的変更**としてリリースノートに明記 |
+| リポジトリ(gitタグ) | `v0.9.6` | **opは継続的に増えていくので、op追加だけなら patch**。修正・改善も patch。**minor** は「集合としての性格が変わるとき」(全体的な作り直しや、破壊的変更がまとまったとき)に取っておく。`opType` のリネーム/削除は**破壊的変更**として必ずリリースノートに明記 |
 | バンドル(`Info.plist`) | `CFBundleShortVersionString` = リポジトリ版 / `CFBundleVersion` = gitコミット数 | ビルド時に `common/version.sh` が自動で焼き込む |
 | オペレータ(`customOPInfo`) | `majorVersion = 0` / `minorVersion = 9`(Vision Face のみ `majorVersion = 1`) | **opごと**。TDが `.toe` 保存値と比較する。後方互換でない変更(パラメータ削除・意味変更)をした**そのopだけ** `majorVersion` を +1 する |
 

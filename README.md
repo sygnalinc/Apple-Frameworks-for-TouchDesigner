@@ -261,7 +261,7 @@ Current release: **0.9.6** (see [`VERSION`](VERSION))
 
 | Layer | Value | Rule |
 |---|---|---|
-| Repository (git tag) | `v0.9.6` | Adding operators / features bumps **minor**, fixes bump **patch**. Renaming or removing an `opType` is a **breaking** change and is called out in the release notes. |
+| Repository (git tag) | `v0.9.6` | **Operators are added continuously, so an addition on its own is a patch** — as are fixes and improvements. **Minor** is reserved for a change in what the collection is (a broad rework, or a batch of breaking changes). Renaming or removing an `opType` is a **breaking** change and is always called out in the release notes. |
 | Bundle (`Info.plist`) | `CFBundleShortVersionString` = repo version, `CFBundleVersion` = git commit count | Stamped automatically by `common/version.sh` at build time. |
 | Operator (`customOPInfo`) | `majorVersion = 0`, `minorVersion = 9` (Vision Face is `majorVersion = 1`) | **Per operator.** TouchDesigner compares these with the values saved in a `.toe`. Bump `majorVersion` **only** for that one operator when a change is not backwards compatible (parameter removed / semantics changed). |
 
