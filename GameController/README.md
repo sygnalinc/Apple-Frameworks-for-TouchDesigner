@@ -28,8 +28,13 @@ menu options / lstickbtn rstickbtn` (plus `gravity xyz / accel xyz / rot xyz` wh
 ### Motion sensors
 
 **`gravity*` staying 0 is not a bug.** Apple's docs say some controllers cannot separate gravity
-from user acceleration. Switch Pro-style and DualShock-style pads are in that group; Xbox-style
-pads have no motion sensors at all.
+from user acceleration. Switch Pro-style and DualShock-style pads are in that group.
+
+**Nothing at all comes through in Xbox mode**, even from a pad that has sensors. Genuine Xbox
+controllers (Xbox One, Series X|S, Elite Series 2) ship without a gyro or accelerometer, so the
+Xbox controller protocol has no channel for motion — a third-party pad emulating it cannot send
+its sensor data even though the hardware is right there. Switching the same pad to Nintendo
+Switch mode makes the sensors appear.
 
 | Channel | Pad can separate | Pad cannot separate |
 |---|---|---|
@@ -90,12 +95,12 @@ def onFrameEnd(frame):
 ```
 
 **モーションは Nintendo Switch モードで確認済み**: `hasmotion` = 1 になり、パッドを傾けると
-`accel*` と `rot*` が反応する。同じパッドでも Xbox モードではセンサー自体が無い
-(`hasmotion` = 0)ので、値が出ないときはまずモード切替を試す。
+`accel*` と `rot*` が反応する。Xbox モードは未実測だが、プロトコルにモーションが載らないので
+`hasmotion` = 0 になるはず。値が出ないときはまずモード切替を試す。
 
 **Motion is confirmed in Nintendo Switch mode**: `hasmotion` = 1, and `accel*` and `rot*` both
-respond to tilting the pad. In Xbox mode the same pad has no sensors at all (`hasmotion` = 0),
-which is why switching modes is the first thing to try.
+respond to tilting the pad. Xbox mode was not measured, but the protocol carries no motion, so
+expect `hasmotion` = 0 there — switching modes is the first thing to try.
 
 Rumble and Pulse are both confirmed on a pad in Xbox mode — including `Double Tap` reading as two
 hits, and no crash when the pad switches modes. Rumble **only runs while the CHOP cooks**: a short
@@ -171,8 +176,13 @@ menu options / lstickbtn rstickbtn`(+ Motion時 `gravity xyz / accel xyz / rot x
 ### モーションセンサー
 
 **`gravity*` が 0 のままなのは不具合ではない。** Apple のドキュメントが明言しているとおり、
-**重力と動きを分離できないパッドがある**。Switch Pro 系・DualShock 系がその側で、
-Xbox 系はそもそもセンサーを持たない。
+**重力と動きを分離できないパッドがある**。Switch Pro 系・DualShock 系がその側。
+
+**Xbox モードでは、センサーを持つパッドでも一切出ない。** 本物の Xbox コントローラー
+(Xbox One / Series X|S / Elite Series 2)はジャイロも加速度計も積んでいないため、
+**Xbox のコントローラープロトコルにモーションを載せる経路が無い**。それを模倣する
+サードパーティ製パッドは、ハードウェアにセンサーがあっても送れない。同じパッドを
+Nintendo Switch モードに切り替えるとセンサーが現れる。
 
 | チャンネル | 分離できるパッド | 分離できないパッド |
 |---|---|---|
