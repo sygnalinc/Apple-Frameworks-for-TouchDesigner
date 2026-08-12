@@ -14,6 +14,7 @@
 #import <Foundation/Foundation.h>
 #import <GameController/GameController.h>
 #import <CoreHaptics/CoreHaptics.h>
+#include <algorithm>
 #include <chrono>
 #include <memory>
 
@@ -186,7 +187,8 @@ public:
                     playPulse(gc,
                               inputs->getParString("Pulsestyle") ? inputs->getParString("Pulsestyle") : "tap",
                               (float)inputs->getParDouble("Pulseintensity"),
-                              (float)inputs->getParDouble("Pulsesharpness"));
+                              (float)inputs->getParDouble("Pulsesharpness"),
+                              inputs->getParDouble("Pulsegap"));
             } else {
                 shutdownHaptics();   // パッドが無くなったらエンジンごと畳む
             }
@@ -249,6 +251,16 @@ public:
             manager->appendFloat(p);
         }
         {
+            OP_NumericParameter p("Pulsegap");
+            p.label = "Pulse Gap (sec, Double Tap)";
+            p.page = "Game Controller";
+            p.defaultValues[0] = 0.26;
+            p.minSliders[0] = 0.05; p.maxSliders[0] = 0.6;
+            p.minValues[0] = 0.02;  p.maxValues[0] = 1.0;
+            p.clampMins[0] = p.clampMaxes[0] = true;
+            manager->appendFloat(p);
+        }
+        {
             OP_NumericParameter p("Pulse");
             p.label = "Pulse";
             p.page = "Game Controller";
@@ -300,7 +312,8 @@ private:
     // 単発の振動。CoreHaptics に名前付きプリセットは無いので、
     // transient(一撃)と continuous(持続)+ sharpness の組み合わせで定番の触感を作る。
     // 連続振動(Rumble)とは別プレイヤーで鳴らすので、鳴っていても邪魔しない。
-    void playPulse(GCController* gc, const char* style, float intensity, float sharpness)
+    void playPulse(GCController* gc, const char* style, float intensity, float sharpness,
+                   double gap)
     {
         if (@available(macOS 11.0, *)) {
             if (!gc.haptics || intensity <= 0.0f)
@@ -338,10 +351,11 @@ private:
             } else if (st == "thud") {                 // 長めの鈍い一撃
                 hit(0.0, 0.22, intensity);
             } else if (st == "double") {               // 二連打
-                // モーターは止まるのに時間がかかる。間を詰めると1回に聞こえるので、
-                // 短く叩いて 0.14秒の無音を挟む(0.05秒 + 0.07秒の無音では繋がってしまった)
-                hit(0.0,  0.06, intensity);
-                hit(0.20, 0.06, intensity);
+                // 余韻の長さはパッドによって違い、詰めると1回に聞こえる。
+                // Xbox系(回転モーター)は 0.20秒で分かれたが、Switch系(HD振動)は繋がった。
+                // 手元のパッドに合わせられるよう Pulse Gap で調整できるようにしてある
+                hit(0.0, 0.06, intensity);
+                hit(std::max(0.08, gap), 0.06, intensity);
             } else if (st == "buzz") {                 // はっきり続く
                 hit(0.0, 0.40, intensity);
             } else {                                   // tap

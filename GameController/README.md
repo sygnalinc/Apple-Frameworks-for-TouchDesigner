@@ -38,6 +38,10 @@ Intensity / Sharpness sliders — it changes the pattern, and the sliders always
 | `Thud` | 0.22 s | 1 |
 | `Buzz` | 0.40 s | 1 |
 
+**How long a pad keeps ringing varies, so `Double Tap` needs tuning.** 0.20 s split cleanly into two
+hits on an Xbox-mode pad (rotating motors) but still read as one in Nintendo Switch mode (HD rumble,
+linear actuators). `Pulse Gap` exists to dial that in — widen it until you hear two.
+
 **The styles differ by length and hit count, not by texture.** Pads that are just two rumble
 motors (Xbox-style) largely ignore `Sharpness`, so a transient-only pattern makes `Tap` and `Click`
 feel identical. Each style therefore layers a transient (for pads that support it) over a short
@@ -147,6 +151,10 @@ menu options / lstickbtn rstickbtn`(+ Motion時 `gravity xyz / accel xyz`)
 | `Double Tap` | 0.06秒 | 2(**0.20秒あけて**。無音0.14秒。モーターが止まるのに時間がかかるので、詰めると1回に聞こえる) |
 | `Thud` | 0.22秒 | 1 |
 | `Buzz` | 0.40秒 | 1 |
+
+**余韻の長さはパッドによって違うので、`Double Tap` は調整が要る。** 0.20秒は Xbox モード
+(回転モーター)ではきれいに2回に分かれたが、Nintendo Switch モード(HD振動・リニアアクチュエータ)
+では1回に聞こえた。`Pulse Gap` はそのための調整用で、2回に聞こえるまで広げる。
 
 **違いは「長さと打数」であって触感の質ではない。** Xbox系のようにモーター2個のパッドは
 `Sharpness` をほとんど反映しないので、transient だけのパターンだと `Tap` と `Click` が
