@@ -63,3 +63,28 @@ menu options / lstickbtn rstickbtn`(+ Motion時 `gravity xyz / accel xyz`)
 ```
 cd GameController && ./build.sh   # → build/GameControllerCHOP.plugin
 ```
+
+## 利用例(demo.toe)
+
+`/project1/GameController` に**簡易3Dアクション**を組んである。制限時間60秒でキューブを集める。
+
+| 入力 | 動作 |
+|---|---|
+| 左スティック / W A S D | 移動(カメラの向き基準) |
+| 右スティック / Q E | カメラ旋回 |
+| A ボタン / Space | ジャンプ |
+| Menu ボタン | リスタート |
+
+取得時に `Rumble` で振動する。**パッドが無くてもキーボードで遊べる**ようにしてあるので、
+接続前でも動作を確認できる。
+
+ゲームのロジック(移動・ジャンプ・取得判定・スコア・タイマー・カメラ追従)は TD 上で実測済み。
+**パッド実機での検証は未実施**(手元にコントローラが無いため)。
+
+### 組むときの注意
+
+- **`soptoPOP` はメッシュ/NURBS を変換しない。** Sphere / Grid SOP の既定 `type` は `mesh` で、
+  そのままだと**何も描画されない**。`poly` にすること(Box SOP は既定が `poly`)
+- TD のカメラは `ry=0` で -Z を向く。追従カメラはプレイヤーの `+sin/+cos` 側に置く
+- Grid SOP は XY 平面。地面にするには Geo ごと `rx=-90`
+
