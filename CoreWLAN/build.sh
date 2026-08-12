@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 set -e
 cd "$(dirname "$0")"
 source ../common/build_plugin.sh

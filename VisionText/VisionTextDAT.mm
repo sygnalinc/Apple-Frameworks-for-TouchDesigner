@@ -16,6 +16,8 @@
 #import <CoreVideo/CoreVideo.h>
 #import <Vision/Vision.h>
 
+#include "../common/AspectCoords.h"
+
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
@@ -104,6 +106,10 @@ public:
         if (!active)
             regions.clear();
 
+        // uv を入力画像のアスペクト比へ再スケール（Body Track CHOP と同名・同既定）
+        const tdaspect::Mapper map{ inputs->getParInt("Aspectcorrectuv") != 0,
+                                    top ? (float)top->textureDesc.width  : 0.0f,
+                                    top ? (float)top->textureDesc.height : 0.0f };
         output->setOutputDataType(DAT_OutDataType::Table);
         output->setTableSize(1 + (int32_t)regions.size(), 6);
         const char* header[6] = {"text", "confidence", "u", "v", "width", "height"};
@@ -115,8 +121,10 @@ public:
             output->setCellString((int32_t)r + 1, 0, region.text.c_str());
             snprintf(buf, sizeof(buf), "%.3f", region.confidence);
             output->setCellString((int32_t)r + 1, 1, buf);
+            const float bv[4] = {map.x(region.bbox[0]), map.y(region.bbox[1]),
+                                 map.dx(region.bbox[2]), map.dy(region.bbox[3])};
             for (int c = 0; c < 4; c++) {
-                snprintf(buf, sizeof(buf), "%.4f", region.bbox[c]);
+                snprintf(buf, sizeof(buf), "%.4f", bv[c]);
                 output->setCellString((int32_t)r + 1, 2 + c, buf);
             }
         }
@@ -131,6 +139,7 @@ public:
             p.page = "Vision Text";
             manager->appendTOP(p);
         }
+        tdaspect::appendAspectCorrect<OP_ParameterManager, OP_NumericParameter>(manager, "Vision Text");
         {
             OP_NumericParameter p("Active");
             p.label = "Active";
@@ -327,7 +336,7 @@ FillDATPluginInfo(DAT_PluginInfo* info)
     info->customOPInfo.majorVersion = 0;
     info->customOPInfo.minorVersion = 9;
     info->customOPInfo.opIcon->setString("VTX");
-    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/VisionText/README.md");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/VisionText/README.md");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
 }

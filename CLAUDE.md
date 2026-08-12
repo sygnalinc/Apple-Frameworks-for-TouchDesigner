@@ -1,8 +1,9 @@
 # CLAUDE.md — TDAppleOps 開発ガイド(AIエージェント向け)
 
-> リポジトリは 2026-07-20 に `TDAppleML` から **`TDAppleOps`** へ改称(中身がML専用でない
-> ため)。コード内のキャッシュパス `~/Library/Caches/TDAppleML/` と過去ログの旧名は、
-> 互換性・履歴保持のため据え置き。ローカル作業フォルダ名は `TDAppleML` のままでも可。
+> リポジトリは 2026-07-20 に `TDAppleML`→`TDAppleOps`、2026-08-07 に一般公開へ向け
+> **`Apple-Frameworks-for-TouchDesigner`**(表示名 "Apple Frameworks for TouchDesigner")へ改称。
+> 旧GitHub URLは自動リダイレクトされる。コード内のキャッシュパス `~/Library/Caches/TDAppleML/`
+> と過去ログの旧名は互換性・履歴保持のため据え置き。ローカル作業フォルダ名は `TDAppleML` のままでも可。
 
 このリポジトリで作業するAI/開発者が守るべきルールと、実装済みプラグインで得た知見の集約。
 **ここに書かれたハマりどころは全て実際に踏んだもの**。同じ穴に落ちないこと。
@@ -2029,7 +2030,7 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 
 - **authorName → "SYGNAL Inc."** 全81プラグイン統一(旧 TDAppleML/sygnal 混在)。会社名で表示。
   codesignは会社名にできず現状ad-hoc維持(要 Developer ID 法人証明書)。gitコミット作者は個人のまま
-- **opHelpURL 追加**(全81): `FillXXXPluginInfo` に `https://github.com/sygnalinc/TDAppleOps/
+- **opHelpURL 追加**(全81): `FillXXXPluginInfo` に `https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/
   blob/main/<Folder>/README.md` を **null ガード付き**で。OPの Help(`?`)ボタンから README が開く。
   **OP Create Dialog のホバー説明は SDK に該当フィールドが無く不可**(opHelpURL が代替)
 - **VisionFlow に Output メニュー追加**: `flow`(生RG32Float・従来) / `visualize`(RGBA8カラー・
@@ -2870,3 +2871,2088 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 配布時の注意(既知): 配布版は署名が変わるためTD初回ロード時にプラグイン承認ダイアログが出る。
   wifiscan-helper.app は位置情報許可の再承認が一度必要
 - 残タスク(任意): GitHub Release への DMG 添付(公開操作のためユーザー確認待ち)
+
+### 2026-08-07 未検証17プラグインを develop ブランチへ分離(リリースは検証済み69本のみ)
+
+- ユーザー指示: 未検証プラグインは develop ブランチに移し、リリースは検証済みのみにする
+- **develop ブランチを main から作成して push**(全プラグイン入りの完全な状態を保持)。
+  未検証プラグインの開発継続は develop で行う
+- **main から17フォルダを git rm**: AVAudioMixer / AVAudioSpatial / AudioToolboxMix /
+  CaptionAuthor / ColorSync / CoreImageKeystone / GameplayKitAgents / GameplayKitPath /
+  ImageCapture / MetalFrameInterp / MetalMPSAnalyze / Phase / Shazam / SpatialVideo /
+  SwiftUI / SwiftUIPanel / UIWidget。依存する palette/NativePanel.tox・SwiftUIButton.tox
+  (SwiftUIPanel/UIWidget前提)も main から削除。README(英日)の該当17行を削除
+- **tools/release.sh に EXCLUDE リスト**(17バンドル名)を追加し、sign 時にコピーから除外
+- **リリース再構築**: 69バンドル署名→全数verify OK→DMG 18MB→公証 **Accepted**→staple→
+  spctl accepted(Notarized Developer ID)
+- 注意: ローカルの常設Pluginsディレクトリは全86本のまま(開発環境は不変)。sample.toe の
+  examples には除外17opの利用例が残っている(リリースDMGだけ導入した環境ではその17例が
+  Unknown operator type になる)→ リリース用に examples を分けるかは今後の課題
+
+### 2026-08-07 リポジトリを Apple-Frameworks-for-TouchDesigner へ改称(一般公開準備)
+
+- ユーザー「公開時に分かりやすい名前に」「macOSのフレームワーク/ライブラリを使ったpluginと
+  伝わる名前」→ 候補比較の結果 **`Apple-Frameworks-for-TouchDesigner`**(表示名
+  "Apple Frameworks for TouchDesigner")に決定。「for Mac/for TouchDesigner」形式は
+  Apple商標ガイドラインの推奨形でもある
+- `gh repo rename` で改称・説明文も更新。**旧URLはGitHubが自動リダイレクト**するため、
+  既存81バンドルに焼き込み済みの opHelpURL(旧TDAppleOps URL)もHelpボタンから飛べる
+- リポジトリ内の旧URL参照68ファイル(ソースの opHelpURL・README・release.sh)を新URLへ一括置換。
+  README(英日)のH1を "Apple Frameworks for TouchDesigner" に変更。ローカル remote URL 更新済み
+- release.sh の成果物名も統一: `dist/Apple-Frameworks-for-TouchDesigner-v0.9.0.dmg`。
+  新名称DMGを再公証 → **Accepted・staple・spctl accepted** を確認
+- **注意(develop運用)**: develop は全プラグイン入りで維持している。main には17フォルダ削除
+  コミットがあるため **main→develop の wholesale merge は厳禁**(削除が伝播して未検証
+  プラグインが消える)。共通修正は cherry-pick で運ぶこと
+- 注意: keychain の notarytool プロファイル名は `tdappleops` のまま(ローカル専用・変更不要)
+
+### 2026-08-07 GitHub Release v0.9.0 作成 + DMG添付
+
+- 既存の v0.9.0 Release(7/25作成・旧コミット・79 operators表記・アセット無し)は develop分離/
+  公証/改称より前の陳腐化した状態だったため削除し、タグを現行HEADへ張り直して再作成
+- **Release v0.9.0**: 英日リリースノート + `Apple-Frameworks-for-TouchDesigner-v0.9.0.dmg`
+  (18MB・検証済み69プラグイン・Notarized Developer ID)を添付
+  https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.0
+- リポジトリはまだ **PRIVATE**。一般公開は Settings → Visibility を Public に切り替えた時点
+
+### 2026-08-07 起動時プラグインエラーの原因究明: OP_CommonAPIVersion 不一致(TDダウングレード)
+
+- 症状: TD起動時に **CoreTextTOP.plugin / ImageIOPointCloudSOP.plugin** だけが
+  "provides an invalid opType name" で拒否される。opType 文字列(`Coretext`/`Imageiopointcloud`)は
+  規約通りで、バイナリにも正しく埋まっている
+- **真因**: TD の `setAPIVersion()` は `apiVersion = version;` の直後に範囲チェックし、
+  **不一致なら早期returnする**。その結果 opType が空文字のままになり、TDは
+  「invalid opType name」という**原因と無関係に見えるエラー**を出す。
+  この2つだけが **OP_CommonAPIVersion = 2**(新しいTD SDK)でビルドされており、
+  ユーザーが **TouchDesigner をダウングレード**したため現行TD(2025.32280・common=1)が拒否していた
+- **診断ツール `tools/apiscan.c`**: PluginInfo構造体の**先頭int32がapiVersion**で、
+  Min/Max=0 のゼロ初期化バッファを渡すと **opTypeポインタに触れる前に早期return**する性質を利用し、
+  バンドルが宣言しているAPIバージョンを安全に読み出す。全69本を走査してこの2本だけを特定
+- **修正**: 2プラグインを現行SDKで再ビルド(common=1確認)→ 署名・インストール → TD再起動で
+  **両方ロード成功・coretext_demo/ImageIOPointCloud例ともエラー0**を確認
+- **release.sh を2点修正**:
+  1. **配布物の収集元をユーザーの常設Pluginsフォルダ → リポジトリの build/ 成果物に変更**。
+     常設フォルダから集めていたため **Azure Kinect(K4ABody/K4ADepth/K4ASelect)** という
+     サードパーティ製3本がDMGに混入していた(ユーザー指摘)。`git ls-files '*/build.sh'` から
+     収集するので main が追跡するものだけが対象になり、EXCLUDEリストも不要になった(69→**66本**)
+  2. **verify に APIバージョン検査を追加**(apiscanで全数 common を現行SDKと突合)。
+     同じ事故を出荷前に止められる
+- 新DMG(66本)を再公証(Accepted・staple・spctl accepted)し、GitHub Release v0.9.0 の
+  アセットを差し替え済み
+
+### 新規ハマりどころ
+
+- **TDの「invalid opType name」エラーは、opType文字列が正しくても出る**。真因が
+  `setAPIVersion()` の失敗(SDKバージョン不一致)であることが多い。TDのバージョンを
+  上げ下げした環境では、**古い/新しいSDKでビルドされたバンドルが混在**して一部だけ拒否される。
+  `tools/apiscan.c` で各バンドルの宣言APIバージョンを読み、現行SDKの
+  `OP_CommonAPIVersion`(CPlusPlus_Common.h)と一致するか確認する。直し方は**当該プラグインの再ビルド**
+- **リリース物をユーザーの常設Pluginsフォルダから集めてはいけない**(サードパーティ製が混入する)。
+  必ずリポジトリのビルド成果物から集める
+
+### 2026-08-07 サンプル映像8本をAI生成して同梱・examplesを全面的に張り直し
+
+- ユーザーが **Adobe Firefly(Google Veo 3.1 Fast)** で提案どおり8本を生成し `Assets/` に追加
+  (いずれも 1280x720 / 24fps / 8秒・合計約28MB・**コミット可能**)。従来の実写素材
+  (`test_video_1.mp4` 183MB 等)は巨大でgitignoreだったため**リポジトリに存在せず、
+  examplesの映像系は全て壊れていた**。これが解消した
+- **共有ソースを1本→9本に**: `examples/media_{people,hands,animals,throw,objects,cutout,
+  horizon,contours}`(+従来の `media_video` は people を指す汎用)。各例の `src`(Select TOP)を
+  用途に応じて張り替え(**28コンテナ**)
+- **実測(M2・TD実機)— 全て新素材で検証**:
+  - VisionPose **5人**・VisionFace **5顔**(people)
+  - VisionHand **2手**(hands)
+  - **VisionAnimalPose 2匹**(animals)← **素材が無く未検証だったopの初の実データ検証**
+  - **VisionTrajectory 4/4 valid**(throw)← **こちらも初の実データ検証**。AI生成の弾道でも
+    `VNDetectTrajectoriesRequest` が成立した
+  - CoreML DAT(YOLO)= **apple / laptop / cup**、VisionClassify = coffee / drink / liquid(objects)
+  - VisionRect 4矩形(objects)、VisionContours 8プリム/893点(contours)
+  - VisionHorizon valid=1・角度3.5°、VisionAesthetics score **0.784**(horizon)
+  - VisionSubject: ブリキロボットのカットアウトを**視認確認**、VisionTrack: 再Startで
+    u=0.512/v=0.466/conf=1.0 で追従(cutout)
+- **踏んだ罠**: ①Vision系CHOPのスロットチャンネル名は **`body1:valid`(コロン)**。
+  `body1/valid` では取れず「検出0」と誤診する ②examplesは出力が使われないため
+  **毎フレームcookされない**。検証は Execute DAT(onFrameEnd)で駆動する。特に
+  VisionTrajectory/VisionTrack は**連続フレーム必須**で、間隔を空けたforce cookでは絶対に成立しない
+  ③VisionTrack の `Top` がコンテナを指したままだった(→`src`に修正)。初期bboxは被写体に合わせる
+- `afm_describe_demo` が参照していた削除済み `test_image_1.jpg` を sample_people.mp4 へ差し替え
+  (classify = people / adult / clothing を確認)。削除済み2素材はgitからも除去
+- **ライセンス表記**: README(英日)の License 節に「Sample media / サンプル素材」小節を追加。
+  Firefly生成のため第三者の肖像権処理・ロケ許可が不要で、人物は合成、リポジトリと同じMITで配布する旨を明記
+
+### 2026-08-07 Vision系OPに Aspect Correct UVs を追加(Body Track CHOP 互換・Ortho Width=1 対応)
+
+- ユーザー要望「uv を入力画像のアスペクト比に応じて正しい比率で出力したい」→「**Body Track CHOP の
+  Aspect Correct 機能と同じように**」→「**インスタンシングして Ortho Width=1 のカメラで
+  映像に重ねられる仕様に**」
+- TD公式ドキュメントで Body Track CHOP のパラメータを確認: `aspectcorrectuv` / ラベル
+  "Aspect Correct UVs" / **Toggle・既定Off**。説明は "Rescales the u and v positions so that
+  they have the correct aspect ratio of the input image."
+- **共通ヘッダ `common/AspectCoords.h`**(namespace tdaspect)を新設。Mapper + appendAspectCorrect()
+  テンプレートで10プラグインに同じ実装を配る
+- **変換式(Ortho Width=1 で合う向きを選定)**:
+  `u' = u`(0〜1のまま) / `v' = 0.5 + (v-0.5)/aspect` / v方向の距離は 1/aspect・u方向は不変。
+  **u を 0〜1 に保つのが要点** — Instance TX=u-0.5 / TY=v-0.5 が
+  Ortho Width=1 の画面いっぱいに一致する(縦視野は自動的に 1/aspect になるため)。
+  u を aspect 倍する実装も試したが、その場合 Ortho Width を aspect に変える必要があり要件に合わない
+- **対応10プラグイン**: VisionPose / VisionHand / VisionFace / VisionAnimalPose / VisionTrack /
+  VisionPose3D(u,v のみ。tx,ty,tz はメートルなので不変)/ VisionRect(bbox+四隅)/
+  VisionTrajectory(検出点・投影点+放物線係数 a,b は 1/aspect・c は y 変換)/
+  CoreML DAT(bbox)/ VisionBarcode DAT(bbox+四隅)。信頼度・角度・IDは非変換
+- **実測(M2・1280x720・同一フレームで厳密比較)**: u=0.81578→0.81578(不変)、
+  v=0.68205→0.60240(= 0.5+(0.68205-0.5)/1.7778 に厳密一致)、bbox height 0.57449→0.32315
+  (=÷1.7778)、width 不変
+- **視覚検証**: VisionPose の全uvを Shuffle(Sequence All Channels)で 175サンプルの tx/ty にし、
+  Geo インスタンシング → **Ortho Width=1 のカメラ** → Render → 映像に Composite。
+  **On で5人全員の関節に赤点が正確に重なる**ことを視認。Off では点が縦に伸びて頭が人物の上に浮く
+- 10件とも再ビルド・署名・インストール・**TD再起動後に全10opでパラメータ生成を確認**。各README更新
+- **踏んだ罠**: ①python の文字列 replace はアンカーが1文字でも違うと**黙って何もしない**。
+  今回コメント行を含むブロックを見落として2回無駄にビルドした → **assert で必ず検証する**。
+  ②`replace(..., 1)` は最初の出現に当たる。`const int perHand` のように getChannelName と execute の
+  両方にある変数宣言は**別関数側に入ってしまう**(コンパイルエラーで気づけたが要注意)。
+  ③Shuffle CHOP で「N個の1サンプルch → 1chのNサンプル」は `seqall`(Sequence All Channels)
+
+### 2026-08-07 v0.9.1 リリース(patch判断の根拠 + 配布時バージョン焼き直し)
+
+- ユーザー提案で **0.10.0 ではなく 0.9.1**(patch)に決定。根拠: 追加した Aspect Correct UVs は
+  **既定Offの追加パラメータで後方互換**(既存 .toe の挙動は不変)。このリポジトリでは
+  オペレータの `customOPInfo.minorVersion` が .toe との互換判定に使われるため、
+  **互換性が変わっていないのに minorVersion を上げると .toe 側へ無用な差分が伝わる**。
+  patch なら minorVersion=9 据え置きでリポジトリ版と自然に揃う。差分の大半が実際バグ修正
+  (起動エラー・K4A混入)であることも patch 寄り。0.x は「いつでも変わりうる」前提なので許容
+- **release.sh に配布時のバージョン焼き直しを追加**: 収集後・**署名前**に全バンドルの
+  Info.plist へ現在の VERSION と git コミット数を書き込む。従来は「各プラグインを最後に
+  ビルドした時点の版」が残り、VERSION を上げても再ビルドしたものだけ新版になっていた。
+  verify にも `CFBundleShortVersionString == VERSION` 検査を追加
+- 66バンドル署名・全数verify(署名/Hardened Runtime/APIバージョン/**版一致**)・DMG 18MB・
+  公証 Accepted・staple・spctl accepted。**Release v0.9.1 を作成**(英日ノート付き)
+- **v0.9.0 のDMGは取り下げた**: 開発中に中身を2度差し替えた結果タグと不一致になっていたため、
+  アセットを削除し「v0.9.1 に置き換わった」注記を追加(タグとリリース自体は履歴として残置)
+
+### 2026-08-07 VisionText DAT にも Aspect Correct UVs を追加
+
+- ユーザー指示。これで **uv を出す Vision系OPは全11件**が対応(Pose/Hand/Face/AnimalPose/Track/
+  Pose3D/Rect/Trajectory/Text + CoreML DAT + Barcode DAT)
+- 出力テーブルの `u,v,width,height`(テキスト領域のbbox)へ適用。text/confidence は非変換
+- **実測(M2・TD実機)**: Text TOP に "COFFEE" を描いて入力し OCR。Off で
+  u=0.5008 v=0.4931 w=0.4828 h=0.1750 → On で **v=0.4961 / h=0.0984**。
+  理論値 `0.5+(0.4931-0.5)/1.7778 = 0.4961` / `0.1750/1.7778 = 0.0984` と完全一致。
+  u と width は不変。confidence=1.000 で認識も正常
+- **VisionSaliency は意図的に対象外**: あのuv系(オートフレーミングのクロップ矩形)は
+  **Crop TOP に直結する前提**で生の0〜1画像座標である必要があるため。補正すると本来の用途が壊れる
+- **OCR素材の方針メモ**: 動画生成AIは文字レンダリングが不安定で「OCRが失敗したのか元が
+  崩れているのか」を切り分けられない。**答えが既知の素材(Text TOP でレンダした文字列)**を
+  正確性検証に使うのが確実(VisionBarcode の利用例が CoreImage Code TOP 生成QRを使うのと同じ考え)。
+  日本語検証は特にこの方式が必須(生成AIに漢字・かなを正しく描かせるのは非現実的)
+- 注意: この変更でリリース v0.9.1 のDMGは1コミット遅れている。サンプル映像4本(crowd/faces/
+  face/ballet)の検証と合わせて次回まとめて配布物を更新する
+
+### 2026-08-07 VisionSimilarity / CoreImageBokeh / CoreImageEnhance を develop へ退避
+
+- ユーザー判断で3件を main から外し、非公開の develop ブランチで開発継続とする
+  (2026-08-07 の17件と同じ扱い。公開リリースは検証済みのみ、の方針)
+- **手順の要点**: develop は main より前の状態(opHelpURL の旧URLのまま)だったため、
+  **先に develop 側を main の最新状態へ同期してから** main で削除した。
+  `git worktree add` で develop を別ディレクトリにチェックアウトし、
+  `git checkout main -- <3フォルダ>` → コミット → push。作業ツリーを汚さずに済む。
+  **main→develop の wholesale merge は厳禁**(main の削除コミットが伝播して develop の
+  未検証プラグインが消える)ので、この folder単位の checkout が正しいやり方
+- main から3フォルダを git rm、README(英日)の該当3行を削除。release.sh は main 追跡分
+  だけを集める仕様なので EXCLUDE の追加は不要(配布は 66 → **63op**)
+- 注意: sample.toe の examples には除外した20op(17+3)の利用例が残っている。main だけを
+  clone した人が sample.toe を開くとその20例が Unknown operator type になる
+
+### 2026-08-07 VisionAesthetics / CoreLocation Beacon も develop へ退避
+
+- 前エントリと同じ手順(worktree で develop へ `git checkout main -- <folder>` して同期 →
+  main で git rm → README英日の行を削除)。**同期を先に行うこと**が要点
+- 公開対象は **61op**(main 追跡59フォルダ。Multipeer CHOP/DAT が In/Out で2バンドルずつ)
+- develop のみの非公開は計22op
+
+### 2026-08-08 ビルドシステムの重大バグ(6件が無言でビルド不能)+ CoreImageCode の bypass 復帰不良
+
+- ユーザー報告「CoreImageCode を bypass/無効化して戻すと黒画像のまま」
+- **原因1(プラグイン側)**: `execute` が `if(myResult.serial==myUploaded) return;` で
+  **一度アップロードしたら二度と上げない**構造だった。通常cook中はTDが前回テクスチャを保持
+  するので露見しないが、bypass/無効化でそれが破棄され、再有効化しても新規アップロードが
+  起きないため黒のまま(パラメータを変えると再生成→serial更新→復帰する症状と一致)。
+  → キャッシュ済みの結果を**毎execute アップロード**するよう変更(空のときだけ return)
+- **同じ構造が18 TOP にある**(`myUploaded`/`myUploadedSerial` で grep)。動画入力のものは
+  次フレームで自己回復するが、**静止画入力や生成系(CoreImageCode)は復帰しない**。
+  他TOPへの横展開は次の課題
+- **原因2(ビルドシステム・より重大)**: `common/build_plugin.sh` は **zsh専用**
+  (`${(%):-%N}`・`arr+="x"` など)なのに、6件の build.sh が `#!/bin/bash` だった。
+  bash から source すると `bad substitution` → `set -e` で**何もビルドされないまま無言で終了**。
+  終了コードも0に見える出力だったため気づかず、**2026-07-23(version.sh 導入)以降
+  CoreImageCode / CoreAudioProcessTap / CoreWLAN / Spotlight / SpeechSynth / VisionHorizon の
+  6件はビルドされていなかった**(=リリースDMGのこの6件は07-23以前のバイナリで、
+  opHelpURL の新URL等が入っていない)。6件の shebang を zsh に統一し、共通ヘルパ冒頭に
+  「このファイルは zsh 専用・呼び出し側も #!/bin/zsh にすること」を明記。6件とも再ビルド済み
+- **検証中に TouchDesigner がクラッシュ**(04:37・EXC_BAD_ACCESS)。クラッシュスタックは
+  **libOPUI/libUI のみでプラグインのフレームは無し**=TD側UIのnull参照。`CrashAutoSave.sample.toe`
+  が生成されている。bypass再検証はTD再起動後に持ち越し
+
+### 2026-08-08 bypass復帰の黒画像を全17 TOPへ横展開修正 + TD実機検証
+
+- CoreImageCode 単体の修正を、同じ構造を持つ **CPUMem TOP 全17件**へ展開:
+  CoreImageHDR / CoreImageRAW / CoreML / CoreMLSAM2 / CoreText / ImageIOFileIn /
+  MetalDenoise / MetalUpscale / PDFKit / VisionFlow / VisionSegment / VisionSubject /
+  VisionSaliency / ScreenCapture / CinematicVideo(以上15件は
+  `myResult.serial == myUploaded ||` の条件を機械的に除去)+ **CoreMLImageGen /
+  ImagePlayground の2件は構造が違う**(serial一致のときだけ変換+アップロードする形)ため、
+  **取り出した画素を `myPixels` にキャッシュし、アップロードだけ毎cook行う**よう書き換えた
+  (ヘルパへの `sd_copy_image`/`pg_copy_image` は従来どおり新画像のときだけ呼ぶ)
+- **TD実機検証**: CoreImageCode = bypass往復3回でもQRが復帰(パラメータ変更なし)。
+  CoreText = bypass解除後にテキスト復帰。いずれも修正前は黒だった
+- **検証設計の注意**: VisionSubject を `play=0` の静止入力で試したところ **before も黒**で
+  不成立だった(入力が1度も更新されず初回解析が走らないため)。bypass検証は
+  **必ず「修正前に生成できていること」を先に確認**してから行う
+- 17件とも署名・APIバージョン検査つきでインストール済み
+- 注意: この17件+先の6件(ビルド不能だったもの)でリリースDMGは大きく遅れている。
+  次回配布時にまとめて更新する
+
+### 2026-08-08 sample.toe → demo.toe に改称 + examples を /project1 直下へフラット化(ユーザー編集)
+
+- ユーザーが利用例を再編。**`/project1/examples` コンテナを廃止し、1オペレータ1コンテナを
+  `/project1` 直下へ**(現在54コンテナ)。共有ソースの `media_video` も廃し、**各コンテナ内に
+  素材の Movie File In を直接置く**方式(例: CoreML TOP の `sample_crowd_2`)に変わった
+- ファイル名は `sample.toe` → **`demo.toe`**(途中経過の `example.toe` はユーザー環境に残置)。
+  git は `sample.toe` を削除し `demo.toe` を追跡。README(英日)の参照6箇所を更新し、
+  `/project1/examples` の記述も削除。`CrashAutoSave.sample.toe` も削除
+- **CoreML CHOP の利用例を新スタイルで作成**: `sample_street(Movie File In) → Coreml1 → out` +
+  note。MobileCLIP S0 画像エンコーダで映像を512次元埋め込みに変換。
+  実測 valid=1 / count=512 / value0=0.0246。**Max Values を 256→512** に上げてモデルの
+  全次元を出す(既定256だと打ち切られる。count はモデル本来の要素数を返すので突き合わせ可)
+- 注意: TD の作業中に構成が変わることがあるので、examples を触る前に毎回
+  `/project1` の子を確認する(`/project1/examples` はもう無い)
+
+### 2026-08-08 demo.toe をカテゴリ別グリッドへ整理 + 利用例の不足を洗い出し
+
+- `/project1` 直下の46コンテナを **ルート README と同じ10カテゴリ**の行に並べ替え。
+  各行の左端に `_cat_01`〜`_cat_10` のラベル Text DAT を置き、旧 `_cat_IO/_cat_Audio/
+  _cat_CoreML/_cat_Vision` は撤去。インフラ(_README / media_audio / td_mcp_server)は最下段へ
+- `_README` を索引に更新(カテゴリ表・不足14件・外部モデルが要るOP・注意)
+- **利用例が無いプラグイン14件**(main の60opに対して): Cinematic Video / CoreImage HDR /
+  CoreImage RAW / ImageIO File In / ImageIO PointCloud / ImagePlayground / Vision Document /
+  CreateML / CreateML Training Recorder / CoreML Motion / CA Process Tap / CoreWLAN /
+  CoreWLAN Scan / Spotlight
+  - 素材/権限が要るもの(Cinematic=実Cinematic動画、HDR/RAW/FileIn/PointCloud=実写HEIC・DNG、
+    CoreWLAN系=Wi-Fi環境、CA Process Tap=音を出すアプリ)と、すぐ作れるもの
+    (Vision Document / CreateML / Spotlight / ImagePlayground)に分かれる
+- **MetalFrameInterp の利用例が残っていた**が、これは develop 送りで main には無い。
+  公開版では Unknown operator type になるため要削除(ユーザー判断待ち)
+- MCP run の癖: **exec のスコープ分離でリスト内包表記から外側の変数が見えない**
+  (`NameError: name 'placed' is not defined`)。明示的な for ループで書く
+
+### 2026-08-08 demo.toe: カテゴリ再編(CoreML統合・demo廃止)+ 利用例3件を追加
+
+- ユーザー指示でカテゴリを再編:
+  - **CoreML系を1カテゴリに統合**(06 CoreML = CoreML TOP/CHOP/DAT・SAM2・ImageGen)。
+    従来 02/03/06 に散っていたものを集約
+  - **「Demos」カテゴリを廃止**し、作例を主役OPのカテゴリへ振り分け
+    (mlx_vision_demo→08 Language & Text、applescript_demo/shortcuts_demo→10 System)
+  - 09 を「3D / Geometry / Document」、10 を「System / Devices / Network」に分割(旧09が13件で長すぎた)
+- **利用例3件を追加**:
+  - **Vision Document**: `Assets/sample_document.png`(新規・見出し/段落/3列の表/箇条書きを含む
+    文書画像・約690KB)→ 31行6列(type/page/index/row/col/text)を抽出。
+    **このOPは TOP ではなく File パラメータ(画像ファイルパス)を受ける**のが要点
+  - **Spotlight**: Query="CoreText"・Search パルスで **21件**ヒット(Mode=Name)
+  - **ImagePlayground**: Prompt+Style(illustration)を設定。Generate はユーザーが押す前提
+    (生成は前面GUIアプリ内でのみ動作)
+- 素材生成のメモ: `cupsfilter` は **HTML→PDF に非対応**。AppKit の
+  `NSAttributedString(html:)` → NSImage → PNG で文書画像を作った(swiftc の小スクリプト)
+- 残る未着手は11件(素材・環境・学習が要るもの)。_README に分類して記載
+
+### 2026-08-08 VisionSegment を develop へ退避
+
+- 手順は従来どおり(worktree で develop へ `git checkout main -- VisionSegment` して同期 →
+  main で git rm → README英日の一覧行を削除)。今回は **「Nvidia専用OPの macOS 代替」表**にも
+  参照があったので併せて削除(この表に残るのは Pose / Upscale / Flow / Face の4件)
+- 公開対象は **59オペレータ**(main 追跡57フォルダ)。develop のみの非公開は計25op
+- demo.toe には VisionSegment の利用例が残っている(MetalFrameInterp と同じ状態)。
+  公開版では Unknown operator type になるため、まとめて削除するかはユーザー判断待ち
+
+### 2026-08-08 LLM AFM の利用例に Tool Calling を追加
+
+- `/project1/LLMAFM` に **ツール呼び出しの往復**を組み込んだ:
+  `sensor`(Constant CHOP: temperature/humidity)+ `handler`(Execute DAT)+ `Llmafm1`
+  - Enable Tool Calling / Tool Name=`get_sensor` / Tool Parameters=`name:string`
+  - handler が `pending_tool_args` を検知 → sensor CHOP から値を引いて Tool Result へ
+    JSON を書き → Return Tool Result をパルス
+- **実測**: 「Use the get_sensor tool with name "temperature"...」→
+  **"The current temperature is 42.0°C."**、humidity に変えると **"The humidity value is 58.0."**。
+  LLM が TD のライブ値を読んでいることを確認
+- **踏んだ罠(既知の再確認)**: 最初 `datexecuteDAT` の `onTableChange` でハンドラを書いたら
+  **pending_tool が出たまま止まった**。非同期な C++ DAT の更新では onTableChange が
+  安定して発火しない → **Execute DAT の onFrameEnd で毎フレーム polling** に変更して解決
+- **踏んだ罠(新規)**: オンデバイスモデルは小さく、「What is the current temperature?」のような
+  曖昧な聞き方だと**ツールを使わず「センサーがありません」と答える**。プロンプトでツール名を
+  明示すると確実に呼ぶ。note にも明記した
+
+### 2026-08-08 LLM MLX の利用例が動かない不具合を修正(Model が式モードで SyntaxError)
+
+- ユーザー報告「LLMMLXが動いてない?」→ `Llmmlx1` に
+  `Error: SyntaxError: invalid decimal literal` が出ていた
+- **原因**: `Model` パラメータが **Expression モード**なのに、式ではなく
+  `gemma-3-4b-it-qat-4bit` という**裸の文字列**が入っていた。Python が
+  `gemma - 3 - 4b - ...` の数式として解釈して構文エラー(4b が不正な数値リテラル)
+- **修正**: `project.folder + '/models/gemma-3-4b-it-qat-4bit'` という正しい式に。
+  ローカルフォルダ指定なので完全オフラインで動く
+- **検証(M2・TD実機)**: Load → Info DAT の `status=ready`(ヘルパプロセス
+  `mlxllm-helper --serve` も起動確認)→ Submit「Name one primary color.」→ **"Red"**
+- 例に **`info`(Info DAT)を追加**。status(loading model / ready)が見えないと
+  「動いていない」のか「ロード中」なのか判別できないため
+- note に**この罠を明記**: リポジトリIDを直接書くなら**クォートで囲む**か
+  パラメータを定数モードに戻すこと。VLM は gemma 系4bitでは不可(Qwen2-VL 系を使う)
+
+### 2026-08-08 models/ をREADMEだけ共有・各利用例のnoteにモデル入手先を明記
+
+- ユーザー指摘「models フォルダは git で共有されていない?」→ そのとおりで完全に未追跡だった
+  (.gitignore の `models/`)。**フォルダ自体を追跡するため `models/*` + `!models/README.md`** に変更
+- **`models/README.md` を新設**(唯一追跡されるファイル)。利用例が期待する**ファイル名 → 用途 →
+  入手先URL** の表と、`hf download <repo> --local-dir models/<name>` の手順、
+  ライセンスは各モデル固有である旨を記載
+  - DepthAnythingV2 / MobileCLIP(image+text)/ YOLOv3 / SAM2.1-tiny /
+    Stable Diffusion 2.1 base / gemma-3-4b-it-qat-4bit / Qwen2-VL-2B(VLM用)
+- **demo.toe の該当6例(CoreML TOP/CHOP/DAT・SAM2・ImageGen・LLM MLX)の note に
+  入手先ブロックを追記**。ファイル名・URL・hf download コマンドをその場で読める
+- ついでに note に残っていた**古い共有ソース表記**(`shared via examples/media_*`)を除去。
+  examples フラット化で `media_video` 方式は廃止済みのため実態と食い違っていた
+- ルート README(英日)のモデル案内を `models/README.md` への導線に更新
+
+### 2026-08-08 demo.toe を9カテゴリへ再編・ノードを色分け
+
+- ユーザー指定のカテゴリで配置し直し、**コンテナの色もカテゴリで統一**:
+  01 Vision Pose系(青) / 02 その他Vision(青緑) / 03 LLM(紫) / 04 CoreML(藍) /
+  05 画像生成(赤紫) / 06 描画(橙) / 07 Sound(緑) / 08 Text(黄緑) / 09 その他(灰)
+- 1行8個で折り返し、超える分は同カテゴリ内の2行目へ(02=11件、09=12件)。
+  ラベル `_cat_01`〜`_cat_09` も同じ色にして行頭に配置
+- 分類の判断: **01 は「ポーズ/キーポイント推定」**として VisionPose / Pose3D / Hand /
+  Face / AnimalPose を入れた(VisionFace は検出+ランドマークなので境界。02へ移したい場合は
+  1行変えるだけ)。08 Text は NLP 系(TextAnalyze / Translate)で、OCR の VisionText と
+  文書構造の VisionDocument は Vision なので 02 に置いた
+- ユーザー側で VisionSegment / MetalFrameInterp / mlx_vision_demo / shortcuts_demo の
+  各コンテナは削除済み、applescript_demo → applescript にリネーム済みだったので、
+  develop送りopの参照切れは demo.toe から解消された
+- _README を新カテゴリ表+色の対応+外部モデルが要るOP+未着手11件の索引に更新
+
+### 2026-08-08 VisionPose 利用例: 骨格線の生成を追加(データは完成・描画は未解決)
+
+- ユーザー要望「点だけでなく関節を繋いで描画したい」
+- **`geo2/skeleton`(Script SOP)を追加**。Vision Pose CHOP を読んで骨(19本)の線分を生成:
+  骨盤→胴→首→鼻、目・耳、肩→肘→手首、腰→膝→足首。**両端の confidence が
+  Minconf 未満なら描かない**(Vision に無い つま先/かかと/指 は confidence=0 なので自動的に除外)
+  - 実測: 5人分で **95プリム / 190点**。座標も検証済み(x≈0.25, y≈-0.04..0.1 と妥当)
+  - Aspect Correct UVs = On 前提で `-0.5` するだけで Ortho Width=1 のカメラに載る設計
+- **踏んだ罠**:
+  ① Script SOP のポリゴンは `appendPoly(2, addPoints=False)` → `poly[0].point = pa` が正しい。
+     最初 `appendPoly(0,...)` + `line.append()` と書いて **1本しか生成されなかった**
+  ② Script SOP は入力が無いと毎フレーム cook しない。custom par `Trigger` に
+     `op('../Visionpose1').totalCooks` の式を入れて dirty にする
+  ③ **script で作った Geometry COMP には既定の `torus1` が入る**。消し忘れると
+     画面いっぱいの塗りになる(実際に踏んだ)
+- **未解決**: geo2 が描画されない。`soptoPOP` で POP 化(190点/93プリム)し、render/display
+  フラグも立て、Constant/Wireframe 双方の MAT を試したが表示されない。**この TD は POP 世代**で、
+  動いている geo1 は「1点のPOP + インスタンシング」構成。**同じくインスタンシングで
+  骨1本ごとに単位線分を配置する方式**に切り替えるのが確実だと思われる(次の手)
+- 例自体は壊していない(点の描画・映像の合成は従来どおり動作)。render1 の解像度は
+  Resolution Multiplier を切って 1280x720 にした(128x128 では合成が破綻していたため)
+
+### 2026-08-08 VisionHand / VisionFace にも線描画を追加(3例とも描画確認)
+
+- VisionPose の骨格線は**描画できていた**(前エントリの「未解決」は誤り)。原因は
+  `.save()` のキャプチャが POP パイプラインの落ち着く前だったため。数フレーム置くと
+  5人ぶんのスティックフィギュアが正しく描かれる
+- **VisionHand**: `geo2/bones`(Script SOP)で指5本(wrist→cmc/mcp→…→tip)＋手のひら
+  (index/middle/ring/little の mcp を連結)。実測 2手で **46本**
+- **VisionFace**: `geo2/contour`(Script SOP)で p0..p75 を領域ごとに連結。並びは Apple の
+  76点コンステレーション順(0-10輪郭 / 11-18左目 / 19-26右目 / 27-32左眉 / 33-38右眉 /
+  39-47鼻 / 48-52鼻筋 / 56-69外唇 / 70-75内唇)。目と唇は閉ループ。
+  実測 **12顔で816本**、全員の顔に正しく描かれることを視認
+- **描画に必要だった手順(3例共通・pitfalls級)**:
+  ① Script SOP → `soptoPOP` → `outPOP` と繋ぐ(このTDは POP 世代で、Geometry COMP は
+     POP を描く)。② **outPOP の render/display フラグを立てる**(立てないと何も出ない)。
+  ③ script で作った Geometry COMP には既定の `torus1` が入るので消す
+  ④ Script SOP は入力が無いと毎フレーム cook しない → custom par `Trigger` に
+     元CHOPの `totalCooks` を式で入れて dirty にする
+  ⑤ ポリゴンは `appendPoly(2, addPoints=False)` → `poly[0].point = pa`
+- 3例とも render1 の Resolution Multiplier を切って 1280x720 に(128x128 では合成が破綻)
+- Face のランドマーク領域範囲は Apple の並び順に依存する。ある領域だけ崩れて見える場合は
+  スクリプト先頭の REGIONS を直す旨を note に明記
+
+### 2026-08-08 VisionFace: ランドマークの並びを領域順に詰め直し(描画できる並びへ)
+
+- ユーザー指摘「landmark の繋ぎ方が変」「顔の輪郭が片側途中まで」→ 2段階の実バグを修正
+- **原因1**: `VNFaceLandmarks2D.allPoints` の並びは**輪郭順ではない**(目の領域内でも
+  座標が -0.25→-0.11→-0.21 と飛ぶ)。連番で結んでも綺麗にならない。
+  → プラグインで **faceContour / leftEye / … と領域ごとに、領域内の正しい順序**で
+  `face.points[]` に詰め直すよう変更(`lm.faceContour` 等を直接読む)
+- **原因2**: 領域ごとの枠を Apple の一般的な数(11/8/8/…)で固定したら、**輪郭が11点に
+  truncate されて顎の片側が途中で切れた**。TD上で「各枠の未使用スロット数」を数えて
+  **実際の点数を実測**: 輪郭16 / 目6・6 / 眉6・6 / nose8 / crest5 / median3 /
+  outerLips14 / innerLips6 = ちょうど76。これに合わせて配分を修正
+- **未使用スロットは u=v=-1 の番兵**にした(0 のままだと bbox 隅の実在しない点に見え、
+  線が画面外へ飛ぶ。実際に画面左下へ集まる線が出た)。描画側はこれをスキップする
+- 実測: 12顔・780プリムで、輪郭が顎の両側まで通り、目/眉/鼻/唇が参考画像どおりに描かれる
+- VisionFace README に「ランドマークの並び」節(範囲・点数・開閉・番兵)を追加。
+  demo.toe の note も同内容に更新
+- **教訓**: Vision の領域点数は constellation により変わる。固定長で切ると**エラーも警告も
+  出ずに形だけ壊れる**。実データで枠の使用数を数えて確かめること
+
+### 2026-08-08 VisionAnimalPose にも骨格線を追加 + 4例の線を見やすく調整
+
+- `geo2/bones`(Script SOP)で25関節を接続: 耳(上→中→下)/ 目-鼻 / 鼻→首 / 首→尾(3点) /
+  前脚(首→肘→膝→足) / 後脚(尾の付け根→肘→膝→足)。実測 **2匹で41本**、犬と猫それぞれの
+  骨格が正しく描かれることを視認
+- **4例すべてで `lineMAT` の Wire Width を 3 に**(既定1pxだと線が細くて見えにくかった)。
+  色も分けた: Pose=緑 / Hand=橙 / Face=水色 / AnimalPose=黄
+- 線描画の型が4例で揃った(Script SOP → soptoPOP → outPOP + render/display フラグ + Trigger)
+
+### 2026-08-08 VisionAnimalPose の骨格接続を修正(top/bottom は「先端/付け根」だった)
+
+ユーザー指摘「AnimalPoseの繋ぎ方が不自然」+ WWDC23 のスケルトン画像。実データを読んで原因を特定。
+
+- **真因**: Apple の関節名の `top` / `bottom` は**画面の上下ではなく、その部位の先端 / 付け根**。
+  猫(高信頼度・実測)で確定: `tail_top`=(856,240) **尻尾の先端** / `tail_bottom`=(865,389) **腰の付け根**。
+  耳も同じで `ear_top`=先端 / `ear_bottom`=頭に付く付け根(垂れ耳の犬では ear_top が画面下に来る)
+- 背骨を `neck → tail_top` で結んでいたため、**尻尾を立てた猫で首から尻尾の先まで空中を横切る線**に
+  なっていた。後脚も尻尾の先から生えていた
+- **修正**: 胴 `nose → neck → tail_bottom`(腰)/ 尾 `tail_bottom → tail_middle → tail_top` /
+  後脚は `tail_bottom` から。耳は**閉じた三角形**、頭部は `ear_bottom → eye → nose`。
+  接続は Apple の joint group(head / trunk / tail / 各脚)に沿わせた
+- **実測(M2・frame 40 で静止して検証)**: 修正後、猫は背骨が背中に沿い尻尾が腰から立ち上がる、
+  犬も背骨・四肢とも自然。2匹で52本。再生に戻した動画でも視認確認
+- VisionAnimalPose/README.md に「関節名の top / bottom は先端 / 付け根」の表と、
+  骨格を引くときの注意を追記。demo.toe の note も同内容に更新
+
+- **検証手順のメモ**: アスペクト補正の影響を外して生 uv を読むために一時的に
+  `Aspectcorrectuv` を Off にしたら、**インスタンシングの overlay が画面外へ飛んだ**
+  (例は補正 On + Ortho Width=1 前提のため)。解析が終わったら必ず On に戻すこと。
+  静止フレームでの検証は `moviefilein.play=False` + `index` 固定 + CHOP を force cook
+- 検証中に TD が落ちたが、**落ちる直前の project.save() は成功していた**(demo.toe は無事)。
+  再起動して note・接続・プリム数がディスク版に入っていることを確認済み
+
+### 2026-08-08 デモGIFをREADMEに掲載(demo_capture の画面収録 → docs/demo/*.gif)
+
+- ユーザーが `demo_capture/` に5本の画面収録(1280x720・60fps・5〜9.4秒)を追加。
+  VisionPose / VisionHand / VisionFace / VisionText / CoreMLDAT(yolo)
+- **`tools/make_demo_gifs.sh`**(zsh)で GIF 化して `docs/demo/*.gif` へ。README(英日)の冒頭に
+  「Demos / デモ」節を新設し2列テーブルで掲載、目次にも追加
+- **GIFはフレーム間差分でしか縮まない**ので、単に色数やディザを削っても効かない(実測: 64色・
+  ディザ無しにしても 520w/12fps で 3.3MB のまま)。効いた順に:
+  ① **hqdn3d で軽くノイズ除去**(変化しない画素が増えて差分が効く)② 幅を480pxへ ③ 12fps
+  ④ **尺を4秒前後に切る**。これで1本1.0〜1.9MB・計約6.8MB
+  - 人混みの街路(CoreMLDAT)はほぼ全画素が毎フレーム変わるので、440w/10fps+強めの hqdn3d が必要
+- **元動画が終わって背景だけになる区間を落とす**: VisionFace は4.0秒以降が輪郭のみ、
+  VisionText は認識枠が出るのが3.4秒から。`signalstats` の YAVG を 2Hz でサンプルして
+  切れ目を機械的に見つけた(`ffmpeg -vf "fps=2,signalstats,metadata=print:key=lavfi.signalstats.YAVG"`)
+- `demo_capture/`(27MB)は **.gitignore**。GIFだけコミットする
+- **zshの罠**: `"...max_colors=$3:stats_mode=diff..."` のように `$N:s` が続くと **zsh の履歴修飾子
+  `:s` と解釈されて文字列が食われる**(ffmpeg が "64teuse=dither=none" を受け取って失敗)。
+  `${3}` と波括弧で囲む
+- GitHub の README は **mp4 を埋め込めない**(markdown内の `<video>` はサニタイズされる)ので GIF 一択
+
+### 2026-08-08 デモGIFに VisionAnimalPose を追加 + サンプル映像9本をコミット
+
+- ユーザーが `demo_capture/VisionAnimalPose.mp4` を追加。**冒頭2.6秒は骨格だけで元動画が出ない**
+  ため 2.6s から3秒を切り出し(切れ目は YAVG が 18→146 に変わる点で判定)。1.5MB
+- README(英日)のデモ表がこれで **3行×2列** に揃った(Pose / Hand / Face / CoreML(YOLO) /
+  Text / AnimalPose の6本・計約8.4MB)
+- **`Assets/sample_*.mp4` 9本(計41MB)をコミット**。demo.toe の Vision系利用例が参照しているのに
+  未追跡で、clone しただけでは映像系の例が全部空になっていた(最大は sample_street.mp4 の15MBで
+  GitHub の100MB制限内)
+
+### 2026-08-08 VisionFace のデモGIFを撮り直し版に差し替え
+
+- ユーザーが `demo_capture/VisionFace.mp4` を撮り直し(5.8秒・**元動画が終わる無駄な区間なし**、
+  ランドマークの輪郭線が青でしっかり出ている)
+- **細い線のオーバーレイは 480px / 64色だと潰れる**(顔のランドマークが読めず、背景の壁も縞になる)。
+  この clip だけ **560px / 128色** に上げ、尺を 3.2秒に詰めて 2.0MB に収めた。
+  `make_demo_gifs.sh` の CLIPS に色数の列を追加して clip ごとに指定できるようにした
+- デモGIF計6本・約9.1MB
+
+### 2026-08-08 td_mcp_server(第三者コンポーネント)の出典を明記
+
+- ユーザー質問「td-mcp を .toe に含めているが問題ないか」を調査。
+  [johnsabath/touchdesigner-mcp](https://github.com/johnsabath/touchdesigner-mcp) は
+  **README に MIT と明記**されており使用・再配布とも可。ただし:
+  - **LICENSE ファイルが無い**(`gh api` でも `license: null`)。MIT は著作権表示と許諾表示の
+    同梱が条件だが、複製すべき著作権行が公開されていない。上流に LICENSE 追加を依頼するのが確実
+  - こちらは `Assets/td_mcp_server.tox` を追跡し、**demo.toe にも埋め込んでいる**
+    (`externaltox` はローカル絶対パスを指すが実ファイルは無く、内容は .toe 側に保存されている)
+  - にもかかわらず README / THIRD_PARTY_NOTICES.md が「**自作コードのみ・第三者ライブラリは
+    同梱していない**」と**事実と異なる記述**になっていた
+- LICENSE 末尾に第三者コンポーネントへの導線、THIRD_PARTY_NOTICES.md に専用節(出典・MIT・
+  LICENSE不在の但し書き)、README(英日)のライセンス節に要約を追記。誤記も訂正
+- **セキュリティの実測**: この COMP は Web Server DAT をポート9988で起動するが、
+  **Web Server DAT に bind アドレスの指定が無く 0.0.0.0 で待ち受ける**。自機のLAN IP
+  (`10.59.224.215:9988`)へ MCP の initialize を POST して **HTTP 200** を確認。
+  エンドポイントは**認証なしで TD 内の任意 Python を実行できる**(`run` ツール)ので、
+  同一LAN上の誰でも TD とマシンを操作できる。この旨を notices と README に明記した
+- **未決**: demo.toe から `td_mcp_server` を外すかどうかはユーザー判断待ち(今回は表記のみ)
+
+### 2026-08-08 Assets/td_mcp_server.tox を削除(demo.toe への影響なしを確認)
+
+- 削除前に無参照を確認: ①`demo.toe` のバイナリに "Assets/td_mcp_server" の文字列は0件
+  ②ロード中の demo.toe で `externaltox` を持つ COMP が1つも無い(=サーバの中身は .toe に
+  埋め込み済みで、外部 tox に依存していない)③リポジトリ内の言及はドキュメントのみ
+- `git rm` して、LICENSE / THIRD_PARTY_NOTICES.md / README(英日)の所在表記を
+  「`demo.toe` に `/project1/td_mcp_server` として埋め込み」へ更新。出典表記自体は維持
+- 注意: **同梱をやめたわけではない**(demo.toe の中に本体がある)ので、出典表記は引き続き必要
+
+### 2026-08-08 Non-Commercial 版の解像度制限について未検証である旨を明記
+
+- ユーザー指示「NonCommercial での検証が不十分なので解像度制限による問題が出る可能性を記載したい」
+- **NC の上限は 1280x1280**(https://derivative.ca/download で確認)。開発・実測はすべて
+  ライセンス版(2025.32280)で行っており、NC 環境での確認はしていない
+- 各READMEの実測解像度を機械的に走査して**上限超えのOPを特定**し、ルートREADME(英日)の
+  必要環境に節を新設して表で列挙 + 該当8プラグインの「注意」節に1行ずつ追記:
+  - Metal Upscale(2x/4x は必ず超える=OPの用途そのもの)/ Cinematic Video(3840x2160)/
+    ImageIO File In・CoreImage RAW・CoreImage HDR(実機写真 3024x4032 級)/
+    Screen Capture(1710x1112)/ PDFKit(1275x1650)/ CoreText(指定解像度しだい)
+  - 回避策は出力解像度を下げること、直らなければ Issue を、と案内
+- **次にやるなら**: `app.addNonCommercialLimit()` / `app.removeNonCommercialLimit()` が
+  TD の Python API に存在する(`dir(app)` で確認)。ライセンス版のまま NC の制限を再現できる
+  可能性があるので、実際に掛けて上記8件の挙動を確認すれば「未検証」を解消できる(今回は
+  ユーザーが作業中のTDに影響するため実行していない)
+
+### 2026-08-08 利用者向けスキル td-apple-ops を追加
+
+- 既存の `td-apple-plugin` は**作る側**のスキルなので、**使う側**(既存OPでTDプロジェクトを組む)の
+  スキルを新設。`.claude/skills/td-apple-ops/` に実体を置き、`~/.claude/skills/` へシンボリックリンク
+  (td-apple-plugin と同じ運用。単一ソースのままセッションを跨いで使える)
+- 構成: `SKILL.md`(導入・OPの選び方・外さない5つのルール・チャンネル名の書式・NC制限)/
+  `wiring.md`(cookを回す・Info CHOP・Flip・Aspect Correct UVs→Ortho Width=1・骨格線・
+  マスク合成・VisionFlow可視化・音声/LLMの注意)/ `troubleshooting.md`(症状別)
+- **OP一覧はスキルに転記しない**(必ず陳腐化する)。ルートREADMEを正として参照させる方針
+
+### 2026-08-08 ops_catalog.json の追跡をやめた(生成物・黙って腐る)
+
+- ユーザー質問「ops_catalog.json はもういらない?」→ 調べたところ**誰も参照しておらず、
+  内容も大きく古かった**ので追跡をやめた
+  - 最終更新は 7/22。その後の develop 分離・CoreMLDetect→CoreMLDAT 改名・Aspect Correct UVs 追加を
+    一切反映しておらず、`_count: 82` に対し **main に存在しない 24 op**(Visiontrack / Visionsegment /
+    Swiftui / Phase 等)を載せたままだった
+  - 参照は `tools/gen_ops_catalog.py`(生成元)と CLAUDE.md の履歴行のみ。README からのリンクも無し
+- `git rm --cached` + `.gitignore` へ追加。**生成スクリプトは残す**(実行して 59 ops を正しく出力する
+  ことを確認済み)。必要になった時点で `python3 tools/gen_ops_catalog.py` で作り直す
+- 教訓: **一覧は1箇所だけを正にする**。人間向けはルート README、機械可読が要るときだけ生成。
+  同じ理由で新スキル td-apple-ops にも OP 一覧を転記していない
+
+### 2026-08-08 利用者向けスキルの案内を README に追記
+
+- 「使い方 / Getting started」に **3. AIコーディングエージェントと組む場合** を新設し、
+  `td-apple-ops` の中身(導入・OPの選び方・配線ルール・レシピ・症状別)と、他プロジェクトから
+  使うためのシンボリックリンク手順を記載(英日)
+- 既存の「プラグインを自作する人へ」の `td-apple-plugin` の行にも、**使う側は td-apple-ops** と
+  相互リンクを追加。作る側/使う側のどちらから入っても辿り着ける
+
+### 2026-08-08 v0.9.2 リリース
+
+- VERSION を 0.9.2 へ。**57プラグインを全て再ビルド**(並列 `xargs -P 6`・全件成功)してから
+  `tools/release.sh sign → verify → dmg → notarize`。59バンドル(Multipeer は In/Out で2つずつ)
+- verify は署名・Hardened Runtime・Developer ID・**OP_CommonAPIVersion=1**・**版一致**を全数検査して通過。
+  DMG 18MB → 公証 **Accepted** → staple → `spctl` accepted(Notarized Developer ID)
+- v0.9.1 からの中身(なぜ patch でなく必要だったか): **bypass/無効化から戻すと黒画像になる不具合を
+  全17 TOP で修正**、**ビルド不能だった6件を修復**(共通ヘルパが zsh 専用なのに shebang が bash
+  → 7/23以降ずっとビルドされていなかった)、VisionFace のランドマーク並び修正、
+  VisionAnimalPose の骨格接続修正、VisionText への Aspect Correct UVs 追加
+- 公開対象は 0.9.1 の66 → **59オペレータ**(VisionSimilarity / CoreImageBokeh / CoreImageEnhance /
+  VisionAesthetics / CoreLocation Beacon / VisionTrack / VisionSegment を develop へ退避したため)
+
+### 2026-08-08 README の「使い方」をリリースDMG優先の順序に変更
+
+- ユーザー指示「まずリリースビルドをダウンロードして使う方法を案内して」。従来は
+  **1. プラグインをビルド** から始まっており、Xcode が要る前提に見えていた
+- 新しい順序(英日): **1. 導入(リリースDMG・ビルド不要)** → **2. 利用例を動かす(demo.toe)** →
+  **3. ソースからビルド(任意)** → **4. AIエージェントと組む場合**。
+  1 に公証済みで Gatekeeper 警告が出ないこと、プラグインは起動時にしか走査されないこと、
+  多数入れ替え直後の初回起動が数分かかることを明記
+- **踏んだ罠**: 最初 `cp -R /Volumes/Apple*Frameworks*/*.plugin ...` と書いたが、
+  **古いバージョンのDMGが同時にマウントされているとグロブが両方に一致する**
+  (実機で v0.9.0 が残っており 59個のはずが128個に一致した)。バージョンを明示する
+  `"/Volumes/Apple Frameworks for TouchDesigner v0.9.2/"*.plugin` に修正し、
+  実際にコピーして59個・コピー後も `codesign --verify --deep --strict` が通ることを確認
+
+### 2026-08-08 README の Versioning にリリース履歴表を追加
+
+- 「現在のリリース」を 0.9.2 へ更新し、あわせて**バージョン / 日付 / OP数 / 主な内容**の
+  履歴表を新設(英日)。0.9.0 は DMG を取り下げ済みである旨も1行で残した
+- OP数の推移が見えるようにした(0.9.1=66 → 0.9.2=59。develop へ7件退避したため)。
+  0.9.1 の Aspect Correct UVs は10op、VisionText を足した0.9.2で11op全対応、という差も表に反映
+
+### 2026-08-08 導入手順に「プラグイン数ぶん許可ダイアログが出る」注意を追加
+
+- ユーザー指摘: Plugins フォルダに入れると**初回起動時にプラグインの数だけ New Plugin の
+  許可ダイアログが出る**(TDは許可結果を `Plugins.json` に記録する)。59個入れると
+  ネットワークに辿り着く前に59回閉じることになる
+- README(英日)の「1. 導入」を **まず使いたいものだけコピーするのを推奨**する書き方に変更。
+  全部入れるコマンドは残しつつ、その前に注意を置いた。許可はプラグインごとに記憶され、
+  あとから足せることも明記
+- skill `td-apple-ops` にも反映: SKILL.md の導入手順に同じ推奨、troubleshooting.md の
+  「Create Dialog に出ない」の**最初のチェック項目**に「許可ダイアログを閉じてしまっていないか」を追加
+
+### 2026-08-08 CoreText TOP: Line Height を1.0未満にすると1行目が動く問題を修正
+
+- ユーザー報告「LineHeight を一定以上小さくすると1行目も動く」。**既知の未修正ブランチ**で、
+  ソースのコメントにも「1.0未満は MaximumLineHeight。この場合のみ1行目もわずかに動く」と残っていた
+- **単体ハーネスで定量化**(Helvetica 72pt・natural=72):
+  - 現行(MaximumLineHeight): 1行目が lh=1.0→62.00 / 0.95→61.00 / 0.60→48.00 / 0.20→34.00 と動く
+  - さらに実際のプラグインは lh>=1.0 で別ブランチ(LineSpacingAdjustment)なので、
+    **1.00→0.95 の瞬間に1行目が 70→61 へ9px飛び**、行送りも 87→68 へ不連続に変わっていた
+    (ユーザーの言う「一定以上小さくすると」はこの段差)
+- **修正: 分岐を廃止し常に LineSpacingAdjustment(負値可)**。1行目のベースラインは全ての値で不動。
+  lh>=1.0 の挙動は従来と完全に同一(同じコードパス)なので既存 .toe の見た目は変わらない
+- **実測(ハーネス)**: 提案方式は Helvetica で 1行目=70.00 固定・行送り 87→51→22.2→15、
+  和文(ヒラギノ角ゴ W3・natural=108)では 1行目=63.00 固定・行送りが 108→54→0 と**完全に線形**
+- **TD実機**: lh=1.00 と 0.40 でレンダしたPNGを比較し、**1行目の上端が両方とも row 39 で一致**
+  (行間だけが詰まる)。修正前は動いていた
+- **使ってはいけないもの**(いずれも1行目まで動く・コメントに明記): `LineHeightMultiple` /
+  `MaximumLineHeight`。行送りは **LineSpacingAdjustment 一択**
+- CoreText/README.md のパラメータ説明を「どの値でも1行目のベースラインは動かない」に更新。
+  リビルド・常設インストール済み
+- **注意**: リリース v0.9.2 の DMG はこの修正の1コミット前。次回配布時に取り込む
+
+### 2026-08-08 CoreText デモにタイプライター表示(一文字ずつ)を追加
+
+- `/project1/coretext` に4ノード追加:
+  `type_source`(全文・Text DAT)→ `typer`(Execute DAT・onFrameEnd)→ `type_out`(Text DAT)
+  → `typewriter`(CoreText TOP の Text DAT に接続)。書き換えるたびに CoreText が再レンダする
+- typer は `absTime.seconds` で進めるので **fps が落ちても表示速度が変わらない**。
+  `CPS`(1秒あたりの文字数)と `HOLD`(全部出てから先頭へ戻るまでの秒数)で調整。
+  文字数は Python の文字列長なので日本語もそのまま1文字ずつ進む(バイト数ではない)。
+  カーソルは 2Hz で点滅、消灯時は空白にして行幅が揺れないようにした
+- **サンプル文は夏目漱石『吾輩は猫である』(1905) 冒頭**(126文字)。漱石は1916年没で
+  日本・米国とも保護期間満了=パブリックドメイン。青空文庫収録
+- **踏んだ罠**:
+  ① **Text Wrap が `balance` / `pretty` だとタイプ中に行が組み直されてガタガタ動く** →
+     `wrap` にする(README にも明記)
+  ② **Vertical=True / ヒラギノ明朝 / 32px になっていたのはユーザーの手編集**だった。
+     「create() が同型の既存ノードから値を引き継いだのでは」と推測して False に上書きしてしまい、
+     ユーザーの指摘で復元した。**TD上でユーザーが同時に編集していることがある**ので、
+     パラメータが想定と違っても勝手に直さず、まず確認すること
+  ③ Execute DAT のフレーム末コールバックのパラメータ名は **`frameend`**(`framiend` ではない)
+- 実機で 126文字が5行に組まれ、先頭から1文字ずつ増えることを視認確認。エラーなし。demo.toe 保存済み
+
+### 2026-08-08 タイプライター例の本文を長文化(272文字・縦書き)
+
+- ユーザー要望で本文を『吾輩は猫である』冒頭**1段落まるごと(272文字)**へ。CPS=24・HOLD=2.0 で
+  1周約13秒。縦書き13段に収まり truncated=0(Info CHOP で確認)
+- **Text Wrap を `balance` → `wrap` に変更**。balance / pretty は文字が増えるたびに行を
+  組み直すため、タイプ中に行がガタガタ動く(README にも明記)
+- 表示はユーザーが縦書き(Vertical=On・ヒラギノ明朝)に設定したものを採用。検証中に一度
+  横書きへ上書きしてしまったので復元済み。私が触った Lineheight / Padding / Alignh / Alignv /
+  背景色・文字色はユーザーの意図と異なる可能性があるため申し送りした
+
+### 2026-08-08 デモを4件追加(深度 / 被写体切り抜き / タイプライター / ImagePlayground)
+
+- ユーザーが `demo_capture/` に3動画+1静止画を追加。README(英日)のデモを **5行×2列=10件**へ
+  - `coreml-depth`(Depth Anything V2 の単眼深度・480w/12fps/4s = 1.09MB)
+  - `visionsubject`(被写体切り抜き・480w/12fps/**6.4s 全尺** = 378KB)
+  - `coretext`(縦組みタイプライター・640w/10fps/**10s** = 274KB)
+  - `imageplayground`(**静止画**・顔写真→イラストの入出力比較)
+- **背景が動かない素材は GIF が桁違いに軽い**: 単色グリーンの切り抜きは6.4秒で378KB、
+  紙面に文字が増えるだけのタイプライターは10秒・640px・96色でも274KB。逆に人混みの街路は
+  4秒で1.9MB。**尺や解像度を削る前に「毎フレーム何割の画素が変わるか」を見ること**
+- タイプライターは**冒頭が真っ白**なので 1.5s から切り出した(GIFの先頭フレームが空だと
+  スクロール中に何も見えない)
+- **動きが無いものは静止画で足りる**。`make_demo_gifs.sh` に STILLS セクションを追加し、
+  レターボックスの黒帯を crop して JPEG 化(1280x720 の黒帯付き 1.0MB PNG → 800x400 43KB)。
+  黒帯の位置は行ごとの最大輝度を見て機械的に決めた(content rows 40-679)
+- docs/demo 合計 約12MB
+
+### 2026-08-08 README のデモGIFが左右で違うサイズに見える問題を修正
+
+- ユーザー指摘。原因は**clip ごとに書き出し解像度を変えていた**こと(440/480/560/640/800px)。
+  GitHub は画像を実寸で並べるのでそのまま差が出る。幅を変えていたのは意図的で、
+  人混みは軽くするため440、細線のランドマークや縦組み明朝は潰れるため560/640、静止画は800
+- **エンコード解像度はそのままに、README側で `<img width="400">` に統一**(英日10件)。
+  markdown の `![]()` を HTML の img に置換。GitHub は表セル内の img と width 属性を通す
+- これで表示は 400x225 に揃う(imageplayground だけ黒帯を切った 2:1 なので 400x200)
+- `make_demo_gifs.sh` の冒頭に「ここの幅はバラバラでよい・表示幅はREADME側で固定している」
+  と明記。あとから「揃えよう」として再エンコードしないための注意
+
+### 2026-08-08 デモ素材を全て 480x270 に統一(前エントリの方針を変更)
+
+- ユーザー指示「全てサイズは揃えて」。前は「幅は clip ごとにバラバラでよい・READMEの
+  `<img width>` で見た目だけ揃える」としたが、**書き出し自体を 480x270(16:9)に統一**した
+- 幅で軽くしていたぶんは **fps・色数・尺・ノイズ除去の強さ**に振り替えた:
+  - visionface: 560→**480 + 色数128**(幅を戻しても線が潰れない。2022→1525KB と逆に軽くなった)
+  - coreml-yolo: 440→**480 + 10fps・3.2s・hqdn3d=16:16:28:28**(1946→1764KB)
+  - coretext: 640→**480**(274→165KB)
+- **静止画も 16:9 に**: 2:1 の内容を 480 幅で描いて上下に `pad` で余白(0xF0F0F0)を足し 480x270 に。
+  黒帯のまま使うと他と並べたとき浮くので、明るい中間色にした(20KB)
+- 全10件が 480x270 であることを `sips` で確認。合計 約12MB。README の `<img width="400">` は
+  そのまま残す(将来サイズ違いが混ざっても崩れないため)
+
+### 2026-08-08 Non-Commercial の実バグを再現・原因特定(修正は未実施)
+
+- ユーザー要望「NCで使ってもバグが出ないようにしたい」。`app.addNonCommercialLimit(password=...)`
+  で**ライセンス版のまま NC 制限を再現**できる(パスワード付きなら `removeNonCommercialLimit` で
+  戻せる。**パスワード無しだとセッション中は解除不能**なので必ず付けること)
+- **実際に壊れることを確認した**(検証用に `_nctest` を作り、上限超えの5 TOP を比較):
+
+  | OP | 通常 | NC | 結果 |
+  |---|---|---|---|
+  | Metal Upscale | 2560x1440 | 1280x720 | **斜めに歪んだガベージ** |
+  | Screen Capture | 1710x1112 | 1280x832 | **斜めに歪んだガベージ** |
+  | ImageIO File In | 3024x4032 | 960x1280 | **RGB縞のガベージ** |
+  | CoreText | 2000x2000 | 1280x1280 | 背景のみ・**文字が出ない** |
+  | PDFKit | 1275x1650 | 989x1280 | **真っ白** |
+
+- **原因**: TD は上限超えの宣言に対し **テクスチャをクランプしたサイズで確保し、こちらのバッファを
+  その幅で読む**(リサンプルはしない)。プラグインは 2560 幅でバイトを並べているので行がずれ、
+  典型的な斜めシアーになる。**エラーにはならず静かに壊れる**
+- **計測で確定**(MetalUpscale に一時的なプローブを入れて実測):
+  - ライセンス版: `want=2560x1440 / suggested=1280x720` → **出力は 2560x1440**(要求が通る)
+  - NC: `suggested` は **1280x720 のまま変わらない**(= Common ページの値であって上限ではない)。
+    TD 側が勝手に 1280x720 で確保する
+  - つまり **`getSuggestedOutputDesc` では上限を知れない**。SDK に上限を問い合わせるAPIも無い
+- **上限の検出手段**: TD の Python に **`licenses.isNonCommercial`** がある(NC適用中 True /
+  解除後 False を実測)。`licenses.type` も "TouchDesigner Non-Commercial" / "Commercial" と変わる。
+  プラグインからは CoreWLANScan と同じ埋め込み Python(`PyRun_String` + `-undefined dynamic_lookup`)
+  で引ける
+- **修正方針(未実装)**: 共有ヘッダ `common/NonCommercialLimit.h` を作り、
+  ① `licenses.isNonCommercial` をキャッシュ付きで判定 ② 超えていたら**アップロード直前に
+  1280x1280 以内へ縮小(アスペクト維持のボックスフィルタ)して textureDesc も揃える**
+  ③ 縮小したことを warning で知らせる。これを各 CPUMem TOP のアップロード箇所に入れる。
+  Upscale のように「拡大が目的」のOPでも、壊れた絵よりは上限で頭打ちの正しい絵のほうがよい
+- 検証コンテナと計測コードは撤去済み。TD は Commercial に復帰済み
+
+### 2026-08-08 NC の解像度上限バグを修正(共通ヘッダ + 10 TOP)
+
+- 前エントリで特定した「上限超えの宣言 → TD がクランプ後の幅でバッファを読む → 斜めシアー」を修正
+- **`common/NonCommercialLimit.h` を新設**:
+  - `tdnc::active()` … TD の Python `licenses.isNonCommercial` を引く(GIL を取って
+    `PyImport_ImportModule("td")`)。結果は 120 cook キャッシュ。**上限内なら Python に触らない**
+  - `tdnc::fit(vector, w, h, fmt)` … 上限超え時だけアスペクト維持で縮小。8bit/32bit float は
+    ボックス平均、16F 等は成分を解釈できないので最近傍。**要素型テンプレート**にして
+    `vector<uint8_t>` と `vector<uint16_t>`(RGBA16Float)の両方を受ける
+  - `tdnc::kWarning` … 縮小したことを利用者に伝える文言
+- **適用した10 TOP**: Metal Upscale / Screen Capture / ImageIO File In / PDFKit / CoreText /
+  CoreImage HDR / CoreImage RAW / CoreML / CoreImage Code / Cinematic Video。
+  各 build.sh に Python.h と `-undefined dynamic_lookup` を追加(既にあるものはそのまま)
+- **未適用4件は構造上超えない**: Metal Denoise / Vision Flow / Vision Subject は入力解像度を
+  そのまま出すが、入力側は TD が既にクランプ済み。CoreML SAM2(256px)/ ImageGen(≤1024)/
+  ImagePlayground(~1024)も上限未満
+- **検証(NC制限を再現して実測)**: 5件とも**警告が TD のクランプ警告から自作の縮小警告に変わり**、
+  絵が正しく出た(街路 / 画面収録 / テストパターン / PDF本文 / テキスト)。CoreImage Code は
+  2400x2400 指定 → 1280x1280 の**読み取り可能なQR**を確認。ライセンス版では従来どおり
+  フル解像度・警告なしで、縮小経路に入らないことも確認
+- **踏んだ罠**:
+  ① **キャッシュのせいで判定が遅れる**。NC を途中で適用すると 120 cook(約2秒)経つまで
+     気づかない。実運用では起動時から NC なので初回判定で当たるが、検証時はここで
+     「修正が効いていない」と誤診した
+  ② Cinematic は `cn_copy_*` で TD のバッファへ直接書いていたので、上限超えのときだけ
+     一時バッファ経由にした(**上限内では従来どおり直接コピーで、余計なコピーを増やさない**)
+  ③ 警告メンバ名がプラグインごとに違う(`myWarning` / 状態から組み立て)。CoreML と Cinematic は
+     専用の `myNCScaled` フラグを足した
+- README(ルート英日 + 該当8プラグイン)の「未検証」記述を「自動で縮小する」へ更新。
+  10 TOP を常設インストール済み
+
+### 2026-08-08 Vision Contours SOP に Aspect Correct UVs を追加(uv系OPは全12件対応)
+
+- ユーザー指示。CHOP/DAT で使っている `common/AspectCoords.h` をそのまま SOP に流用
+  (`tdaspect::appendAspectCorrect` + `Mapper`)。既定Off で既存 .toe は従来動作のまま
+- SOP は点座標が Vision の 0〜1(左下原点)なので、**そのままだと 0〜1 の正方形**に入り、
+  16:9 の映像に重ねると輪郭が縦に間延びする。On で `P.y' = 0.5+(P.y-0.5)/aspect`
+- **踏んだ罠**: `emitGeometry` には**座標を書く箇所が2つ**ある。輪郭を閉じるための
+  **先頭点の複製** `positions.emplace_back(line.points.front().x, ...)` を変換し忘れ、
+  各輪郭の1点だけ元座標に残っていた。数値で y の**上端(0.7812)は理論値と一致するのに
+  下端(0.0017)が合わない**という形で出た。上端だけ合っているときは「一部の点が未変換」を疑う
+- **実測(1280x720・同一フレーム655点で比較)**: Off は `y 0.0000..1.0000`、
+  On は `y 0.2188..0.7812` で理論値 `0.5±0.5/1.7778` と完全一致。x は不変
+- **視認**: Geo を -0.5 寄せ + Ortho Width=1 のカメラで元映像に合成し、
+  Off は輪郭がシルエットからはみ出す / On はぴったり重なる、を確認
+- **検証時の注意**: SOP to POP は**ワイヤでなく `sop` パラメータ**でSOPを指す。
+  POP は **Geometry COMP の内側**に置かないと描画されない(外に置くと何も出ない)
+- リビルド・署名・常設インストール済み。README にパラメータ行と解説節を追加
+
+### 2026-08-08 VisionFace のランドマークが左右非対称に見える件を再調査(原因は鼻の並び順)
+
+- ユーザー報告「landmarks が左右非対称に見える」。**再確認した結果、プラグインのパッキングは正しく、
+  原因は Vision が返す鼻まわりの点の並び順**だった
+- **確認手順**: 静止フレームで76点を全部ダンプし、領域ごとに左右の中心・範囲を比較
+  - 顔の中心(輪郭 mid 0.511)に対し 目 0.462/0.557、眉 0.455/0.562、唇 0.511 と**左右バランスは正常**
+  - 目は左右とも「外側→上まぶた→内側→下まぶた」の同じ順序で、**閉ループも対称**
+  - `noseCrest` だけ mid 0.497 と中心から外れていた → 個別にダンプして原因特定
+- **判明した実データ**(12顔中4顔で同じ構造を確認・一過性ではない):
+  - `noseCrest` 48-52 は **48→51 が鼻筋の直線、5点目 p52 だけ稜線から左へ外れる**
+  - `nose` 40-47 は **p40 が鼻筋の上端(正中)で、p41 でいきなり左の小鼻へ飛ぶ**
+  - `medianLine` 53-55 は **noseCrest の先頭3点と完全に同一座標**(重複)
+  - → 連番で結ぶと「正中から左小鼻への長い斜線」「鼻筋から左への突起」「鼻筋の二重線」が出る
+- **パッキングのズレではないことの確認**: 固定スロット方式なので、点数が足りなければ番兵(-1)が
+  残るだけで隣の領域へずれ込まない。実際 medianLine の3点が crest の先頭3点と一致しており、
+  オフバイワンでもない
+- **修正は描画側**(demo.toe の `VisionFace/geo2/contour`): 小鼻の掃引は **p41 から**、
+  鼻筋は **48-51 のみ**、`medianLine` は**描かない**。修正前後を並べて視認確認済み
+- VisionFace/README.md に「鼻は連番で結ぶと非対称に見える」の症状→実データ→描き方の表を追加
+
+### 2026-08-08 VisionFace 輪郭の左右非対称の真因: 領域の確保数が実測より少なく切り捨てていた
+
+- ユーザー指摘「顔の輪郭も左右対称ではない」。前エントリで鼻の並び順は説明できたが、
+  **輪郭の非対称は別原因**だった
+- **切り分け**: `roll = 0 / yaw = 0`、目の高さ差 0.0024 で**頭は傾いていない**のに、
+  輪郭の上端で左右差 0.035(下の顎に近いほど小さい=片側が途中で終わっている形)
+- **プラグインに一時プローブを入れて `region.pointCount` を直接計測**したところ:
+
+  | 領域 | 実際 | 旧確保 | |
+  |---|---|---|---|
+  | faceContour | **17** | 16 | 切り捨て |
+  | noseCrest | **6** | 5 | 切り捨て |
+  | medianLine | **10** | 3 | 切り捨て |
+  | 他 | 一致 | | |
+
+  12顔×複数フレーム(288サンプル)で**点数は常に一定**。合計 **85点**
+- **`allPoints` が 76 しか返さないのは medianLine が他領域と重複しているため**。
+  76 を信じて配分したのが誤りだった
+- **以前の検証方法の盲点**: 「使用スロット数を数える」やり方では**不足しか検出できず、
+  超過(切り捨て)は見えない**。領域の `pointCount` を直接測ること
+- **修正**: `kNumLandmarks` 76→**85**、`counts` を実測値
+  `{17,6,6,6,6,8,6,10,14,6}` に。新レイアウト:
+  `0-16 輪郭 / 17-22 左目 / 23-28 右目 / 29-34 左眉 / 35-40 右眉 / 41-48 鼻 /
+  49-54 鼻筋 / 55-64 正中線 / 65-78 外唇 / 79-84 内唇`
+- **実測(修正後)**: 輪郭は顎 p8 を挟んで**左右8点ずつ**の均等配置になり、上端の左右差は
+  **0.035 → 0.011**(残りは実際の顔の非対称)
+- **鼻の件も真因が判明**: `noseCrest` は 6点で「49-52 が鼻筋 + p53/p54 が**左右の小鼻**」。
+  以前 5 点で切っていたため**左の小鼻だけ残って**非対称に見えていた。分けて描けば対称になる
+- **後方非互換**(p インデックスがずれ、チャンネル数が 152→170/顔)なので、
+  ルールどおり**この op だけ majorVersion を 0→1**(minor 9→0)に上げた
+- demo.toe の描画(`geo2/contour`)を新レイアウトへ更新。README(該当+ルート英日)も更新
+- **注意**: 実行中のTDはプラグインをプロセス内キャッシュしているため、**TD再起動まで
+  例は旧76点のまま**。再起動後に見た目を再確認すること
+
+### 2026-08-09 v0.9.3 リリース
+
+- 当初 0.10.0 で切ったが、**ユーザー判断で 0.9.3(patch)へ変更**。v0.10.0 のタグと
+  GitHub Release は削除し、DMG を v0.9.3 で作り直して公証し直した
+- (0.10.0 を提案した理由は VisionFace のランドマーク 76→85 が後方非互換だから。
+  op 単位の majorVersion は 0→1 のまま据え置き、リポジトリ版だけ patch にしている)
+- 57プラグインを全て再ビルド(並列・全件成功)→ `release.sh sign → verify → dmg → notarize`。
+  59バンドル・全数verify通過(署名/Hardened Runtime/Developer ID/APIバージョン/版一致)。
+  DMG 18MB → 公証 **Accepted** → staple → spctl accepted
+- v0.9.2 からの中身: **NC の解像度上限で絵が崩れる不具合を10 TOPで修正**(最大の成果。
+  上限超えの宣言に対し TD がクランプ後の幅でバッファを読むため斜めシアーになっていた)、
+  **VisionFace のランドマーク切り捨てを解消**(76→85・輪郭17点目など)、
+  Vision Contours に Aspect Correct UVs、CoreText の行送りで1行目が動く問題を修正
+
+### 2026-08-09 VisionRect 利用例: 検出した四隅に映像を貼り込む(corner pin)
+
+- ユーザーが VisionRect 用の素材2本を追加(`Assets/sample_laptops.mp4`(白画面のノートPC2台)
+  `sample_gallery.mp4`(壁の絵画3枚)・各2〜3MB・**コミットした**)。これに合わせて
+  `/project1/VisionRect` を「四隅を数値で見るだけ」から**実際に画像を合わせる例**へ拡張
+- 構成: `null4(元映像) → Visionrect1 → rectdata(Shuffle: Sequence All Channels) → warp(GLSL TOP)`。
+  GLSL の入力0=元映像 / 入力1=`art`(sample_ballet.mp4)。出力 `out1`
+- シェーダは **単位正方形→四隅 の射影変換(Heckbert)を作り `inverse(M)` で逆写像**し、
+  貼り込む画像側の st が 0〜1 の内側の画素だけ合成する。矩形数は
+  `textureSize(uRects)/14` から自分で求めるので Max Rectangles を変えても壊れない
+- **実測(M2・TD実機で視認)**: ノートPC2台の画面に同時にバレエ映像が**遠近つきで**貼り付く。
+  静止フレームでは画面枠とほぼ完全一致。gallery に差し替えると大きな絵画が映像に置き換わる
+- **踏んだ罠**:
+  ① **GLSL TOP の Array に CHOP を直結すると texel 数 = サンプル数**。70ch×1sample の CHOP は
+     **1 texel しか渡らない**(`textureSize` が 1)。**Shuffle CHOP の `Sequence All Channels`**
+     で `1ch×70sample` にしてから渡す
+  ② TOP空間のワープには**生の 0〜1 画像座標**が必要 → `Aspect Correct UVs` は **Off**
+     (On だと v が縮んで貼り込みが上下にずれる)
+  ③ `w.par.array = 1` では**シーケンスのブロックが増えない**。`w.seq.array.numBlocks = 1`
+     (ヘッダ par の値は「追加ブロック数」なので 0 のまま表示される)
+  ④ `par.pixeldat` / `par.array0chop` に **OPオブジェクトを代入すると効かないことがある**
+     (パス文字列で入れる)。glslmultiTOP を Python で create すると
+     `<name>_pixel/_info/_compute` が**自動でドック生成される**ので、自分で作った同名DATは
+     `_pixel1` にリネームされる(自動生成された方に書く)
+  ⑤ キーボード面が矩形として拾われていたので **Maximum Aspect Ratio を 0.8** に(画面は 0.66〜0.69)
+- 検出は非同期なのでカメラが速く動くと貼り込みが1〜2フレーム遅れる(note と README に明記)
+- VisionRect/README.md に「四隅に画像を貼り込む」節、skill `td-apple-ops/wiring.md` に
+  同名のレシピを追加。demo.toe 保存済み
+
+### 2026-08-09 各opのREADMEを英日併記に統一(57件)
+
+- ユーザー指示「それぞれのopのREADMEを英語と日本語の併記にして」
+- **1ファイルに英語セクション + 日本語セクション**の形にした(`README.md` は各opの
+  `opHelpURL` の参照先なので、ルートのように `README.ja.md` へ分けるとHelpボタンから
+  英語版しか開けなくなる)。構成は `# タイトル` → `**English** | [日本語](#日本語)` →
+  `## English` → `## 日本語`。元のH2/H3は1段下げて格納
+- **ついでに直した実害のある古い記述**:
+  - タイトルが opLabel とずれていた: CoreAudioProcessTap(CoreAudio Tap → **CA Process Tap**)、
+    SpeechActivity(Voice Activity → **Speech Activity**)、CoreMLImageGen(Image Gen →
+    **CoreML ImageGen**)
+  - **ビルド手順の cd 先がリネーム前のフォルダ**: CoreAudioProcessTap(ProcessAudio)、
+    CoreWLAN(WiFiMonitor)、Spotlight(SemanticIndex)、MultipeerDAT(Multipeer)
+  - **成果物名が実際の build.sh と不一致**: CreateMLTrainingRecorder / LLMAFM / CoreMLDAT
+  - **消えたopへのリンク**: CoreMLCHOP→CoreMLDetect、CoreMLMotion→CreateMLMotion、
+    TextAnalyze→VisionSimilarity(develop送り)、VisionSubject→VisionSegment(同)
+  - VisionFace の見出しが `p0..p75` のまま(実体は85点)、VisionPose に存在しない
+    VisionPoseOSC アプリの節、CoreText の利用例パスが `sample.toe`
+- 補足を足した箇所: VisionPose3D は Aspect Correct が **u,v のみ**に効く(tx,ty,tz は
+  メートルなので不変)、VisionSaliency は **意図的に Aspect Correct を持たない**
+  (Crop TOP へ直接渡す前提で生uvが要る)、VisionTrajectory は放物線係数も補正される、
+  LLMMLX の Model が式モードだと裸のリポジトリIDで SyntaxError、
+  SpeechSynth の timeslice 修正、LLMAFM のツール呼び出しはプロンプトでツール名を明示する
+- 検証: 57件すべてで `## English` / `## 日本語` / ナビ行が各1個であることを機械チェック
+- **palette/README.md・models/README.md・Assets/ml_examples/README.md は対象外**
+  (opのREADMEではないため)。ルート README(英日)は従来どおり別ファイル
+
+### 2026-08-09 palette/README.md を現状に合わせて訂正
+
+- ユーザー質問「Paletteフォルダの中身はすでに古い?」→ **古かった**。README が主役として
+  説明していた `NativePanel.tox` / `SwiftUIButton.tox` は、依存する SwiftUI Panel CHOP と
+  UI Widget DAT を 2026-08-07 に develop へ移した際に main から削除済みで、
+  **main に残っているのは `WifiScanner.tox` だけ**だった(登録手順も NativePanel を置く指示のまま)
+- WifiScanner のみの内容に書き直し、登録手順を `WifiScanner.tox` に修正。
+  develop へ移した2件は「どこへ行ったか」を1節にして残した(消えた理由が分かるように)
+- ついでに op の README と同じ**英日併記**にした(CoreWLANScan の README からリンクされており、
+  そちらは併記済みのため)
+- **ローカルの TD palette フォルダには3つとも残っている**
+  (`~/Library/.../palette/sygnal/`)。開発機には全プラグインが入っているので動作はする。
+  リポジトリと揃えたい場合はユーザー側で削除する(今回は触っていない)
+
+### 2026-08-09 palette/ を main から外して develop 側のみに
+
+- ユーザー指示「WifiScannerも不要なので一旦Paletteもmainから外してdevelopへ」
+- **develop 側は同期不要だった**: develop には既に3つの .tox(NativePanel / SwiftUIButton /
+  WifiScanner)と、3つとも説明した README が入っている。`WifiScanner.tox` は main と
+  **バイト一致**(sha256 0763e6c2…)を確認したうえで main から `git rm -r palette`
+- CoreWLANScan/README.md の `palette/WifiScanner.tox` へのリンク2箇所(英日)を削除。
+  リポジトリ内に palette への参照は履歴ログ(CLAUDE.md)以外に残っていないことを確認
+- ローカルの TD palette フォルダ(`~/Library/.../palette/sygnal/`)には3つとも残したまま。
+  開発機では引き続き使える(消すかはユーザー判断)
+
+### 2026-08-09 VisionFace の素材を10人版に差し替え + デモGIF更新
+
+- ユーザーがカメラ固定・各人が個別に喋る/動く10人の映像を生成(2行×5人・正面向き)。
+  旧素材(12人・横顔と重なりが多く一部の顔でランドマークが崩れていた)を置き換え
+- ユーザーが置いた `Assets/smple_faces2.mp4` は**ファイル名のタイポ**だったので
+  `Assets/sample_faces.mp4` へリネーム(旧12人版を上書き)。TD側も
+  `/project1/VisionFace/smple_faces2` → `sample_faces` にリネームし file par を更新。
+  **旧 sample_faces.mp4 を参照するノードが他に無いことを全27 moviefilein の走査で確認**してから実施
+- **実測**: `Max Faces = 10` で **valid = 10**(全員検出)。コンテナ内エラー・警告なし
+- デモGIF を `demo_capture/VisionFace2.mp4` から作り直し(`make_demo_gifs.sh` の
+  visionface 行を VisionFace2.mp4 / 4.0秒に変更)。**2.0MB → 1.2MB と尺を伸ばして軽くなった**
+  — カメラ固定+無地背景で毎フレームの変化画素が減ったため(GIFはフレーム間差分でしか縮まない)
+- 素材自体も 5.3MB → 3.5MB
+- **demo.toe の利用例コンテナは既定で `allowCooking = False`**(43/47コンテナ。常時ONだと
+  全例のML推論が同時に走るため)。そのため中の moviefilein は 128x128 のまま=非ロードで、
+  MCPから `cook(force=True)` しても**中身は cook されない**。
+  検証するときは **一時的に `comp.allowCooking = True` にして cook → 確認 → False に戻す**
+  (この手順で src 1280x720・out1 1280x720・valid=10 を実測。戻し済み)
+
+### 2026-08-09 Metal Denoise: 非対応ハードをエラーから「警告+素通し」に変更
+
+- ユーザー報告「MetalDenoiseのdemoがエラーで動いてない」。原因は既知の
+  **M2 が VTTemporalNoiseFilter 非対応**(`isSupported=false`)。バグではないが、
+  デモとしては赤いエラーノードで壊れて見える
+- **挙動を変更**: 非対応ハード / macOS 26 未満は `getErrorString` ではなく
+  **`getWarningString` + 入力の素通し**(`passthrough()` を追加)。非対応マシンで
+  開いただけのネットワークが下流ごと止まらないようにする
+- **検証(TD再起動なし)**: 新バイナリを `/private/tmp/.../dn_<epoch>/` にコピーして
+  素の `cplusplusTOP` の Plugin Path で読ませ、**errors 空 / warning のみ /
+  出力 1280x720 が入力と同一**を視認確認(同一パスはプロセス内キャッシュで旧コードのまま)
+- demo.toe の note を書き換え。**当初「このMacでは」と書いたが、demo.toe は配布物で
+  実行環境は人それぞれなのでその書き方は無意味**(ユーザー指摘)。
+  「対応ハードでのみ効果がある / 非対応なら警告+素通し / 警告が出ていなければ効いている /
+  判定は vtprobe で」という**環境に依存しない書き方**に修正した。
+  MetalDenoise コンテナの allowCooking も他と揃えて False に戻した
+- README(MetalDenoise 英日 + ルート英日一覧)を「エラー」→「警告+素通し」に更新
+- **注意**: 稼働中のTDは常設パスの旧バイナリをキャッシュしているため、
+  `/project1/MetalDenoise` は**TD再起動までエラー表示のまま**
+
+### 2026-08-09 Metal Upscale の PROBE 警告 = 私のデバッグコードの消し忘れ(インストール済みのみ)
+
+- ユーザー報告「Metalupscaleでもwarningが出てる」。中身は
+  `Warning: PROBE init=1 step=3 val=0 active=0 w=1280` で、**NC解像度上限の調査(08-08)で
+  MetalUpscale に一時的に入れたプローブ**がそのままインストールされていた
+- **範囲を確定**: ソース(.mm)・リポジトリの `build/`・`dist/`・**リリースDMG v0.9.3 とも PROBE は 0件**。
+  汚れていたのは `~/Library/.../Plugins/` の**インストール済みバイナリ1つだけ**(08-08 22:19)。
+  インストール済み全66バンドルを strings で走査して他に無いことも確認
+- リポジトリの build 成果物(=v0.9.3 リリースビルド)を再インストールして解消。
+  バージョン付きパス方式で検証し **errors/warnings とも空・640x360→1280x720** を確認
+- **教訓**: 調査用のプローブを入れたら、**ソースから消すだけでなく常設Pluginsへ再インストールし直す**。
+  ソースはきれいなのにインストール済みだけ汚れている、という状態は気づきにくい。
+  `strings <installed>/Contents/MacOS/<exe> | grep PROBE` で一括確認できる
+- 参考: インストール済みの他62バンドルは 08-07〜08-08 のビルドで、リポジトリの
+  v0.9.3 ビルド(08-09 07:46)とバイナリが異なる。ほとんどは同一ソースの焼き直しだが、
+  開発環境をリリースと完全に揃えたい場合は全件再インストールする
+
+### 2026-08-09 LLM AFM の利用例に LINE 風チャットUIを追加(英語)
+
+- ユーザー要望。`/project1/LLMAFM/chat`(base COMP・720x1280 の縦画面)を新設し、
+  会話テーブルを吹き出しで描く。コンテナ直下に `out1` を追加してデモ一覧にも出るようにした
+- **構成**: 吹き出し1個 = `t{i}`(CoreText TOP・本文)+ `r{i}`(Rectangle TOP・角丸)を
+  `o{i}`(Over)で重ね、`comp1`(Composite・over)で全部を背景+ヘッダーに載せる。8スロット固定。
+  レイアウトは `chatui`(Execute DAT / **onFrameEnd**)が毎フレーム計算
+  (非同期な C++ DAT は onTableChange が安定して発火しないため。既存 handler と同じ理由)
+- **各吹き出しは画面全体(720x1280)のキャンバス**にして、位置は CoreText の
+  **Padl/Padr/Padt/Padb** と Rectangle の centerx/centery(pixels)で決める。
+  こうすると Transform TOP を挟まずに済み、ノード数が 1吹き出し=3個で収まる
+- 幅は文字数からの見積り(**34pt で 1文字≒15px・行送り 42px** が実測)。ずれても
+  CoreText の **Auto Fit** が縮めて収めるので破綻しない
+- **踏んだ罠**: ①`create(coretextTOP,…)` は不可 → カスタムOPは **`create('CoretextTOP', …)`**
+  (先頭大文字opType + FAMILY大文字)②base COMP を Out TOP に繋ぐのは
+  `connect(comp)` ではなく **`connect(comp.outputConnectors[0])`**
+  ③MCPの `run` は exec スコープなので、**全部を1つの関数に入れて呼ぶ**と変数が見える
+- **構造化出力(Schema)は解除した**。JSON が返るとチャットとして読めないため。
+  ツール呼び出しはそのまま
+- **実測(M2・実会話)**: 「What is the temperature on stage?」→ **ツールを使わず**
+  「取得できません」/「Use the get_sensor tool with name "temperature".」→ **ツールを呼び 42.0**。
+  ツール名を明示すべき、という既知の癖がそのままデモになった
+- **新しく分かった制約**: オンデバイスモデルは**コンテキスト窓が小さい**。40語程度の
+  Instructions + 3ターンで `error: Exceeded model context window size` になる。
+  Instructions を短くし、出たら Clear Conversation。LLMAFM/README(英日)に追記
+
+### 2026-08-09 今セッションの罠を skill へ反映
+
+ユーザー指示「踏んだ罠はskillsにも反映できる事はしておいて」。4ファイルへ振り分け:
+
+- **td-apple-plugin/verification.md**: ①`run` の exec スコープ回避は「インラインで書く」だけ
+  でなく**処理全体を1関数に入れて呼ぶ**のが確実、と追記(今回何度も効いた)
+  ②TDノード操作の節を新設(カスタムOPは `create('<OpType>TOP', name)` / base COMP は
+  `connect(comp.outputConnectors[0])` / シーケンスは `seq.<name>.numBlocks` /
+  OP参照parはパス文字列 / glslmultiTOP は `_pixel` 等が自動ドック生成)
+  ③**demo.toe の利用例は `allowCooking = False`** で、force cook しても中は cook されず
+  読めた値は残留値、という節を新設
+- **td-apple-plugin/build.md**: ①調査用デバッグコードは**ソースから消すだけでなく再インストール**
+  が要る(strings で一括監査するワンライナー付き)②リリース物は**リポジトリの build/ から集める**
+  (インストール済みフォルダから集めると第三者製が混入する)
+- **td-apple-plugin/pitfalls.md**: ①VT系は**対応チップ一覧が非公開**で `tools/vtprobe.m` で実測
+  ②**非対応ハードはエラーではなく警告+素通し**にする設計指針 ③Core Text の実測値
+  (英字34ptで1文字≒15px・行送り42px)と `Padl/Padr/Padt/Padb` で Transform 無しに配置できること
+- **td-apple-ops/wiring.md**: ①LLM節に**コンテキスト窓が小さい / ツール名を明示 /
+  Schema とチャット表示は両立しない**を追加(末尾の重複bulletは統合して削除)
+  ②「会話をチャット画面として描く」レシピを新設 ③Vision Face のランドマークを
+  **p0..p75 → p0..p84(85点)** に訂正し、鼻の描き方を追記
+- **td-apple-ops/troubleshooting.md**: ①「demo.toe の利用例が動かない/値が更新されない」=
+  allowCooking ②「警告は出るが映像は流れている(Metal Denoise)」を追加
+- リポジトリ外の個人skill **~/.claude/skills/touchdesigner-dev** にも、TD汎用の4点
+  (exec スコープ・カスタムOPのcreate・outputConnectors・allowCooking)を反映
+
+### 2026-08-09 LLM AFM の例を2ノードに分離(Llmafm1=ツール / Llmafm2=チャット)
+
+- ユーザーが `Llmafm2` を追加。**Llmafm1 はツール呼び出しのデモのまま**、
+  **Llmafm2 を LINE 風チャットの表示元**にする、という分担にした
+- `chatui` の先頭に **`SRC = 'Llmafm2'`** を置いて描画対象を切り替えられるようにした
+  (以前は Llmafm1 をハードコードしていた)
+- Llmafm2: **1文で答えられる質問7往復**に差し替え(ユーザー指示「長い返答が必要のない質問で」)。
+  Instructions = `Answer in English in one short sentence.` / Max Tokens = **40**。
+  bit / GPU / Python の immutable 型 / FPS / API / TDの拡張子 / 色の混色。
+  **7往復通って status=ready のまま**(短い返答はコンテキストの伸びが遅い)
+- 吹き出しは下から積むので、**入り切らない古い往復は自然に画面外へ流れる**(実チャットと同じ挙動)
+- **傾向がはっきり出た: 一般的な用語は全問正解、TouchDesigner 固有の知識だけ誤答**。
+  拡張子を「.td」と答える(正しくは .toe)。前回の会話でも CHOP の説明と
+  `str.reverse()` のでっち上げで同じ傾向だった。ユーザー判断で**そのまま残し**、
+  note に「どれが誤りか」と「知識に依存しない用途向き / 事実はツール呼び出しで渡す」を明記
+- **Max Tokens を増やす必要はない**という結論: コンテキスト超過は Max Tokens ではなく
+  「Instructions + 履歴 + 生成」の合計で起きる。長く続けたいなら
+  **Instructions を短く・Max Tokens を小さく**が正解(40語+512で3往復 → 7語+40で7往復)
+- Llmafm1: Instructions をツール用に戻し、`get_sensor` の往復を1回実行して
+  「42.0 degrees」が出る状態にした
+- ユーザー側の調整はそのまま活かした: 背景を灰(0.7)に変更、`chat/out1 -> fit1 -> out1` で
+  720x1280 の縦画面を 1280x720 に収めてデモ一覧に載るようにしている
+- note を2ノードの役割分担で書き直し。**チャット表示側は Schema を空にする**
+  (JSON が返ると会話として読めない)ことも明記
+
+### 2026-08-09 チャットデモに日本語版を追加(英日を並べて表示)
+
+- ユーザー「日本語版もお願い」。`Llmafm3`(日本語)+ `chat_ja` を追加し、英日を横並びで出す
+  - `Llmafm2 → chat → pad_en` / `Llmafm3 → chat_ja → pad_ja` → `both`(Over)→ `fit1` → `out1`
+  - `chatui` を **`PAIRS = [(DAT名, chatコンテナ名), ...]`** にして1つの Execute DAT で両方描く
+- **日本語対応で `chatui` の折り返しを書き直した**(ここが本題):
+  - **日本語は分かち書きしない**ので、単語単位の折り返しだと1行が伸びきってしまう。
+    **全角は1文字ずつ・半角の連なりは1単語**としてトークン化してから詰める
+  - 文字幅も別 — **全角 34px / 半角 15px**(34pt 時)。`cols`(文字数)ではなく
+    **ピクセル幅**で折り返すよう変更した。混在文でも破綻しない
+  - `chat_ja` の CoreText は Font を `HiraginoSans-W3` に明示(SFでもフォールバックはするが確実に)
+- **横並びは Layout TOP をやめた**。`align` の値が `horizltr` ではなく `horizlr` で、
+  無効値を入れても**黙って none のまま**になる。さらに fit/解像度の組合せで結果が安定しなかったので、
+  **Fit TOP(1440x1280・fit=nativeres・justifyh=left/right)×2 → Over** の手組みにした。確実
+- **日本語は英語より精度が落ちるのが実測で出た**(そのまま残す):
+  - 「赤と青を混ぜると?」→ **「青」(誤り)**。英語の同じ質問では purple と正答
+  - FPS を「Frame **Per** Second」(正しくは Frames)
+  - 一方 1バイト=8ビット / GPU の略 / Python のイミュータブル型 は正答
+- note を3ノード構成に書き直し、**どれが誤答か**と「知識に依存しない用途向き」を明記
+
+### 2026-08-09 英日チャットを同時再生するドライバを追加(キャプチャ用)
+
+- ユーザーがレイアウトを修正(`chat` + `chat_ja` → `layout1` → `fit1` → `out1` + `moviefileout1`)。
+  「同時に二つの会話をしてみて」を受けて、**英日へ同じ内容の質問を同時に投げるドライバ**を追加
+- **`chatdrive`(Execute DAT / onFrameEnd)+ COMP の `Play Conversation` パルス**:
+  Clear → 質問を Llmafm2/Llmafm3 へ**同時 Submit** → **両方の busy が下りるまで待つ** → 次へ。
+  質問リストは `PAIRS`、読む間合いは `SETTLE`(既定100フレーム≒1.7秒。キャプチャ向けに緩め)
+- 完了判定は **Info CHOP の `busy`**(`info_llmafm2` / `info_llmafm3` を新設)。
+  行数の増加で判定するより確実
+- **2つの LLM AFM は同時に生成できる**(実測)。6往復×2=12生成が約20秒で完了し、
+  12件すべて完全な文で返った。セッションはインスタンスごとに独立している
+- **同じ質問セットでの英日の差(実測)**: 英語 6/6 正解、日本語 5/6。
+  外したのは「赤と青を混ぜると?」→「青」(英語では purple と正答)。
+  今回は FPS も日本語で "Frames Per Second" と正答した(前回は Frame)
+- note に再生手順を追記
+- **踏んだ罠**: `c.customPars` は**プロパティ**(`customPars()` と呼ぶと
+  `'list' object is not callable`)。ただしこのエラーが出た時点で
+  ノード生成自体は完了しているので、作り直す前に状態を確認する
+
+### 2026-08-09 英日チャットのデモGIFを追加 + READMEにモデル名と誤答の注記
+
+- ユーザーが `demo_capture/LLMAFM_chat.mp4`(1280x720・16.1秒)をキャプチャ。
+  空の状態から英日の会話が同時に育っていく流れがそのまま撮れている
+- GIF 化して `docs/demo/llmafm-chat.gif`(480x270・12fps・128色・**648KB**)。
+  **文字が主役なので色数を上げたが、背景が動かないので16秒の長尺でも軽い**
+  (人混みの街路が4秒で1.8MBだったのと対照的)。README(英日)のデモ表に6行目として追加
+- ユーザー指示「どのモデルで出力しているのか、間違いが含まれている事など簡単にREADMEには示して」:
+  - デモ節の導入に、**外部Core MLモデルはキャプションに名前を書いている(Depth Anything V2 /
+    YOLOv3)/ LLM は Apple Intelligence 内蔵の ~3B / 出力は加工せずそのままなので
+    モデルの誤りもそのまま映る / ~3B は固有知識が当てにならないので下書き扱い**、を追記
+  - LLM AFM のキャプションに **「日本語側の『赤と青を混ぜると青』は誤答(英語側は purple と正答)」**
+    を明記。誤答を残していることが README だけで分かるようにした
+
+### 2026-08-09 VisionPose3D の高速化(リクエスト使い回し)+ 古い性能値の訂正
+
+- ユーザー「VisionPose3Dのfpsは改善できないか?」。**まず何が効くかを単体harnessで実測**してから着手
+  (`scratchpad/pose3dbench.m`。VNDetectHumanBodyPose3DRequest を条件別に測る)
+- **効いた: リクエストオブジェクトの使い回し**。実装は**毎フレーム
+  `[[VNDetectHumanBodyPose3DRequest alloc] init]` していた**ので、ワーカーが1個持って再利用するよう変更
+  (ハンドラは画像ごとに必要なので毎回作る)
+- **TD実機のA/B(同一入力で並走させて公平に比較)**: 新 **165ms / 307解析** 対
+  旧 **323ms / 141解析** → **約2倍**。単独で走らせた新ビルドは **111ms・毎秒8.5回**
+- **効かなかった手も実測して README に残した**(同じ質問が再燃しないように):
+  - 入力縮小 1280x720→480x270: 182→159ms。Vision が内部でリサイズするので割に合わない
+  - `setComputeDevice:forComputeStage:` で ANE/GPU 明示: 166/163ms 対 指定なし166ms = **差なし**
+  - IOSurface 付きバッファ: 差なし(158ms)。**revision は 1 しか無い**
+- **README の「約0.5秒/フレーム(≒2fps)」は古かった**(7月の値)。現行は 110〜170ms(毎秒6〜9回)。
+  ルートREADME(英日)の一覧も「約2fpsのじっくり系」→「毎秒6〜9回」に修正
+- **教訓**: 「遅い」と書いてある実測値は OS 更新で変わる。高速化を頼まれたら
+  **まず現状を測り直す**(今回は半分が OS 側の改善、半分がコード側だった)
+
+### 2026-08-09 VisionPose の骨格線を「線」から「リボン(四角形)」へ + Wire Width は効かないと判明
+
+- ユーザー「VisionPoseの体の関節をlineで繋いで」。**骨格線自体は 2026-08-08 に実装済み**
+  (`geo2/skeleton` Script SOP・19本)で、5人ぶん92本が正しく生成されていた。見えなかった原因は
+  **① lineMAT が白のまま**(Hand=橙/Face=青/AnimalPose=黄 は色を付けたのに Pose だけ白が残っていた。
+  白い studio 背景+白い点スプライトに完全に埋もれる)**② 線が 1px**
+- **`Wire Width` はまったく効かないと実測で確定**: Constant MAT の Wire Width を **1 と 12** で
+  レンダして緑画素を数えたところ **どちらも 4171px で完全一致**。macOS/Metal は
+  ライン primitive の太さが常に 1px(Wireframe の on/off も無関係)。
+  2026-08-08 のログの「4例すべてで Wire Width を 3 に(見えにくかったので)」は**効果が無かった**
+- **修正**: skeleton を 2点の線ではなく **細長い四角形(リボン)** を出すよう書き換え。
+  進行方向に垂直なオフセット `n = (-dy, dx)/len * half` で4点を作り
+  `appendPoly(4, addPoints=False, closed=True)`。`Width` custom par(uv単位・既定 0.005)を追加。
+  **Aspect Correct UVs = On + Ortho Width = 1 では uv の1単位が縦横とも同じピクセル数**になるので、
+  太さを uv 単位で素直に指定できる(0.005 ≒ 1280px 幅で 6px)。四角形の継ぎ目は関節の点スプライトが隠す
+- lineMAT を緑(0.1, 1.0, 0.35)に。**実測**: 5人×19本=95プリム/380点、エラー・警告なし。
+  レンダを視認して全員の骨格がはっきり出ることを確認
+- skill `td-apple-ops/wiring.md` の「線が細いときは Wire Width を上げる」という**誤った助言を削除**し、
+  リボン方式のコード片に差し替え。demo.toe の note も更新(allowCooking は False に戻して保存)
+- **未着手**: VisionHand / VisionFace / VisionAnimalPose も同じ 1px のままなので、同じリボン方式に
+  するかはユーザー判断待ち(色は付いているので Pose ほど見えないわけではない)
+
+### 2026-08-09 VisionPose3D にも骨格線(3Dビルボードリボン)
+
+- ユーザー「VisionPose3DもLineで繋いで」。VisionPose(2D)と違い、こちらの例は
+  **メートル単位の実3D座標**(`{joint}:tx,ty,tz`・腰が原点)を perspective カメラで見る構成
+  (映像への重ね合わせではない)。なので骨も3D空間に置く
+- `geo2/skeleton`(Script SOP)→ `sop2pop` → `out1`(render/display On)を新設し、
+  `lineMAT`(Constant・シアン 0.2/0.9/1.0)を geo2 に。render1 は `geometry='*'` なので自動で拾う。
+  17関節を **16本**の骨で接続(root→spine→center_shoulder→center_head→top_head、両腕、両脚)
+- **3Dリボンはビルボードにする**: 平面リボンだと横から見たとき紙のように消える。
+  `cross(骨ベクトル, 骨の中点→カメラ位置)` の向きへ広げれば常にカメラを向く。
+  カメラ位置は `cam.worldTransform` の最終列(取れなければ par.tx/ty/tz へフォールバック)。
+  骨が視線と平行(外積≈0)のときは描かない
+- そのため **Trigger は totalCooks ではなく `absTime.frame`**。ポーズ更新は毎秒6〜9回だが、
+  カメラを動かしたらビルボードを向け直す必要があるので毎フレーム cook させる
+- **実測**: 16プリム/64点・エラー警告なし。正面と **カメラを55°回した状態**の両方でレンダを視認し、
+  回しても骨の太さが変わらない(ビルボードが効いている)ことを確認。Width は메ートル単位・既定0.02
+- note の「約2fps」も実測値(毎秒6〜9回)に修正
+- **検証時の注意**: `.save()` した PNG を白背景で見ると、白い点スプライトが骨の上に乗って
+  **骨が途切れて見える**。レンダ背景は透明なので、暗色に合成して確認すること(実際に一瞬誤診した)
+- **CHOPチャンネルの存在判定に真偽値を使わない**: `if vp['root:tx']` は値が 0.0 だと False になる
+  (root は原点なので必ず踏む)。`is None` で判定する
+
+### 2026-08-09 ループ区間探索ツール(tools/find_loop.py)
+
+- ユーザー「ダンスでループ可能な素材にできればしたい」。生成AIの動画は素で貼ると必ず
+  継ぎ目で飛ぶので、**一番よく繋がるフレーム対を探して切り出す**ツールを用意
+  (Schödl らの Video Textures と同じ考え方)
+- 動画を 160x90 グレースケールに落とし、候補 (i, j)=「フレーム i..j-1 を再生して i に戻る」
+  について継ぎ目の段差を測る。**連続フレーム間の差分の中央値を基準**にして比で出すので、
+  「何倍なら見えるか」が素材によらず判断できる(実測: 3倍を超えると厳しい)
+- **踏んだ罠(合成データで捕まえた)**: 継ぎ目のコストを `d(f[j-1], f[i])` にすると
+  **末尾と先頭が同じ絵になり1フレーム重複する**。正しくは「本来 j-1 の次に来るはずの
+  フレーム j」と先頭 i の差 `d(f[j], f[i])`。周期ちょうど48フレームの合成ループで検証したら
+  修正前は 2.04秒(49フレーム)、修正後は **2.00秒(48フレーム)** と正しい周期を返した。
+  実素材だけで試していたら気づけなかった
+- 動きの向きが逆の点を掴まないよう、前後1フレーム `d(j-1,i-1)` `d(j+1,i+1)` も 0.5 の重みで加算
+- 動きの少ない素材で基準値が 0 になり 0除算で落ちるのも合成テストで発見 → 下限を入れた
+- **現行 `Assets/sample_ballet.mp4` の実測**: 最良でも継ぎ目が基準の **5.84倍**。
+  = この素材はどこで切ってもループしない(開始と終了のポーズが揃っていないため)
+- 使い方: `python3 tools/find_loop.py <video> --min 4.0 [--out <cut.mp4>]`
+- **注意**: `sample_ballet.mp4` は VisionPose3D だけでなく **VisionRect の `art`**
+  (ノートPC画面に貼り込む映像)でも使っている。差し替えではなく新規ファイルにすること
+
+### 2026-08-09 VisionPose3D に Coordinate Space(root / camera)を追加
+
+- ユーザー「VisionPose3Dにはカメラを原点にそこからの相対座標にする機能はない?」→ **無かった**ので追加。
+  `Coordinate Space` メニュー(root=既定・従来どおり / camera)。既定が従来値なので後方互換
+- 実装: 観測時に `out.toCamera = simd_inverse(obs.cameraOriginMatrix)` を保存し、cook で
+  Space=camera のとき各関節に掛ける。**cookでの切替なので再解析不要**(同じフレームで両モードを
+  厳密比較できる)
+- ~~**TD側の引き算では代用できないことを実測で確認**~~ **← この段落は誤り。次のエントリで訂正**: `camera:tx,ty,tz` はプラグインが
+  `cameraOriginMatrix` の**平行移動列だけ**を出しており、回転は落ちている。同一フレームで比較すると
+  引き算だと腰が `(0.006, -0.144, 2.420)`、正しい `inverse(matrix)` では `(-0.434, -0.573, 2.315)`。
+  **0.62m ずれる**(カメラからの距離はどちらも 2.424m で一致 = 純粋に回転ぶんの向き違い)。
+  これが「TDでやらずプラグインに入れる」根拠
+- `camera:tx,ty,tz` は両モードとも root 基準のまま(カメラ基準では定義上ゼロで情報が無い)。
+  カメラ空間では被写体が **+Z 側**に来る
+- **TD再起動なしで検証**: 新バンドルを `/tmp/.../vp3_<epoch>/` にコピー(cp -R 後は要再署名)し、
+  素の cplusplusCHOP の Plugin Path で読ませた。稼働中のTDを止めずに新パラメータを確認できる
+- README(英日)にモードの表と 0.62m の実測を追記。バンドルはインストール済み
+  (**demo.toe の `Visionpose3d1` に Space par が出るのは TD再起動後**。既定=root なので
+  それまでの挙動は変わらない)
+- 未着手: demo をカメラ空間に切り替えるかは新素材(前後移動あり)が来てから。切り替えると図が
+  z≈+2.3・中心から 0.4〜0.6m ずれた位置に出るので、表示カメラの再フレーミングが要る
+
+### 2026-08-09 【訂正】cameraOriginMatrix は逆行列ではなく「そのもの」を掛ける
+
+- 直前のエントリで「Space=camera は `inverse(cameraOriginMatrix)` を掛ける」「TD側の引き算だと
+  0.62m ずれる」と書いたが、**どちらも誤り**。ユーザーが実機で「camera at origin は上手く
+  動いてなさそう」と気づいて発覚(図が画面外へ飛んでいた)
+- **切り分け**: 静止したカメラなのに腰のカメラ基準位置が
+  `(-0.43,-0.57, 2.32)`(ほぼ+Z)→`(-2.40,-0.07, 0.16)`(ほぼ-X)と 90° 振れた。
+  距離だけは 2.41m で一致 = 回転の掛け方が違う、と当たりを付けた
+- **決め方(推測せず実測)**: 候補ごとにカメラ空間の点を射影(`x/z`, `y/z`)し、焦点距離を最小二乗で
+  当てはめて **Vision 自身の `pointInImage` との再投影残差**を8フレームで測った
+  (`scratchpad/projtest2.m`):
+
+  | 候補 | 平均残差(正規化画像座標) |
+  |---|---|
+  | **`M * p`** | **0.00000**(全フレーム厳密一致) |
+  | `p - t` | 0.01309 |
+  | `inverse(M) * p` | 0.02663 |
+
+- **結論**: `cameraOriginMatrix` は名前に反して **model → camera** の変換。カメラ基準は `M * p`。
+  カメラ空間は **-Z 前方**(TDのカメラと同じ規約)で、被写体は -Z 側に来る。
+  既存の `camera:tx,ty,tz`(= M の平行移動列)も「カメラの位置」ではなく
+  **「腰のカメラ基準位置」**が実体だった(README の説明も訂正)
+- **教訓**: 行列の向きは名前から推測しない。**Vision が別途返している 2D 投影 (`pointInImage`) が
+  ground truth になる**ので、再投影残差で決めれば一発で分かる。相関係数だけだとどの候補も
+  0.98 超で差が出ず、判定できなかった(最小二乗フィット後の残差にして初めて 0.00000 が見えた)
+- 修正版をビルド・インストールし **TD再起動して実機確認**: 腰が `(0.014, 0.064, -2.510)`
+  = 画面中央のダンサーがカメラの 2.5m 前、頭 +0.845 / 足首 -0.884 で身長 1.73m。妥当
+- demo の `cam1` は原点だと**見切れる**(TD の FOV Angle は**水平**なので 16:9 だと縦が足りない)。
+  `tz = 2.5` に引いて全身が収まることを視認確認
+
+### 2026-08-09 VisionPose3D の camera:* を cam:* 一式へ作り直し(破壊的変更)
+
+- ユーザー「互換性は無視して破壊的変更をしても構わないので、camera:tx,ty,tz を使いやすい様にして」
+- 旧 `camera:tx,ty,tz`(3ch)は名前と実体がずれていた(実体は「腰のカメラ基準位置」)。
+  **9ch の `cam:*` 一式に置換**(91ch → 97ch):
+
+  | チャンネル | 内容 |
+  |---|---|
+  | `cam:tx,ty,tz` | カメラ位置(人物 root 基準) |
+  | `cam:rx,ry,rz` | カメラ回転(度・**TD Camera COMP にそのまま挿せる**) |
+  | `cam:distance` | レンズ〜腰の距離(m) |
+  | `cam:azimuth` / `cam:elevation` | 腰が光軸から何度ずれているか(+右 / +上) |
+
+- **接頭辞を `cam:` に統一したのが要点**。関節だけ欲しいときは Select CHOP の `^*cam*` 一発で
+  落とせる(demo の select4 がまさにそれで、`^*camera*` → `^*cam*` の1文字修正で済んだ)
+- **TD の Rotate Order は実測で確定**: カメラに rx20/ry30/rz40 を入れて `worldTransform` を読み、
+  候補行列と突き合わせた結果 **`R = Rz·Ry·Rx`**(小数5桁一致)。分解は
+  `ry=asin(-r20) / rx=atan2(r21,r22) / rz=atan2(r10,r00)`
+- **検証(ピクセル一致)**: ①root 空間 + カメラを `cam:t*`/`cam:r*` で駆動 ②camera 空間 +
+  カメラ原点 ——この2つのレンダが **平均絶対差 0.0000・インク画素数も 22284 で完全一致**。
+  Euler 抽出と回転順が正しいことの決定的な確認になった(動画は play=False で固定して比較)
+- **踏んだバグ**: 固定チャンネルを 6→12 に増やしたのに、**関節側の書き込みが
+  `channels[6 + j*5 + c]` のままだった**ため cam系の後半を上書きして全体がずれた。
+  症状は `cam:distance` が 0.525 なのに `|root(camera space)|` は 2.52、という不整合。
+  **チャンネル数を変えるときは getChannelName と execute の両方のオフセットを直す**
+  (定数 `kFixedChans` に集約して再発を防いだ)
+- README(英日)を新チャンネル表+検証結果に更新。demo の note にも cam:* の説明を追加。
+  Space の説明に残っていた「被写体は +Z」の誤りも -Z に訂正
+
+### 2026-08-09 VisionPose3D 評価ツール(tools/pose3d_eval.m)+ 骨の長さは固定モデルと判明
+
+- ユーザー「ダンス以外の、関節の動きの正しさを評価できる素材を作りたい」→ 先に**測る手段**を用意
+- **最初の案は外れだった**: 「人体は剛体なので骨の長さは一定のはず。その揺れ=推定誤差」で
+  実装したら、**上腕 0.3165 / 前腕 0.2475 / 腿 0.4705 / 脛 0.4849m が全フレーム完全一定**、
+  しかも **sample_ballet と sample_pose3d(別人・別動画)で1桁まで同一**だった。
+  → **Vision は固定プロポーションの人体モデルを角度だけ合わせている**。長さの一定性は
+  構造上の定数であって品質と無関係。同じ理由で**人物の体格は測れない**
+  (肩幅だけ CV 0.8%、脊椎 0.1% とわずかに動く。他は完全固定)
+- `pointInImage` との再投影誤差も 0(3Dから導出された値なので独立でない)ため指標にならない
+- **採用した指標: 2D姿勢推定(`VNDetectHumanBodyPoseRequest`)との食い違い**。別モデルなので
+  独立した比較対象になる。3D関節を画像に投影して 2D検出の位置と px で比較する
+- **ベースライン(1280x720・6fps サンプリング・48フレーム)**:
+
+  | | sample_pose3d | sample_ballet |
+  |---|---|---|
+  | 全関節平均 | **21.3 px** | 21.6 px |
+  | neck | 13.6 | 18.4 |
+  | 肩 | 15〜16 | 18〜20 |
+  | 肘 | 16〜17 | 15〜20 |
+  | 手首 | 20〜24 | 23 |
+  | 膝 | 22〜29 | 20〜34 |
+  | 足首 | **31〜37** | **30** |
+
+  **末端ほど誤差が大きい**(neck 13.6 → 足首 37)という素直な傾向。最悪値は足首 296px /
+  手首 314px と跳ねるので、そのフレームを見に行けば苦手なポーズが分かる
+- **ビルドの罠(再発)**: `clang ... 2>&1 | head -5` は **head がパイプを閉じて clang が SIGPIPE
+  で死ぬ**ためリンクまで到達せず、警告だけ出て**バイナリができない**。
+  CLAUDE.md 既出の `codesign | grep -q` と同じ型。パイプで切るなら `| tail` か変数に取る
+
+### 2026-08-09 GT付きデータセットは使えず → 幾何的不変量で評価する方式に
+
+- ユーザー「同梱しないので、正解データのわかるデータと動画をダウンロードして使ってみて」
+- **調べた結論: 動画+3D正解が揃うデータセットは軒並み非商用・要申請で、法人では使えない**
+  - **AIST Dance Video DB**: 学術研究限定・**商用不可**・再配布禁止・**申請フォーム必須**
+    (AIST++ の**アノテーションだけ**は GitHub Releases から直接落とせて CC BY 4.0 だが、
+    対になる動画が上記なので意味がない。落としかけて中断・削除した)
+  - **MoVi / BML**: 「非商用・学術研究目的のみ。商用利用は禁止」と明記
+  - Human3.6M / MPI-INF-3DHP / 3DPW / BEDLAM も登録必須・研究ライセンス
+  - **Pexels / Pixabay / Mixkit** は利用自体は自由だが**再配布禁止**なのでリポジトリ同梱は不可
+    (ローカル評価だけなら可)
+  - **Wikimedia Commons の CC BY** が唯一「同梱もできる」選択肢
+- **方針転換**: 正解データセットを探すのをやめ、**幾何的に正解が分かる不変量**を測る方式に。
+  `tools/pose3d_eval.m` に追加: `torso_pitch`(体幹が鉛直から何度)/ `head_tilt`(体幹に対する頭)/
+  `arm_elev_L/R`(腕が水平から何度)/ `knee_flex_L/R`。**T-pose なら arm_elev が 0 で左右一致**、
+  **お辞儀なら torso_pitch が 0→90 に振れる**、というように正解が事前に分かる
+- **踏んだ罠(自分のツールのバグ)**: 最初 model 空間で角度を測ったら、スクワットなのに
+  `torso_pitch` の range が **10.9°** しか出なかった。**model 空間の +Y は体幹軸に沿っている**ため、
+  体幹の傾きは定義上ほぼ 0 になる。**カメラ空間(`M * p`)で測り直すと 8.8→38.1°(range 29.2°)** と
+  実際のバックスクワットの前傾に一致した。**「人が前に倒れているか」を知りたいなら Space=camera**
+- 実測(Wikimedia CC BY のスクワット映像・[FitnessScape](https://commons.wikimedia.org/wiki/File:Squat_-_exercise_demonstration_video.webm)):
+  膝の曲げ 40→158°(正しい)・体幹 8.8→38.1°(正しい)。2D比較スコアは 34.6px
+  (ダンス素材 21.3px より悪い = 後ろ姿+バーベル遮蔽の難しさが数字に出ている)
+
+### 2026-08-09 モーション評価用素材の置き場を eval/ に決定(git 同期しない)
+
+- ユーザー「gitに同期しないモーション評価用動画を入れるフォルダを決めて」
+- **`eval/`** を新設。`models/` と同じ「中身は除外・README だけ共有」方式
+  (`.gitignore` に `eval/*` + `!eval/README.md`)
+- **分離する理由は容量ではなくライセンス**。評価に使いたい素材は再配布できないものが多く
+  (Pexels/Pixabay/Mixkit は再配布禁止、研究用データセットは商用不可)、**コミットされる
+  `Assets/` に置いてしまう事故**を防ぐのが目的。README に「ここに置いてよい/`Assets/` に
+  置いてよい」の対応表を書いた
+- README には評価の手順(ffmpeg で 6fps 展開 → `tools/pose3d_eval.m`)、**比較用ベースライン**
+  (sample_pose3d 21.3px / sample_ballet 21.6px / Wikimediaスクワット 34.6px)、
+  撮るべきポーズと「そのポーズで何の正解が分かるか」の対応、既知の落とし穴
+  (角度はカメラ空間で測る・骨の長さは使えない・メートルは1.8m仮定)をまとめた
+- 手元の Wikimedia CC BY スクワット映像を
+  `eval/wikimedia_squat_CC-BY_FitnessScape.webm` として配置(**ファイル名に出典と
+  ライセンスを入れる**運用にした。後から素性が分からなくなるのを防ぐ)。
+  `git check-ignore` で除外されていることを確認済み
+
+### 2026-08-10 eval/ の実素材7本で VisionPose3D を評価(Tポーズ/お辞儀の正解チェック含む)
+
+- ユーザーが `eval/` に7本投入(モーションアクター社の Tポーズ/お辞儀/やったー/不屈、
+  コンテンポラリーダンス、モデルのポージング、Wikimediaスクワット)。ユーザー指示で
+  **`eval/` は README も含めて丸ごと gitignore**(`eval/*`+`!README` → `eval/`)に変更
+- **指標の欠陥を1つ修正**: ズレを px で出していたが、それだと **1920幅の映像が 1280幅より
+  不利**になり、被写体が小さく写っているだけで良く見える。**2D検出点の縦の広がり(=人物の
+  身長)に対する % に正規化**した(`VNHumanBodyPoseObservation` に boundingBox は無いので自前算出)
+- `tools/eval_video.sh` を追加(eval/ の全動画をまとめて評価。既定 3fps・150フレーム上限)
+
+**結果(身長比%・小さいほど画像と整合)**
+
+| クリップ | スコア | 検出率 | 備考 |
+|---|---|---|---|
+| **Tポーズ** | **4.79%** | 84.4% | 最良 |
+| モデルのポージング | 6.20% | 95.3% | 直立中心 |
+| スクワット(Wikimedia) | 7.81% | 95.2% | 後ろ姿+遮蔽 |
+| コンテンポラリーダンス | 8.35% | 92.7% | |
+| **お辞儀** | **8.56%** | 98.0% | |
+| やったー(跳ぶ) | 10.84% | 90.6% | |
+| **不屈(倒れる/起き上がる)** | **18.81%** | 84.7% | **最悪・Tポーズの約4倍** |
+
+- **正解チェックは合格**: Tポーズで `arm_elev` が **L=-3.1° / R=-0.3°**(水平からのずれ)、
+  **左右差 2.8°**。お辞儀は `torso_pitch` が 0.4→**51.4°** と正しく振れた
+- **床/寝そべり系が明確に弱い**。不屈は右膝 31.4%(最悪 315%)・右足首 27.3%(最悪 417%)と
+  桁違いに崩れる。倒れた姿勢では**下半身がほぼ当てにならない**
+- Tポーズでも **左手首だけ 11.7%** と他(3〜5%)から浮く。左右非対称な崩れ方をする傾向は
+  スクワット(後ろ姿)でも見えており、**片側だけ壊れる**のがこのモデルの典型的な失敗
+- 検出率は Tポーズ 84.4% / 不屈 84.7% と低め。全身が画面内にあるかどうかに素直に効く
+
+### 2026-08-10 bodyheight/heightestimation 削除 + Camera FOV パラメータ追加(intrinsics を渡せる)
+
+- ユーザー「iPhoneならLiDARのdepthが取れるがMacには無い。bodyheightは意味のない数字では?
+  不要なパラメーターは非表示にしたい」
+- **削除(98ch → 96ch)**: `bodyheight` / `heightestimation`。**7クリップ・44検出で
+  measured=0・bodyHeight=1.8000 固定**を実測。1つの値しか取り得ないチャンネルは出さない
+- **ただし「Macだから無理」は不正確**。深度は `initWithCVPixelBuffer:depthData:orientation:options:`
+  で渡すもので、これは **API_AVAILABLE(macos 14.0)**。正しくは「**TOP は色しか運ばないから無理**」。
+  深度とカメラ内部パラメータを運ぶ入力経路を足せば measured にできる(将来の選択肢として記録)
+
+- **副産物として重要な発見**: ユーザーの「cam:fov は映像素材ごとに計算している?」という質問を
+  実測したら、**8クリップ(1280x720/1920x1080・被写体も画角もばらばら)すべてで 98.823〜98.824°**。
+  = Vision は実カメラの画角を推定しておらず、**水平98.8°の広角を固定で仮定**していた
+- **`VNImageOptionCameraIntrinsics` は macOS でも効く**(実測)。そこで **Camera FOV パラメータ**
+  (既定0=Vision既定)を追加し、>1 なら intrinsics を組んで渡すようにした。TD実測(同一フレーム):
+
+  | Camera FOV | cam:distance |
+  |---|---|
+  | 0(98.8°仮定) | 2.8 m |
+  | 120° | 2.05 m |
+  | 70° | 5.14 m |
+  | 40° | 8.54 m |
+
+- **姿勢そのものは画角に依存しない**(model空間の関節座標は全FOVでビット一致)。効くのは
+  **カメラとの位置関係**だけ = `cam:distance` / `cam:t*` / `cam:r*` / camera空間の座標。
+  骨格の形しか使わないなら 0 のままでよい、と README に明記
+- 罠: `VNImageOptionCameraIntrinsics` の値は **NSData**(`NSValue valueWithBytes:objCType:` だと
+  nil になり辞書生成で例外)。intrinsics は列優先 `simd_matrix(col0,col1,col2)` で
+  `[[fx,0,0],[0,fy,0],[cx,cy,1]]`
+- パラメータ変更時は `myLastCookSeen = -1` で静止画入力でも再解析させる
+
+### 2026-08-10 cam:* の使い道を実測で確定(cam:ry = 演者の向き)
+
+- ユーザー「cam:distance / cam:tx,ty,tz / cam:rx,ry,rz の使い道は?」→ 設計した本人として
+  推測で答えず実測した
+- **`cam:ry` は「演者がカメラに対してどちらを向いているか」**。独立指標(カメラ空間での
+  左右肩の奥行き差 = どちらの肩がレンズに近いか)と**符号・大きさが完全に一致**し、
+  `cam:ry` が ±65〜79° のとき画像上の肩幅が 0.004〜0.017 まで潰れる(=ほぼ真横)。
+  0=正面 / ±90=真横。**向きをこれだけ直接取れるチャンネルは他に無い**
+- **重要な性質**: `cam:*` は**演者自身の座標系から見たカメラ**なので、**三脚で固定していても
+  `cam:ry` は振れる**(体と一緒に座標系が回るため)。「自分のカメラの姿勢」だと思うと混乱する。
+  README に相対量である旨を明記
+- `cam:distance` は近接演出用(Camera FOV 未設定でも単調なので相対値としては使える)。
+  `cam:rx` は難フレームで暴れる(168°/-155°/-87° の外れ値はジャンプ中のフレーム)。
+  `cam:tx,ty,tz` は `root` 空間でTDカメラを実カメラに合わせる用途に限られ、
+  **`camera` 空間+カメラ原点と同じ絵**になる冗長性がある(体を原点に固定して回り込みたいときだけ有効)
+- README(英日)に「どのチャンネルで何が分かるか/何に使うか」の表を追加
+
+### 2026-08-10 cam:* を3chへ整理(cam:facing 新設)+ 前回の説明を訂正
+
+- ユーザー「root空間でTDカメラを合わせる使い方はしない」「cam:ryが演者の向きというのがピンと
+  こない、名前を変えたほうがいい」「cam:distance がわかれば fov も計算できる?」
+- **前回の「cam:ry = 演者の向き」は不正確だった**。**全編ずっと後ろ姿**のスクワット映像で検証すると
+  **ry は -35° 付近のまま動かず、代わりに rx が ±178° に振れる**。Euler 分解(ry=asin(...) は
+  ±90° 頭打ち)のせいで向きの情報が2軸に分裂しており、**ry 単体では正面/背面を区別できない**。
+  最初にダンス素材(ほぼ正面)だけで確認したのが甘かった
+- **`cam:facing` を新設**: カメラ空間で「右肩→左肩」と上方向の外積=胸の法線を求め `atan2`。
+  **±180° の全周**を1本で表せる。実測: 後ろ姿 +125〜138° / 正面 +5〜10° / 真横 ±74〜81°
+- **削除**: `cam:tx,ty,tz`(root空間でTDカメラを合わせる用途専用・ユーザーが使わないと明言。
+  camera空間+カメラ原点と同じ絵)、`cam:rx,ry,rz`(facing に置換)、
+  `cam:azimuth`/`cam:elevation`(**`root:u,v` を角度にしただけ**。u から fov 経由で復元した値が
+  +11.179 で azimuth と完全一致することを実測)。**96ch → 89ch**、cam系は 10 → 3
+- **`cam:distance` は `cam:tz` ではない**(質問への回答)。ベクトル全体の長さで、実測では
+  体のZ方向 2.16m に対し総距離 2.52m と 16% 違う
+- **distance から fov は逆算できない**(循環)。同一フレームで `distance × tan(fov/2)` を測ると
+  2.55〜2.62 とほぼ一定 = この積はショット固有の定数(演者の写る大きさ)であって情報が増えない。
+  **ただし実距離をメジャーで1回測れば較正できる**: `K = distance_auto × tan(98.824°/2)`、
+  `FOV = 2·atan(K/実距離)`。K=2.59 なら実距離5mで55°、3mで82°
+- TD実機で 89ch・`cam:facing` が +76→-84 と振れること・errors なしを確認
+
+### 2026-08-10 body:facing/pitch/roll に改名・拡張 + 関節回転は取得できないと確認
+
+- ユーザー「camより人体の回転情報として分かる命名がいい」「rootや各関節の回転情報は取得できない?」
+- **関節の回転は Vision から取れない**(実測で確定)。`VNHumanBodyRecognizedPoint3D.position` と
+  `localPosition` は `simd_float4x4` なので期待したが、**3x3部分は全関節で完全に単位行列**
+  (非対角の合計 0.0000・det 1.0)。中身は平行移動だけ。骨の**向き**は位置から作れるが、
+  骨まわりのひねり(前腕の回内など)は点からは原理的に復元不可
+- **`cam:facing` → `body:facing` に改名し、`body:pitch` / `body:roll` を追加**(91ch)。
+  体幹の3自由度が揃った。`right`=肩ベクトル / `fwd`=胸の法線 / `up`=世界の上 で体の枠を作り、
+  pitch・roll を**演者自身の枠**で測るので、どちらを向いていても「前に曲げた」が同じ意味になる
+- **検証中に自分が素材を読み違えた**: Tポーズ素材で facing が ±90 と -6 を行き来するのを
+  「不安定」と誤解したが、フレームを見たら**正面と横向きを実演している映像**で、値は正しかった。
+  数値がおかしいと思ったら**まず素材を見る**
+- お辞儀素材(モーションアクター)は**後ろ姿・小さい・マーカースーツ**で推定自体が不安定。
+  指標の検証には向かない素材だった(スコア 8.56% だったのも納得)
+- 実測: 直立で pitch/roll とも ±3° 以内、お辞儀で pitch +31°、
+  facing は 後ろ姿 +125〜138° / 正面 -6° / 真横 ±89〜91°
+
+### 2026-08-10 深度入力の検証は失敗(Vision が落ちる)+ 深度で何が変わるかの整理
+
+- ユーザー「depthデータがあったら精度が上がる?」→ 手元に深度付き素材が残っていないので
+  **人物セグメンテーションから合成深度を作って**比較しようとしたが、**Vision 内部で落ちた**:
+  `Assertion failed: ... "Algebra after the logarithm map does not require normalization."`
+  `function enforce, file se3.hpp, line 270`
+- 階段状(2m→7m)が原因かと思い**3回ボックスぼかしで滑らかに**しても同じアサート。
+  原因はおそらく **`AVDepthData` に `cameraCalibrationData`(内部パラメータ)が無い**こと。
+  実機の深度は必ず持っているが、`depthDataFromDictionaryRepresentation:` で自作したものには無い
+- **これは実装上の地雷**: 将来 depth 入力を足すなら、**不正な AVDepthData で TD ごと落ちる**。
+  `getCameraRelativePosition:` のクラッシュと合わせ、**Vision の3D姿勢APIはクラッシュ経路が複数ある**
+- 合成では精度を測れないので、**深度で何が変わるかは未検証のまま**。分かっているのは:
+  - ドキュメント上 `heightEstimation` が `measured` になり `bodyHeight` が実身長になる
+    = **1.8m仮定が消えて絶対スケールが正しくなる**(Camera FOV と同じ種類の改善)
+  - 姿勢そのものが良くなるかは**不明**。FOV実験で「幾何的なカメラ情報を与えても model空間の
+    関節はビット一致」だったこと、固定プロポーションのモデルを角度だけ合わせていることから、
+    **スケールと配置が主で、関節角度への効果は限定的**と推測されるが**実測していない**
+- 実測するには iPhone のポートレート HEIC か深度付き動画が要る。`eval/` に置いてもらえれば検証可能
+
+### 2026-08-10 demo に向き矢印を追加 + body:facing は横向きで180度反転すると判明
+
+- ユーザー「body:facing pitch roll から向いている向きを矢印で描画して」
+- `/project1/VisionPose3D/geo3`(arrow Script SOP → sop2pop → outPOP + arrowMAT マゼンタ)を追加。
+  胸(center_shoulder)から出る**板ポリゴンの矢印**。facing=水平の向き / pitch=上下の傾き /
+  **roll=板のバンク**。矢印の「向き」は2自由度しか持てないので、roll は板の傾きに割り当てた
+- **実装より重要な発見**: 実機で矢印が**逆を向いた**。人物は明らかに左を向いているのに
+  `facing=+89.6`。オフラインでは 左向き -90.2 / 右向き +90.7 と正しかったので符号規約は正しい。
+  → **Vision の facing 推定が横向き付近で約180度反転している**
+- **定量化**(10fps・隣接フレームの角度差で測定。人は 0.1秒で180度回れない):
+
+  | クリップ | 90度超の飛び | 最大 |
+  |---|---|---|
+  | Tポーズ | 10/56 (**18%**) | 179.4° |
+  | Model posing | 9/59 (**16%**) | 179.6° |
+  | sample_pose3d | 10/57 (**18%**) | 152.9° |
+
+  **約6フレームに1回、ほぼ180度**。真横のシルエットは前後でほぼ同形なので単眼では原理的に曖昧
+- **矢印は値に忠実**で、プラグイン側で反転を隠す補正は入れていない(本当の挙動を見せるため)。
+  演出で使うなら「飛んだら180度足して連続にする」後処理を入れる、と note と README に明記
+- **教訓**: 見た目がおかしいとき、描画側を疑う前に**値と素材を突き合わせる**。今回は
+  頭部を拡大して顔の向きを確認 → 値のほうが誤りと確定できた
+
+### 2026-08-10 VNSequenceRequestHandler で安定性が大幅改善(ただし intrinsics と両立しない)
+
+- ユーザー「Swift の Mac アプリとして実装しても同じ精度?」→ モデルは同じなので基本は同じ、
+  ただし**入力の与え方**で差が出る。調べる過程で**プラグイン側の改善点が見つかった**
+- **連続フレームとして渡すと劇的に安定する**(3クリップ・10fps・60フレームで実測):
+
+  | | 検出率 | body:facing の180度反転 | 最大の飛び |
+  |---|---|---|---|
+  | 1枚ずつ `VNImageRequestHandler`(従来) | 56〜59/60 | 16〜18% | 179.6° |
+  | **`VNSequenceRequestHandler`** | **60/60** | **0〜8%** | 69.8〜176° |
+
+  単眼では真横の前後が原理的に曖昧なので、時間方向の文脈が効く。値の一致率は 3〜7% しかなく、
+  **別物の結果**が返る
+- **ただし intrinsics と両立しない**。実測で確定:
+
+  | 経路 | 40度/90度を渡したときの復元値 |
+  |---|---|
+  | `VNImageRequestHandler` + `options:VNImageOptionCameraIntrinsics` | **40.000 / 90.000**(効く) |
+  | `VNSequenceRequestHandler` + CMSampleBuffer attachment | 98.824 / 98.824(**無視**) |
+  | `VNImageRequestHandler` + CMSampleBuffer attachment | 98.824 / 98.824(**無視**) |
+
+  `VNSequenceRequestHandler` に `options:` 版は無い。**intrinsics を受け付けるのは
+  VNImageRequestHandler の options だけ**
+- **実装**: Camera FOV = 0 なら sequence(既定・安定重視)、> 0 なら image+intrinsics(距離重視)に
+  自動で切り替える。TD実測で Fov=0→cam:fov 98.824/dist 2.20、Fov=50→50.000/4.99 を確認
+- **Swift アプリとの比較の結論**: モデルもOSも同じなので**推定精度そのものは同じ**。差が出るのは
+  ①深度を渡せるか(AVDepthData・TOPには無い)②intrinsics をライブ撮影から自動取得できるか
+  ③入力画像がTDのチェーンで加工されていないか。**連続フレーム処理は今回プラグイン側にも入れた**ので
+  この点の差は解消した
+
+### 2026-08-10 顔の向きは VisionFace に既存。ただし ±45〜50度で頭打ち
+
+- ユーザー「顔の向いている向きは取れない?」→ **VisionPose3D では取れない**(頭の関節が
+  `center_head`/`top_head` の2点で同一直線上。その軸まわりの回転は原理的に表現されない)。
+  **VisionFace CHOP が `face{i}/roll,yaw,pitch`(ラジアン)を既に出している**
+- **実測(向きを目視で確認したフレームと突き合わせ)**:
+
+  | 被写体 | face yaw | body:facing |
+  |---|---|---|
+  | 正面 | −4.2° | −5.8° |
+  | 右へ90度 | **+48.0°** | +90.7° |
+  | 右へ90度 | **+41.1°** | +89.4° |
+  | 左へ90度 | **顔検出なし** | −90.2° |
+  | 背面 | **顔検出なし** | +136.9° |
+
+- **2つの限界**: ①`yaw` は **±45〜50度で頭打ち**。真横でも 90度にならないので「絶対方位」ではなく
+  「頭のひねり具合」として扱う ②真横は当たり外れ、背面は何も返らない。**角度を使う前に顔側の
+  valid で門番する**
+- **組み合わせが本命**: `body:facing`(全周の体の向き)と `face yaw`(カメラに対する頭の向き)で、
+  **「体は正対したまま顔だけ横」と「体ごと向きを変えた」を区別できる**
+- なお **顔検出が失敗するのは真横〜背面**で、これは body:facing の180度反転が起きる領域と重なる。
+  つまり**顔で反転を解消する用途には期待しすぎない**ほうがよい
+- VisionFace/README(英日)に実測表と使い方の注意を追記
+
+### 2026-08-10 v0.9.4 リリース
+
+- ユーザー指示でリリース。**57プラグインを全て再ビルド**(並列・全件成功)してから
+  `tools/release.sh sign → verify → dmg → notarize`。59バンドル・全数verify通過
+  (署名/Hardened Runtime/Developer ID/APIバージョン/版一致)。DMG 18MB →
+  公証 **Accepted**(c8be18e9-5dca-4f61-bed5-c39deed44464)→ staple → spctl accepted
+- 0.9.3 からの中身は **VisionPose3D の全面的な見直し**が中心:
+  連続フレーム処理(検出率 56〜59/60 → 60/60・向きの反転 16〜18% → 0〜8%)、
+  リクエスト使い回しで約2倍速、`Coordinate Space`(root/camera)・`Camera FOV`・
+  `body:facing/pitch/roll`・`cam:distance/fov` を追加、`bodyheight`/`heightestimation` と
+  旧 `camera:*` 6ch を削除(**このopに関して後方非互換**)。
+  ほかに Metal Denoise の警告+素通し化、**07-23 から黙ってビルドされていなかった6プラグインの修復**、
+  READMEの英日併記化、評価ツール2本(`tools/pose3d_eval.m` / `tools/eval_video.sh`)、
+  ループ探索(`tools/find_loop.py`)、VisionPose/3D の骨格線と向き矢印
+- **patch にした理由**: `opType` の追加・削除・リネームは無く、影響は VisionPose3D の
+  チャンネル構成のみ。op 単位の `majorVersion` も据え置き
+- **申し送り**: demo.toe はユーザーが作業中の状態でコミットした。VisionPose3D コンテナに
+  `eval/`(gitignore)の映像を参照する Movie File In が4本残っている可能性がある。
+  clone しただけの人はその4ノードがファイル無しになる。次回整理する
+
+### 2026-08-10 SoundClass のクラスID全一覧を README に収録(303件)
+
+- ユーザー「SoundClass の Class 名一覧はどこにある?」→ **リポジトリには無かった**。
+  Info DAT は「今鳴っている音の上位10件」しか出しておらず、全体を知る手段が無かった
+- 正は API の `SNClassifySoundRequest.knownClassifications`。macOS 26.6 の
+  `com.apple.SoundAnalysis.classifier.v1` で **303件**
+- `tools/sound_classes.m` を追加(この一覧を吐くだけの小さなCLI)。**一覧は OS バージョンに
+  紐づく**ので、README に貼ったのはスナップショットである旨を明記し、再生成手順も併記
+- SoundClass/README(英日)に `<details>` で全303件を収録
+
+### 2026-08-10 SoundClass デモに Info DAT が無く「上位10件が出ていない」ように見えていた
+
+- ユーザー「infoDATが自動で上位10件を出している様には見えない。Classes に書いたものしか出ていない」
+- **プラグインは正常。デモに Info DAT ノードが無かっただけ**。`/project1/SoundClass` にあったのは
+  `chopto1`(CHOP to DAT)で、これは**チャンネル**=`Classes` に列挙したIDしか表にしない
+- 一時的に Info DAT を繋いで確認すると、`Classes`(applause/cheering/laughter/music/speech)に
+  無い **synthesizer 0.739 / keyboard_musical 0.725 / disc_scratching 0.285** 等がちゃんと出た。
+  SDK も `classifications` は「sorted with highest confidence first」と保証しており、実装は
+  先頭から `kRankRows = 10` 件を取るので確かに上位10件
+- デモに **`top10`(Info DAT・Operator=Soundclass1)** を追加し、両方にノードコメントを付けた。
+  note と README(英日)にも「Info DAT ノードのことであって CHOP to DAT とは別物」と明記
+- **教訓**: 機能を実装しても**利用例に置いていないと存在しないのと同じ**。今回は
+  「Classes を知らなくても探せる」という設計意図そのものが見えなくなっていた
+
+### 2026-08-10 SoundClass CHOP に Info DAT 自動生成を追加(pythonCallbacksDAT の横展開)
+
+- ユーザー「soundclass chop から infoDAT を出せる様にして」
+- `common/PyCallbacksBootstrap.h` を使い、CoreWLANScan / Cinematic Video / Spatial Video / PDFKit と
+  同じ仕組みを SoundClass CHOP へ横展開。**配置しただけで Callbacks DAT が閉じたチップとして
+  ドック接続**され、**`Info DAT (top 10)` トグル off→on で `<node名>_info` を自動生成**
+- build.sh に `TD_EXTRA_CFLAGS`(Python.h + `-undefined dynamic_lookup`)を追加。
+  共通ヘルパは `TD_EXTRA_CFLAGS` を読むので1行足すだけで済む
+- **検証で一度ハマった**: 生成直後は `sc_callbacks` も `sc_info` も出ず「効いていない」と見えたが、
+  原因は**CHOP が cook されていなかった**だけ(bootstrap も callback 発火も execute の中にある)。
+  `out.cook(force=True)` を数回回したら両方生成された。実測 sc_info 11x2、
+  synthesizer 0.846 / keyboard_musical 0.781 / music 0.748、callbacks は
+  dock=sc / expose=True / viewer=True / showDocked=False
+
+### 2026-08-10 social preview 画像を作成(docs/social-preview.jpg)
+
+- ユーザー「この動画を social preview にできない?」→ **動画は不可**。GitHub の social preview は
+  **PNG / JPG / GIF・1MB未満**(推奨 1280×640)。しかも GIF にしても X は静止画にするので労力に見合わない
+- **1MB制限が厳しい**のは尺ではなく「毎フレーム何割の画素が変わるか」。手元の GIF は
+  llmafm-chat(16秒)が 648KB、visionface(4秒)が 1.5MB。1280×640 に上げると実写の動きものは無理
+- 静止画で作成。素材は `AfterEffects/AppleFrameworksForTD_demos.mp4`(gitignore・24秒/1280x720)の
+  **t=2.4s**(5人の骨格オーバーレイが一番読める)。1280×720 → 上80pxを落として 1280×640。
+  下に指数 0.75 のグラデーションスクリムを敷いて可読性を確保し、Helvetica Bold 58 / Regular 32 で
+  「Apple Frameworks for TouchDesigner」「50+ native operators · macOS」。**115KB**
+- **social preview は API から設定できない**(Settings → General → Social preview の Web UI のみ)。
+  画像は `docs/social-preview.jpg` に置いたのでユーザーがアップロードする
+- あわせて調査した結果: リポジトリは **PUBLIC・星4・説明文あり**だが **Topics が空**。
+  `touchdesigner` トピックには 426リポジトリあり、そこの導線から完全に外れている(要 Topics 設定)。
+  awesome-touchdesigner(163★)への PR も有効
+
+### 2026-08-10 SpeechText の Locale をプルダウン化(実行時に supportedLocales から生成)
+
+- ユーザー「SpeechText の locale をプルダウンからの選択にしたい」
+- **対応ロケールは OS のバージョンで変わる**ので静的メニューにせず、helper に
+  `sp_locales()`(C ABI)を足して `SpeechTranscriber.supportedLocales` から実行時に取る。
+  **macOS 26.6 実測で 30件**、うち **10件がこの Mac にインストール済み**
+- ラベルは `en-US - English (United States) (installed)` の形。**インストール済みかを出す**のは、
+  未インストールだと初回に数分のダウンロードが走るため(選ぶ前に分かるようにした)。
+  **UIラベルは ASCII のみ**の規約があるので、英語名から非ASCIIを落としている
+- **文字列パラメータ + `appendDynamicStringMenu` なので、一覧に無いコードも打ち込める**
+  (実測: `sv-SE` を代入でき、値として保持された)。WhisperKit は99言語対応なので、
+  30件のリストに縛られないこの挙動が要る
+- macOS 26 未満で一覧が空になる場合に備え、en-US/ja-JP など7件のフォールバックを持たせた
+- helper のキャッシュは初回だけ semaphore で待つ(5秒上限)。`supportedLocales` は静的な
+  一覧なので実測では即返る
+
+### 2026-08-10 Speech Text → Speech Transcribe に改名(破壊的変更)
+
+- ユーザー「SpeechText という名前が機能をわかりづらくしている」→ 確かに紛らわしい。
+  リポジトリには **Speech Synth(テキスト→音声)** があり、**Speech Text(音声→テキスト)** と
+  並ぶと**どちらの向きか名前から読めない**
+- ユーザー選択で **Speech Transcribe**(opType `Speechtranscribe` / icon `STR`)に。
+  「フレームワーク名 + 機能」の規約に合い、Speech Synth と *transcribe / synth* の動詞ペアになる
+- 手順は既存の改名と同じ: `git mv` でフォルダ・ソース → opType/opLabel/opIcon/クラス名/
+  バンドル名を置換 → README(各 + ルート英日)・THIRD_PARTY_NOTICES・Translate/TextAnalyze の
+  相互参照・skill 2ファイルを更新 → 旧バンドル削除 → 新バンドル設置
+- **Swiftヘルパは内部名を保持**(module `SpeechHelper` / C ABI `sp_` / `libSpeechHelper`)。規約どおり
+- **opType 変更は破壊的**なので、このopの `majorVersion` を 0→1(minor 9→0)に上げた
+- **SPM の罠を再度踏んだ**: フォルダ移動で `whisper/.build` の ModuleCache パスがずれて
+  `could not build module '_DarwinFoundation1'`。`rm -rf whisper/.build` してから再ビルドで解決
+  (ImageGen で同じことを踏んでおり、CLAUDE.md にも既出)
+- TD再起動後、demo の該当ノードは **`Speechtranscribe1` として型もパラメータも正常に復帰**し
+  errors なし。コンテナ名も `SpeechTranscribe` に変更して保存
+
+### 2026-08-10 デモ用の英語音声を追加(Assets/sample_speech_en.aiff)
+
+- ユーザー「demo用に英語の音声ファイルがほしい」。`say -v Samantha` で生成(19秒・818KB・
+  合成音声なので第三者の権利なし)。既存の日本語は `sample_speech.aiff` → **`sample_speech_ja.aiff`**
+  に改名して対を明示
+- **デモの既定を英語に変更**。`en-*` のモデルは多くの Mac に最初から入っているが `ja-JP` は
+  初回にダウンロードが走るため、初見の体験がよい。`repeat=on` でループ再生
+- **原稿を2回書き直した**: 最初の版は `on-device` が **`undevised`** に、`in TouchDesigner` が
+  `and touch designer` に化けた(合成音声の発音と相性が悪い)。**素直な英文に書き換えたら
+  誤りゼロ**になった。デモに載せる音声は、認識器が転ぶ語を避けたほうがよい
+- **先頭に 0.8 秒の無音を足した**。無いと再生開始と同時に認識が始まるので **冒頭の "This is" を
+  取りこぼす**。無音を入れたら拾えるようになった
+- 検証の注意: `Clear` パルス直後や `reloadpulse` 直後は数秒空振りする。**audio CHOP の peak と
+  Info DAT の status を見てから**表を読むこと(空を見て「動いていない」と誤診しかけた)
+
+### 2026-08-10 SpeechSynth の Voice もプルダウン化(こちらはDL不要)
+
+- ユーザー「SpeechSynth の VoiceIdentifier は何？これも選択式にできるならしたい」
+  「locale を選ぶ必要はない?」「この音声モデルはダウンロードが必要?」
+- `Voice` は `com.apple.voice.compact.en-US.Samantha` のような **AVSpeechSynthesisVoice の識別子**を
+  手打ちする欄だった。`AVSpeechSynthesisVoice.speechVoices()` から実行時にプルダウンを組むよう変更。
+  **この Mac で 180音声 / 49言語**。言語→名前でソートし `en-US  Samantha  (Default)` 形式のラベル
+- **Locale パラメータは不要**(ユーザー質問への回答): 識別子が言語を内包している
+  (`com.apple.voice.compact.ja-JP.Kyoko` は日本語)。認識と違い、合成は声を決めれば言語も決まる
+- **ダウンロードも不要**(同): `speechVoices()` は**インストール済みのものしか返さない**ので、
+  一覧に出ている時点で全部使える(3件を `voiceWithIdentifier` で実際にインスタンス化して確認)。
+  **SpeechTranscribe の Locale とは逆の性質** — あちらは未インストールも並ぶので `(installed)` を
+  付けている。この Mac は 180件すべて Default(compact)で、Enhanced/Premium は0件だった
+  (欲しい場合はシステム設定 > アクセシビリティ > 読み上げコンテンツ > 声を管理 でDL。
+  実行時に組み直すので自動で一覧に加わる)
+- **罠**: 動的メニューは**空文字の既定値だとパラメータ自体が生成されない**(既出)。
+  「空欄=既定音声」の挙動を保つため、`default` という番兵値を既定にして
+  speak 側で「空 or default なら音声指定なし」と解釈するようにした
+- demo の Voice が `Trinoids`(ネタ音声)だったので Samantha に変更。実際に発話して peak 0.36〜0.63 を確認
+
+### 2026-08-10 Speech Synth: 未インストール音声のDLは不可と確定 → 設定への導線+自動再取得を追加
+
+- ユーザー「Voice で未インストールも表示して、選択時にダウンロードする挙動は可能?」→ **SDKを実測して
+  結論: ダウンロードの起動は不可能、列挙も公開APIでは不可能**
+  - `AVSpeechSynthesisVoice` のクラスメソッドは **`speechVoices` / `currentLanguageCode` /
+    `voiceWithLanguage` / `voiceWithIdentifier` の4つだけ**(ヘッダを全走査)。DL系は皆無
+  - ヘッダのコメントに「`voiceWithIdentifier:` は識別子が正しくても**まだユーザーがDLしていない場合は
+    nil**」と明記 = フレームワークは未DL音声の存在を認識しているが取得手段を出していない
+  - `AVSpeechSynthesisProvider.h` にも download 系0件。`MobileAssetCLI` 相当のCLIも無い
+  - **列挙だけなら抜け道はあるが採用しない**: `/System/Library/AssetsV2/
+    com_apple_MobileAsset_VoiceServices_CombinedVocalizerVoices/*.xml`(43件)と
+    `MacinTalkVoiceAssets`(22件)に Name/VoiceId/Languages/DLサイズが載っている。ただし
+    **これは `/System/Volumes/Data` 上にあり assetd が更新するキャッシュ**(OS同梱ではない)で、
+    識別子も `com.apple.ttsbundle.Allison` 形式で AV 側の `com.apple.voice.enhanced.*` と別体系。
+    列挙できてもDLできない以上、選べない項目が並ぶだけなので見送った
+- **実装した現実解**(SpeechSynth CHOP):
+  - **`Open Voice Settings` パルス**: `x-apple.systempreferences:
+    com.apple.Accessibility-Settings.extension?SpokenContent` を NSWorkspace で開く。
+    **実測でシステム設定の「リーダーと読み上げ」に直行**(声を管理 がある画面)。
+    旧アンカー `com.apple.preference.universalaccess?Speech` はアクセシビリティのトップ止まりだった
+  - **`AVSpeechSynthesisAvailableVoicesDidChangeNotification` を監視**してメニューを自動再取得。
+    DL後にTD再起動もノード作り直しも不要。手動用に **`Refresh Voice List`** パルスも用意
+  - AppKit をリンク追加(NSWorkspace のため)
+- **前回の「Enhanced 0件」は誤り。訂正**: 設定画面が「システムの声 = Kyoko(拡張)」と表示していたので
+  測り直したところ **183音声・うち Enhanced 2件**(`com.apple.voice.enhanced.ja-JP.Kyoko` /
+  `.Otoya`・quality=2)。Premium は0。**DL済み音声は speechVoices に自動で出る**ことの実証でもある
+- ラベルの `(Enhanced)` 重複を修正(`v.name` が既に "Kyoko (Enhanced)" なので品質を足すと二重になる)
+- **検証(TD再起動なし・バージョン付きパス方式)**: `Refreshvoices`/`Voicesettings` の両パルス生成、
+  メニュー184件(System Default + 183)、Refresh後も184、TDからのパルスで設定が
+  「リーダーと読み上げ」で開くことを確認。errors/warnings なし。検証ノードは削除済み
+- **罠**: cplusplusCHOP のプラグインパラメータは **`customPars` / `isCustom` では取れない**(0件)。
+  `n.pars('*')` で名前を見ること。これで一度「パラメータが生成されていない」と誤診した
+
+### 2026-08-10 Speech Activity CHOP は動作しないと判明(SpeechDetector が結果を返さない)
+
+- ユーザー「SpeechActivity の使い道を教えて」→ README に「実発話での onset/offset は未検証」と
+  残っていたので、答える前に `Assets/sample_speech_en.aiff`(Speech Transcribe で誤りゼロだった
+  19秒の英語ナレーション)で検証したところ、**このオペレータは全く動いていなかった**
+- **TD実測**: Execute DAT の onFrameEnd で毎フレーム駆動して729フレーム観測し、
+  `speaking` が一度も1にならない。22050Hz / 48000Hz、感度 medium / high の4通りとも0。
+  Info DAT は `listening`、errors/warnings なし(=静かに死んでいる)
+- **単体Swiftハーネスで原因を特定**:
+  1. `SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith:[detector])` が
+     **0 Hz / 0 ch** を返す(`availableCompatibleAudioFormats` もこの1件だけ)
+  2. helper はこれを変換先にするので `AVAudioConverter` が **nil** → `feed()` が早期return
+     → **音声が1サンプルも解析器へ届かない**
+  3. `status="listening"` は `analyzer.start()` の**前**にセットしているので起動の証拠にならない
+  4. detector 単体で `prepareToAnalyze` すると Apple自身の致命的エラー
+     **"Cannot create SpeechDetector-only worker; use with a transcriber module"**
+  5. `SpeechTranscriber` と組み合わせると format は 16kHz になり19秒投入できるが、
+     **`detector.results` は0件**(同じ実行で transcriber は正しい認識結果を4件返すので音声経路は正常)
+- **結論**: `SpeechDetector` はユーザー向けVADではなく transcriber の内部ゲート用モジュールとして
+  振る舞う。macOS 26.6 では「単体VAD CHOP」という設計自体が成立しない
+- **代替**: 発話ゲートは **Sound Class CHOP**(303クラスに `speech` がある)を閾値処理する。
+  レベルだけでよければ SoundFeatures の RMS(ただし物音でも立つ)。字幕の区切りは
+  Speech Transcribe が無音で確定行に落とす仕組みを既に持っている
+- README(SpeechActivity 英日 + ルート英日一覧)を実測に合わせて訂正。**develop へ退避するかは
+  ユーザー判断待ち**(公開は検証済みのみ、という方針からは退避が筋)
+- **教訓**: 「実測」と書く対象を間違えていた。正弦波で `speaking=0` を確認して「非音声として正しい」
+  と読んでいたが、**実際は入力が何であれ0**だった。**陰性の確認は、陽性が出ることを先に示してから**
+- **教訓**: 状態文字列は**処理が実際に始まってから**立てる。開始前に立てると、失敗しても
+  「動いているように見える」表示が残る
+
+### 2026-08-10 Speech Activity CHOP を develop へ退避(動作しないため)
+
+- 直前の調査で「`SpeechDetector` は結果を返さず、単体VADという設計自体が現行APIで成立しない」と
+  確定したため、ユーザー判断で main から外した。「公開は検証済みのみ」の方針どおり
+- 手順は従来どおり: worktree で develop をチェックアウト → `git checkout main -- SpeechActivity`
+  で **先に develop を main の最新(診断入りREADME)へ同期**(56ad1c0)→ main で `git rm -r`。
+  **main→develop の wholesale merge は厳禁**(main の削除コミットが伝播する)
+- ルートREADME(英日)の該当行を削除。**公開は 56フォルダ / 58オペレータ**
+  (Multipeer と PDFKit/Cinematic 等で1フォルダ複数バンドルがあるため数が一致しない)
+- **skill 側の参照も付け替えた**(退避すると死んだポインタになるため):
+  SKILL.md の「Swiftヘルパが要る → `SpeechActivity/`」→ **`VisionDocument/`**(swiftc直の単一
+  ヘルパ + epoch名dylib で、スキルが推奨する形そのもの)、build.md の手書きbuild.sh骨格も
+  VisionDocument ベースに差し替え、naming.md の opLabel 例は `Speech Transcribe` に
+- ローカルの常設Pluginsには SpeechActivityCHOP.plugin を残置(開発環境は不変・従来と同じ扱い)
+- demo.toe の利用例削除はユーザーが実施
+
+### 2026-08-10 Cinematic Video TOP を Movie File In 相当の自動再生に + Info DAT → Info CHOP
+
+- ユーザー「CinematicVideo を MovieFileIn の様に自動で再生可能な仕様にしたい」。従来は
+  `Position`(0..1)を外から動かさないと止まったままだった
+- **`OP_Inputs::getTimeInfo()->deltaMS` でタイムライン駆動**にした(Movie File In と同じ考え方。
+  TDのタイムラインを止めれば再生も止まる)。追加パラメータ: `Play`(既定On)/ `Speed`(負値で逆再生)/
+  `Loop`(既定On)/ `Cue` / `Cue Point` / `Cue Pulse`。`Position` は **Play が Off のときだけ**
+  効く手動スクラブ(Movie File In の Index と同じ役割)に。Info CHOP へ `position`(秒)と
+  `playing` を追加(kFixedChans 8→10)
+- **要求時刻はソースのfpsでフレーム量子化**する。しないと同じ絵を何度もデコードし直す
+- **実測(M2・実Cinematic動画 57.1秒)**: Depth 512x288 で **実時間の 0.98倍・59描画/秒**、
+  Speed=0.5 → 0.50x、Speed=-1 → -1.00x(逆再生)、Rendered 1920x1080 でも **1.00x・59.8描画/秒**。
+  Loop On=先頭へ折り返し / Off=終端で停止、Cue On=キュー点で保持、Cue Pulse=ジャンプ、
+  Play Off + Position=0.5 → 28.55秒(=dur×0.5)を全て確認
+- **ユーザー指摘「infoDATよりinfoCHOPの方が良いのでは」→ そのとおりだった**: このOPには
+  **`getInfoDATSize` の実装がそもそも無く**、出しているデータは全て数値。`Info DAT` トグルは
+  中身の無いDATを作るだけだった(demo.toe にも自動生成された空の `_info`(infoDAT)と、
+  ユーザーが手で置いた `info1`(infoCHOP)が並んでいた)。トグルを **`Info CHOP`** に変更し、
+  stub も `onInfoCHOP` → `p.create(infoCHOP, ...)` に。**PDFKit(本文/アウトライン)と
+  Spatial Video(codec/hero_eye 等の文字列)は DAT のままが正しい**
+- **検証の制約**: `pythonCallbacksDAT` は **Plugin Path で読ませた素の cplusplusTOP では効かない**
+  (`callbacks` パラメータ自体が生成されない)ため、バージョン付きパス方式では bootstrap を検証
+  できない。stub 関数を取り出して直接実行し、`_info` が **infoCHOP** として生成され op が
+  自ノードを指し二重生成もしないことを確認した。トグル経由の一連の流れは**TD再起動後に要確認**
+- **罠(再確認)**: TD内Pythonで `time.sleep` を呼ぶと **TD本体が止まる**ので、再生の経過を測る
+  ときはシェル側で待つ。これで一度「Loopが折り返さない」と誤診した
+- 常設インストール済み。**TD再起動で `Play` 等の新パラメータと `Info CHOP` トグルが出る**。
+  demo.toe に残っている `Cinematicvideo1_info`(infoDAT)は用済みになる(ユーザー側で整理)
+
+### 2026-08-10 Cinematic Video に Both モード(色+深度を2色バッファ同時出力)
+
+- ユーザー「同じ動画ファイルから color と depth を同時に出したい」
+- **C++ TOP は複数の色バッファへ出せる**(SDK の `TOP_UploadInfo::colorBufferIndex`。
+  ヘッダに「**色バッファごとに解像度もピクセル形式も別でよい**」「0以降は Render Select TOP で取る」
+  と明記)。これを使い `Mode = Both` を追加: **バッファ0=Rendered(RGBA16Float) / バッファ1=Depth
+  (Mono32Float)**。同じジョブから両方を出すので**構造上フレームがずれない**
+- 実装: アップロードを `uploadPlane(out, depth, bufIndex)` に切り出し、Both は2回呼ぶ。
+  worker は `if(mode!=1) cn_depth; if(mode!=0) cn_render;`
+- **実測(M2・実素材)**: 色 1920x1080 RGBA16F + 深度 512x288 Mono32F を**同時取得**、
+  **実時間1.00倍・60組/秒**。両バッファの絵が同一フレーム(キッチンの色と対応する視差)であることを視認
+- **重要な使い方の罠**: **Render Select TOP は参照で読むので、参照元の cook を引っ張らない**。
+  下流が Render Select だけだと参照元がほとんど cook されず再生が這う
+  (実測: Render Select 4408 cook に対し参照元 29 cook)。**バッファ0はワイヤで下流に繋ぐ**
+  (Null TOP で十分)。READMEに明記
+- **検証中に TD がクラッシュ**(EXC_BAD_ACCESS)。**クラッシュスタックに自作プラグインのフレームは
+  1つも無く**、Python からのパラメータ設定 → libOP → libPRM → libC_TOP → libUT で落ちていた。
+  状況(常設の旧ビルド=Mode 2項目 と 一時パスの新ビルド=3項目 が**同じ opType `Cinematic` で
+  同時にロード**されており、そこへ `Mode='Both'` を設定した)から、**古いメニュー定義に無い値を
+  入れたのが原因**と考えられる。新ビルドを常設へ入れ、一時パスのコピーを消して TD を再起動したら
+  同じ操作でクラッシュせず動いた
+- **教訓**: バージョン付きパス方式は「パラメータの追加」までは安全だが、**メニュー項目の増減など
+  定義そのものが変わる変更には使えない**(同じ opType の定義が2つ同時に存在するため)。
+  そういう変更は常設インストール+TD再起動で検証する
+- TD再起動時に「New Plugin Detected」ダイアログが出るので computer-use で承認して起動を完了させた。
+  クラッシュ時の `CrashAutoSave.demo.toe`(17:24)がリポジトリ直下に残っている(demo.toe 本体は無事)
+
+### 2026-08-10 Cinematic Video: 再生中のメモリ暴走を修正(TDが固まる)+ Play Mode 追加
+
+- ユーザー報告「再生していると動画が止まる」→「TDがメモリを極端に使って固まったので強制終了した」
+  →「ループ再生でまた固まった」。**自動再生化(前エントリ)で初めて毎秒数十回デコードするように
+  なり、元からあった資源リークが表面化した**。自分が入れた退行なので最優先で修正
+- **原因3つ(単体ハーネス `scratchpad/mem.c` で RSS を測って特定。TDを巻き込まずに測れる)**:
+  1. **`AVAssetReader` を毎回作って `cancelReading()` せずに捨てていた**。`startReading()` した
+     readerはデコードパイプラインを抱えたままで、毎秒数十本作ると解放が追いつかない。
+     **変換が終わってから** `defer { frames.reader.cancelReading() }` で解放(変換**前**に
+     cancel すると読み出したバッファが無効になるので順序が重要)
+  2. **再レンダ先の `CVPixelBuffer`(IOSurface付き)を毎フレーム新規作成**していた →
+     `CNState` に持って使い回す
+  3. **ワーカースレッドに autorelease プールが無い**。AVFoundation/CoreVideo の autorelease
+     オブジェクトが永久に溜まる。**これが最大**で、helper の `cn_render`/`cn_depth`/`cn_meta` を
+     `autoreleasepool { }` で包み、C++ 側 worker のジョブ1件ごとにも `@autoreleasepool` を入れた
+- **実測**: 単体ハーネス 修正前 400回で RSS 23→324MB(増加中) / 修正後 **1000回で 93MB 横ばい**。
+  TD実機で Speed=8 のループ再生を2分(5451フレーム描画)して **RSS 1575MB のまま完全に横ばい**
+- **Play Mode 追加**(Movie File In と同じ3種): `Sequential`(既定・自前の時計)/
+  `Locked to Timeline`(タイムライン秒×Speed+Cue Point。スクラブに追従しフレーム単位で再現するので
+  書き出し向き)/ `Specify Index`(Position のみ)。実測: Locked でタイムライン 2.00/5.00/9.00秒 →
+  position 2.02/5.02/9.02秒、Specify で Position 0.25/0.75 → 14.28/42.83秒(=尺×比)
+- **教訓**: **常駐ワーカースレッドから ObjC/Swift のフレームワークを叩くなら autorelease プールを
+  必ず張る**。1回あたりは小さくても、毎フレーム呼ぶ設計にした瞬間に破綻する。
+  「今まで動いていたコード」でも、**呼ぶ頻度を上げる変更は資源管理の前提を壊す**
+- **教訓**: メモリの増え方は **TD の外の小さなハーネスで測る**のが速くて安全(TDを固めずに済む)。
+  `mach_task_basic_info` の resident_size を数十回ごとに出すだけでよい
+
+### 2026-08-10 Cinematic Video に Color モード + Both を廃して All(3枚同時)へ
+
+- ユーザー「出力できる映像は rendered と depth 以外に color は無い?」→ **素材の映像トラック
+  (ボケを付ける前の原版)は読んでいたが、再レンダの入力に使うだけで出す口が無かった**。
+  `cn_color` を追加して出せるようにした
+- 続けてユーザー提案「color+depth / rendered+depth ではなく3つ同時に出す機能にしては」→
+  **Both(2バッファ)を廃止し `Mode = All` に一本化**。`0=Rendered / 1=Color / 2=Depth` の3色バッファ。
+  Mode は **Depth / Rendered / Color / All** の4つになった
+- **All はファイル読みを1回節約している**: `cn_render` に `keepColor` を足し、**再レンダが既に
+  デコードした映像トラックからそのまま色を取り出す**(別途 readFrames しない)。
+  実測でも All が Rendered と同じ 60フレーム/秒
+- **Color の正しさを数値で確認**: `Aperture` f/16 の再レンダ結果と**サンプル領域で完全一致
+  (平均絶対差 0.00)**、f/2 では背景の高周波エネルギーが 365→282 に落ちる(=ボケている)。
+  つまり Color はボケを付ける前の原版で正しい
+- 色の回転は render(CNRenderingSession が preferredTransform を適用)と揃えるため
+  `rotateRGBA16` で自前に掛ける。深度と同じ「回転→上下反転」の順
+- **実測(M2・実素材)**: All で buffer0 1920x1080 RGBA16F / buffer1 1920x1080 RGBA16F /
+  buffer2 512x288 Mono32F を同時取得、**全モード60フレーム/秒**、3枚とも同一フレーム(視認)
+- **踏んだ罠(2回)**: 非同期ワーカーの完了を待たずに `.save()` すると**1つ前のモードの絵が保存される**。
+  実際に「color と f/2 が完全一致(差0.02)」という誤った結果を得て誤診しかけた。
+  モードやパラメータを変えたら**シェル側で数秒待ってから**保存する(TD内 `time.sleep` はTDが止まる)
+
+### 2026-08-10 VisionPose3D に深度を渡す件の結論(Cinematic の深度は使えない・TDが落ちる)
+
+- ユーザー「VisionPose3D の input に Cinematic Video で撮影した depth を入れて精度を上げられないか?」
+  → 以前「深度素材が用意できたら相談」としていた宿題。**実測して不可と確定**
+- **単体ハーネス(`scratchpad/p3d.swift`)で検証**(Vision が落ちる可能性があるので必ず別プロセスで):
+  Cinematic 動画から color(1920x1080)と disparity(512x288)をデコードし、
+  `AVDepthData(fromDictionaryRepresentation:)` で深度を組んで `VNDetectHumanBodyPose3DRequest` に渡した
+- **結果**:
+  - AVDepthData の**生成自体は成功**する(以前の合成データ特有の問題ではなかった)。ただし
+    `cameraCalibrationData = nil`
+  - 深度**なし**なら検出できる(orientation は down/left/right。up は検出0=向きの問題)
+  - 深度**あり**で **`se3.hpp:270` のアサーションでプロセスごと即死**。以前 synthetic depth で
+    踏んだのと**同じクラッシュ**で、原因は合成かどうかではなく**較正情報の欠落**だった
+- **回避不能な理由(SDKで確認)**: `AVCameraCalibrationData` に**イニシャライザが存在しない**
+  (ヘッダにインスタンスメソッド1つのみ)。`replacingDepthDataMap(with:)` も Apple自身が
+  「返るオブジェクトの cameraCalibrationData は**常に nil**」と明記。=**自作の深度マップに較正を
+  付ける公開手段が無い**。較正が残るのは撮影経路そのままの深度だけ
+  (ポートレートHEICの `CGImageSourceCopyAuxiliaryDataInfoAtIndex` / `AVCaptureDepthDataOutput`)
+- **Cinematic 固有の追加の壁**: Cinematic フレームワークに較正/内部パラメータのAPIが無い
+  (`calibration|intrinsic|focal|baseline` で swiftinterface を走査して0件)。視差もメートルでなく相対値
+- **設計上の壁**: TOP は色しか運ばないので、そもそも深度用の入力経路が別途要る
+- **危険度が高いので README(英日)に明記**した。「エラーになる」ではなく**TD本体が落ちる**ので、
+  安易に試させないことが重要
+- 将来やるなら: iPhone ポートレート HEIC(較正付き)を **ファイルパスで**受ける専用経路。
+  ただし静止画なので用途は狭い。ライブ深度は Mac に深度カメラが無いので対象外
+
+### 2026-08-10 CI RAW の出力が壊れていたのを実RAWで発見・修正 + 4件の利用例を追加
+
+- ユーザーが実素材を追加: `Assets/sample_heic/IMG_3095.HEIC`(iPhone・**較正付き視差**+
+  **HDRゲインマップ**)と `Assets/sample_raw.DNG`(iPhone 17 Pro の Apple ProRAW・8064x6048・**52.9MB**)。
+  これで CI RAW / CI HDR の「実素材未入手で未検証」が解消できるようになった
+- **CI RAW の実バグを発見**: `[CIContext render:... format:kCIFormatRGBA16 ...]`
+  (**16bit符号なし整数**)で描いた結果を、TOPへは `RGBA16Float`(**半精度浮動小数**)として
+  アップロードしていた。ビット列が別物として解釈され、実RAWで **NaN / -4696.0** のような値になり
+  画面は真っ白。**`kCIFormatRGBAh` に修正**して正常な現像結果を視認確認
+  - **非RAWのJPEG等では気づきにくく、実RAWを入れて初めて露見した**。READMEに「実RAW視覚検証は未実施」と
+    書いてあった箇所がまさにそれ
+  - 横断監査: `kCIFormat` を使う3件のうち **CoreImageHDR は正しい**
+    (RGBAf で描いてから明示的に float32→float16 変換している)。CoreImageCode も BGRA8→BGRA8Fixed で一致。
+    壊れていたのは CI RAW だけ
+- **利用例4件を demo.toe に追加**(ユーザー要望): CIRAW / CIHDR(y=-1400 描画の行)、
+  CoreWLAN / CoreWLANScan(y=-2400 その他の行)。既存の型どおり `<Optype>1` + note + out1
+  - **CI RAW**: Scale=0.25(2016x1512)。Scale=1.0 のフル現像は初回約10秒
+  - **CI HDR**: HDR / Gain Map / SDR の3ノードを並べた。実測 4032x3024・2016x1512・RGBA16Float
+  - **CoreWLAN**: 9ch(rssi -50 / snr 43 / channel 104)+ Info DAT。SSID/BSSID は位置情報許可が要り空欄
+  - **CoreWLAN Scan**: 126ch・39ネットワーク検出・best_ch_24=14 / best_ch_5=64。
+    配置しただけで Callbacks DAT が自動ドックされることも確認
+- **素材はまだコミットしていない(ユーザー判断待ち)**。理由は下記の privacy/容量:
+  - **DNG に写り込んだノートPC画面が全部読める**。表示されていたのは作業中の会話と、
+    サイドバーの**他案件名**(業務情報)。1/4解像度でも判読可能で、実ファイルはその4倍精細
+  - **GPS が両方に入っている**(HEIC 35.3381467,139.4899300 / DNG 35.3381783,139.490005)。
+    撮影日時も入る
+  - **DNG 52.9MB**(現在の Assets 合計 85.4MB に対して大きい)。git履歴は消せないので慎重に
+- demo.toe も未コミット(素材の扱いが決まってから)
+
+### 2026-08-10 CoreWLAN Scan の SSID が取れない件 → 原因3つ + 配布物のGatekeeper問題を修正
+
+- ユーザー「Corewlanscan ssid一覧が取れない」→ **プラグインの不具合ではなく位置情報の許可が切れていた**。
+  ただし調べる過程で**配布に関わる実害のある問題**が2つ出てきた
+- **原因1(直接原因)**: システム設定 > プライバシーとセキュリティ > 位置情報サービス の
+  `wifiscan-helper.app` が **OFF** になっていた(8/7 に許可した後に切れた)。オンにしたら
+  **69ネットワーク**取得、demo の `_ssid` Info DAT にも **46件**表示された
+- **原因2(LaunchServices のゴースト)**: `open` が **-1712** で失敗していた。
+  `lsregister -dump` を見ると、bundle id `tokyo.sygnal.wifiscan-helper` が
+  **既にアンマウントされた `/Volumes/Apple Frameworks for TouchDesigner v0.9.0` 上のパス**に
+  紐づいたままだった(リリースDMGを一度マウントしたため)。`lsregister -f <helper.app>` で実パスを
+  再登録し、DMG由来の `com.apple.quarantine` も外して解消
+- **原因3(プラグイン側の実装不備・修正済み)**: ヘルパーは `{"status":"timeout"|"denied"|...}` を
+  返しているのに、**CHOP がその status を完全に無視**して空の表を出すだけだった。だから理由が
+  分からず詰まった。status を読んで**警告に直し方を出す**ようにした
+  (「位置情報サービスで wifiscan-helper をオンに。混雑度は許可なしで動く」)
+- **配布物の問題(重要・release.sh を修正)**: ユーザー質問「他の人もインストールしただけで取れる?」を
+  実測で検証した結果、**取れない**:
+  - DMG にはチケットが貼られているが、**取り出した .plugin にはチケットが無い**
+    (`stapler validate` → "does not have a ticket stapled to it")
+  - quarantine 付きのコピーから入れ子のヘルパーを起動すると、**「マルウェアが含まれていないことを
+    検証できませんでした」でブロック**され、プロセスが起動しない(実際にダイアログを再現)
+  - **`xcrun stapler staple` は .plugin にも貼れる**ことを確認 → `tools/release.sh` の notarize を
+    「①dist の全pluginをzipで公証してバンドル個別にステープル ②その状態でDMGを作り直す
+    ③DMGを公証・ステープル」に変更した
+  - なお**チケットを貼っても「インストールしただけ」では不十分**で、位置情報の許可は必ず一度
+    ユーザーが出す必要がある(OSがユーザーに尋ねる仕組みなのでアプリ側からは決められない)
+- **自分のミス**: 検証で `/tmp` のコピーに quarantine を付けて起動したところ、ユーザーの画面に
+  Gatekeeper のブロックダイアログを出してしまった。テストコピーは削除済み・実インストールは無傷
+- **開発時の注意**: 常設Pluginsへ `codesign -f -s - --deep` で入れ直すと **Developer ID 署名が壊れる**。
+  そのため開発機の状態はリリース版と Gatekeeper 的に別物になる。配布の検証は必ず**DMGの中身**で行う
+- README(CoreWLANScan 英日)に「SSID一覧が空のままのとき」の症状別表と Gatekeeper の説明を追加
+
+### 2026-08-10 Cinematic Video に Color + Depth モードを追加(All が重い件の実測含む)
+
+- ユーザー「All だと fps が落ちる。color と depth だけの選択肢も欲しい」
+- **`Color + Depth`(2色バッファ: 0=色 / 1=深度)を追加**。`cn_render`(Metal 再レンダ)を通さず
+  `cn_color` だけを使うので All より軽い。Mode は **Depth / Rendered / Color / Color+Depth / All**
+- **文字列メニュー(`OP_StringParameter`+`appendMenu`)は .toe に「値の文字列」が保存される**ので、
+  途中に項目を挿しても既存の .toe は壊れない(インデックスではないため)。今回 All の前に挿入した
+- **実測(M2)で分かったこと**:
+  - 1920×1080 ではどのモードも 60 フレーム/秒。**差が出るのは 4K から**
+  - 3840×2160(demo の `Assets/sample_cinematic.MOV`)での生成フレーム数/秒:
+    Depth 59.9 / Color 49.2 / **Color+Depth 46.7** / Rendered 44.8 / **All 41.7**
+  - ただし**この素材は 23.976fps**なので、All の 41.7 でも 1倍速再生には十分足りている。
+    数字が効くのは速いスクラブや `Speed`>1 のとき
+  - **TD 自体の実fps はどのモードでも 59.8〜60.0 で落ちなかった**(検証チェーン上では)。
+    デコードはワーカースレッドなので cook は 0.4〜9.5ms と軽い
+  - → **`All` で fps が落ちるのは下流の負荷**と考えられる。All は 3840×2160 の RGBA16Float を
+    2枚渡すので、ビューア / Layout / Composite TOP に載せるとそれだけで重い。
+    Color+Depth で半減、ノード直後の Resolution TOP が最も効く、と README に明記
+- README(各+ルート英日)更新。検証ノードは削除済み
+
+### 2026-08-10 Cinematic Video: バッファ番号を統一 + Info DAT で素材メタデータ
+
+- ユーザー「Color+Depth と All でバッファ番号が変わるので揃えたい。0=color 1=depth 2=rendered では?」
+  → そのとおりなので統一。**Color+Depth が All の先頭2枚と同じ並び**になり、モードを切り替えても
+  下流の Render Select を振り直さなくてよくなった
+  - 副作用: **All のバッファ0(ノード自身の出力)が再レンダ→原版の色に変わる**。再レンダをワイヤで
+    受けたい場合は Render Select で 2 を取る
+  - demo の `renderselect_color`/`renderselect_depth` は既に 0/1 だったので、**今回の変更で
+    名前と中身が一致した**(従来は名前と逆のものが出ていた)
+- **Info DAT を追加**(`cn_fileinfo`): ファイルが自分について持っている情報を key/value で。
+  実測20行 — duration / rotation / is_cinematic / cinematic_intent / video_size(3840x2160) /
+  video_codec(hvc1) / video_fps(23.990) / video_mbps(20.4) / disparity_size(512x288) /
+  disparity_codec(dish) / audio_codec / make(Apple) / model(iPhone 17 Pro) / software(26.6) /
+  creationDate / **location(GPS)**。cn_open 時に1回だけ作るので毎フレームの負荷は無い
+  - GPS が入る点は README と demo の note に注意書きを入れた
+- **踏んだ罠2つ(共通ヘッダを修正)**:
+  1. **stub は Callbacks DAT を作るときにしか書かれない**。既に自動生成済みのノードには
+     後から増えたコールバック(`onInfoDAT`)が入らず、トグルを押しても何も起きない。
+     → `bootstrapCallbacksDAT` に「自動生成した名前の DAT に限り、**不足している def だけ追記**」を追加
+  2. **`par.callbacks.eval()` は文字列ではなく DAT オブジェクトを返す**(実測)。
+     `== n.name + '_callbacks'` の比較が常に False で、上の追記処理が動かなかった。
+     `.name` で比較する
+- 実測: 再起動後の初回cookで callbacks に `onInfoDAT` が追記され、Infodat=On で
+  `Cinematicvideo1_meta`(20x2)が生成された
+
+### 2026-08-10 Info DAT の Callbacks stub が壊れていた(script error)
+
+- ユーザー「scriptError が出てる」→ 自動生成された Callbacks DAT の `onInfoDAT` が
+  **`d` で作ったのに末尾で `c` を参照**しており NameError になっていた
+- 原因: stub へ `onInfoDAT` を挿入した位置が悪く、**`onInfoCHOP` の末尾3行
+  (`c.nodeX` / `c.nodeY` / `c.viewer`)が `onInfoDAT` の中に移ってしまった**。
+  構文エラーにはならないので、コンパイルチェックだけでは見つからない
+- 修正: 各関数が自分の変数の末尾処理を持つように stub を直した。
+  **検証方法も追加**: .mm の stub 文字列を復元して `compile()` に通し、
+  さらに関数ごとに「代入した変数」と「参照した変数」を突き合わせる
+  (未定義参照を機械的に検出できる)
+- 既に生成済みの壊れた DAT は追記ロジックでは直らない(`onInfoDAT` は既に存在するため)。
+  **自動生成された `_callbacks` DAT を消せば次のcookで作り直される**
+- 教訓: 文字列連結で作る stub は**挿入位置を間違えても構文は通る**。
+  生成結果を実際に compile し、変数の定義/参照まで確認すること
+
+### 2026-08-10 CI HDR / CI RAW に Apply EXIF Orientation を追加(既定On)
+
+- ユーザー要望。**CI HDR は向きを一切適用していなかった**(実測: `orientation=6` の HEIC で
+  4032x3024 の横倒しのまま)。`CIImage` 読み込みの `kCIImageApplyOrientationProperty` を追加し、
+  On で 3024x4032(正立)になることを確認
+- **CI RAW は既定で適用済み**だった(`CIRAWFilter.orientation` がファイルの値を持っている)。
+  トグルは **Off のときだけ `.up` にする**実装。実測(iPhone ProRAW・orientation=3):
+  On で正立 / Off で180度反転(180°なので寸法は変わらない)
+- 素材: ユーザーが `Assets/sample_heic/` を `Assets/sample_heic.HEIC`(1.3MB)へ整理し、
+  **`sample_raw.DNG` は除外**(画面の写り込みのため)。CIRAW の利用例は素材同梱なしにして、
+  note に「自分で ProRAW を撮って指定する」手順を書いた
+- **検証時の注意**: 非同期なので**トグルを変えた直後の読みは1手前の値**。実際に
+  「On→4032x3024(前の値)」を見て誤診しかけた。設定→数秒待つ→読む、を守る
+
+### 2026-08-10 v0.9.5 リリース
+
+- VERSION を 0.9.5 へ。**56プラグインを全て再ビルド**(並列・全件成功)してから
+  `release.sh sign → verify → dmg → notarize`。58バンドル・全数verify通過
+- **今回から各 .plugin にも公証チケットを貼る**(release.sh の notarize を改修)。
+  DMG 内の3件を抜き取って `stapler validate` OK、quarantine 付きコピーでも
+  `spctl` が accepted(以前はここでブロックダイアログが出ていた)
+- 0.9.4 からの中身: **Cinematic Video の刷新**(自動再生 + Play Mode、Color モード、
+  `All`/`Color + Depth` の複数色バッファ出力、Info DAT でファイルのメタデータ、
+  **再生中のメモリ暴走を修正**)、**CI RAW のピクセル形式不一致を修正**(実RAWで NaN だった)、
+  CI RAW / CI HDR に **Apply EXIF Orientation**、CoreWLAN Scan の空振り理由を警告に、
+  Speech Activity を develop へ退避、利用例4件追加(CIRAW / CIHDR / CoreWLAN / CoreWLANScan)
+- 公開は **58オペレータ**(Speech Activity を外し、Cinematic/PDFKit 等で1フォルダ複数バンドル)

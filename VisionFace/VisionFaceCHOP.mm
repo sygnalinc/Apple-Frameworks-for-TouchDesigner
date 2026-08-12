@@ -12,7 +12,7 @@
 //   face{i}/right_eye:u,v            右目の中心
 //   face{i}/nose:u,v                 鼻
 //   face{i}/mouth:u,v                口の中心
-//   （Landmarks オン時）face{i}/p{0..75}:u,v   全76ランドマーク点
+//   （Landmarks オン時）face{i}/p{0..84}:u,v   全85ランドマーク点
 //
 // face の並びは bbox 中心の x で左→右にソートする。
 //
@@ -22,6 +22,8 @@
 #import <Foundation/Foundation.h>
 #import <CoreVideo/CoreVideo.h>
 #import <Vision/Vision.h>
+
+#include "../common/AspectCoords.h"
 
 #include <algorithm>
 #include <atomic>
@@ -39,7 +41,10 @@ using namespace TD;
 namespace {
 
 constexpr int kMaxFaces = 100;
-constexpr int kNumLandmarks = 76;
+// 各領域の点数は Vision が返す実測値（288サンプルで一定・macOS 26）。合計85。
+// allPoints は76しか返さないが、これは medianLine が他領域と重複しているため。
+// **確保数を実測より小さくすると末尾が切り捨てられ、輪郭が片側だけ短くなる**（実際に踏んだ）。
+constexpr int kNumLandmarks = 85;
 constexpr int kNumCentroids = 4;   // left_eye, right_eye, nose, mouth
 
 static const char* kCentroidNames[kNumCentroids] = {
@@ -167,25 +172,30 @@ public:
             std::lock_guard<std::mutex> lock(myMutex);
             faces = myFaces;
         }
+        const tdaspect::Mapper map{ inputs->getParInt("Aspectcorrectuv") != 0,
+                                    top ? (float)top->textureDesc.width  : 0.0f,
+                                    top ? (float)top->textureDesc.height : 0.0f };
         for (int i = 0; i < myMaxFaces; i++) {
             const bool on = active && i < (int)faces.size() && faces[i].valid;
             const Face& face = (i < (int)faces.size()) ? faces[i] : myEmpty;
             int ch = i * perFace();
             output->channels[ch++][0] = on ? 1.0f : 0.0f;
-            for (int c = 0; c < 4; c++)
-                output->channels[ch++][0] = on ? face.bbox[c] : 0.0f;
+            output->channels[ch++][0] = on ? map.x(face.bbox[0]) : 0.0f;
+            output->channels[ch++][0] = on ? map.y(face.bbox[1]) : 0.0f;
+            output->channels[ch++][0] = on ? map.dx(face.bbox[2]) : 0.0f;
+            output->channels[ch++][0] = on ? map.dy(face.bbox[3]) : 0.0f;
             for (int c = 0; c < 3; c++)
                 output->channels[ch++][0] = on ? face.rot[c] : 0.0f;
             if (myQuality)
                 output->channels[ch++][0] = on ? face.quality : 0.0f;
             for (int c = 0; c < kNumCentroids; c++) {
-                output->channels[ch++][0] = on ? face.centroid[c][0] : 0.0f;
-                output->channels[ch++][0] = on ? face.centroid[c][1] : 0.0f;
+                output->channels[ch++][0] = on ? map.x(face.centroid[c][0]) : 0.0f;
+                output->channels[ch++][0] = on ? map.y(face.centroid[c][1]) : 0.0f;
             }
             if (myLandmarks) {
                 for (int p = 0; p < kNumLandmarks; p++) {
-                    output->channels[ch++][0] = on ? face.points[p][0] : 0.0f;
-                    output->channels[ch++][0] = on ? face.points[p][1] : 0.0f;
+                    output->channels[ch++][0] = on ? map.x(face.points[p][0]) : 0.0f;
+                    output->channels[ch++][0] = on ? map.y(face.points[p][1]) : 0.0f;
                 }
             }
         }
@@ -193,6 +203,8 @@ public:
 
     void setupParameters(OP_ParameterManager* manager, void*) override
     {
+        // uv を入力画像のアスペクト比へ再スケール（Body Track CHOP と同名・同既定）
+        tdaspect::appendAspectCorrect<OP_ParameterManager, OP_NumericParameter>(manager, "Vision Face");
         {
             OP_StringParameter p("Top");
             p.label = "TOP";
@@ -221,7 +233,7 @@ public:
         }
         {
             OP_NumericParameter p("Landmarks");
-            p.label = "All Landmark Points (76)";
+            p.label = "All Landmark Points (85)";
             p.page = "Vision Face";
             p.defaultValues[0] = 0;
             manager->appendToggle(p);
@@ -341,6 +353,13 @@ private:
 
             for (VNFaceObservation* obs in request.results) {
                 Face face;
+                // ランドマークの未使用スロットは -1 で埋める（0 だと bbox 隅の
+                // 「実在しない点」に見えてしまい、線を引くと画面外へ飛ぶ）。
+                // 領域ごとの点数は顔の constellation により変わる（目が6点のこともある）。
+                for (int i = 0; i < kNumLandmarks; i++) {
+                    face.points[i][0] = -1.0f;
+                    face.points[i][1] = -1.0f;
+                }
                 face.valid = true;
                 const CGRect b = obs.boundingBox;
                 face.bbox[0] = (float)(b.origin.x + b.size.width * 0.5);
@@ -371,12 +390,38 @@ private:
                     regionCentroid(lm.rightEye, b, face.centroid[1]);
                     regionCentroid(lm.nose, b, face.centroid[2]);
                     regionCentroid(lm.outerLips, b, face.centroid[3]);
-                    VNFaceLandmarkRegion2D* all = lm.allPoints;
-                    if (all) {
-                        const CGPoint* pts = all.normalizedPoints;
-                        const int n = std::min((int)all.pointCount, kNumLandmarks);
-                        for (int i = 0; i < n; i++)
-                            mapPoint(pts[i], b, face.points[i]);
+                    // allPoints は「領域を繋いだ順」ではなく描画に使えない並びなので、
+                    // **領域ごとに、その領域内の正しい順序で**詰め直す。
+                    // 並び（p0 始まり・合計85点）:
+                    //   0-16  faceContour(17)  17-22 leftEye(6)   23-28 rightEye(6)
+                    //   29-34 leftEyebrow(6)   35-40 rightEyebrow(6)
+                    //   41-48 nose(8)          49-54 noseCrest(6)  55-64 medianLine(10)
+                    //   65-78 outerLips(14)    79-84 innerLips(6)
+                    // 点数は macOS 26 実測（288サンプルで一定）。**allPoints は76しか返さないが
+                    // 領域の合計は85**（medianLine が他領域と重複するため）。
+                    // 確保数を実測より小さくすると末尾が切り捨てられる。以前 contour を 16 に
+                    // していたため 17 点目が落ち、輪郭の片側だけ短く終わって左右非対称に見えた。
+                    // 領域が取れなかった分は 0 のまま（描画側は confidence ではなく
+                    // この並びを前提に線を引ける）。
+                    {
+                        VNFaceLandmarkRegion2D* regions[10] = {
+                            lm.faceContour, lm.leftEye, lm.rightEye,
+                            lm.leftEyebrow, lm.rightEyebrow,
+                            lm.nose, lm.noseCrest, lm.medianLine,
+                            lm.outerLips, lm.innerLips,
+                        };
+                        const int counts[10] = {17, 6, 6, 6, 6, 8, 6, 10, 14, 6};
+                        int base = 0;
+                        for (int r = 0; r < 10; r++) {
+                            VNFaceLandmarkRegion2D* reg = regions[r];
+                            if (reg) {
+                                const CGPoint* pts = reg.normalizedPoints;
+                                const int n = std::min((int)reg.pointCount, counts[r]);
+                                for (int i = 0; i < n && base + i < kNumLandmarks; i++)
+                                    mapPoint(pts[i], b, face.points[base + i]);
+                            }
+                            base += counts[r];
+                        }
                     }
                 }
                 result.push_back(face);
@@ -423,10 +468,12 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     info->customOPInfo.opType->setString("Visionface");
     info->customOPInfo.opLabel->setString("Vision Face");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
-    info->customOPInfo.majorVersion = 0;
-    info->customOPInfo.minorVersion = 9;
+    // ランドマークの並びを 76 → 85 に変更した（輪郭17点目などの切り捨てを解消）。
+    // p インデックスがずれる後方非互換の変更なので、この op だけ major を上げる。
+    info->customOPInfo.majorVersion = 1;
+    info->customOPInfo.minorVersion = 0;
     info->customOPInfo.opIcon->setString("VFC");
-    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/VisionFace/README.md");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/VisionFace/README.md");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
 }

@@ -18,6 +18,7 @@
 
 #include "SOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
+#include "../common/AspectCoords.h"
 
 using namespace TD;
 
@@ -134,7 +135,12 @@ public:
             std::lock_guard<std::mutex> lock(myMutex);
             result = myResult;
         }
-        emitGeometry(output, result);
+        // 点は Vision の 0〜1（左下原点）。Ortho Width=1 のカメラで映像に重ねるなら
+        // 縦を 1/aspect に縮めておく（-0.5 するだけで合うようになる）
+        const tdaspect::Mapper map{ inputs->getParInt("Aspectcorrectuv") != 0,
+                                    top ? (float)top->textureDesc.width  : 0.0f,
+                                    top ? (float)top->textureDesc.height : 0.0f };
+        emitGeometry(output, result, map);
     }
 
     void executeVBO(SOP_VBOOutput*, const OP_Inputs*, void*) override {}
@@ -225,6 +231,10 @@ public:
         flip.page = "Vision Contours";
         flip.defaultValues[0] = 1;
         manager->appendToggle(flip);
+
+        // 輪郭の点座標を入力画像のアスペクト比に合わせる（既定Off・他のVision系と同じ）
+        tdaspect::appendAspectCorrect<OP_ParameterManager, OP_NumericParameter>(
+            manager, "Vision Contours");
     }
 
     int32_t getNumInfoCHOPChans(void*) override { return 7; }
@@ -256,7 +266,8 @@ public:
     }
 
 private:
-    void emitGeometry(SOP_Output* output, const ContourResult& result)
+    void emitGeometry(SOP_Output* output, const ContourResult& result,
+                      const tdaspect::Mapper& map)
     {
         std::vector<Position> positions;
         std::vector<int32_t> indices;
@@ -267,13 +278,16 @@ private:
                 continue;
             const int32_t start = (int32_t)positions.size();
             for (const auto& p : line.points) {
-                positions.emplace_back(p.x, p.y, 0.0f);
+                positions.emplace_back(map.x(p.x), map.y(p.y), 0.0f);
                 contourIds.push_back((float)line.contourId);
                 parentIds.push_back((float)line.parentId);
                 depths.push_back((float)line.depth);
                 closed.push_back(1.0f);
             }
-            positions.emplace_back(line.points.front().x, line.points.front().y, 0.0f);
+            // 輪郭を閉じるための先頭点の複製。ここも同じ変換を掛けること
+            // （掛け忘れると各輪郭の1点だけ元座標に残り、下端が合わなくなる）
+            positions.emplace_back(map.x(line.points.front().x),
+                                   map.y(line.points.front().y), 0.0f);
             contourIds.push_back((float)line.contourId);
             parentIds.push_back((float)line.parentId);
             depths.push_back((float)line.depth);
@@ -432,7 +446,7 @@ DLLEXPORT void FillSOPPluginInfo(SOP_PluginInfo* info)
     info->customOPInfo.opType->setString("Visioncontours");
     info->customOPInfo.opLabel->setString("Vision Contours");
     info->customOPInfo.opIcon->setString("VCS");
-    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/VisionContours/README.md");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/VisionContours/README.md");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.majorVersion = 0;
     info->customOPInfo.minorVersion = 9;

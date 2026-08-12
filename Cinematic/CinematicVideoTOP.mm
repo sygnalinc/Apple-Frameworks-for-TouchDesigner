@@ -7,6 +7,8 @@
 // 取得は CNScript(ピクセルデコード不要)なので低コスト。Info CHOP をこのノードに
 // 向けるだけで旧CHOPと同じデータが得られる。
 #import <Foundation/Foundation.h>
+#include <cmath>
+#include <cstring>
 #include <string>
 #include <atomic>
 #include <condition_variable>
@@ -15,27 +17,46 @@
 #include <vector>
 #include "TOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
+#include "../common/NonCommercialLimit.h"
 #include "../common/PyCallbacksBootstrap.h"
 using namespace TD;
 
 // Callbacks DAT 雛形(配置時に自動生成・ドックチップ接続)。
-// Info DAT トグル ON で隣にメタデータの Info DAT を自動生成する(二重生成ガード付き)。
+// Info CHOP トグル ON で隣にメタデータの Info CHOP を自動生成する(二重生成ガード付き)。
+// 数値(尺・フォーカス距離・被写体スロット)は Info CHOP、
+// ファイルのメタデータ(機種・撮影日時・コーデック等の文字列)は Info DAT。
 static const char* PythonCallbacksDATStubs =
 "# Cinematic Video TOP callbacks\n"
 "#\n"
-"# onInfoDAT: 'Info DAT' トグルを on にした瞬間に呼ばれる。\n"
-"# 隣にメタデータ表示用の Info DAT を自動生成する(既にあれば何もしない)。\n"
-"def onInfoDAT(op, enabled):\n"
+"# onInfoCHOP: 'Info CHOP' トグルを on にした瞬間に呼ばれる。\n"
+"# 隣にメタデータ表示用の Info CHOP を自動生成する(既にあれば何もしない)。\n"
+"def onInfoCHOP(op, enabled):\n"
 "\tif not enabled:\n"
 "\t\treturn\n"
 "\tp = op.parent()\n"
 "\tname = op.name + '_info'\n"
 "\tif p.op(name):\n"
 "\t\treturn\n"
+"\tc = p.create(infoCHOP, name)\n"
+"\tc.par.op = op.name\n"
+"\tc.nodeX = op.nodeX + 200\n"
+"\tc.nodeY = op.nodeY\n"
+"\tc.viewer = True\n"
+"\treturn\n"
+"\n"
+"# onInfoDAT: 'Info DAT' トグルを on にした瞬間に呼ばれる。\n"
+"# 隣に素材のメタデータ(機種・撮影日時・コーデック等)を出す Info DAT を作る。\n"
+"def onInfoDAT(op, enabled):\n"
+"\tif not enabled:\n"
+"\t\treturn\n"
+"\tp = op.parent()\n"
+"\tname = op.name + '_meta'\n"
+"\tif p.op(name):\n"
+"\t\treturn\n"
 "\td = p.create(infoDAT, name)\n"
 "\td.par.op = op.name\n"
 "\td.nodeX = op.nodeX + 200\n"
-"\td.nodeY = op.nodeY\n"
+"\td.nodeY = op.nodeY - 150\n"
 "\td.viewer = True\n"
 "\treturn\n";
 
@@ -46,14 +67,25 @@ extern "C" {
     int   cn_depth(void*, double timeSec, int flip, int normalize);
     int   cn_latest_depth_info(void*, int* w, int* h, unsigned long long* serial);
     void  cn_copy_depth(void*, void* dst);
-    int   cn_render(void*, double timeSec, float fNumber, float focusOverride, int flip);
+    int   cn_render(void*, double timeSec, float fNumber, float focusOverride, int flip, int keepColor);
+    int   cn_color(void*, double timeSec, int flip);
+    int   cn_latest_color_info(void*, int* w, int* h, unsigned long long* serial);
+    void  cn_copy_color(void*, void* dst);
     int   cn_latest_render_info(void*, int* w, int* h, unsigned long long* serial);
     void  cn_copy_render(void*, void* dst);
     const char* cn_meta(void*, double timeSec);
+    const char* cn_fileinfo(void*);
 }
 
 namespace {
 struct Job { std::string file; int mode; double time; float fnum, focus; bool flip, norm; };
+
+// Mode: 0=Depth 1=Rendered 2=Color 3=Color+Depth 4=All(3枚同時)
+// 複数出すときの色バッファの並びは **0=Color / 1=Depth / 2=Rendered** で統一する。
+// こうすると Color+Depth が All の先頭2枚と同じ並びになり、
+// モードを切り替えても下流の Render Select のインデックスがずれない。
+enum Plane { kRendered = 0, kDepth = 1, kColor = 2 };
+enum { kModeDepth = 0, kModeRendered = 1, kModeColor = 2, kModeColorDepth = 3, kModeAll = 4 };
 
 static constexpr int kMaxSub = 20;   // Info CHOP の被写体スロット上限(旧CHOPのスライダー上限)
 
@@ -81,15 +113,22 @@ public:
     ~CinematicVideoTOP() override { { std::lock_guard<std::mutex> l(myMutex); myQuit = true; } myCond.notify_all(); if (myThread.joinable()) myThread.join(); if (myState) cn_destroy(myState); }
 
     void getGeneralInfo(TOP_GeneralInfo* g, const OP_Inputs*, void*) override { g->cookEveryFrameIfAsked = true; }
+    void pulsePressed(const char* name, void*) override { if (!strcmp(name, "Cuepulse")) myCuePulse = true; }
 
     void execute(TOP_Output* out, const OP_Inputs* in, void*) override {
         myExec++;
         // 配置後の cook で雛形入り Callbacks DAT を自動生成・ドック接続(成功するまでリトライ)
         if (!myBootstrapped) myBootstrapped = tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);
-        // Info DAT トグル off→on で隣に Info DAT を自動生成
+        // Info CHOP トグル off→on で隣に Info CHOP を自動生成
+        bool infoChop = in->getParInt("Infochop") != 0;
+        if (infoChop && !myPrevInfoChop) {
+            tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);   // 消されていたら再生成
+            tdpycb::firePythonCallback(myNode, "onInfoCHOP", true);
+        }
+        myPrevInfoChop = infoChop;
         bool infoDat = in->getParInt("Infodat") != 0;
         if (infoDat && !myPrevInfoDat) {
-            tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);   // 消されていたら再生成
+            tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);
             tdpycb::firePythonCallback(myNode, "onInfoDAT", true);
         }
         myPrevInfoDat = infoDat;
@@ -102,19 +141,52 @@ public:
         j.flip = in->getParInt("Flip") != 0;
         j.norm = in->getParInt("Normalize") != 0;
         myMax = std::clamp((int)in->getParInt("Maxsubjects"), 1, kMaxSub);
-        if (j.file != myFile) { myFile = j.file; if (!j.file.empty()) cn_open(myState, j.file.c_str()); }
+        if (j.file != myFile) { myFile = j.file; myTime = 0; if (!j.file.empty()) cn_open(myState, j.file.c_str()); }
 
         // status(status|duration|fps|error)
-        std::string st, err; double dur = 0;
+        std::string st, err; double dur = 0, fps = 0;
         { const char* s = cn_status(myState); if (s) { std::string all(s); free((void*)s);
             size_t a=all.find('|'), b=all.find('|',a+1), c=all.rfind('|');
             if(a!=std::string::npos&&b!=std::string::npos&&c!=std::string::npos){
-                st=all.substr(0,a); dur=atof(all.substr(a+1,b-a-1).c_str()); err=all.substr(c+1);} } }
+                st=all.substr(0,a); dur=atof(all.substr(a+1,b-a-1).c_str());
+                fps=atof(all.substr(b+1,c-b-1).c_str()); err=all.substr(c+1);} } }
         myStatus = st; myErr = err; myDur = dur;
 
-        // Position(0..1)→秒。ヘルパは秒指定(旧実装は0..1を秒として渡していて全尺スクラブ不可だった)
-        double pos = std::clamp((double)in->getParDouble("Position"), 0.0, 1.0);
-        j.time = pos * (dur > 0 ? dur : 0);
+        // 再生位置(秒)。Movie File In の Play Mode と同じ3種:
+        //   Sequential        … deltaMS ぶんだけ自前で進める(TDのタイムラインを止めれば止まる)
+        //   Locked to Timeline… タイムライン位置をそのまま尺へ写す(スクラブに追従する)
+        //   Specify Index     … Position(0..1)で手動指定
+        const int playMode = (int)in->getParInt("Playmode");   // 0=Sequential 1=Locked 2=Specify
+        const double speed = in->getParDouble("Speed");
+        const bool loop = in->getParInt("Loop") != 0;
+        bool play = in->getParInt("Play") != 0;
+        double cuePoint = in->getParDouble("Cuepoint");
+        auto wrap = [&](double t) {
+            if (dur <= 0) return t;
+            if (loop) { t = std::fmod(t, dur); if (t < 0) t += dur; return t; }
+            return std::clamp(t, 0.0, dur);
+        };
+        if (myCuePulse.exchange(false)) myTime = cuePoint;
+        if (playMode == 2) {
+            myTime = std::clamp((double)in->getParDouble("Position"), 0.0, 1.0) * (dur > 0 ? dur : 0);
+            play = false;
+        } else if (in->getParInt("Cue") != 0) {
+            myTime = cuePoint;                       // Cue On の間はキュー点で保持
+            play = false;
+        } else if (playMode == 1) {
+            const OP_TimeInfo* ti = in->getTimeInfo();
+            double sec = (ti && ti->rate > 0) ? ti->frame / ti->rate : 0.0;
+            myTime = wrap(sec * speed + cuePoint);
+        } else if (play) {
+            const OP_TimeInfo* ti = in->getTimeInfo();
+            myTime = wrap(myTime + (ti ? ti->deltaMS / 1000.0 : 0.0) * speed);
+        } else {
+            // Sequential で Play Off のときは Position(0..1)で手動スクラブ
+            myTime = std::clamp((double)in->getParDouble("Position"), 0.0, 1.0) * (dur > 0 ? dur : 0);
+        }
+        // ソースのフレーム境界へ量子化する。しないと同じ絵を何度もデコードし直すことになる
+        j.time = (fps > 0) ? std::round(myTime * fps) / fps : myTime;
+        myPlaying = (playMode == 1) || (play && in->getParInt("Cue") == 0);
 
         // ジョブ投入(ready時・変化時)
         char b[256]; snprintf(b,sizeof b,"%d|%.5f|%.3f|%.4f|%d|%d",j.mode,j.time,j.fnum,j.focus,j.flip?1:0,j.norm?1:0);
@@ -129,47 +201,123 @@ public:
         // メタデータの最新スナップショットを Info CHOP 用にコピー
         { std::lock_guard<std::mutex> l(myMutex); myMetaSnap = myMeta; }
 
-        // 最新結果をアップロード
-        int mode = j.mode;
-        int lw=0, lh=0; unsigned long long serial=0;
-        bool has = mode == 0 ? cn_latest_depth_info(myState,&lw,&lh,&serial) : cn_latest_render_info(myState,&lw,&lh,&serial);
-        if (!has || serial == myUploaded || lw <= 0 || lh <= 0) return;
-        if (mode == 0) {
-            TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D; ui.textureDesc.width=lw; ui.textureDesc.height=lh; ui.textureDesc.pixelFormat=OP_PixelFormat::Mono32Float;
-            auto buf = myContext->createOutputBuffer((size_t)lw*lh*sizeof(float), TOP_BufferFlags::None, nullptr); if(!buf) return;
-            cn_copy_depth(myState, buf->data); out->uploadBuffer(&buf, ui, nullptr);
+        // 最新結果をアップロード。Both は 0=Rendered / 1=Depth の2色バッファに出す
+        // (SDK上、色バッファごとに解像度もピクセル形式も別でよい。1以降は Render Select TOP で取る)
+        myNCScaled = false;
+        bool ok = false;
+        if (j.mode == kModeAll) {                           // 3色バッファ
+            ok  = uploadPlane(out, kColor,    0);
+            ok |= uploadPlane(out, kDepth,    1);
+            ok |= uploadPlane(out, kRendered, 2);
+        } else if (j.mode == kModeColorDepth) {             // 2色バッファ(再レンダなし)
+            ok  = uploadPlane(out, kColor, 0);
+            ok |= uploadPlane(out, kDepth, 1);
         } else {
-            TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D; ui.textureDesc.width=lw; ui.textureDesc.height=lh; ui.textureDesc.pixelFormat=OP_PixelFormat::RGBA16Float;
-            auto buf = myContext->createOutputBuffer((size_t)lw*lh*4*sizeof(uint16_t), TOP_BufferFlags::None, nullptr); if(!buf) return;
-            cn_copy_render(myState, buf->data); out->uploadBuffer(&buf, ui, nullptr);
+            ok  = uploadPlane(out, j.mode == kModeDepth ? kDepth
+                                 : (j.mode == kModeColor ? kColor : kRendered), 0);
         }
-        myUploaded = serial; myFrames++;
+        if (ok) myFrames++;
+    }
+
+    // 1面ぶんのアップロード
+    bool uploadPlane(TOP_Output* out, Plane plane, uint32_t bufIndex) {
+        const bool depth = (plane == kDepth);
+        int lw=0, lh=0; unsigned long long serial=0;
+        bool has = depth ? cn_latest_depth_info(myState,&lw,&lh,&serial)
+                 : plane == kColor ? cn_latest_color_info(myState,&lw,&lh,&serial)
+                                   : cn_latest_render_info(myState,&lw,&lh,&serial);
+        if (!has || lw <= 0 || lh <= 0) return false;
+        const OP_PixelFormat pf = depth ? OP_PixelFormat::Mono32Float
+                                        : OP_PixelFormat::RGBA16Float;
+        const size_t bytes = (size_t)lw * lh * (depth ? sizeof(float) : 4 * sizeof(uint16_t));
+
+        if ((uint32_t)lw > tdnc::kMaxDim || (uint32_t)lh > tdnc::kMaxDim) {
+            // NC の 1280x1280 上限を超える。超えたまま渡すと TD がクランプ後の幅で
+            // バッファを読み絵が崩れるので、いったん自前バッファへ出して縮小する。
+            // (上限内のときは下の直接コピー経路のままで、余計なコピーはしない)
+            std::vector<uint8_t> tmp(bytes);
+            if (depth)                cn_copy_depth(myState, tmp.data());
+            else if (plane == kColor) cn_copy_color(myState, tmp.data());
+            else                      cn_copy_render(myState, tmp.data());
+            uint32_t cw = (uint32_t)lw, ch = (uint32_t)lh;
+            if (tdnc::fit(tmp, cw, ch, pf)) myNCScaled = true;
+            TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D; ui.colorBufferIndex=bufIndex;
+            ui.textureDesc.width=cw; ui.textureDesc.height=ch; ui.textureDesc.pixelFormat=pf;
+            auto buf = myContext->createOutputBuffer(tmp.size(), TOP_BufferFlags::None, nullptr); if(!buf) return false;
+            memcpy(buf->data, tmp.data(), tmp.size());
+            out->uploadBuffer(&buf, ui, nullptr);
+        } else {
+            TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D; ui.colorBufferIndex=bufIndex;
+            ui.textureDesc.width=lw; ui.textureDesc.height=lh; ui.textureDesc.pixelFormat=pf;
+            auto buf = myContext->createOutputBuffer(bytes, TOP_BufferFlags::None, nullptr); if(!buf) return false;
+            if (depth)                cn_copy_depth(myState, buf->data);
+            else if (plane == kColor) cn_copy_color(myState, buf->data);
+            else                      cn_copy_render(myState, buf->data);
+            out->uploadBuffer(&buf, ui, nullptr);
+        }
+        myUploaded = serial;
+        return true;
     }
 
     void setupParameters(OP_ParameterManager* m, void*) override {
         const char* PAGE = "Cinematic";
         { OP_StringParameter p("File"); p.label = "Cinematic Video (iPhone)"; p.page = PAGE; m->appendFile(p); }
         { OP_StringParameter p("Mode"); p.label = "Mode"; p.page = PAGE;
-          const char* n[] = {"Depth","Rendered"}; const char* l[] = {"Depth (disparity map)","Rendered (change focus/aperture)"};
-          std::vector<const char*> nv(n,n+2), lv(l,l+2); p.defaultValue="Rendered"; m->appendMenu(p,2,nv.data(),lv.data()); }
-        { OP_NumericParameter p("Position"); p.label="Position (0..1)"; p.page=PAGE; p.defaultValues[0]=0; p.minSliders[0]=0; p.maxSliders[0]=1; p.minValues[0]=0; p.maxValues[0]=1; p.clampMins[0]=p.clampMaxes[0]=true; m->appendFloat(p); }
+          const char* n[] = {"Depth","Rendered","Color","Colordepth","All"};
+          const char* l[] = {"Depth (disparity map)",
+                             "Rendered (change focus/aperture)",
+                             "Color (original, no bokeh)",
+                             "Color + Depth (buffer 0 color / 1 depth)",
+                             "All (buffer 0 color / 1 depth / 2 rendered)"};
+          std::vector<const char*> nv(n,n+5), lv(l,l+5); p.defaultValue="Rendered"; m->appendMenu(p,5,nv.data(),lv.data()); }
+        // 再生系(Movie File In と同じ考え方)
+        { OP_StringParameter p("Playmode"); p.label="Play Mode"; p.page=PAGE;
+          const char* n[] = {"Sequential","Locktotimeline","Specifyindex"};
+          const char* l[] = {"Sequential","Locked to Timeline","Specify Index"};
+          std::vector<const char*> nv(n,n+3), lv(l,l+3); p.defaultValue="Sequential";
+          m->appendMenu(p,3,nv.data(),lv.data()); }
+        { OP_NumericParameter p("Play"); p.label="Play"; p.page=PAGE; p.defaultValues[0]=1; m->appendToggle(p); }
+        { OP_NumericParameter p("Speed"); p.label="Speed"; p.page=PAGE; p.defaultValues[0]=1; p.minSliders[0]=-2; p.maxSliders[0]=2; m->appendFloat(p); }
+        { OP_NumericParameter p("Loop"); p.label="Loop"; p.page=PAGE; p.defaultValues[0]=1; m->appendToggle(p); }
+        { OP_NumericParameter p("Cue"); p.label="Cue"; p.page=PAGE; p.defaultValues[0]=0; m->appendToggle(p); }
+        { OP_NumericParameter p("Cuepoint"); p.label="Cue Point (sec)"; p.page=PAGE; p.defaultValues[0]=0; p.minSliders[0]=0; p.maxSliders[0]=60; m->appendFloat(p); }
+        { OP_NumericParameter p("Cuepulse"); p.label="Cue Pulse"; p.page=PAGE; m->appendPulse(p); }
+        { OP_NumericParameter p("Position"); p.label="Position (0..1, when Play is off)"; p.page=PAGE; p.defaultValues[0]=0; p.minSliders[0]=0; p.maxSliders[0]=1; p.minValues[0]=0; p.maxValues[0]=1; p.clampMins[0]=p.clampMaxes[0]=true; m->appendFloat(p); }
         { OP_NumericParameter p("Fnumber"); p.label="Aperture (f-number)"; p.page=PAGE; p.defaultValues[0]=4.0; p.minSliders[0]=2; p.maxSliders[0]=16; m->appendFloat(p); }
         { OP_NumericParameter p("Focus"); p.label="Focus Disparity Override (0=use script)"; p.page=PAGE; p.defaultValues[0]=0; p.minSliders[0]=0; p.maxSliders[0]=1; m->appendFloat(p); }
         { OP_NumericParameter p("Normalize"); p.label="Normalize Depth (0..1)"; p.page=PAGE; p.defaultValues[0]=1; m->appendToggle(p); }
         { OP_NumericParameter p("Flip"); p.label="Flip Vertically"; p.page=PAGE; p.defaultValues[0]=1; m->appendToggle(p); }
         { OP_NumericParameter p("Maxsubjects"); p.label="Max Subjects (Info CHOP)"; p.page=PAGE; p.defaultValues[0]=10; p.minSliders[0]=1; p.maxSliders[0]=20; p.minValues[0]=1; p.maxValues[0]=kMaxSub; p.clampMins[0]=p.clampMaxes[0]=true; m->appendInt(p); }
+        { OP_NumericParameter p("Infochop"); p.label="Info CHOP"; p.page=PAGE; p.defaultValues[0]=0; m->appendToggle(p); }
         { OP_NumericParameter p("Infodat"); p.label="Info DAT"; p.page=PAGE; p.defaultValues[0]=0; m->appendToggle(p); }
     }
 
     // Info CHOP: 診断 + 旧 Cinematic Data CHOP のメタデータチャンネル
-    static constexpr int kFixedChans = 8;   // executes,submits,frames,ready,duration,focus_disparity,focus_strong,subjects
+    static constexpr int kFixedChans = 10;  // executes,submits,frames,ready,duration,position,playing,focus_disparity,focus_strong,subjects
+    // Info DAT: 素材のメタデータ(機種・撮影日時・コーデック・回転など)を key/value で出す。
+    // 中身は cn_open 時にヘルパーが1回だけ作った JSON。
+    bool getInfoDATSize(OP_InfoDATSize* i, void*) override {
+        std::lock_guard<std::mutex> l(myMutex);
+        i->rows = (int32_t)myFileMeta.size();
+        i->cols = 2; i->byColumn = false;
+        return i->rows > 0;
+    }
+    void getInfoDATEntries(int32_t row, int32_t, OP_InfoDATEntries* e, void*) override {
+        std::lock_guard<std::mutex> l(myMutex);
+        if (row < 0 || row >= (int32_t)myFileMeta.size()) return;
+        e->values[0]->setString(myFileMeta[row].first.c_str());
+        e->values[1]->setString(myFileMeta[row].second.c_str());
+    }
+
     int32_t getNumInfoCHOPChans(void*) override { return kFixedChans + myMax * 8; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override {
         if (i < kFixedChans) {
             int ready = (myStatus == "ready") ? 1 : 0;
-            const char* n[] = {"executes","submits","frames","ready","duration","focus_disparity","focus_strong","subjects"};
+            const char* n[] = {"executes","submits","frames","ready","duration","position","playing",
+                               "focus_disparity","focus_strong","subjects"};
             float v[] = {(float)myExec.load(),(float)mySubmit.load(),(float)myFrames.load(),(float)ready,
-                         (float)myDur, myMetaSnap.focus, myMetaSnap.strong, (float)myMetaSnap.count};
+                         (float)myDur, (float)myTime, myPlaying ? 1.f : 0.f,
+                         myMetaSnap.focus, myMetaSnap.strong, (float)myMetaSnap.count};
             c->name->setString(n[i]); c->value = v[i];
             return;
         }
@@ -180,18 +328,67 @@ public:
         if (slot >= myMetaSnap.count) { c->value = 0; return; }
         c->value = (f == 0) ? 1.0f : myMetaSnap.sub[slot][f - 1];
     }
-    void getWarningString(OP_String* s, void*) override { if (myStatus == "error" && !myErr.empty()) s->setString(("Cinematic: " + myErr).c_str()); }
+    std::atomic<bool> myNCScaled{false};   // NC上限で縮小したか（警告表示用）
+    void getWarningString(OP_String* s, void*) override {
+        if (myStatus == "error" && !myErr.empty()) s->setString(("Cinematic: " + myErr).c_str());
+        else if (myNCScaled) s->setString(tdnc::kWarning);
+    }
 
 private:
     void worker() {
         while (true) {
             Job j;
             { std::unique_lock<std::mutex> l(myMutex); myCond.wait(l, [this]{ return myQuit || myPending; }); if (myQuit) return; j = myJob; myPending = false; myBusy = true; }
-            if (j.mode == 0) cn_depth(myState, j.time, j.flip?1:0, j.norm?1:0);
-            else cn_render(myState, j.time, j.fnum, j.focus, j.flip?1:0);
-            fetchMeta(j.time);   // 同一worker上でCNScriptメタも更新(ヘルパ呼び出しを直列化)
+            @autoreleasepool {   // 常駐スレッドなので1ジョブごとに必ず排出する
+                if (j.mode == kModeDepth || j.mode == kModeColorDepth || j.mode == kModeAll)
+                    cn_depth(myState, j.time, j.flip?1:0, j.norm?1:0);
+                // All は再レンダのデコード結果から色も取り出す(keepColor=1)のでファイル読みが1回減る。
+                // Color+Depth は再レンダ(Metal)を通さないぶん All より軽い
+                if (j.mode == kModeRendered || j.mode == kModeAll)
+                    cn_render(myState, j.time, j.fnum, j.focus, j.flip?1:0, j.mode == kModeAll);
+                else if (j.mode == kModeColor || j.mode == kModeColorDepth)
+                    cn_color(myState, j.time, j.flip?1:0);
+                fetchMeta(j.time);   // 同一worker上でCNScriptメタも更新(ヘルパ呼び出しを直列化)
+                if (!myFileMetaDone) fetchFileMeta();   // ファイル全体のメタは1回だけ
+            }
             { std::lock_guard<std::mutex> l(myMutex); myBusy = false; }
         }
+    }
+
+    // worker: cn_fileinfo の JSON(素材のメタデータ)を key/value 表に変換。ファイルごとに1回
+    void fetchFileMeta() {
+        const char* j = cn_fileinfo(myState);
+        if (!j) return;
+        std::string js(j); free((void*)j);
+        if (js.size() < 3) return;   // "{}" = まだ ready でない
+        std::vector<std::pair<std::string,std::string>> rows;
+        @autoreleasepool {
+            NSData* d = [NSData dataWithBytes:js.data() length:js.size()];
+            NSDictionary* m = [NSJSONSerialization JSONObjectWithData:d options:0 error:nil];
+            if (![m isKindOfClass:[NSDictionary class]]) return;
+            // 読みやすい順に並べる。ここに無いキーは後ろへ回す
+            const char* order[] = {"duration","rotation","is_cinematic","cinematic_intent",
+                                   "video_size","video_codec","video_fps","video_mbps",
+                                   "disparity_size","disparity_codec","disparity_fps","disparity_mbps",
+                                   "audio_codec","audio_mbps",
+                                   "make","model","software","creationDate","location"};
+            NSMutableSet* used = [NSMutableSet set];
+            for (const char* k : order) {
+                NSString* key = [NSString stringWithUTF8String:k];
+                id v = m[key];
+                if (!v) continue;
+                rows.emplace_back(k, [[v description] UTF8String]);
+                [used addObject:key];
+            }
+            for (NSString* key in m) {
+                if ([used containsObject:key]) continue;
+                rows.emplace_back([key UTF8String], [[m[key] description] UTF8String]);
+            }
+        }
+        if (rows.empty()) return;
+        std::lock_guard<std::mutex> l(myMutex);
+        myFileMeta = std::move(rows);
+        myFileMetaDone = true;
     }
 
     // worker: cn_meta の JSON をパースして Meta を更新(旧 Cinematic Data CHOP のロジック)
@@ -226,12 +423,17 @@ private:
     }
 
     const OP_NodeInfo* myNode = nullptr;   // Python コールバック用
-    bool myBootstrapped = false, myPrevInfoDat = false;
+    bool myBootstrapped = false, myPrevInfoChop = false, myPrevInfoDat = false;
+    std::vector<std::pair<std::string,std::string>> myFileMeta;   // myMutex 保護(Info DAT 用)
+    bool myFileMetaDone = false;
     TOP_Context* myContext; void* myState = nullptr;
     std::thread myThread; std::condition_variable myCond; std::mutex myMutex;
     bool myQuit=false, myPending=false, myBusy=false;
     Job myJob; std::string myFile, mySig, myStatus, myErr; unsigned long long myUploaded=0;
     double myDur = 0; int myMax = 10;
+    double myTime = 0;                 // 再生位置(秒)。Play On のとき deltaMS ぶん進む
+    bool myPlaying = false;
+    std::atomic<bool> myCuePulse{false};
     Meta myMeta, myMetaSnap;   // myMeta=worker書き込み(要mutex) / myMetaSnap=cookスレッド専用
     std::atomic<uint64_t> myExec{0}, mySubmit{0}, myFrames{0};
 };
@@ -244,7 +446,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Cinematicvideo");
     i->customOPInfo.opLabel->setString("Cinematic Video");
     i->customOPInfo.opIcon->setString("CNV");
-    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/Cinematic/README.md");
+    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/Cinematic/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.majorVersion = 0;
     i->customOPInfo.minorVersion = 9;

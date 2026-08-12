@@ -31,6 +31,7 @@
 
 #include "TOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
+#include "../common/NonCommercialLimit.h"
 
 using namespace TD;
 
@@ -110,10 +111,17 @@ public:
         FrameResult frame;
         {
             std::lock_guard<std::mutex> lock(myMutex);
-            if (myResult.serial == myUploadedSerial || myResult.data.empty())
+            if (myResult.data.empty())
                 return;
             frame = myResult;
             myUploadedSerial = myResult.serial;
+        }
+
+        // NC の 1280x1280 上限を超えたままだと TD がクランプ後の幅でバッファを読み、
+        // 絵が斜めに崩れる。宣言する前に収める。
+        if (tdnc::fit(frame.data, frame.width, frame.height, frame.format)) {
+            std::lock_guard<std::mutex> lock(myMutex);
+            myWarning = tdnc::kWarning;
         }
 
         TOP_UploadInfo info;
@@ -786,7 +794,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->customOPInfo.majorVersion = 0;
     info->customOPInfo.minorVersion = 9;
     info->customOPInfo.opIcon->setString("MUP");
-    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/MetalUpscale/README.md");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/MetalUpscale/README.md");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;
 }

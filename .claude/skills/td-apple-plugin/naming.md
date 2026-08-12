@@ -16,7 +16,7 @@ TDは起動時にカスタムOPの名前を検証する。規約違反は**起�
 ## opLabel(OP Create Dialog の表示名)
 
 - **`Framework Feature` 形式**にする(例 `Vision Pose` / `CoreImage Bokeh` / `Metal Upscale` /
-  `RealityKit Capture` / `Speech Activity`)
+  `RealityKit Capture` / `Speech Transcribe`)
 - **接頭辞は実装フレームワーク名**。「Apple」等の共通接頭辞は
   **OP Create Dialog のタイルで折り返して読めなくなる**(1タイル約20文字)ため使わない
 - ラベルはフレームワークの粒度に合わせる:
@@ -50,7 +50,7 @@ TDは起動時にカスタムOPの名前を検証する。規約違反は**起�
 | CoreImage Bokeh / Keystone / Enhance / Code | Coreimagebokeh 等 | Core Image |
 | Metal Upscale / Denoise / FrameInterp / MPSAnalyze | Metalupscale 等 | VideoToolbox/MetalFX/MPS |
 | Sound Class / Features | Soundclass 等 | SoundAnalysis |
-| Speech Text / Synth / Activity | Speechtext 等 | SpeechAnalyzer/AVSpeech |
+| Speech Transcribe / Synth / Activity | Speechtranscribe 等 | SpeechAnalyzer/AVSpeech |
 | Foundation Model | Foundationmodel | FoundationModels(汎用"LLM"は他統合と衝突回避で避けた) |
 | Translate | Translate | Translation |
 | RealityKit Capture | Realitykitcapture | RealityKit Object Capture |

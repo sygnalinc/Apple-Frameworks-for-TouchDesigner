@@ -17,6 +17,7 @@
 #import <CoreVideo/CoreVideo.h>
 #import <Vision/Vision.h>
 
+#include "../common/AspectCoords.h"
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
@@ -161,6 +162,9 @@ public:
             std::lock_guard<std::mutex> lock(myMutex);
             hands = myHands;
         }
+        const tdaspect::Mapper map{ inputs->getParInt("Aspectcorrectuv") != 0,
+                                    top ? (float)top->textureDesc.width  : 0.0f,
+                                    top ? (float)top->textureDesc.height : 0.0f };
         const int perHand = 2 + kNumJoints * 3;
         for (int h = 0; h < myMaxHands; h++) {
             const bool on = active && h < (int)hands.size() && hands[h].valid;
@@ -170,8 +174,8 @@ public:
             output->channels[base + 1][0] = on ? hand.chirality : 0.0f;
             for (int j = 0; j < kNumJoints; j++) {
                 const int jb = base + 2 + j * 3;
-                output->channels[jb + 0][0] = on ? hand.joints[j][0] : 0.0f;
-                output->channels[jb + 1][0] = on ? hand.joints[j][1] : 0.0f;
+                output->channels[jb + 0][0] = on ? map.x(hand.joints[j][0]) : 0.0f;
+                output->channels[jb + 1][0] = on ? map.y(hand.joints[j][1]) : 0.0f;
                 output->channels[jb + 2][0] = on ? hand.joints[j][2] : 0.0f;
             }
         }
@@ -179,6 +183,8 @@ public:
 
     void setupParameters(OP_ParameterManager* manager, void*) override
     {
+        // uv を入力画像のアスペクト比へ再スケール（Body Track CHOP と同名・同既定）
+        tdaspect::appendAspectCorrect<OP_ParameterManager, OP_NumericParameter>(manager, "Vision Hand");
         {
             OP_StringParameter p("Top");
             p.label = "TOP";
@@ -344,7 +350,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     info->customOPInfo.majorVersion = 0;
     info->customOPInfo.minorVersion = 9;
     info->customOPInfo.opIcon->setString("VHD");
-    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/VisionHand/README.md");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/VisionHand/README.md");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
 }

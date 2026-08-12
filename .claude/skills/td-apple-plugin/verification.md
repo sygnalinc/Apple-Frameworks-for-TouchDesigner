@@ -25,11 +25,54 @@
 
 - **複数行コードは戻り値が返らない**。値が欲しいときは**単一式**で書く
   (例 `op('x').numChans` のように1式で評価)
-- **genexpr / ネストしたdef は外側変数を見られない**。ヘルパ関数を定義せずインラインで書く
+- **exec スコープなので、内包表記やネストした def から「外側で定義した変数」が見えない**
+  (`NameError`)。回避は2択:
+  1. 短いものはインラインで書く(ヘルパ関数を作らない)
+  2. **処理全体を1つの関数に入れて最後に呼ぶ**。関数のローカル同士なら普通に見えるので、
+     長いスクリプトはこちらが確実
+     ```python
+     def build():
+         w, h = 720, 1280
+         for i in range(8):
+             ...            # w, h が見える
+     build()
+     ```
 - **`time.sleep` は cook を止める**。待ちは run 内 sleep ではなく、**Bash側の sleep ループ**で
   時間を置いてから再度evalする
 - 検証ノードは `_codex_*` 等の接頭辞で作り、**検証後に必ず全削除**する
   (`/project1` に検証ノードを残さない)
+
+## TDのノード操作でつまずくところ
+
+- **カスタムOPの生成は `create('<OpType>TOP', name)`**(先頭大文字の opType + FAMILY大文字の
+  文字列)。`create(coretextTOP, ...)` のような Python 型定数は**カスタムOPには存在しない**
+  → `NameError`。標準OPだけが `coretextTOP` 形式の定数を持つ
+- **base COMP を親側のTOPに繋ぐ**ときは `connect(comp)` ではなく
+  **`connect(comp.outputConnectors[0])`**(`connect(comp)` は型エラー)。
+  COMPに出力コネクタが出るのは、中に Out TOP がある場合
+- **シーケンスのブロック追加は `op.seq.<name>.numBlocks = N`**。
+  `op.par.<name> = N` では増えない(ヘッダparの値は「追加ブロック数」なので0のまま見える)
+- `par.pixeldat` などのOP参照パラメータは、**OPオブジェクトではなくパス文字列**を入れると確実
+- `glslmultiTOP` を Python で create すると `<name>_pixel/_info/_compute` が**自動でドック生成**
+  される。自分で同名DATを作ると `_pixel1` にリネームされるので、**自動生成された方に書く**
+
+## demo.toe の利用例コンテナは cook が止めてある
+
+`demo.toe` の各利用例(base COMP)は **`allowCooking = False`** が既定
+(全部を常時 cook すると全例のML推論が同時に走るため)。この状態では:
+
+- 中の Movie File In は **128x128 のまま**(=非ロード)
+- MCP から `cook(force=True)` しても**中身は cook されない**
+- CHOP から読めた値は**前に cook されたときの残留値**。実測と勘違いしやすい
+
+検証するときは **一時的に True にして cook → 確認 → False に戻す**:
+
+```python
+c = op('/project1/VisionFace')
+c.allowCooking = True
+...  # cook して確認
+c.allowCooking = False
+```
 
 ## テスト素材
 

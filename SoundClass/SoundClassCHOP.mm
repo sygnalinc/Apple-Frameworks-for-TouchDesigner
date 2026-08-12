@@ -29,6 +29,8 @@
 #include <thread>
 #include <vector>
 
+#include "../common/PyCallbacksBootstrap.h"
+
 #include "CHOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
 
@@ -38,6 +40,30 @@ using namespace TD;
 @interface SoundClassObserverImpl : NSObject <SNResultsObserving>
 @property (nonatomic, assign) void* owner;
 @end
+
+
+// 配置するだけで Callbacks DAT が繋がり、Info DAT トグルで上位10件の表が出る。
+// （CHOP のチャンネルは Classes に書いたIDだけなので、CHOP to DAT では上位10件は見られない）
+static const char* PythonCallbacksDATStubs =
+"# Sound Class CHOP callbacks\n"
+"#\n"
+"# onInfoDAT: 'Info DAT' トグルを on にした瞬間に呼ばれる。\n"
+"# 隣に Info DAT を自動生成する(既にあれば何もしない)。\n"
+"# そこには **303クラス全体の上位10件** が出る。Classes に書いていないIDも出るので、\n"
+"# 音を鳴らしながらこの表を見て、欲しいIDを Classes に足していく使い方を想定している。\n"
+"def onInfoDAT(op, enabled):\n"
+"\tif not enabled:\n"
+"\t\treturn\n"
+"\tp = op.parent()\n"
+"\tname = op.name + '_info'\n"
+"\tif p.op(name):\n"
+"\t\treturn\n"
+"\td = p.create(infoDAT, name)\n"
+"\td.par.op = op.name\n"
+"\td.nodeX = op.nodeX + 200\n"
+"\td.nodeY = op.nodeY\n"
+"\td.viewer = True\n"
+"\treturn\n";
 
 namespace {
 
@@ -50,7 +76,7 @@ struct Ranked
 class SoundClassCHOP : public CHOP_CPlusPlusBase
 {
 public:
-    explicit SoundClassCHOP(const OP_NodeInfo*)
+    explicit SoundClassCHOP(const OP_NodeInfo* nodeInfo) : myNode(nodeInfo)
     {
         myWorker = std::thread([this] { workerLoop(); });
     }
@@ -91,6 +117,17 @@ public:
 
     void execute(CHOP_Output* output, const OP_Inputs* inputs, void*) override
     {
+        // 配置後の cook で雛形入り Callbacks DAT を自動生成・ドック接続(成功するまでリトライ)
+        if (!myBootstrapped)
+            myBootstrapped = tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);
+        // Info DAT トグル off→on で隣に Info DAT を自動生成
+        const bool infoDat = inputs->getParInt("Infodat") != 0;
+        if (infoDat && !myPrevInfoDat) {
+            tdpycb::bootstrapCallbacksDAT(myNode, PythonCallbacksDATStubs);   // 消されていたら再生成
+            tdpycb::firePythonCallback(myNode, "onInfoDAT", true);
+        }
+        myPrevInfoDat = infoDat;
+
         myExecCount++;
         const bool active = inputs->getParInt("Active") != 0;
 
@@ -137,6 +174,14 @@ public:
             p.label = "Active";
             p.page = "Sound Class";
             p.defaultValues[0] = 1;
+            manager->appendToggle(p);
+        }
+        {
+            // 上位10件の表(Info DAT)を隣に自動生成する
+            OP_NumericParameter p("Infodat");
+            p.label = "Info DAT (top 10)";
+            p.page = "Sound Class";
+            p.defaultValues[0] = 0;
             manager->appendToggle(p);
         }
         {
@@ -365,6 +410,9 @@ private:
     std::vector<std::string> mySelected;
     std::map<std::string, float> myConfidence;
     std::vector<Ranked> myRanking;
+    const OP_NodeInfo* myNode = nullptr;
+    bool myBootstrapped = false;
+    bool myPrevInfoDat = false;
 
     std::atomic<int> myExecCount{0}, myResultCount{0};
 };
@@ -401,7 +449,8 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     info->customOPInfo.majorVersion = 0;
     info->customOPInfo.minorVersion = 9;
     info->customOPInfo.opIcon->setString("SND");
-    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/SoundClass/README.md");
+    info->customOPInfo.pythonCallbacksDAT = PythonCallbacksDATStubs;
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/SoundClass/README.md");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;
 }

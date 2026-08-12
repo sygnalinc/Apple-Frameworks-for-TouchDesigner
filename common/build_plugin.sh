@@ -11,6 +11,10 @@
 # 前提: Xcode（clang++）と TouchDesigner.app（C++ SDK ヘッダを流用）
 set -e
 
+# **このファイルは zsh 専用**（配列 append `arr+="x"` など zsh 固有の記法を使う）。
+# 呼び出し側の build.sh も必ず #!/bin/zsh にすること。#!/bin/bash から source すると
+# ${(%):-%N} が "bad substitution" になり、set -e で**何もビルドされないまま無言で中断**する
+# （実際に CoreImageCode 等6件がこの状態でビルド不能になっていた）。
 source "$(dirname "${(%):-%N}")/version.sh"
 
 TD_SDK="${TD_SDK:-/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP}"

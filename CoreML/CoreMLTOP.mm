@@ -35,6 +35,7 @@
 
 #include "TOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
+#include "../common/NonCommercialLimit.h"
 
 using namespace TD;
 
@@ -163,11 +164,16 @@ public:
         FrameResult frame;
         {
             std::lock_guard<std::mutex> lock(myMutex);
-            if (myResult.serial == myUploadedSerial || myResult.data.empty())
+            if (myResult.data.empty())
                 return;
             frame = myResult;
             myUploadedSerial = myResult.serial;
         }
+
+        // NC の 1280x1280 上限に収めてから宣言する（超えたまま渡すと TD が
+        // クランプ後の幅でバッファを読み、絵が斜めに崩れる）
+        if (tdnc::fit(frame.data, frame.width, frame.height, frame.format))
+            myNCScaled = true;
 
         TOP_UploadInfo info;
         info.textureDesc.texDim = OP_TexDim::e2D;
@@ -339,6 +345,8 @@ public:
             warning->setString("Set a Core ML model file (.mlpackage / .mlmodel / .mlmodelc)");
         else if (myState.status == "compiling" || myState.status == "loading")
             warning->setString("Loading model... (first ANE compile can take a while)");
+        else if (myNCScaled)
+            warning->setString(tdnc::kWarning);
     }
 
     void getInfoPopupString(OP_String* info, void*) override
@@ -774,6 +782,7 @@ private:
     int64_t myLastCookSeen = -1;
 
     std::atomic<bool> myFlip{true}, myInvert{false};
+    std::atomic<bool> myNCScaled{false};   // NC上限で縮小したか（警告表示用）
     int myRangeMode = 0;
     int myScaleOption = 0;
     float myRangeMin = 0.0f, myRangeMax = 1.0f;
@@ -804,7 +813,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->customOPInfo.majorVersion = 0;
     info->customOPInfo.minorVersion = 9;
     info->customOPInfo.opIcon->setString("CML");
-    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/CoreML/README.md");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/CoreML/README.md");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;
 }

@@ -17,6 +17,7 @@
 #include <vector>
 #include "TOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
+#include "../common/NonCommercialLimit.h"
 #include "../common/PyCallbacksBootstrap.h"
 using namespace TD;
 
@@ -68,7 +69,10 @@ public:
         std::string sig=file+"|"+std::to_string(page)+"|"+std::to_string((int)dpi)+"|"+imode;
         if (sig!=mySig){ mySig=sig; std::unique_lock<std::mutex> l(myMutex, std::try_to_lock);
             if (l.owns_lock() && !myPending && !myBusy){ myFile=file; myPage=page; myDpi=dpi; myInfoMode=imode; myPending=true; mySubmit++; l.unlock(); myCond.notify_one(); } else mySig.clear(); }
-        Result r; { std::lock_guard<std::mutex> l(myMutex); if(myResult.serial==myUploaded||!myResult.ok||myResult.bgra.empty()) return; r=myResult; myUploaded=r.serial; }
+        Result r; { std::lock_guard<std::mutex> l(myMutex); if(!myResult.ok||myResult.bgra.empty()) return; r=myResult; myUploaded=r.serial; }
+        // NC の 1280x1280 上限に収めてから宣言する（超えたまま渡すと TD が
+        // クランプ後の幅でバッファを読み、絵が斜めに崩れる）
+        if (tdnc::fit(r.bgra, r.w, r.h, OP_PixelFormat::BGRA8Fixed)) myWarn = tdnc::kWarning;
         TOP_UploadInfo ui; ui.textureDesc.texDim=OP_TexDim::e2D; ui.textureDesc.width=r.w; ui.textureDesc.height=r.h; ui.textureDesc.pixelFormat=OP_PixelFormat::BGRA8Fixed;
         auto b=myContext->createOutputBuffer((size_t)r.w*r.h*4, TOP_BufferFlags::None, nullptr); if(!b) return;
         memcpy(b->data, r.bgra.data(), r.bgra.size()); out->uploadBuffer(&b, ui, nullptr);
@@ -227,7 +231,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Pdfkit");
     i->customOPInfo.opLabel->setString("PDFKit");
     i->customOPInfo.opIcon->setString("PDF");
-    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/PDFKit/README.md");
+    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/PDFKit/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.majorVersion = 0;
     i->customOPInfo.minorVersion = 9;

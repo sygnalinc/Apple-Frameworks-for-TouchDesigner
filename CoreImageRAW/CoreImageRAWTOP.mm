@@ -11,10 +11,11 @@
 #include <vector>
 #include "TOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
+#include "../common/NonCommercialLimit.h"
 using namespace TD;
 
 namespace {
-struct Params { std::string file; float exposure, boost, temp, tint, lumaNR, colorNR, sharpen, contrast, scale; bool flip; };
+struct Params { std::string file; float exposure, boost, temp, tint, lumaNR, colorNR, sharpen, contrast, scale; bool flip; bool applyOri = true; };
 struct Result { std::vector<uint16_t> p; uint32_t w = 0, h = 0; uint64_t serial = 0; };
 
 class CoreImageRAWTOP final : public TOP_CPlusPlusBase {
@@ -38,8 +39,9 @@ public:
         p.contrast = (float)in->getParDouble("Contrast");
         p.scale = (float)in->getParDouble("Scale");
         p.flip = in->getParInt("Flip") != 0;
-        char buf[256]; snprintf(buf, sizeof buf, "%s|%.3f|%.3f|%.1f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%d",
-            p.file.c_str(), p.exposure, p.boost, p.temp, p.tint, p.lumaNR, p.colorNR, p.sharpen, p.contrast, p.scale, p.flip ? 1 : 0);
+        p.applyOri = in->getParInt("Applyorientation") != 0;
+        char buf[256]; snprintf(buf, sizeof buf, "%s|%.3f|%.3f|%.1f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d",
+            p.file.c_str(), p.exposure, p.boost, p.temp, p.tint, p.lumaNR, p.colorNR, p.sharpen, p.contrast, p.scale, p.flip ? 1 : 0, p.applyOri ? 1 : 0);
         std::string sig = buf;
         if (sig != mySig) {
             mySig = sig;
@@ -48,7 +50,11 @@ public:
             else mySig.clear();
         }
         Result r;
-        { std::lock_guard<std::mutex> l(myMutex); if (myResult.serial == myUploaded || myResult.p.empty()) return; r = myResult; myUploaded = r.serial; }
+        { std::lock_guard<std::mutex> l(myMutex); if (myResult.p.empty()) return; r = myResult; myUploaded = r.serial; }
+        // NC の 1280x1280 上限に収めてから宣言する（超えたまま渡すと TD が
+        // クランプ後の幅でバッファを読み、絵が斜めに崩れる）
+        if (tdnc::fit(r.p, r.w, r.h, OP_PixelFormat::RGBA16Float)) myWarning = tdnc::kWarning;
+
         TOP_UploadInfo ui;
         ui.textureDesc.texDim = OP_TexDim::e2D;
         ui.textureDesc.width = r.w; ui.textureDesc.height = r.h;
@@ -73,6 +79,7 @@ public:
         f("Contrast", "Contrast", 1.0, 0.0, 2.0);
         f("Scale", "Scale Factor", 1.0, 0.1, 1.0);
         { OP_NumericParameter p("Flip"); p.label = "Flip Vertically"; p.page = PAGE; p.defaultValues[0] = 1; m->appendToggle(p); }
+        { OP_NumericParameter p("Applyorientation"); p.label = "Apply EXIF Orientation"; p.page = PAGE; p.defaultValues[0] = 1; m->appendToggle(p); }
     }
 
     int32_t getNumInfoCHOPChans(void*) override { return 4; }
@@ -110,6 +117,9 @@ private:
                 if (f.sharpnessSupported) f.sharpnessAmount = p.sharpen;
                 f.contrastAmount = p.contrast;
                 f.scaleFactor = p.scale;
+                // 撮影時のカメラの向き(EXIF Orientation)。CIRAWFilter は既定でファイルの値を
+                // 持っているので、off のときだけ .up にしてセンサーそのままの向きで出す
+                if (!p.applyOri) f.orientation = kCGImagePropertyOrientationUp;
                 CIImage* img = f.outputImage;
                 if (!img) { w = "RAW develop produced no image"; return false; }
                 CGRect e = img.extent;
@@ -118,7 +128,10 @@ private:
                 r.w = W; r.h = H; r.p.resize((size_t)W * H * 4);
                 CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearSRGB);
                 CIContext* ctx = [CIContext contextWithOptions:@{ kCIContextWorkingColorSpace : (__bridge id)cs }];
-                [ctx render:img toBitmap:r.p.data() rowBytes:(size_t)W * 4 * sizeof(uint16_t) bounds:e format:kCIFormatRGBA16 colorSpace:cs];
+                // kCIFormatRGBA16 は **16bit符号なし整数**。RGBA16Float(半精度浮動小数)として上げるので
+                // 形式が一致せず、ビット列が別物として解釈されて NaN や負の巨大値になる(実RAWで実測)。
+                // 半精度で描く kCIFormatRGBAh が正しい対。
+                [ctx render:img toBitmap:r.p.data() rowBytes:(size_t)W * 4 * sizeof(uint16_t) bounds:e format:kCIFormatRGBAh colorSpace:cs];
                 CGColorSpaceRelease(cs);
                 if (p.flip) { // Core Image出力(top-down) → TD正立へ行反転
                     size_t rb = (size_t)W * 4; std::vector<uint16_t> tmp(rb);
@@ -143,7 +156,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i) {
     i->customOPInfo.opType->setString("Ciraw");
     i->customOPInfo.opLabel->setString("CI RAW");
     i->customOPInfo.opIcon->setString("CIR");
-    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/CoreImageRAW/README.md");
+    if (i->customOPInfo.opHelpURL) i->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/CoreImageRAW/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
     i->customOPInfo.majorVersion = 0;
     i->customOPInfo.minorVersion = 9;

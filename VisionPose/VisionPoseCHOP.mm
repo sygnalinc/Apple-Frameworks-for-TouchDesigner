@@ -24,6 +24,8 @@
 #import <CoreVideo/CoreVideo.h>
 #import <Vision/Vision.h>
 
+#include "../common/AspectCoords.h"
+
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -211,6 +213,11 @@ public:
             std::lock_guard<std::mutex> lock(myMutex);
             memcpy(slots, mySlots, sizeof(slots));
         }
+        // uv を入力画像のアスペクト比に合わせて再スケール(Body Track CHOP と同仕様・既定Off)
+        const tdaspect::Mapper map{ inputs->getParInt("Aspectcorrectuv") != 0,
+                                    top ? (float)top->textureDesc.width  : 0.0f,
+                                    top ? (float)top->textureDesc.height : 0.0f };
+
         const int perKP = myRotations ? 6 : 3;
         const int perBody = 6 + kNumKP * perKP;
         for (int b = 0; b < myMaxBodies; b++) {
@@ -218,13 +225,15 @@ public:
             const bool on = active && body.valid;
             const int base = b * perBody;
             output->channels[base + 0][0] = on ? 1.0f : 0.0f;
-            for (int f = 0; f < 4; f++)
-                output->channels[base + 1 + f][0] = on ? body.bbox[f] : 0.0f;
+            output->channels[base + 1][0] = on ? map.x(body.bbox[0]) : 0.0f;
+            output->channels[base + 2][0] = on ? map.y(body.bbox[1]) : 0.0f;
+            output->channels[base + 3][0] = on ? map.dx(body.bbox[2]) : 0.0f;
+            output->channels[base + 4][0] = on ? map.dy(body.bbox[3]) : 0.0f;
             output->channels[base + 5][0] = on ? (float)body.trackingId : 0.0f;
             for (int k = 0; k < kNumKP; k++) {
                 const int kb = base + 6 + k * perKP;
-                output->channels[kb + 0][0] = on ? body.kp[k][0] : 0.0f;
-                output->channels[kb + 1][0] = on ? body.kp[k][1] : 0.0f;
+                output->channels[kb + 0][0] = on ? map.x(body.kp[k][0]) : 0.0f;
+                output->channels[kb + 1][0] = on ? map.y(body.kp[k][1]) : 0.0f;
                 output->channels[kb + 2][0] = on ? body.kp[k][2] : 0.0f;
                 if (myRotations) {
                     output->channels[kb + 3][0] = 0.0f;   // rx/ry/rz は Vision では取れない
@@ -271,6 +280,8 @@ public:
             p.defaultValues[0] = 0;
             manager->appendToggle(p);
         }
+        // uv を入力画像のアスペクト比へ再スケール（Body Track CHOP と同名・同既定）
+        tdaspect::appendAspectCorrect<OP_ParameterManager, OP_NumericParameter>(manager, "Vision Pose");
         {
             // TD の TOP ダウンロードは GL 系の上下逆（bottom-up）なので既定でフリップする
             OP_NumericParameter p("Flip");
@@ -495,7 +506,7 @@ FillCHOPPluginInfo(CHOP_PluginInfo* info)
     info->customOPInfo.majorVersion = 0;
     info->customOPInfo.minorVersion = 9;
     info->customOPInfo.opIcon->setString("VPS");
-    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/VisionPose/README.md");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/VisionPose/README.md");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
 }

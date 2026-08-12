@@ -31,26 +31,27 @@ build_td_plugin CoreImageBokehTOP coreimagebokeh-top CoreImageBokehTOP.mm -- Cor
 ObjC++から呼べないSwift専用APIは、helperを dylib 化して C ABI で繋ぐ。共通ヘルパは使わず手書き。
 
 - **Cプレフィックスをプラグインごとに分ける**: `sd_`/`pg_`(ImageGen)・`fm_`(FoundationModel)・
-  `tr_`(Translate)・`sp_`(SpeechText)・`wk_`(WhisperKit)・`sh_`(Shazam)・`ph_`(Photogrammetry)
+  `tr_`(Translate)・`sp_`(SpeechTranscribe)・`wk_`(WhisperKit)・`sh_`(Shazam)・`ph_`(Photogrammetry)
 - helperは `@_cdecl` でエクスポート、ハンドルは `Unmanaged.passRetained().toOpaque()`
 - 状態受け渡しは **poll方式のJSON**(status/busy/…)+ 必要ならバイト列コピー関数
 - 依存が単純なら `swiftc -emit-library` 直、SPM依存(ml-stable-diffusion/WhisperKit)なら
   helper/ を Swift Package にして `swift build -c release`
 - dylibは `.plugin/Contents/Frameworks/` に同梱し、リンク時 `-rpath @loader_path/../Frameworks`
 
-手書きbuild.shの骨格(SpeechActivity 参照):
+手書きbuild.shの骨格(VisionDocument 参照。dylib名は下記のとおり epoch 付き):
 
 ```zsh
-NAME=SpeechActivityCHOP
+NAME=VisionDocumentDAT
 OUT="build/$NAME.plugin/Contents"
+DYLIB="libVisionDocumentHelper_$(date +%s).dylib"
 mkdir -p "$OUT/MacOS" "$OUT/Frameworks"
-swiftc -O -emit-library -module-name VoiceActivityHelper \
-  -target arm64-apple-macos14.0 VoiceActivityHelper.swift \
-  -framework Speech -framework AVFAudio \
-  -Xlinker -install_name -Xlinker @rpath/libVoiceActivityHelper.dylib \
-  -o "$OUT/Frameworks/libVoiceActivityHelper.dylib"
-clang++ -std=c++17 -fobjc-arc -O2 -bundle -I "$SDK" SpeechActivityCHOP.mm \
-  -framework Foundation -L "$OUT/Frameworks" -lVoiceActivityHelper \
+swiftc -O -emit-library -module-name VisionDocumentHelper \
+  -target arm64-apple-macos26.0 VisionDocumentHelper.swift \
+  -framework Vision \
+  -Xlinker -install_name -Xlinker "@rpath/$DYLIB" \
+  -o "$OUT/Frameworks/$DYLIB"
+clang++ -std=c++17 -fobjc-arc -O2 -bundle -I "$SDK" VisionDocumentDAT.mm \
+  -framework Foundation -L "$OUT/Frameworks" -l"${DYLIB:3:-6}" \
   -Xlinker -rpath -Xlinker @loader_path/../Frameworks -o "$OUT/MacOS/$NAME"
 # Info.plist を PlistBuddy で生成 → codesign --force --deep -s -
 ```
@@ -79,6 +80,31 @@ cp -R <Name>/build/<Name>.plugin \
   **opType重複衝突**を起こす
 - cplusplus系ノードは plugin設定直後にカスタムパラメータが未生成のことがある →
   `reinitpulse` をパルスするか1フレーム待つ
+
+## 調査用のデバッグコードは「ソースから消す」だけでは足りない
+
+一時的に仕込んだ `setWarningString("PROBE ...")` のようなコードは、
+**ソースから消したあと常設Pluginsへ再インストールし直す**まで残り続ける。
+ソースはきれいなのにインストール済みバイナリだけ汚れている状態は気づきにくい
+(実例: NC解像度の調査で入れたプローブが、翌日まで警告を出し続けていた)。
+
+一括監査:
+
+```sh
+P=~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins
+for d in "$P"/*.plugin; do
+  exe="$d/Contents/MacOS/$(basename "$d" .plugin)"
+  [ -f "$exe" ] && strings -a "$exe" | grep -q PROBE && echo "$(basename $d)"
+done
+```
+
+## リリース物はリポジトリの build/ から集める
+
+`tools/release.sh` は `git ls-files '*/build.sh'` から対象を決め、各 `<Name>/build/*.plugin`
+を収集する。**インストール済みの Plugins フォルダから集めてはいけない** —
+サードパーティ製(Azure Kinect 等)や、古い/デバッグ入りのバンドルが混入する。
+verify では署名・Hardened Runtime・Developer ID に加えて
+**`OP_CommonAPIVersion` と `CFBundleShortVersionString`** も全数照合する。
 
 ## Git
 

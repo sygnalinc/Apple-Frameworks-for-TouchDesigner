@@ -114,7 +114,7 @@ public:
         {
             std::lock_guard<std::mutex> lock(myMutex);
             myLatest = myShared;   // Info CHOP 用に cook スレッド側へコピー
-            if (myShared.serial == myUploadedSerial || myShared.heat.empty())
+            if (myShared.heat.empty())
                 return;
             result = myShared;
             myUploadedSerial = myShared.serial;
@@ -438,7 +438,7 @@ FillTOPPluginInfo(TOP_PluginInfo* info)
     info->customOPInfo.majorVersion = 0;
     info->customOPInfo.minorVersion = 9;
     info->customOPInfo.opIcon->setString("VSL");
-    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/TDAppleOps/blob/main/VisionSaliency/README.md");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/VisionSaliency/README.md");
     info->customOPInfo.minInputs = 1;
     info->customOPInfo.maxInputs = 1;
 }

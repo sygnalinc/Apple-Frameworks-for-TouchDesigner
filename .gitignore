@@ -4,7 +4,9 @@ __pycache__/
 *.pyc
 Backup/
 *.toe.*
-models/
+# モデル本体は巨大なので追跡しない。ただし入手先を書いた README だけは共有する
+models/*
+!models/README.md
 .build/
 # 100MB超のテスト動画はローカルのみ(LFS不使用)
 Assets/test_animal.mp4
@@ -27,3 +29,21 @@ Assets/LIVE_Photo_sample/
 Assets/portrait_mode_sample/
 .xcbuild/
 dist/
+
+# README用GIFの元になる画面収録(1本5MB前後・GIFだけコミットする)
+# 作り直すときは ./tools/make_demo_gifs.sh
+demo_capture/
+
+# 生成物（コミットしない・必要なときに tools/gen_ops_catalog.py で作る）
+ops_catalog.json
+
+# Codex 関連(ローカル専用・コミットしない)
+AGENTS.md
+.codex/
+
+# After Effects の作業ファイル(ローカル専用・33MB)
+AfterEffects/
+
+# モーション評価用の動画置き場。素材は再配布できないものが多く、README も含めて
+# まるごとローカル専用にする(評価手順とベースラインは CLAUDE.md に記録済み)
+eval/
