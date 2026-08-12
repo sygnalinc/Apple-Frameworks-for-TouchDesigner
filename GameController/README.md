@@ -34,7 +34,7 @@ Intensity / Sharpness sliders — it changes the pattern, and the sliders always
 |---|---|---|
 | `Click` | 0.03 s | 1 |
 | `Tap` | 0.08 s | 1 |
-| `Double Tap` | 0.05 s | 2, 0.12 s apart |
+| `Double Tap` | 0.06 s | 2, **0.20 s apart** (0.14 s of silence — motors need that long to spin down, or it reads as one hit) |
 | `Thud` | 0.22 s | 1 |
 | `Buzz` | 0.40 s | 1 |
 
@@ -136,7 +136,7 @@ menu options / lstickbtn rstickbtn`(+ Motion時 `gravity xyz / accel xyz`)
 |---|---|---|
 | `Click` | 0.03秒 | 1 |
 | `Tap` | 0.08秒 | 1 |
-| `Double Tap` | 0.05秒 | 2(0.12秒あけて) |
+| `Double Tap` | 0.06秒 | 2(**0.20秒あけて**。無音0.14秒。モーターが止まるのに時間がかかるので、詰めると1回に聞こえる) |
 | `Thud` | 0.22秒 | 1 |
 | `Buzz` | 0.40秒 | 1 |
 

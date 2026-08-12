@@ -278,8 +278,10 @@ private:
             } else if (st == "thud") {                 // 長めの鈍い一撃
                 hit(0.0, 0.22, intensity);
             } else if (st == "double") {               // 二連打
-                hit(0.0,  0.05, intensity);
-                hit(0.12, 0.05, intensity);
+                // モーターは止まるのに時間がかかる。間を詰めると1回に聞こえるので、
+                // 短く叩いて 0.14秒の無音を挟む(0.05秒 + 0.07秒の無音では繋がってしまった)
+                hit(0.0,  0.06, intensity);
+                hit(0.20, 0.06, intensity);
             } else if (st == "buzz") {                 // はっきり続く
                 hit(0.0, 0.40, intensity);
             } else {                                   // tap
