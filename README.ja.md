@@ -45,8 +45,10 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | **[CoreML](CoreML/)** — Depth Anything V2 で単眼深度推定 | **[Vision Subject](VisionSubject/)** — グリーンバック無しの被写体切り抜き |
 | <img src="docs/demo/coretext.gif" width="400" alt="CoreText"> | <img src="docs/demo/imageplayground.jpg" width="400" alt="ImagePlayground"> |
 | **[CoreText](CoreText/)** — 日本語の縦組みを一文字ずつ表示 | **[ImagePlayground](ImagePlayground/)** — 顔写真(左)からイラスト(右)を生成 |
-| <img src="docs/demo/llmafm-chat.gif" width="400" alt="LLM AFM"> | |
-| **[LLM AFM](LLMAFM/)** — Apple Intelligence のオンデバイスモデル(~3B)が英語と日本語で同時に応答。日本語側の「赤と青を混ぜると青」は**誤答**(正しくは紫。英語側は purple と正答) | |
+| <img src="docs/demo/llmafm-chat.gif" width="400" alt="LLM AFM"> | <img src="docs/demo/gamecontroller.gif" width="400" alt="GameController"> |
+| **[LLM AFM](LLMAFM/)** — Apple Intelligence のオンデバイスモデル(~3B)が英語と日本語で同時に応答。日本語側の「赤と青を混ぜると青」は**誤答**(正しくは紫。英語側は purple と正答) | **[GameController](GameController/)** — ゲームパッドでカメラを街に飛ばす。ボタンでシーンを切り替える(ワイヤーフレーム / カラーパレット / ビルの高さが音に連動) |
+| <img src="docs/demo/ciglass.gif" width="400" alt="CI Glass"> | |
+| **[CI Glass](CoreImageGlass/)** — macOS の Liquid Glass を Core Image で組み直したもの。縁で背後の街が歪み、文字の輪郭に沿ってリムが光る | |
 
 ## 目次
 
@@ -126,6 +128,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [CoreML](CoreMLCHOP/) | CHOP | 任意の Core ML モデルの**ベクトル出力**をCHへ(埋め込み・キーポイント等) |
 | [CoreML ImageGen](CoreMLImageGen/) | TOP | **外部 Core ML モデルで text2img / img2img**(Stable Diffusion / SDXL / SD Turbo) |
 | [ImagePlayground](ImagePlayground/) | TOP | **Apple Image Playground でテキスト→画像**(`ImageCreator`・macOS 15.4+)。外部モデル不要。Animation / Illustration / Sketch。人物は入力0に顔画像を接続 |
+| [CI Glass](CoreImageGlass/) | TOP | **macOSのすりガラスとmacOS 26のLiquid Glass**。プリセットは実物から実測。縁の屈折は形のマスクから生成 |
 | [CoreImage Code](CoreImageCode/) | TOP | QR / Aztec / PDF417 / Code128 の**生成**(外部ライブラリ不要) |
 | [CreateML](CreateML/) | DAT | **統合オンデバイストレーナ**。`Task`メニューで Image / Hand Pose / Action(体)/ Hand Action / Sound / Activity(CHOP時系列)/ Tabular分類・回帰 を切替→`.mlmodel`。出力は CoreML TOP / CoreML Motion CHOP / SoundClass 等が推論 |
 | [CreateML Training Recorder](CreateMLTrainingRecorder/) | CHOP | **CHOP時系列 → CreateML学習用CSV**(recording / label / 特徴列)。VisionPose/Hand等をTD内で収録・ラベル付けし、CreateML(Activity)へ直結 |
@@ -156,6 +159,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [RealityKit Capture](RealityKitCapture/) | SOP | **写真フォルダ→3Dメッシュ**(RealityKit Object Capture)。テクスチャ付きOBJ出力 |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **写真の深度→3Dポイントクラウド**(カメラ較正/画角で逆投影)。RGBから色サンプル |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic動画**(macOS 26+): 深度(視差)マップ/**f値・ピント差し替え再レンダ**。**Movie File In と同じく自動再生**(Play Mode: Sequential / Locked to Timeline / Specify Index、Speed/Loop/Cue)。`Mode = All` で**色・深度・再レンダを3色バッファ同時出力**(`Color + Depth` は同じ番号のまま軽い2バッファ版)。`Info DAT` で素材のメタデータも出せる。メタデータ(フォーカス深度・被写体)は**Info CHOP**で出力 |
+| [Spatial Video](SpatialVideo/) | TOP | **iPhone / Vision Pro の空間ビデオ(MV-HEVC)** から**左眼 / 右眼**を取り出す。左右連結、または**2つのカラーバッファ**に出して Render Select TOP で取る(デコード1回で済み、左右が必ず同じフレームになる)。**再生は Movie File In と同じ**(Play Mode / Speed / Loop / Cue)。基線・画角・hero eye は **Info CHOP / Info DAT** |
 | [Vision Contours](VisionContours/) | SOP | 画像の輪郭を**閉じたLineジオメトリ**へ(Sweep/Extrude/Particle 直結) |
 | [Screen Capture](ScreenCapture/) | TOP | ディスプレイ/**名前で選べる単一ウインドウ**の**画面収録**(最大120fps) |
 | [CA Process Tap](CoreAudioProcessTap/) | CHOP | **指定アプリの音だけ**をタップ(Core Audio Process Tap・macOS 14.4+)or 全システム音→48kHz stereo。Screen Captureより粒度が細かい |
@@ -183,8 +187,8 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/` へドラッグしてください。
 
 > **まずは必要なものだけを推奨。** TouchDesigner は次の起動時に**プラグイン1つずつ
-> 許可のダイアログ**を出します。59個すべてコピーすると、ネットワークに辿り着く前に
-> 59回ダイアログを閉じることになります。あとから足せますし、許可はプラグインごとに
+> 許可のダイアログ**を出します。60個すべてコピーすると、ネットワークに辿り着く前に
+> 60回ダイアログを閉じることになります。あとから足せますし、許可はプラグインごとに
 > 記憶されます。
 
 まとめて入れる場合は:

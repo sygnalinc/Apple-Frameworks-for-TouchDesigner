@@ -46,8 +46,10 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | **[CoreML](CoreML/)** — monocular depth with Depth Anything V2 | **[Vision Subject](VisionSubject/)** — subject cutout, no green screen |
 | <img src="docs/demo/coretext.gif" width="400" alt="CoreText"> | <img src="docs/demo/imageplayground.jpg" width="400" alt="ImagePlayground"> |
 | **[CoreText](CoreText/)** — vertical Japanese typesetting, revealed a character at a time | **[ImagePlayground](ImagePlayground/)** — a face photo (left) turned into an illustration (right) |
-| <img src="docs/demo/llmafm-chat.gif" width="400" alt="LLM AFM"> | |
-| **[LLM AFM](LLMAFM/)** — Apple Intelligence's on-device model (~3B) answering in English and Japanese at once. Note the wrong answer: mixing red and blue gives *purple*, but the Japanese side says *blue* | |
+| <img src="docs/demo/llmafm-chat.gif" width="400" alt="LLM AFM"> | <img src="docs/demo/gamecontroller.gif" width="400" alt="GameController"> |
+| **[LLM AFM](LLMAFM/)** — Apple Intelligence's on-device model (~3B) answering in English and Japanese at once. Note the wrong answer: mixing red and blue gives *purple*, but the Japanese side says *blue* | **[GameController](GameController/)** — flying a camera through a city with a gamepad. The face buttons switch the scene: wireframe, colour palette, and building heights driven by audio |
+| <img src="docs/demo/ciglass.gif" width="400" alt="CI Glass"> | |
+| **[CI Glass](CoreImageGlass/)** — macOS's Liquid Glass rebuilt in Core Image. The border refracts the street behind it and the rim lights up along the letterforms | |
 
 ## Table of contents
 
@@ -127,6 +129,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | [CoreML](CoreMLCHOP/) | CHOP | **Vector output** of any Core ML model into channels (embeddings, keypoints…) |
 | [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img** with an **external Core ML model** (Stable Diffusion / SDXL / SD Turbo) |
 | [ImagePlayground](ImagePlayground/) | TOP | **text→image via Apple Image Playground** (`ImageCreator`, macOS 15.4+). No external model; Animation / Illustration / Sketch. Wire a face image into input 0 to generate people |
+| [CI Glass](CoreImageGlass/) | TOP | **macOS frosted glass and macOS 26 Liquid Glass**. Presets measured from the real views; edge refraction driven by the shape mask |
 | [CoreImage Code](CoreImageCode/) | TOP | **Generate** QR / Aztec / PDF417 / Code128 (no external library) |
 | [CreateML](CreateML/) | DAT | **Unified on-device trainer** — one `Task` menu for Image / Hand Pose / Action (body) / Hand Action / Sound / Activity (CHOP series) / Tabular classifier & regressor → `.mlmodel`. Output models are read by CoreML TOP / CoreML Motion CHOP / SoundClass etc. |
 | [CreateML Training Recorder](CreateMLTrainingRecorder/) | CHOP | **Record a CHOP time-series → CreateML dataset CSV** (recording / label / feature columns). Capture VisionPose/Hand takes in TD, label them, feed straight to CreateML (Activity) |
@@ -157,6 +160,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | [RealityKit Capture](RealityKitCapture/) | SOP | **Photo folder → 3D mesh** (RealityKit Object Capture). Textured OBJ output |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **Photo depth → 3D point cloud** (unproject via camera calibration / FOV). Colors sampled from RGB |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic video** (macOS 26+): depth (disparity) map or **re-render with adjustable focus / aperture**. **Plays automatically like a Movie File In** (Play Mode: Sequential / Locked to Timeline / Specify Index, plus Speed / Loop / Cue). `Mode = All` emits **colour, depth and rendered as three colour buffers** (`Color + Depth` is the lighter two-buffer variant with the same indices); `Info DAT` lists the file's own metadata; metadata (focus depth, subjects) on its **Info CHOP** |
+| [Spatial Video](SpatialVideo/) | TOP | **MV-HEVC spatial video** from iPhone / Vision Pro: pull out the **left or right eye**, side-by-side, or **both as two colour buffers** (buffer 1 read with a Render Select TOP — one decode, and the eyes are guaranteed to be the same frame). **Plays like a Movie File In** (Play Mode / Speed / Loop / Cue). Baseline, field of view and hero eye on the **Info CHOP / Info DAT** |
 | [Vision Contours](VisionContours/) | SOP | Image contours → **closed Line geometry** (wire into Sweep / Extrude / Particle) |
 | [Screen Capture](ScreenCapture/) | TOP | **Screen recording** of a display or **a single window picked by name from a dropdown** (up to 120fps) |
 | [CA Process Tap](CoreAudioProcessTap/) | CHOP | **Tap a single app's audio** (Core Audio Process Tap, macOS 14.4+) or all system audio → 48kHz stereo. Finer-grained than Screen Capture |
@@ -184,7 +188,7 @@ Open it and drag **only the `.plugin` bundles you actually need** into
 `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/`.
 
 > **Start with a few.** TouchDesigner asks you to approve **each new plugin individually**
-> on the next launch, so copying all 59 means dismissing 59 dialogs before you reach the
+> on the next launch, so copying all 60 means dismissing 60 dialogs before you reach the
 > network. You can always add more later — the approval is remembered per plugin.
 
 If you do want everything:

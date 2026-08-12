@@ -25,6 +25,8 @@ Assets/ml_examples/*.mlmodel
 Assets/gs_sample
 Assets/gs_sample.ply
 Assets/spatial_video_sample.MOV
+# 空間ビデオの実素材。GPS(撮影場所)が埋まっているのでコミットしない
+Assets/sample_spatial.MOV
 Assets/LIVE_Photo_sample/
 Assets/portrait_mode_sample/
 .xcbuild/
