@@ -68,6 +68,8 @@ What matters for **using the CHOP**:
 - **Rising-edge detection is on you.** The CHOP only reports the current value, so keep the
   previous one and test `value > 0.5 and prev <= 0.5`
 - **Some pads have no stick click** (`lstickbtn` / `rstickbtn`). Don't put essential controls there
+- **Don't write `Rumble` every frame.** A script that sets it to 0 each cook makes the slider
+  impossible to drag by hand — it snaps back before you feel anything. Pulse it, then clear it once
 - To draw a panel that lights up on press, fold the CHOP to `1ch × Nsample` with a **Shuffle
   (Sequence All Channels)** before feeding a GLSL TOP array — wiring it directly gives one texel
   per *sample*, so 19ch × 1sample arrives as a single texel
@@ -150,6 +152,8 @@ cd GameController && ./build.sh   # → build/GameControllerCHOP.plugin
 - **立ち上がり検出は自前で行う。** CHOPは現在値しか出さないので、前フレームの値を持って
   `value > 0.5 and prev <= 0.5` で見る
 - **スティック押し込み(`lstickbtn` / `rstickbtn`)が無いパッドがある。** 必須の操作に割り当てない
+- **`Rumble` を毎フレーム書かない。** 毎cook 0 を書くスクリプトがあると、手でスライダーを
+  動かしても即座に戻されて振動を確認できない。パルスさせたら**一度だけ**0に戻す
 - 押した所が光るパネルを作るなら、CHOPを **Shuffle の Sequence All Channels** で
   `1ch × Nsample` に畳んでから GLSL TOP の Array へ渡す。直結すると texel 数 = **サンプル数**に
   なり、19ch × 1sample は 1 texel しか届かない

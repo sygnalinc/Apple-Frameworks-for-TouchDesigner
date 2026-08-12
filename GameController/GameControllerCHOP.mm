@@ -179,54 +179,96 @@ public:
 
 private:
     // 連続振動。
-    // 停止は cook に依存させない: パターンの duration を短く取り、鳴らしたい間だけ
-    // cook のたびに掛け直す。こうすると CHOP が cook されなくなった時点で
-    // 自然に止まる(以前は duration=3600 で、Rumble を 0 に戻しても cook が来なければ
-    // 止められず鳴りっぱなしになっていた)。
-    static constexpr double kRumbleDur = 1.0;      // 1回ぶんの長さ(秒)
-    static constexpr double kRumbleRenew = 0.4;    // 掛け直す間隔(秒)
+    //
+    // 作り直しでは強度を変えられない: 前のパターンが残っている間に新しいものを重ねると
+    // 振動が足し算になり、「上げると強くなるが下げても弱くならない」状態になる(実際に踏んだ)。
+    // そのため走っているプレイヤーは1つだけに保ち、強度は sendParameters で動かす。
+    //
+    // 停止も cook に依存させない: パターンを有限長にして鳴らしたい間だけ掛け直すので、
+    // CHOP が cook されなくなれば kRumbleDur 以内に自然に止まる。
+    static constexpr double kRumbleDur   = 2.0;    // パターンの長さ(秒)
+    static constexpr double kRumbleRenew = 1.2;    // 掛け直す間隔(秒)。必ず Dur より短く
+    static constexpr double kZeroHold    = 0.15;   // 強度0を命令してから片付けるまで(秒)
+
+    void sendIntensity(float value) API_AVAILABLE(macos(11.0))
+    {
+        if (!myPlayer)
+            return;
+        CHHapticDynamicParameter* p = [[CHHapticDynamicParameter alloc]
+            initWithParameterID:CHHapticDynamicParameterIDHapticIntensityControl
+                          value:value
+                   relativeTime:0];
+        [myPlayer sendParameters:@[p] atTime:0 error:nil];
+    }
+
+    void armPlayer(GCController* gc, float value) API_AVAILABLE(macos(11.0))
+    {
+        NSError* err = nil;
+        if (!myEngine) {
+            CHHapticEngine* engine =
+                [gc.haptics createEngineWithLocality:GCHapticsLocalityDefault];
+            if (!engine || ![engine startAndReturnError:&err])
+                return;
+            myEngine = engine;
+        }
+        CHHapticEventParameter* intensity = [[CHHapticEventParameter alloc]
+            initWithParameterID:CHHapticEventParameterIDHapticIntensity value:value];
+        CHHapticEvent* event = [[CHHapticEvent alloc]
+            initWithEventType:CHHapticEventTypeHapticContinuous
+                   parameters:@[intensity]
+                 relativeTime:0
+                     duration:kRumbleDur];
+        CHHapticPattern* pattern =
+            [[CHHapticPattern alloc] initWithEvents:@[event] parameters:@[] error:&err];
+        id<CHHapticPatternPlayer> next =
+            pattern ? [myEngine createPlayerWithPattern:pattern error:&err] : nil;
+        if (!next)
+            return;
+        // 重ねない。古いプレイヤーは必ず止めてから差し替える
+        if (myPlayer) {
+            sendIntensity(0.0f);
+            [myPlayer stopAtTime:0 error:nil];
+            myPlayer = nil;
+        }
+        if ([next startAtTime:0 error:&err])
+            myPlayer = next;
+    }
 
     void updateRumble(GCController* gc, float value)
     {
         if (@available(macOS 11.0, *)) {
-            if (value <= 0.0f || !gc.haptics) {
-                if (myPlayer || myEngine || myRumbleValue > 0.0f)
-                    stopRumble();
+            const auto now = std::chrono::steady_clock::now();
+            const bool want = value > 0.001f && gc.haptics != nil;
+
+            if (want) {
+                myZeroSince = {};                       // 停止予約を解除
+                const double since =
+                    std::chrono::duration<double>(now - myRumbleStart).count();
+                if (!myPlayer || since >= kRumbleRenew) {
+                    armPlayer(gc, value);               // 期限が来たので掛け直す
+                    myRumbleStart = now;
+                    myRumbleValue = value;
+                } else if (fabsf(value - myRumbleValue) >= 0.005f) {
+                    sendIntensity(value);               // 走っているプレイヤーの強度だけ変える
+                    myRumbleValue = value;
+                }
+                return;
+            }
+
+            // 0 になった。まず強度0を命令し、効いてから片付ける
+            // (停止と同時に送ると反映されず、モーターが回り続けるパッドがある)
+            if (!myPlayer) {
                 myRumbleValue = 0.0f;
                 return;
             }
-            const bool changed = fabsf(value - myRumbleValue) >= 0.01f;
-            const auto now = std::chrono::steady_clock::now();
-            const double since = std::chrono::duration<double>(now - myRumbleStart).count();
-            if (myPlayer && !changed && since < kRumbleRenew)
-                return;                             // 期限内なのでそのまま鳴らし続ける
-            myRumbleValue = value;
-
-            NSError* err = nil;
-            if (!myEngine) {
-                CHHapticEngine* engine =
-                    [gc.haptics createEngineWithLocality:GCHapticsLocalityDefault];
-                if (!engine || ![engine startAndReturnError:&err])
-                    return;
-                myEngine = engine;
-            }
-            CHHapticEventParameter* intensity = [[CHHapticEventParameter alloc]
-                initWithParameterID:CHHapticEventParameterIDHapticIntensity value:value];
-            CHHapticEvent* event = [[CHHapticEvent alloc]
-                initWithEventType:CHHapticEventTypeHapticContinuous
-                       parameters:@[intensity]
-                     relativeTime:0
-                         duration:kRumbleDur];
-            CHHapticPattern* pattern =
-                [[CHHapticPattern alloc] initWithEvents:@[event] parameters:@[] error:&err];
-            id<CHHapticPatternPlayer> player =
-                pattern ? [myEngine createPlayerWithPattern:pattern error:&err] : nil;
-            if (!player || ![player startAtTime:0 error:&err])
+            if (myZeroSince.time_since_epoch().count() == 0) {
+                sendIntensity(0.0f);
+                myRumbleValue = 0.0f;
+                myZeroSince = now;
                 return;
-            if (myPlayer)
-                [myPlayer stopAtTime:0 error:nil];   // 前の周期のプレイヤーを畳む
-            myPlayer = player;
-            myRumbleStart = now;
+            }
+            if (std::chrono::duration<double>(now - myZeroSince).count() >= kZeroHold)
+                stopRumble();
         }
     }
 
@@ -234,13 +276,7 @@ private:
     {
         if (@available(macOS 11.0, *)) {
             if (myPlayer) {
-                // 止める前に強度0を送る。エンジンの停止は非同期で、
-                // これが無いとパッドによってはモーターが回りっぱなしになる
-                CHHapticDynamicParameter* zero = [[CHHapticDynamicParameter alloc]
-                    initWithParameterID:CHHapticDynamicParameterIDHapticIntensityControl
-                                  value:0.0f
-                           relativeTime:0];
-                [myPlayer sendParameters:@[zero] atTime:0 error:nil];
+                sendIntensity(0.0f);            // 念のためもう一度0を命令してから止める
                 [myPlayer stopAtTime:0 error:nil];
             }
             if (myEngine)
@@ -249,11 +285,13 @@ private:
         myPlayer = nil;
         myEngine = nil;
         myRumbleValue = 0.0f;
+        myZeroSince = {};
     }
 
     bool myMotion = false;
     float myRumbleValue = -1.0f;
     std::chrono::steady_clock::time_point myRumbleStart{};
+    std::chrono::steady_clock::time_point myZeroSince{};
     CHHapticEngine* myEngine API_AVAILABLE(macos(11.0)) = nil;
     id<CHHapticPatternPlayer> myPlayer API_AVAILABLE(macos(11.0)) = nil;
     std::atomic<int> myExecCount{0};
