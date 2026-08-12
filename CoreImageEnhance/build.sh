@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 set -e
 cd "$(dirname "$0")"
 TD_SDK="${TD_SDK:-/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP}"

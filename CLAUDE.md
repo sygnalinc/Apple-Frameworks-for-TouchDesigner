@@ -4956,3 +4956,21 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   CI RAW / CI HDR に **Apply EXIF Orientation**、CoreWLAN Scan の空振り理由を警告に、
   Speech Activity を develop へ退避、利用例4件追加(CIRAW / CIHDR / CoreWLAN / CoreWLANScan)
 - 公開は **58オペレータ**(Speech Activity を外し、Cinematic/PDFKit 等で1フォルダ複数バンドル)
+
+### 2026-08-12 develop に main(v0.9.5)を取り込み + develop限定プラグインの build.sh を修正
+
+- ユーザー「developブランチで作業したい」→ develop は **2026-08-07 で分岐したまま129コミット遅れ**で、
+  そのまま作業すると古い共有コードでビルドすることになるため、先に main を取り込んだ
+- **取り込み方法**: `git checkout origin/main -- .`。これは**「main に無いファイルは消さない」**ので、
+  develop 限定の25プラグインと palette/ はそのまま残る。**禁止している wholesale merge と違い、
+  main の削除コミットが伝播しない**(この方法をブランチ同期の標準手順にする)
+- 取り込み後に手で片付けたもの: 旧名の重複 `SpeechText/`(→SpeechTranscribe/)、`sample.toe`(→demo.toe)、
+  `ops_catalog.json`(生成物)、旧 Assets 4件(sample_speech.aiff / td_mcp_server.tox /
+  test_image_1.jpg / test_video_1.mp4)。`checkout` は削除を伝えないので、リネーム・削除は手動になる
+- **develop限定プラグイン9件が `#!/bin/bash` のままだった**(AVAudioMixer / AVAudioSpatial /
+  AudioToolboxMix / ColorSync / CoreImageEnhance / CoreLocationBeacon / GameplayKitAgents /
+  ImageCapture / Phase)。共通ヘルパは zsh 専用なので**無言でビルドされない**状態。
+  main 側は 2026-08-08 に直したが、develop 限定のものは対象外だった。9件とも zsh に直して
+  **25プラグイン全件のビルド成功を確認**
+- 教訓: **ブランチを分けたら、共通基盤の修正は分岐先にも当たっているか必ず確認する**。
+  今回は「main で直したから直っている」と思い込みやすい典型例だった
