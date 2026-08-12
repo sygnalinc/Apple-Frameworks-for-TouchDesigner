@@ -74,6 +74,13 @@ Bluetooth pads appear in `[GCController controllers]` once paired with macOS.
 **A plain command-line process sees zero controllers even while TouchDesigner sees one** —
 GameController discovery needs a GUI app, so debug from inside TD rather than a standalone binary.
 
+**CoreHaptics raises ObjC exceptions, it does not just return an `NSError`.** Calling `stopAtTime:`
+on a player whose engine has stopped throws, and an ObjC exception unwinding into C++ terminates
+the process — switching the pad between Switch and Xbox mode (a disconnect and reconnect as a
+different device) crashed TouchDesigner this way. Every CoreHaptics call here is wrapped in
+`@try`/`@catch`, the engine is rebuilt when the controller changes, and `stoppedHandler` /
+`resetHandler` flag it as dead so the next cook drops the stale references.
+
 ### Example
 
 `/project1/GameController` in `demo.toe` uses this CHOP to fly a camera through a 3D scene —
@@ -175,6 +182,12 @@ BluetoothのパッドはmacOSとペアリング後に `[GCController controllers
 
 **素のコマンドラインプロセスからは、TDが認識していてもコントローラが0台に見える** —
 GameController の探索は GUI アプリを要求するため、切り分けは単体バイナリではなく TD 内で行う。
+
+**CoreHaptics は NSError を返すのではなく ObjC 例外を投げる。** エンジンが止まった後の
+`stopAtTime:` は例外になり、それが C++ 側へ伝わるとプロセスごと終了する。実際に
+**パッドの Switch / Xbox モード切替**(切断 → 別デバイスとして再接続)で TouchDesigner が落ちた。
+CoreHaptics に触る箇所は全て `@try`/`@catch` で包み、パッドが変わったらエンジンを作り直し、
+`stoppedHandler` / `resetHandler` で死亡フラグを立てて次のcookで参照を捨てている。
 
 ### ビルド
 

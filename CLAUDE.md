@@ -5413,3 +5413,21 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   手で上げても即座に戻されていた。**着地時に短いパルスを出し、終わりに一度だけ0へ戻す**方式に変更
 - **教訓**: パラメータを毎フレーム書くスクリプトがあると、そのパラメータは手で操作できない。
   症状が「スライダーが勝手に戻る」ならプラグインではなく**書いている側**を疑う
+
+### 2026-08-13 GameController: パッドのモード切替でTDが落ちるクラッシュを修正
+
+- ユーザー報告「haptics を送ってコントローラーの Switch/Xbox モード切り替えをすると TD がクラッシュ」
+- **クラッシュレポートで一発特定**: `[PatternPlayer stopAtTime:]` → `checkEngineRunning:` →
+  `Haptic_RaiseException` → `objc_exception_throw` → `std::terminate` → SIGABRT
+- **原因**: **CoreHaptics は不正な状態で NSError を返さず ObjC 例外を投げる**。モード切替は
+  「切断 → 別デバイスとして再接続」なので、古いエンジンが止まった後に `stopAtTime:` を呼び、
+  例外が C++ の呼び出し元へ伝わってプロセスごと終了していた
+- **修正**: ①CoreHaptics に触る箇所を全て `@try`/`@catch`(`hapticCall`)で包み、例外が出たら
+  握っている参照を捨てる ②`ensureEngine` に集約し、**パッドが変わったらエンジンを作り直す**
+  (`myHapticsOwner` で比較)③`stoppedHandler` / `resetHandler` で死亡フラグを立て、次のcookで
+  参照を捨てる。ハンドラは別スレッドなので**フラグを立てるだけ**にし、生存tokenで破棄後の
+  アクセスを防ぐ(SpeechSynth と同じ型)
+- **教訓**: **ObjC のフレームワークが例外を投げるかを確認する。** NSError を返す API だと
+  思い込んで裸で呼ぶと、C++ カスタムOPではプロセスごと落ちる。CoreHaptics は投げる側
+- 罠: `__block` 変数は **C++ ラムダで捕捉できない**。`hapticCall` は ObjC ブロックではなく
+  ラムダなので `__block` は不要(付けるとコンパイルエラー)

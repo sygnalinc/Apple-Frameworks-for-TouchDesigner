@@ -15,6 +15,7 @@
 #import <GameController/GameController.h>
 #import <CoreHaptics/CoreHaptics.h>
 #include <chrono>
+#include <memory>
 
 #include <atomic>
 #include <cstring>
@@ -46,7 +47,7 @@ public:
         [GCController startWirelessControllerDiscoveryWithCompletionHandler:nil];
     }
 
-    ~GameControllerCHOP() override { shutdownHaptics(); }
+    ~GameControllerCHOP() override { myAlive->store(false); shutdownHaptics(); }
 
     void getGeneralInfo(CHOP_GeneralInfo* ginfo, const OP_Inputs*, void*) override
     {
@@ -69,6 +70,69 @@ public:
             name->setString(kChanNames[index]);
         else
             name->setString(kMotionNames[index - kBaseChans]);
+    }
+
+    // CoreHaptics は不正な状態(エンジンが止まった後の stop など)で NSError を返さず
+    // **ObjC 例外を投げる**。C++ の呼び出し元へ伝わると std::terminate でプロセスごと落ちる。
+    // パッドの Switch/Xbox モード切替(=切断→別デバイスとして再接続)で実際にTDが落ちた。
+    // CoreHaptics に触る箇所は必ずこれで包み、例外が出たら握っている参照を捨てる。
+    // エンジンは接続中のパッド1台につき1つ。パッドが変わったら必ず作り直す
+    // (Switch/Xbox モード切替は「切断 → 別デバイスとして再接続」なので、
+    //  古いエンジンを掴んだままだと落ちる)
+    bool ensureEngine(GCController* gc) API_AVAILABLE(macos(11.0))
+    {
+        if (myEngineDead.exchange(false))
+            forgetHaptics();
+        if (myEngine && myHapticsOwner != gc)
+            forgetHaptics();
+        if (myEngine)
+            return true;
+        if (!gc.haptics)
+            return false;
+        CHHapticEngine* e = [gc.haptics createEngineWithLocality:GCHapticsLocalityDefault];
+        if (!e)
+            return false;
+        BOOL ok = NO;
+        if (!hapticCall([&] { ok = [e startAndReturnError:nil]; }) || !ok)
+            return false;
+        // エンジンが自分で止まったら(デバイス切断など)、次のcookで参照を捨てる。
+        // ハンドラは別スレッドで呼ばれるので、ここではフラグを立てるだけにする
+        auto alive = myAlive;
+        std::atomic<bool>* dead = &myEngineDead;
+        e.stoppedHandler = ^(CHHapticEngineStoppedReason) {
+            if (alive->load()) dead->store(true);
+        };
+        e.resetHandler = ^{
+            if (alive->load()) dead->store(true);
+        };
+        myEngine = e;
+        myHapticsOwner = gc;
+        return true;
+    }
+
+    template <typename F>
+    bool hapticCall(F&& f)
+    {
+        @try {
+            f();
+            return true;
+        } @catch (NSException*) {
+            forgetHaptics();
+            return false;
+        }
+    }
+
+    // 参照を捨てるだけ(止めようとしない)。次のcookで作り直される
+    void forgetHaptics()
+    {
+        if (@available(macOS 11.0, *)) {
+            myPlayer = nil;
+            myShotPlayer = nil;
+            myEngine = nil;
+        }
+        myHapticsOwner = nil;
+        myRumbleValue = 0.0f;
+        myZeroSince = {};
     }
 
     void pulsePressed(const char* name, void*) override
@@ -242,12 +306,8 @@ private:
             if (!gc.haptics || intensity <= 0.0f)
                 return;
             NSError* err = nil;
-            if (!myEngine) {
-                CHHapticEngine* e = [gc.haptics createEngineWithLocality:GCHapticsLocalityDefault];
-                if (!e || ![e startAndReturnError:&err])
-                    return;
-                myEngine = e;
-            }
+            if (!ensureEngine(gc))
+                return;
             auto ev = [&](BOOL transient, float inten, float sharp, double at, double dur) {
                 NSArray* ps = @[
                     [[CHHapticEventParameter alloc]
@@ -289,9 +349,11 @@ private:
             }
             CHHapticPattern* pattern =
                 [[CHHapticPattern alloc] initWithEvents:events parameters:@[] error:&err];
-            id<CHHapticPatternPlayer> player =
-                pattern ? [myEngine createPlayerWithPattern:pattern error:&err] : nil;
-            if (player && [player startAtTime:0 error:&err])
+            id<CHHapticPatternPlayer> player = nil;
+            if (pattern)
+                hapticCall([&] { player = [myEngine createPlayerWithPattern:pattern error:&err]; });
+            BOOL ok = NO;
+            if (player && hapticCall([&] { ok = [player startAtTime:0 error:&err]; }) && ok)
                 myShotPlayer = player;                 // 再生中に解放されないよう保持する
         }
     }
@@ -304,19 +366,15 @@ private:
             initWithParameterID:CHHapticDynamicParameterIDHapticIntensityControl
                           value:value
                    relativeTime:0];
-        [myPlayer sendParameters:@[p] atTime:0 error:nil];
+        id<CHHapticPatternPlayer> pl = myPlayer;
+        hapticCall([&] { [pl sendParameters:@[p] atTime:0 error:nil]; });
     }
 
     void armPlayer(GCController* gc, float value) API_AVAILABLE(macos(11.0))
     {
         NSError* err = nil;
-        if (!myEngine) {
-            CHHapticEngine* engine =
-                [gc.haptics createEngineWithLocality:GCHapticsLocalityDefault];
-            if (!engine || ![engine startAndReturnError:&err])
-                return;
-            myEngine = engine;
-        }
+        if (!ensureEngine(gc))
+            return;
         CHHapticEventParameter* intensity = [[CHHapticEventParameter alloc]
             initWithParameterID:CHHapticEventParameterIDHapticIntensity value:value];
         CHHapticEvent* event = [[CHHapticEvent alloc]
@@ -326,17 +384,20 @@ private:
                      duration:kRumbleDur];
         CHHapticPattern* pattern =
             [[CHHapticPattern alloc] initWithEvents:@[event] parameters:@[] error:&err];
-        id<CHHapticPatternPlayer> next =
-            pattern ? [myEngine createPlayerWithPattern:pattern error:&err] : nil;
+        id<CHHapticPatternPlayer> next = nil;
+        if (pattern)
+            hapticCall([&] { next = [myEngine createPlayerWithPattern:pattern error:&err]; });
         if (!next)
             return;
         // 重ねない。古いプレイヤーは必ず止めてから差し替える
         if (myPlayer) {
             sendIntensity(0.0f);
-            [myPlayer stopAtTime:0 error:nil];
+            id<CHHapticPatternPlayer> old = myPlayer;
             myPlayer = nil;
+            hapticCall([&] { [old stopAtTime:0 error:nil]; });
         }
-        if ([next startAtTime:0 error:&err])
+        BOOL started = NO;
+        if (hapticCall([&] { started = [next startAtTime:0 error:&err]; }) && started)
             myPlayer = next;
     }
 
@@ -383,10 +444,12 @@ private:
     {
         stopRumble();
         if (@available(macOS 11.0, *)) {
-            if (myShotPlayer)
-                [myShotPlayer stopAtTime:0 error:nil];
-            if (myEngine)
-                [myEngine stopWithCompletionHandler:nil];
+            id<CHHapticPatternPlayer> shot = myShotPlayer;
+            CHHapticEngine* eng = myEngine;
+            if (shot)
+                hapticCall([&] { [shot stopAtTime:0 error:nil]; });
+            if (eng)
+                hapticCall([&] { [eng stopWithCompletionHandler:nil]; });
         }
         myShotPlayer = nil;
         myEngine = nil;
@@ -397,7 +460,8 @@ private:
         if (@available(macOS 11.0, *)) {
             if (myPlayer) {
                 sendIntensity(0.0f);            // 念のためもう一度0を命令してから止める
-                [myPlayer stopAtTime:0 error:nil];
+                id<CHHapticPatternPlayer> pl = myPlayer;
+                hapticCall([&] { [pl stopAtTime:0 error:nil]; });
             }
             // エンジンは止めない(単発パルス用に残す。切断時と破棄時にだけ畳む)
         }
@@ -413,6 +477,10 @@ private:
     CHHapticEngine* myEngine API_AVAILABLE(macos(11.0)) = nil;
     id<CHHapticPatternPlayer> myPlayer API_AVAILABLE(macos(11.0)) = nil;
     id<CHHapticPatternPlayer> myShotPlayer API_AVAILABLE(macos(11.0)) = nil;
+    GCController* myHapticsOwner = nil;            // エンジンを作った時のパッド
+    std::atomic<bool> myEngineDead{false};         // 別スレッドのハンドラから立つ
+    std::shared_ptr<std::atomic<bool>> myAlive =
+        std::make_shared<std::atomic<bool>>(true);   // 破棄後にハンドラが触らないように
     std::atomic<bool> myPulse{false};
     std::atomic<int> myExecCount{0};
 };
