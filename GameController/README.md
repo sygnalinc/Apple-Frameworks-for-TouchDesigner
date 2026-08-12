@@ -11,19 +11,39 @@ rumble (CoreHaptics vibration).
 ### Output channels
 
 `connected / a b x y / l1 r1 l2 r2 (analog) / lstickx y / rstickx y / dpadx y /
-menu options / lstickbtn rstickbtn` (plus `gravity xyz / accel xyz` when Motion is on)
+menu options / lstickbtn rstickbtn` (plus `gravity xyz / accel xyz / rot xyz` when Motion is on)
 
 ### Parameters
 
 | Name | Description |
 |---|---|
 | Controller Index | 0–7 (multiple controllers) |
-| Motion Sensors | Output gravity/acceleration on supported pads (DualSense etc.) |
+| Motion Sensors | Adds 9 motion channels on pads that have sensors. See below — `gravity*` stays 0 on most pads |
 | Rumble | Continuous vibration 0–1 (supported pads only, via CoreHaptics). **Only runs while the CHOP cooks** — a short pattern is re-armed each cook, so it stops on its own if cooking stops |
 | Pulse | **One-shot vibration** — press to fire a single haptic pattern. Independent of `Rumble`; firing one while the pad is rumbling does not disturb it |
 | Pulse Style | `Tap` / `Click` / `Thud` / `Double Tap` / `Buzz` |
 | Pulse Intensity / Sharpness | Strength (0–1) and how hard-edged it feels (0–1) |
 | Pulse Gap | Spacing of `Double Tap`, in seconds. **Widen it until you hear two hits** — how long the actuator keeps ringing varies by pad |
+
+### Motion sensors
+
+**`gravity*` staying 0 is not a bug.** Apple's docs say some controllers cannot separate gravity
+from user acceleration. Switch Pro-style and DualShock-style pads are in that group; Xbox-style
+pads have no motion sensors at all.
+
+| Channel | Pad can separate | Pad cannot separate |
+|---|---|---|
+| `gravity*` | gravity vector | **0** |
+| `accel*` | user acceleration (gravity removed) | **total acceleration (gravity included)** |
+| `rot*` | angular velocity, rad/s | angular velocity, rad/s |
+
+So **`accel*` always carries something** as long as the pad has sensors, and `rot*` is usually the
+most useful signal on a gyro pad. Check what you actually have in the Info CHOP: `hasmotion` /
+`hasgravity` / `hasrotation` / `sensorsactive`. If `hasmotion` is 0 the op warns you — an
+Xbox-mode pad has no sensors, so try Nintendo Switch mode.
+
+Sensors stay off until asked for (they drain the battery), so **the first frame after switching
+Motion Sensors on still reads 0**.
 
 ### Haptic presets
 
@@ -126,19 +146,38 @@ TD標準 Joystick CHOP のモダン代替。アナログトリガー・モーシ
 ### 出力チャンネル
 
 `connected / a b x y / l1 r1 l2 r2(アナログ)/ lstickx y / rstickx y / dpadx y /
-menu options / lstickbtn rstickbtn`(+ Motion時 `gravity xyz / accel xyz`)
+menu options / lstickbtn rstickbtn`(+ Motion時 `gravity xyz / accel xyz / rot xyz`)
 
 ### パラメータ
 
 | 名前 | 内容 |
 |---|---|
 | Controller Index | 0〜7(複数台) |
-| Motion Sensors | 対応パッド(DualSense等)の重力/加速度を出力 |
+| Motion Sensors | センサーを持つパッドで9chを追加。下記参照 — `gravity*` は多くのパッドで0のまま |
 | Rumble | 0〜1 の連続振動(対応パッドのみ・CoreHaptics)。**cook されている間だけ続く** — 短いパターンを毎cook掛け直しているので、cook が止まれば自然に止まる |
 | Pulse | **単発の振動**。押すと1回だけ鳴る。`Rumble` とは別プレイヤーなので、連続振動中に撃っても邪魔しない |
 | Pulse Style | `Tap` / `Click` / `Thud` / `Double Tap` / `Buzz` |
 | Pulse Intensity / Sharpness | 強さ(0〜1)と当たりの硬さ(0〜1) |
 | Pulse Gap | `Double Tap` の間隔(秒)。**2回に聞こえるまで広げる** — 余韻の長さはパッドによって違う |
+
+### モーションセンサー
+
+**`gravity*` が 0 のままなのは不具合ではない。** Apple のドキュメントが明言しているとおり、
+**重力と動きを分離できないパッドがある**。Switch Pro 系・DualShock 系がその側で、
+Xbox 系はそもそもセンサーを持たない。
+
+| チャンネル | 分離できるパッド | 分離できないパッド |
+|---|---|---|
+| `gravity*` | 重力ベクトル | **0** |
+| `accel*` | 重力を除いた動き | **重力込みの合計加速度** |
+| `rot*` | 角速度(rad/s) | 角速度(rad/s) |
+
+したがって**センサーさえあれば `accel*` には必ず値が入る**。ジャイロ付きパッドでは `rot*` が
+一番使いやすい。何が取れているかは Info CHOP の `hasmotion` / `hasgravity` / `hasrotation` /
+`sensorsactive` で確認する。`hasmotion` が 0 のときは警告が出る(Xbox モードのパッドは
+センサーが無いので Nintendo Switch モードを試す)。
+
+センサーは電池を食うので既定では止まっており、**On にした直後の1フレームは 0 のまま**。
 
 ### 振動のプリセットについて
 
