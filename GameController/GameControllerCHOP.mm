@@ -6,7 +6,7 @@
 //
 // 出力: connected / a,b,x,y / l1,r1,l2,r2(アナログ)/ lstick,rstick x,y /
 //       dpad x,y / menu,options / lstickbtn,rstickbtn (+ Motion時 gravity/accel xyz)
-// Rumble パラメータ(0〜1)で振動(CoreHaptics・対応パッドのみ)。
+// Rumble パラメータ(0〜1)で連続振動、Pulse で単発振動(CoreHaptics・対応パッドのみ)。
 // 振動は cook されている間だけ続く(短いパターンを掛け直す方式)。
 //
 // 実装: GCController の値読みは cook 内で直接行う(軽量・ノンブロッキング)。
@@ -46,7 +46,7 @@ public:
         [GCController startWirelessControllerDiscoveryWithCompletionHandler:nil];
     }
 
-    ~GameControllerCHOP() override { stopRumble(); }
+    ~GameControllerCHOP() override { shutdownHaptics(); }
 
     void getGeneralInfo(CHOP_GeneralInfo* ginfo, const OP_Inputs*, void*) override
     {
@@ -70,6 +70,9 @@ public:
         else
             name->setString(kMotionNames[index - kBaseChans]);
     }
+
+    void pulsePressed(const char* name, void*) override
+    { if (!strcmp(name, "Pulse")) myPulse = true; }
 
     void execute(CHOP_Output* output, const OP_Inputs* inputs, void*) override
     {
@@ -115,8 +118,13 @@ public:
                     v[kBaseChans + 5] = (float)m.userAcceleration.z;
                 }
                 updateRumble(gc, rumble);
+                if (myPulse.exchange(false))
+                    playPulse(gc,
+                              inputs->getParString("Pulsestyle") ? inputs->getParString("Pulsestyle") : "tap",
+                              (float)inputs->getParDouble("Pulseintensity"),
+                              (float)inputs->getParDouble("Pulsesharpness"));
             } else {
-                stopRumble();
+                shutdownHaptics();   // パッドが無くなったらエンジンごと畳む
             }
         }
 
@@ -146,6 +154,41 @@ public:
             p.page = "Game Controller";
             p.defaultValues[0] = 0;
             manager->appendToggle(p);
+        }
+        {
+            OP_StringParameter p("Pulsestyle");
+            p.label = "Pulse Style";
+            p.page = "Game Controller";
+            p.defaultValue = "tap";
+            const char* n[] = {"tap", "click", "thud", "double", "buzz"};
+            const char* l[] = {"Tap", "Click", "Thud", "Double Tap", "Buzz"};
+            manager->appendMenu(p, 5, n, l);
+        }
+        {
+            OP_NumericParameter p("Pulseintensity");
+            p.label = "Pulse Intensity";
+            p.page = "Game Controller";
+            p.defaultValues[0] = 1.0;
+            p.minSliders[0] = 0; p.maxSliders[0] = 1;
+            p.minValues[0] = 0;  p.maxValues[0] = 1;
+            p.clampMins[0] = p.clampMaxes[0] = true;
+            manager->appendFloat(p);
+        }
+        {
+            OP_NumericParameter p("Pulsesharpness");
+            p.label = "Pulse Sharpness";
+            p.page = "Game Controller";
+            p.defaultValues[0] = 0.5;
+            p.minSliders[0] = 0; p.maxSliders[0] = 1;
+            p.minValues[0] = 0;  p.maxValues[0] = 1;
+            p.clampMins[0] = p.clampMaxes[0] = true;
+            manager->appendFloat(p);
+        }
+        {
+            OP_NumericParameter p("Pulse");
+            p.label = "Pulse";
+            p.page = "Game Controller";
+            manager->appendPulse(p);
         }
         {
             OP_NumericParameter p("Rumble");
@@ -189,6 +232,58 @@ private:
     static constexpr double kRumbleDur   = 2.0;    // パターンの長さ(秒)
     static constexpr double kRumbleRenew = 1.2;    // 掛け直す間隔(秒)。必ず Dur より短く
     static constexpr double kZeroHold    = 0.15;   // 強度0を命令してから片付けるまで(秒)
+
+    // 単発の振動。CoreHaptics に名前付きプリセットは無いので、
+    // transient(一撃)と continuous(持続)+ sharpness の組み合わせで定番の触感を作る。
+    // 連続振動(Rumble)とは別プレイヤーで鳴らすので、鳴っていても邪魔しない。
+    void playPulse(GCController* gc, const char* style, float intensity, float sharpness)
+    {
+        if (@available(macOS 11.0, *)) {
+            if (!gc.haptics || intensity <= 0.0f)
+                return;
+            NSError* err = nil;
+            if (!myEngine) {
+                CHHapticEngine* e = [gc.haptics createEngineWithLocality:GCHapticsLocalityDefault];
+                if (!e || ![e startAndReturnError:&err])
+                    return;
+                myEngine = e;
+            }
+            auto ev = [&](BOOL transient, float inten, float sharp, double at, double dur) {
+                NSArray* ps = @[
+                    [[CHHapticEventParameter alloc]
+                        initWithParameterID:CHHapticEventParameterIDHapticIntensity value:inten],
+                    [[CHHapticEventParameter alloc]
+                        initWithParameterID:CHHapticEventParameterIDHapticSharpness value:sharp]
+                ];
+                return transient
+                    ? [[CHHapticEvent alloc] initWithEventType:CHHapticEventTypeHapticTransient
+                                                   parameters:ps relativeTime:at]
+                    : [[CHHapticEvent alloc] initWithEventType:CHHapticEventTypeHapticContinuous
+                                                   parameters:ps relativeTime:at duration:dur];
+            };
+            NSMutableArray<CHHapticEvent*>* events = [NSMutableArray array];
+            const std::string st = style;
+            if (st == "click") {                       // 硬い一撃
+                [events addObject:ev(YES, intensity, 1.0f, 0.0, 0)];
+            } else if (st == "thud") {                 // 鈍い衝撃(低いsharpness + 短い余韻)
+                [events addObject:ev(YES, intensity, 0.1f, 0.0, 0)];
+                [events addObject:ev(NO, intensity * 0.6f, 0.0f, 0.0, 0.12)];
+            } else if (st == "double") {               // 二連打
+                [events addObject:ev(YES, intensity, sharpness, 0.0, 0)];
+                [events addObject:ev(YES, intensity, sharpness, 0.09, 0)];
+            } else if (st == "buzz") {                 // 短いブザー
+                [events addObject:ev(NO, intensity, sharpness, 0.0, 0.20)];
+            } else {                                   // tap: 素直な一撃
+                [events addObject:ev(YES, intensity, sharpness, 0.0, 0)];
+            }
+            CHHapticPattern* pattern =
+                [[CHHapticPattern alloc] initWithEvents:events parameters:@[] error:&err];
+            id<CHHapticPatternPlayer> player =
+                pattern ? [myEngine createPlayerWithPattern:pattern error:&err] : nil;
+            if (player && [player startAtTime:0 error:&err])
+                myShotPlayer = player;                 // 再生中に解放されないよう保持する
+        }
+    }
 
     void sendIntensity(float value) API_AVAILABLE(macos(11.0))
     {
@@ -272,6 +367,20 @@ private:
         }
     }
 
+    // 連続振動もパルスもやめてエンジンごと畳む(切断時 / 破棄時)
+    void shutdownHaptics()
+    {
+        stopRumble();
+        if (@available(macOS 11.0, *)) {
+            if (myShotPlayer)
+                [myShotPlayer stopAtTime:0 error:nil];
+            if (myEngine)
+                [myEngine stopWithCompletionHandler:nil];
+        }
+        myShotPlayer = nil;
+        myEngine = nil;
+    }
+
     void stopRumble()
     {
         if (@available(macOS 11.0, *)) {
@@ -279,11 +388,9 @@ private:
                 sendIntensity(0.0f);            // 念のためもう一度0を命令してから止める
                 [myPlayer stopAtTime:0 error:nil];
             }
-            if (myEngine)
-                [myEngine stopWithCompletionHandler:nil];
+            // エンジンは止めない(単発パルス用に残す。切断時と破棄時にだけ畳む)
         }
         myPlayer = nil;
-        myEngine = nil;
         myRumbleValue = 0.0f;
         myZeroSince = {};
     }
@@ -294,6 +401,8 @@ private:
     std::chrono::steady_clock::time_point myZeroSince{};
     CHHapticEngine* myEngine API_AVAILABLE(macos(11.0)) = nil;
     id<CHHapticPatternPlayer> myPlayer API_AVAILABLE(macos(11.0)) = nil;
+    id<CHHapticPatternPlayer> myShotPlayer API_AVAILABLE(macos(11.0)) = nil;
+    std::atomic<bool> myPulse{false};
     std::atomic<int> myExecCount{0};
 };
 

@@ -20,6 +20,24 @@ menu options / lstickbtn rstickbtn` (plus `gravity xyz / accel xyz` when Motion 
 | Controller Index | 0–7 (multiple controllers) |
 | Motion Sensors | Output gravity/acceleration on supported pads (DualSense etc.) |
 | Rumble | Continuous vibration 0–1 (supported pads only, via CoreHaptics). **Only runs while the CHOP cooks** — a short pattern is re-armed each cook, so it stops on its own if cooking stops |
+| Pulse | **One-shot vibration** — press to fire a single haptic pattern. Independent of `Rumble`; firing one while the pad is rumbling does not disturb it |
+| Pulse Style | `Tap` / `Click` / `Thud` / `Double Tap` / `Buzz` |
+| Pulse Intensity / Sharpness | Strength (0–1) and how hard-edged it feels (0–1) |
+
+### Haptic presets
+
+**CoreHaptics has no named presets.** What it gives you is two event types and a couple of
+parameters, and the familiar feels are built from them:
+
+| Style | Built from |
+|---|---|
+| `Tap` | one **transient** event at the given sharpness |
+| `Click` | one transient at sharpness 1.0 — hard-edged |
+| `Thud` | transient at sharpness 0.1 plus a 0.12 s continuous tail — dull impact |
+| `Double Tap` | two transients 0.09 s apart |
+| `Buzz` | a 0.20 s continuous event |
+
+`Intensity` is how strong, `Sharpness` is how hard-edged. Add your own by editing `playPulse`.
 
 ### Measured (M2 / macOS 26.6, XPT compact Bluetooth gamepad)
 
@@ -98,6 +116,24 @@ menu options / lstickbtn rstickbtn`(+ Motion時 `gravity xyz / accel xyz`)
 | Controller Index | 0〜7(複数台) |
 | Motion Sensors | 対応パッド(DualSense等)の重力/加速度を出力 |
 | Rumble | 0〜1 の連続振動(対応パッドのみ・CoreHaptics)。**cook されている間だけ続く** — 短いパターンを毎cook掛け直しているので、cook が止まれば自然に止まる |
+| Pulse | **単発の振動**。押すと1回だけ鳴る。`Rumble` とは別プレイヤーなので、連続振動中に撃っても邪魔しない |
+| Pulse Style | `Tap` / `Click` / `Thud` / `Double Tap` / `Buzz` |
+| Pulse Intensity / Sharpness | 強さ(0〜1)と当たりの硬さ(0〜1) |
+
+### 振動のプリセットについて
+
+**CoreHaptics に名前付きのプリセットは無い。** あるのはイベント2種と少数のパラメータで、
+よくある触感はそこから組み立てる。
+
+| スタイル | 中身 |
+|---|---|
+| `Tap` | **transient**(一撃)を1つ。sharpness は指定値 |
+| `Click` | transient を sharpness 1.0 で。硬い当たり |
+| `Thud` | transient(sharpness 0.1)+ 0.12秒の continuous の余韻。鈍い衝撃 |
+| `Double Tap` | transient を 0.09秒あけて2つ |
+| `Buzz` | 0.20秒の continuous |
+
+`Intensity` が強さ、`Sharpness` が当たりの硬さ。増やしたいときは `playPulse` に足す。
 
 ### 実測(M2 / macOS 26.6・XPTの小型Bluetoothパッドを接続)
 
