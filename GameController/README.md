@@ -19,7 +19,7 @@ menu options / lstickbtn rstickbtn` (plus `gravity xyz / accel xyz` when Motion 
 |---|---|
 | Controller Index | 0–7 (multiple controllers) |
 | Motion Sensors | Output gravity/acceleration on supported pads (DualSense etc.) |
-| Rumble | Continuous vibration 0–1 (supported pads only, via CoreHaptics) |
+| Rumble | Continuous vibration 0–1 (supported pads only, via CoreHaptics). **Only runs while the CHOP cooks** — a short pattern is re-armed each cook, so it stops on its own if cooking stops |
 
 ### Measured (M2 / macOS 26.6, XPT compact Bluetooth gamepad)
 
@@ -40,8 +40,10 @@ def onFrameEnd(frame):
         d[c.name] = max(d.get(c.name, 0.0), abs(c.eval()))
 ```
 
-Rumble fires (the example pulses it on pickup) but the vibration itself was not independently
-confirmed.
+Rumble is confirmed working on a pad in Xbox mode. It **only runs while the CHOP cooks**: a short
+pattern is re-armed on each cook, so setting `Rumble` back to 0 — or the node simply not cooking —
+stops the motor within about a second. (Earlier the pattern lasted an hour, so a pad could keep
+buzzing after the value went back to 0 if nothing cooked the CHOP.)
 
 Bluetooth pads appear in `[GCController controllers]` once paired with macOS.
 
@@ -93,7 +95,7 @@ menu options / lstickbtn rstickbtn`(+ Motion時 `gravity xyz / accel xyz`)
 |---|---|
 | Controller Index | 0〜7(複数台) |
 | Motion Sensors | 対応パッド(DualSense等)の重力/加速度を出力 |
-| Rumble | 0〜1 の連続振動(対応パッドのみ・CoreHaptics) |
+| Rumble | 0〜1 の連続振動(対応パッドのみ・CoreHaptics)。**cook されている間だけ続く** — 短いパターンを毎cook掛け直しているので、cook が止まれば自然に止まる |
 
 ### 実測(M2 / macOS 26.6・XPTの小型Bluetoothパッドを接続)
 
@@ -114,7 +116,10 @@ def onFrameEnd(frame):
         d[c.name] = max(d.get(c.name, 0.0), abs(c.eval()))
 ```
 
-Rumble は発火している(利用例が取得時にパルスしている)が、振動そのものは未確認。
+Rumble は Xbox モードのパッドで振動することを確認済み。**cook されている間だけ続く**:
+短いパターンを毎cook掛け直しているので、`Rumble` を 0 に戻しても、ノードが cook されなく
+なっても、1秒ほどでモーターが止まる。(以前はパターンの長さが1時間だったため、値を0に
+戻しても CHOP が cook されなければ鳴りっぱなしになっていた。)
 
 BluetoothのパッドはmacOSとペアリング後に `[GCController controllers]` に現れる。
 
