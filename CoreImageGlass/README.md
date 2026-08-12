@@ -58,6 +58,16 @@ refracts exactly like the built-in rounded rectangle.
 Note that `CIWarpKernel` cannot sample an image (it only returns coordinates), so refraction and rim
 are done together in one general `CIKernel`.
 
+### Arbitrary shapes
+
+Wire a mask into input 1 and the glass takes that shape — **including the refraction**, because the
+edge normal comes from the mask rather than from a rounded-rectangle formula. Verified with white
+text from CoreText TOP: the border bends and the rim lights up along the letterforms.
+
+The mask is read as **luminance, not alpha**, so paint the background black. Any black-and-white
+image works: CoreText (letterforms), Circle / Rectangle, GLSL, or Vision Subject (a cut-out person
+or object). A mask at a different resolution is scaled to the input automatically.
+
 ### Parameters
 
 `Style` (Frosted / Liquid Glass) · `Material` (contents follow Style) · `Appearance` (Light / Dark) ·
@@ -129,6 +139,16 @@ Liquid Glass の特徴は縁で背景が歪むこと。実装は、形のマス�
 
 なお `CIWarpKernel` は画像をサンプルできない（座標しか返さない）ため、
 屈折とリムは1つの汎用 `CIKernel` にまとめている。
+
+### 任意の形にする
+
+入力1にマスクを繋げばその形になる。**屈折も形に追従する** — 縁の法線を角丸矩形の数式ではなく
+マスクから作っているため。CoreText TOP の白文字で検証済みで、文字の輪郭に沿って背景が歪み、
+リムが光る。
+
+マスクは**アルファではなく輝度**を見るので、背景は黒で塗ること。白黒の画像なら何でも使える:
+CoreText(文字)、Circle / Rectangle、GLSL、Vision Subject(人物や物体の切り抜き)など。
+入力0と解像度が違うマスクは自動でスケールされる。
 
 ### パラメータ
 
