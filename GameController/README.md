@@ -23,6 +23,7 @@ menu options / lstickbtn rstickbtn` (plus `gravity xyz / accel xyz` when Motion 
 | Pulse | **One-shot vibration** — press to fire a single haptic pattern. Independent of `Rumble`; firing one while the pad is rumbling does not disturb it |
 | Pulse Style | `Tap` / `Click` / `Thud` / `Double Tap` / `Buzz` |
 | Pulse Intensity / Sharpness | Strength (0–1) and how hard-edged it feels (0–1) |
+| Pulse Gap | Spacing of `Double Tap`, in seconds. **Widen it until you hear two hits** — how long the actuator keeps ringing varies by pad |
 
 ### Haptic presets
 
@@ -34,7 +35,7 @@ Intensity / Sharpness sliders — it changes the pattern, and the sliders always
 |---|---|---|
 | `Click` | 0.03 s | 1 |
 | `Tap` | 0.08 s | 1 |
-| `Double Tap` | 0.06 s | 2, **0.20 s apart** (0.14 s of silence — motors need that long to spin down, or it reads as one hit) |
+| `Double Tap` | 0.06 s | 2, spaced by **Pulse Gap** (default 0.26 s) |
 | `Thud` | 0.22 s | 1 |
 | `Buzz` | 0.40 s | 1 |
 
@@ -137,6 +138,7 @@ menu options / lstickbtn rstickbtn`(+ Motion時 `gravity xyz / accel xyz`)
 | Pulse | **単発の振動**。押すと1回だけ鳴る。`Rumble` とは別プレイヤーなので、連続振動中に撃っても邪魔しない |
 | Pulse Style | `Tap` / `Click` / `Thud` / `Double Tap` / `Buzz` |
 | Pulse Intensity / Sharpness | 強さ(0〜1)と当たりの硬さ(0〜1) |
+| Pulse Gap | `Double Tap` の間隔(秒)。**2回に聞こえるまで広げる** — 余韻の長さはパッドによって違う |
 
 ### 振動のプリセットについて
 
@@ -148,7 +150,7 @@ menu options / lstickbtn rstickbtn`(+ Motion時 `gravity xyz / accel xyz`)
 |---|---|---|
 | `Click` | 0.03秒 | 1 |
 | `Tap` | 0.08秒 | 1 |
-| `Double Tap` | 0.06秒 | 2(**0.20秒あけて**。無音0.14秒。モーターが止まるのに時間がかかるので、詰めると1回に聞こえる) |
+| `Double Tap` | 0.06秒 | 2(**Pulse Gap** の間隔。既定0.26秒) |
 | `Thud` | 0.22秒 | 1 |
 | `Buzz` | 0.40秒 | 1 |
 
