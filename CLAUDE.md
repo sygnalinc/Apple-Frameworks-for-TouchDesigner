@@ -5374,3 +5374,25 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   **水平かどうかは上ベクトルが (0,1,0) かで見る**(修正前 (0.392,0,-0.920) / 修正後 (0,1,0))
 - テスト順序でも隠れていた: 最初の検証は CHASE を最初に見ていたので rx がまだ 0 で、症状が出なかった。
   **モード切替のバグは全モードを巡回してから確認する**
+
+### 2026-08-13 develop の作業を main へ PR + v0.9.6 リリース
+
+- ユーザー「今日の develop の作業を main に PR して反映させたい」→ **develop をそのまま
+  マージはしない**(develop 限定の23プラグインが main に戻ってしまう)。main からブランチを切り、
+  `git checkout develop -- <対象>` で必要なファイルだけ持ってきて PR #5 を作成・マージ
+  - 入れた: GameController(ドローン飛行+VJデモ)/ CoreImageGlass / SpatialVideo /
+    demo.toe / docs/demo の2 GIF / README(英日)/ CLAUDE.md / .gitignore / make_demo_gifs.sh
+  - 入れない: develop 限定プラグインの同期5件、main→develop 取り込み、develop限定 build.sh 修正
+  - **ユーザー判断で CI Glass と Spatial Video も main へ**(当初は develop 限定の想定だった)
+- **README のop数が 59 のままだった**(Speech Activity を develop へ移した際の直し漏れ)。
+  実際は main 56フォルダ = 58op。CI Glass と Spatial Video を足して **60** に修正
+- **リリース履歴の 0.9.5 の行が抜けていた**ので併せて補完
+- **versioning ルールを緩和**(ユーザー指示「opは今後もどんどん追加される」):
+  「op追加は minor」→ **「op追加だけなら patch。minor は集合としての性格が変わるとき」**。
+  これで 0.9.6(patch)で op を2つ足すのが規約と矛盾しなくなった
+- **GameController の README からデモの詳細を削除**(ユーザー指示「opの使い方に留めて」)。
+  飛行モデル・ビュー切替・VJ・画面レイアウトの説明は demo.toe の note DAT にあるので、
+  READMEは「立ち上がり検出は自前」「スティック押し込みが無いパッドがある」
+  「GLSLへ渡すときは Shuffle で畳む」という**CHOPを使う側の要点**だけにした(349行 → 150行)
+- リリース: 58プラグインを全て再ビルド(並列・全件成功)→ sign → verify(60バンドル全数)→
+  DMG 18MB → 公証 **Accepted** → staple → spctl accepted
