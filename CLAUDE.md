@@ -5440,3 +5440,20 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   2回に分かれた)。余韻の長さはパッドの駆動方式で違う(回転モーター vs HD振動のリニア
   アクチュエータ)ので固定値では合わせられない。**`Pulse Gap` パラメータで調整**できるようにし、
   既定を 0.26秒に広げた
+
+### 2026-08-13 GameController: モーションで加速度が取れない原因(gravity/userAcceleration は分離できるパッドのみ)
+
+- ユーザー「motion sensors を on にしても加速度の値が取れない」
+- **原因は Apple のドキュメントに明記されていた**: `hasGravityAndUserAcceleration` が NO のパッドは
+  **重力と動きを分離できず、`gravity` / `userAcceleration` は 0 のまま**。代わりに合計加速度の
+  **`acceleration`**(macOS 11+・別プロパティ)を読む必要がある。プラグインは分離前提で
+  `gravity`/`userAcceleration` だけを読んでいたので、Switch Pro 系・DualShock 系では常に 0 だった
+- **修正**: ①`hasGravityAndUserAcceleration` を見て、分離できないパッドでは `accel*` に
+  `acceleration`(重力込みの合計)を入れる ②**`rotx/roty/rotz`(角速度)を追加**(ジャイロ付きパッドでは
+  これが一番使える。モーション 6ch → **9ch**)③Info CHOP に `hasmotion` / `hasgravity` /
+  `hasrotation` / `sensorsactive` を追加(2ch → 6ch)④モーションを持たないパッド(Xbox モードは
+  センサー自体が無い)では警告を出す
+- **教訓**: 能力フラグを持つ API は、フラグを見ずに主プロパティだけ読むと**エラーも警告も出ずに 0 が
+  返る**。`has*` が生えているプロパティは分岐を書く。今回はヘッダのコメントに
+  「分離できないなら acceleration を使え」と対処法まで書いてあった
+- ビルド・署名・インストール済み(**TD再起動で 9ch と Info CHOP 6ch が出る**)。README(英日)更新

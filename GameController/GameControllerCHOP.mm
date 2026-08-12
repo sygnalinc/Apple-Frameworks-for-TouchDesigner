@@ -34,9 +34,24 @@ static const char* kChanNames[kBaseChans] = {
     "lstickx", "lsticky", "rstickx", "rsticky", "dpadx", "dpady",
     "menu", "options", "lstickbtn", "rstickbtn",
 };
-constexpr int kMotionChans = 6;
+// モーション。パッドによって「何が取れるか」が違うので、能力に応じて中身を変える。
+//
+// Apple のドキュメントが明言している: gravity と userAcceleration を**分離できないパッドがある**
+// (hasGravityAndUserAcceleration == NO)。その場合この2つは 0 のままで、代わりに合計加速度の
+// acceleration を読む。Switch Pro 系・DualShock 系は分離できない側で、
+// 「Motion Sensors を On にしても加速度が 0」の正体はこれ(実際に踏んだ)。
+//
+//   gravity*  分離できるパッドのみ。できなければ 0
+//   accel*    分離できれば userAcceleration(重力を除いた動き)、
+//             できなければ acceleration(重力込みの合計)。**どちらでも必ず値が入る**
+//   rot*      角速度(rad/s)。ジャイロを持つパッドはここが一番使える
+//
+// 何が有効かは Info CHOP の hasgravity / hasrotation で確認する
+constexpr int kMotionChans = 9;
 static const char* kMotionNames[kMotionChans] = {
-    "gravityx", "gravityy", "gravityz", "accelx", "accely", "accelz",
+    "gravityx", "gravityy", "gravityz",
+    "accelx", "accely", "accelz",
+    "rotx", "roty", "rotz",
 };
 
 class GameControllerCHOP : public CHOP_CPlusPlusBase
@@ -171,16 +186,35 @@ public:
                 v[17] = pad.leftThumbstickButton ? pad.leftThumbstickButton.value : 0.0f;
                 v[18] = pad.rightThumbstickButton ? pad.rightThumbstickButton.value : 0.0f;
 
+                myHasMotion = (gc.motion != nil);
                 if (myMotion && gc.motion) {
                     GCMotion* m = gc.motion;
+                    // センサーは明示的に起こす必要がある(電池を食うので既定は止まっている)。
+                    // 起こした直後の1フレームは 0 のまま
                     if (m.sensorsRequireManualActivation && !m.sensorsActive)
                         m.sensorsActive = YES;
-                    v[kBaseChans + 0] = (float)m.gravity.x;
-                    v[kBaseChans + 1] = (float)m.gravity.y;
-                    v[kBaseChans + 2] = (float)m.gravity.z;
-                    v[kBaseChans + 3] = (float)m.userAcceleration.x;
-                    v[kBaseChans + 4] = (float)m.userAcceleration.y;
-                    v[kBaseChans + 5] = (float)m.userAcceleration.z;
+
+                    const bool sep = m.hasGravityAndUserAcceleration;
+                    myHasGravity  = sep;
+                    myHasRotation = m.hasRotationRate;
+                    mySensorsOn   = m.sensorsActive;
+
+                    GCAcceleration acc = sep ? m.userAcceleration : m.acceleration;
+                    if (sep) {
+                        v[kBaseChans + 0] = (float)m.gravity.x;
+                        v[kBaseChans + 1] = (float)m.gravity.y;
+                        v[kBaseChans + 2] = (float)m.gravity.z;
+                    }
+                    v[kBaseChans + 3] = (float)acc.x;
+                    v[kBaseChans + 4] = (float)acc.y;
+                    v[kBaseChans + 5] = (float)acc.z;
+
+                    if (myHasRotation) {
+                        GCRotationRate r = m.rotationRate;
+                        v[kBaseChans + 6] = (float)r.x;
+                        v[kBaseChans + 7] = (float)r.y;
+                        v[kBaseChans + 8] = (float)r.z;
+                    }
                 }
                 updateRumble(gc, rumble);
                 if (myPulse.exchange(false))
@@ -281,11 +315,16 @@ public:
         }
     }
 
-    int32_t getNumInfoCHOPChans(void*) override { return 2; }
+    int32_t getNumInfoCHOPChans(void*) override { return 6; }
     void getInfoCHOPChan(int32_t index, OP_InfoCHOPChan* chan, void*) override
     {
-        const char* names[2] = {"executes", "controllers"};
-        float values[2] = {(float)myExecCount, (float)[GCController controllers].count};
+        // モーション系は「このパッドで何が取れるか」の診断。
+        // hasgravity が 0 なら gravity* は 0 のままで、accel* に重力込みの合計が入る
+        const char* names[6] = {"executes", "controllers",
+                                "hasmotion", "hasgravity", "hasrotation", "sensorsactive"};
+        float values[6] = {(float)myExecCount, (float)[GCController controllers].count,
+                           (float)myHasMotion, (float)myHasGravity,
+                           (float)myHasRotation, (float)mySensorsOn};
         chan->name->setString(names[index]);
         chan->value = values[index];
     }
@@ -294,6 +333,9 @@ public:
     {
         if ([GCController controllers].count == 0)
             warning->setString("No game controller connected");
+        else if (myMotion && !myHasMotion)
+            warning->setString("This controller has no motion sensors. "
+                               "Xbox-mode pads have none; try Nintendo Switch mode.");
     }
 
 private:
@@ -485,6 +527,10 @@ private:
     }
 
     bool myMotion = false;
+    bool myHasMotion = false;    // gc.motion があるか(Xboxモードのパッドは無い)
+    bool myHasGravity = false;   // gravity と userAcceleration を分離できるか
+    bool myHasRotation = false;  // 角速度が取れるか
+    bool mySensorsOn = false;    // センサーが起きているか
     float myRumbleValue = -1.0f;
     std::chrono::steady_clock::time_point myRumbleStart{};
     std::chrono::steady_clock::time_point myZeroSince{};
