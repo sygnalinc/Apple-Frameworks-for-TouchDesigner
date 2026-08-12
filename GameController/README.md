@@ -64,7 +64,8 @@ def onFrameEnd(frame):
         d[c.name] = max(d.get(c.name, 0.0), abs(c.eval()))
 ```
 
-Rumble is confirmed working on a pad in Xbox mode. It **only runs while the CHOP cooks**: a short
+Rumble and Pulse are both confirmed on a pad in Xbox mode — including `Double Tap` reading as two
+hits, and no crash when the pad switches modes. Rumble **only runs while the CHOP cooks**: a short
 pattern is re-armed on each cook, so setting `Rumble` back to 0 — or the node simply not cooking —
 stops the motor within about a second. (Earlier the pattern lasted an hour, so a pad could keep
 buzzing after the value went back to 0 if nothing cooked the CHOP.)
@@ -173,7 +174,8 @@ def onFrameEnd(frame):
         d[c.name] = max(d.get(c.name, 0.0), abs(c.eval()))
 ```
 
-Rumble は Xbox モードのパッドで振動することを確認済み。**cook されている間だけ続く**:
+Rumble も Pulse も Xbox モードのパッドで実機確認済み(`Double Tap` が2回と分かること、
+モード切替で落ちないことを含む)。Rumble は **cook されている間だけ続く**:
 短いパターンを毎cook掛け直しているので、`Rumble` を 0 に戻しても、ノードが cook されなく
 なっても、1秒ほどでモーターが止まる。(以前はパターンの長さが1時間だったため、値を0に
 戻しても CHOP が cook されなければ鳴りっぱなしになっていた。)
