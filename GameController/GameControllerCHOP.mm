@@ -261,20 +261,29 @@ private:
                     : [[CHHapticEvent alloc] initWithEventType:CHHapticEventTypeHapticContinuous
                                                    parameters:ps relativeTime:at duration:dur];
             };
+            // スタイルは「長さと打数」で作り分ける。
+            // Xbox系のようにモーター2個のパッドは sharpness(触感の質)をほとんど反映しないので、
+            // transient だけだと Tap と Click の区別が付かない。どのスタイルも
+            // transient(対応パッド用)+ 短い continuous(モーターだけのパッド用)を重ねて、
+            // continuous の長さで差を出す。Sharpness はどのスタイルでもそのまま渡す。
             NSMutableArray<CHHapticEvent*>* events = [NSMutableArray array];
             const std::string st = style;
-            if (st == "click") {                       // 硬い一撃
-                [events addObject:ev(YES, intensity, 1.0f, 0.0, 0)];
-            } else if (st == "thud") {                 // 鈍い衝撃(低いsharpness + 短い余韻)
-                [events addObject:ev(YES, intensity, 0.1f, 0.0, 0)];
-                [events addObject:ev(NO, intensity * 0.6f, 0.0f, 0.0, 0.12)];
+            auto hit = [&](double at, double dur, float inten) {
+                [events addObject:ev(YES, inten, sharpness, at, 0)];       // 一撃(対応パッドのみ)
+                if (dur > 0)
+                    [events addObject:ev(NO, inten, sharpness, at, dur)];  // モーターで感じる本体
+            };
+            if (st == "click") {                       // 一番短い
+                hit(0.0, 0.03, intensity);
+            } else if (st == "thud") {                 // 長めの鈍い一撃
+                hit(0.0, 0.22, intensity);
             } else if (st == "double") {               // 二連打
-                [events addObject:ev(YES, intensity, sharpness, 0.0, 0)];
-                [events addObject:ev(YES, intensity, sharpness, 0.09, 0)];
-            } else if (st == "buzz") {                 // 短いブザー
-                [events addObject:ev(NO, intensity, sharpness, 0.0, 0.20)];
-            } else {                                   // tap: 素直な一撃
-                [events addObject:ev(YES, intensity, sharpness, 0.0, 0)];
+                hit(0.0,  0.05, intensity);
+                hit(0.12, 0.05, intensity);
+            } else if (st == "buzz") {                 // はっきり続く
+                hit(0.0, 0.40, intensity);
+            } else {                                   // tap
+                hit(0.0, 0.08, intensity);
             }
             CHHapticPattern* pattern =
                 [[CHHapticPattern alloc] initWithEvents:events parameters:@[] error:&err];

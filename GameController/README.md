@@ -26,18 +26,24 @@ menu options / lstickbtn rstickbtn` (plus `gravity xyz / accel xyz` when Motion 
 
 ### Haptic presets
 
-**CoreHaptics has no named presets.** What it gives you is two event types and a couple of
-parameters, and the familiar feels are built from them:
+**CoreHaptics has no named presets.** It gives you two event types (transient / continuous) and a
+few parameters; the familiar feels are built from those. `Pulse Style` does **not** move the
+Intensity / Sharpness sliders — it changes the pattern, and the sliders always apply on top.
 
-| Style | Built from |
-|---|---|
-| `Tap` | one **transient** event at the given sharpness |
-| `Click` | one transient at sharpness 1.0 — hard-edged |
-| `Thud` | transient at sharpness 0.1 plus a 0.12 s continuous tail — dull impact |
-| `Double Tap` | two transients 0.09 s apart |
-| `Buzz` | a 0.20 s continuous event |
+| Style | Continuous length | Hits |
+|---|---|---|
+| `Click` | 0.03 s | 1 |
+| `Tap` | 0.08 s | 1 |
+| `Double Tap` | 0.05 s | 2, 0.12 s apart |
+| `Thud` | 0.22 s | 1 |
+| `Buzz` | 0.40 s | 1 |
 
-`Intensity` is how strong, `Sharpness` is how hard-edged. Add your own by editing `playPulse`.
+**The styles differ by length and hit count, not by texture.** Pads that are just two rumble
+motors (Xbox-style) largely ignore `Sharpness`, so a transient-only pattern makes `Tap` and `Click`
+feel identical. Each style therefore layers a transient (for pads that support it) over a short
+continuous event (what the motors actually reproduce).
+
+Add your own by editing `playPulse`.
 
 ### Measured (M2 / macOS 26.6, XPT compact Bluetooth gamepad)
 
@@ -122,18 +128,24 @@ menu options / lstickbtn rstickbtn`(+ Motion時 `gravity xyz / accel xyz`)
 
 ### 振動のプリセットについて
 
-**CoreHaptics に名前付きのプリセットは無い。** あるのはイベント2種と少数のパラメータで、
-よくある触感はそこから組み立てる。
+**CoreHaptics に名前付きのプリセットは無い。** あるのはイベント2種(transient / continuous)と
+少数のパラメータで、よくある触感はそこから組み立てる。`Pulse Style` を変えても
+**Intensity / Sharpness のスライダーは動かない** — 変わるのはパターンで、スライダーは常に上乗せされる。
 
-| スタイル | 中身 |
-|---|---|
-| `Tap` | **transient**(一撃)を1つ。sharpness は指定値 |
-| `Click` | transient を sharpness 1.0 で。硬い当たり |
-| `Thud` | transient(sharpness 0.1)+ 0.12秒の continuous の余韻。鈍い衝撃 |
-| `Double Tap` | transient を 0.09秒あけて2つ |
-| `Buzz` | 0.20秒の continuous |
+| スタイル | continuous の長さ | 打数 |
+|---|---|---|
+| `Click` | 0.03秒 | 1 |
+| `Tap` | 0.08秒 | 1 |
+| `Double Tap` | 0.05秒 | 2(0.12秒あけて) |
+| `Thud` | 0.22秒 | 1 |
+| `Buzz` | 0.40秒 | 1 |
 
-`Intensity` が強さ、`Sharpness` が当たりの硬さ。増やしたいときは `playPulse` に足す。
+**違いは「長さと打数」であって触感の質ではない。** Xbox系のようにモーター2個のパッドは
+`Sharpness` をほとんど反映しないので、transient だけのパターンだと `Tap` と `Click` が
+区別できない。そのためどのスタイルも transient(対応パッド用)に短い continuous
+(モーターが実際に再現する部分)を重ねてある。
+
+増やしたいときは `playPulse` に足す。
 
 ### 実測(M2 / macOS 26.6・XPTの小型Bluetoothパッドを接続)
 
