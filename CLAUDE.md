@@ -5696,3 +5696,21 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   `/project1/CoreMIDIOut` 利用例を追加。**公開 59 / experimental 23 / blocked 1**
 - 次にやること: **CoreMIDI In CHOP**(同じフォルダに追加)、MIDI 2.0 (UMP) 対応、
   実機材での UniqueID 再接続の確認(仮想エンドポイントは挿し直すと UID が変わるため未検証)
+
+### 2026-08-13 demo に CHOP シーケンサの利用例を追加(CoreMIDI Out の入力チャンネル)
+
+- ユーザー「demo に CHOP で演奏データを作って再生するのを作って」
+- `/project1/CoreMIDIOut_seq`: `seq`(Script CHOP)→ `Coremidiout1` → `out1`(Null CHOP)。
+  112 BPM の8分音符シーケンサで、Cマイナー系のリフ(8ステップ)+ 4分頭のベース(note36)+
+  cc74 のスイープを出す
+- **要点は「ゲートを立てる CHOP を作れば、それがそのまま演奏データになる」**こと。
+  CoreMIDI Out は入力チャンネルを名前で解釈する(`note<n>` / `cc<n>`)ので、
+  LFO / Pattern / Trigger / Timer など TD の CHOP を何でも繋げられる
+- **実測(M2・5秒間)**: NoteOn 19回(112BPM×8分 = 18.7 と一致)、`20904665 20902478` =
+  リード note70 vel101 とベース note36 vel120 の同時発音、対の Note Off、cc74 が 81→89 と
+  連続変化。velocity は 0.80→101 / 0.95→120 で 0..1 換算どおり
+- **注意としてnoteに明記**: ①**チャンネルの並びは毎フレーム固定にする**(数や順序が変わると
+  前フレームとの比較がずれて Note Off が出ない)②**cook されないと鳴らない**(自動 Note Off も
+  cook 依存なので、止まると音が残る → All Notes Off)
+- `Device` は環境依存の UniqueID なので **(none) で保存**。利用者が自分の送り先を選ぶ
+- Script CHOP のコールバック内では `math` がそのまま使える(import 不要)ことを確認
