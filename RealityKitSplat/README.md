@@ -5,6 +5,10 @@ macOS 27 で公開された RealityKit の `GaussianSplatComponent` / `GaussianS
 `RealityRenderer` でオフスクリーン描画して TOP に出す。USD / USDZ / Reality のメッシュシーンも
 同じノードでロードできる(従来機能)。
 
+> **状態: 実験中(macOS 27+)。** DMG には含まれません(`PLUGINS.tsv` が唯一の正)。
+> 実 3DGS シーンの描画は確認済みですが、macOS 27 が beta で、高次SH(f_rest_*)が未対応のため
+> released には上げていません。
+
 - 3DGS .ply(INRIA形式)は**自前パース**して `LowLevelBuffer` へ投入する
   (Apple のドキュメント通り、フレームワークにファイルローダは無い)
 - scale(log値)/ opacity(logit)は生値のまま渡し、`scaleActivation = .exponential` /

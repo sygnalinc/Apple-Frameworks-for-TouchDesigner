@@ -102,7 +102,6 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 |---|---|---|
 | [Vision Subject](VisionSubject/) | TOP | **任意被写体の切り抜き**(写真アプリ「被写体をコピー」と同じAPI)。ソフトマスク/背景透過 |
 | [CoreML SAM2](CoreMLSAM2/) | TOP | **点を指定して任意物体をマスク**(SAM 2.1)。観客が触れたものを切り抜く演出に |
-| [Vision IterSeg](VisionIterSeg/) | TOP | **Apple純正の対話的セグメンテーション**(macOS 27): 点/矩形/**なぞり書き**プロンプト→ソフトマスク。外部モデル不要(OS管理資産)。SAM2代替 |
 
 ### 追跡・モーション・カメラワーク
 
@@ -143,13 +142,12 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [Sound Features](SoundFeatures/) | CHOP | 音響特徴(RMS/peak/centroid/onset/beat/BPM/16帯域) |
 | [Speech Transcribe](SpeechTranscribe/) | DAT | **ライブ文字起こし**。Apple SpeechAnalyzer(macOS26+)/ WhisperKit(macOS14+・多言語・英訳) |
 | [Speech Synth](SpeechSynth/) | CHOP | オンデバイス**音声合成**→ PCM stereo |
-| [Music Understanding](MusicUnderstanding/) | DAT | **音楽ファイルのオンデバイス楽曲解析**(macOS 27): ビート/小節/**BPM**・調・**楽曲構造(セクション)**・ペース・ラウドネス・**楽器別アクティビティ**(vocal/drum/bass/other)。実測123BPM/Gマイナー正検出 |
 
 ### 言語・テキスト
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
-| [LLM AFM](LLMAFM/) | DAT | **Apple Intelligence LLM**(macOS26+)。macOS27で**モデル選択(On-Device AFM / Private Cloud Compute)・画像入力(vision)・Reasoningレベル**に対応。**構造化出力(JSONスキーマ)**+**ツール呼び出し**(LLMがツールを要求→TouchDesignerが実行して結果を返す)でショー制御へ直結 |
+| [LLM AFM](LLMAFM/) | DAT | **Apple Intelligence LLM**(macOS26+)。**構造化出力(JSONスキーマ)**+**ツール呼び出し**(LLMがツールを要求→TouchDesignerが実行して結果を返す)でショー制御へ直結。*(実験中・未検証: macOS 27 のモデル選択/画像入力/Reasoning)* |
 | [LLM MLX](LLMMLX/) | DAT | **Apple MLX によるローカルLLM**(mlx-swift-lm)。任意の mlx-community モデル(Gemma 4 / Qwen / Llama)を完全オンデバイスで実行しトークンをストリーミング。APIキー不要・モデルは初回にHFから自動DL |
 | [Translate](Translate/) | DAT | **オンデバイス翻訳**。Speech Transcribe 直結でリアルタイム字幕翻訳 |
 | [Text Analyze](TextAnalyze/) | DAT | 感情スコア・言語判定・固有表現・意味的類似度(日本語対応)+**トークン(token / 品詞 / 見出し語)**と**埋め込みベクトル**(数値)。「発話の感情/話題でビジュアル制御」 |
@@ -158,8 +156,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
-| [RealityKit Capture](RealityKitCapture/) | SOP | **写真フォルダ→3Dメッシュ**(RealityKit Object Capture)。テクスチャ付きOBJ出力+**splat PLY書き出し**(写真→3DGS形式.ply→RealityKit Splat TOPで描画) |
-| [RealityKit Splat](RealityKitSplat/) | TOP | **3D Gaussian Splatting(.ply)を真のsplatとして描画**(macOS 27 `GaussianSplatComponent`)+USD/USDZシーン。RealityRendererオフスクリーン。36.9万splat≈44fps @720p(M2) |
+| [RealityKit Capture](RealityKitCapture/) | SOP | **写真フォルダ→3Dメッシュ**(RealityKit Object Capture)。テクスチャ付きOBJ出力。*(実験中: splat PLY書き出し — 実験中の RealityKit Splat TOP 用)* |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **写真の深度→3Dポイントクラウド**(カメラ較正/画角で逆投影)。RGBから色サンプル |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic動画**(macOS 26+): 深度(視差)マップ/**f値・ピント差し替え再レンダ**。**Movie File In と同じく自動再生**(Play Mode: Sequential / Locked to Timeline / Specify Index、Speed/Loop/Cue)。`Mode = All` で**色・深度・再レンダを3色バッファ同時出力**(`Color + Depth` は同じ番号のまま軽い2バッファ版)。`Info DAT` で素材のメタデータも出せる。メタデータ(フォーカス深度・被写体)は**Info CHOP**で出力 |
 | [Spatial Video](SpatialVideo/) | TOP | **iPhone / Vision Pro の空間ビデオ(MV-HEVC)** から**左眼 / 右眼**を取り出す。左右連結、または**2つのカラーバッファ**に出して Render Select TOP で取る(デコード1回で済み、左右が必ず同じフレームになる)。**再生は Movie File In と同じ**(Play Mode / Speed / Loop / Cue)。基線・画角・hero eye は **Info CHOP / Info DAT** |
@@ -191,6 +188,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [CoreMIDI In](CoreMIDI/) | CHOP | 実験中 |
 | [AVAudio Mixer CHOP](AVAudioMixer/) | CHOP | 実験中 |
 | [AVAudio Spatial CHOP](AVAudioSpatial/) | CHOP | 実験中 |
+| [AVF Camera TOP](AVFoundationCamera/) | TOP | 実験中 |
 | [AudioToolbox Mix CHOP](AudioToolboxMix/) | CHOP | 実験中 |
 | [Caption Author DAT](CaptionAuthor/) | DAT | 実験中 |
 | [ColorSync TOP](ColorSync/) | TOP | 実験中 |
@@ -203,13 +201,16 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [Image Capture DAT](ImageCapture/) | DAT | 実験中 |
 | [Metal FrameInterp TOP](MetalFrameInterp/) | TOP | 実験中 |
 | [MPS Analyze CHOP](MetalMPSAnalyze/) | CHOP | 実験中 |
+| [Music Understanding DAT](MusicUnderstanding/) | DAT | 実験中 — macOS 27+ |
 | [PHASE CHOP](Phase/) | CHOP | 実験中 |
+| [RealityKit Splat TOP](RealityKitSplat/) | TOP | 実験中 — macOS 27+ |
 | [Shazam DAT](Shazam/) | DAT | 実験中 |
 | [Speech Activity CHOP](SpeechActivity/) | CHOP | **動作しない** — 現行APIでは成立しないと実測で確定 |
 | [SwiftUI TOP](SwiftUI/) | TOP | 実験中 |
 | [SwiftUI Panel CHOP](SwiftUIPanel/) | CHOP | 実験中 |
 | [UI Widget DAT](UIWidget/) | DAT | 実験中 |
 | [VisionAesthetics CHOP](VisionAesthetics/) | CHOP | 実験中 |
+| [Vision IterSeg TOP](VisionIterSeg/) | TOP | 実験中 — macOS 27+ |
 | [Vision Segment TOP — 人物セグメンテーション（macOS）](VisionSegment/) | TOP | 実験中 |
 | [Vision Similarity CHOP](VisionSimilarity/) | CHOP | 実験中 |
 | [VisionTrack CHOP](VisionTrack/) | CHOP | 実験中 |

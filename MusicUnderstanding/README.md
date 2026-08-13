@@ -3,6 +3,9 @@
 **音楽ファイルのオンデバイス楽曲解析**(macOS 27+・Apple `MusicUnderstanding` framework)。
 演出制御に直結する構造データをテーブル出力する:
 
+> **状態: 実験中(macOS 27+)。** DMG には含まれません(`PLUGINS.tsv` が唯一の正)。
+> 3曲で BPM / 調 / 構造の正検出を確認済みですが、macOS 27 が beta のため released には上げていません。
+
 | 解析 | 出力 |
 |---|---|
 | Rhythm | **ビート/小節の時刻列 + BPM** |

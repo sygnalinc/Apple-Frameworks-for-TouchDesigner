@@ -85,7 +85,11 @@ is enough to produce `status: error: Exceeded model context window size` (measur
 - For structured results, either use Output Schema above or instruct "reply in JSON only" and
   parse the DAT
 
-### macOS 27 (AFM3-generation) additions
+### macOS 27 (AFM3-generation) additions — experimental
+
+> **Unverified.** These are implemented and the parameters/diagnostics were checked in TD,
+> but generation itself is untested because Apple Intelligence is not enabled on the test
+> machine yet. macOS 26 behaviour is unchanged.
 
 On macOS 27 FoundationModels moves to the new-generation model (AFM3) with an extended API.
 This OP adds:
@@ -118,7 +122,10 @@ Apple の **FoundationModels framework**（Apple Intelligence のオンデバイ
 
 実測（M2）: 日本語の実況テキスト生成が数秒・ストリーミングで出力。
 
-### macOS 27(AFM3世代)の新機能
+### macOS 27(AFM3世代)の新機能 — 実験中
+
+> **未検証。** 実装とパラメータ/診断の表示はTD実機で確認済みですが、検証機で
+> Apple Intelligence が未有効のため**生成そのものは未テスト**です。macOS 26 の挙動は不変。
 
 macOS 27 では FoundationModels が新世代モデル(AFM3)と拡張APIになり、本OPは以下に対応:
 

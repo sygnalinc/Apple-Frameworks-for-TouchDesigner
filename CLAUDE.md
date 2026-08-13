@@ -6085,3 +6085,23 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - マージ後のソースで新規3件+改修2件(RealityKitCapture / LLMAFM)を**再ビルドして全OK**
 - 注意: マージで main 側の `demo.toe`(旧 sample.toe)運用に変わったので、macOS 27 op の
   利用例は今後 demo.toe 側へ追加する。RealityKitSplat の未検証項目(SH degree 1〜3)は据え置き
+
+### 2026-08-14 新規3opを README でも experimental 扱いに統一
+
+- ユーザー「こちらで作ったopをREADMEでもexperimental扱いして欲しい」。**PLUGINS.tsv だけでなく
+  README の見え方も揃える**:
+  - **mainのREADME慣習を確認**: experimental op は本表(Plugin catalog)には載せず、
+    末尾の「Experimental plugins / 実験中のプラグイン」表にだけ載せる(status列に experimental /
+    **blocked** を書く)。今回はこの慣習に合わせ、新規3op(Vision IterSeg / Music Understanding /
+    RealityKit Splat)を**本表から削除し実験中表へ移動**(英日とも・status に "macOS 27+" を付記)
+  - **個別READMEにも状態注記**: 最新の慣習(AVF Camera の `> **Status: experimental.**` ブロック)に
+    倣い3件の冒頭へ「実験中(macOS 27+)・DMG非同梱・PLUGINS.tsvが正」+ 何を検証済みで
+    なぜ released でないかを明記
+  - **released op に足した macOS 27 機能も個別に実験中と明記**: RealityKit Capture の Splat出力節
+    (描画先の Splat TOP が実験中)、LLM AFM の AFM3節(実装とパラメータは確認済みだが
+    **Apple Intelligence 未有効で生成そのものは未検証**)。op自体は released のまま据え置き
+- **副産物の発見と修正**: `AVFoundationCamera` は PLUGINS.tsv では experimental なのに
+  **README の実験中表から漏れていた**(main側で追加した際の抜け)。英日とも1行追加して補った
+- 検算: PLUGINS.tsv の experimental 集合と README 実験中表が一致(blocked の SpeechActivity は
+  同表に別ラベルで載る仕様なので差分に出るのが正)、英日の表が同件数・同集合(30行)、
+  本表に非released opの混入なし — をスクリプトで確認

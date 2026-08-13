@@ -95,6 +95,9 @@ Info DAT: `texture`(抽出テクスチャのパス)/ `splat`(書き出したply�
 
 ## Splat出力(写真→ガウシアンスプラット)
 
+> **この機能は実験中です。** 出力先の描画に使う RealityKit Splat TOP が実験中(macOS 27+)のため。
+> メッシュ再構成(本体機能)は従来どおり検証済みです。
+
 `Export Splat PLY` をオンにすると、メッシュと同時に `PhotogrammetrySession` の
 **pointCloud リクエスト**を実行し、点群を **3DGS形式(INRIA互換)の .ply** に変換して書き出す。
 これを **RealityKit Splat TOP** に読ませると、キャプチャした被写体を真のガウシアン
