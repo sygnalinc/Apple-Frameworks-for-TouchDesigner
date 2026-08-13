@@ -22,15 +22,30 @@ MIDIObjectGetStringProperty` with `kMIDIPropertyDisplayName`. That tells you exa
 If you just need to send notes to a DAW that is already running, TD's built-in MIDI Out CHOP is fine
 and better integrated. Reach for this one when devices come and go during a show.
 
-### Testing without writing a script
+### Sending without writing a script
 
-Everything needed to prove the connection is on the parameters:
+Everything is on the **Send** page:
 
 1. Pick the target in **Device**
-2. Press **Send Note** — sends Note On, then Note Off after **Note Duration**
+2. Press **Send Note** — Note On, then Note Off after **Note Duration**
 3. Press **Send CC**, or **All Notes Off** if something hangs
 
 `connected`, `online` and `sends` on the output tell you whether it went out.
+
+### Controlling a DAW's transport
+
+**Play / Stop / Record / Return to Start** are on the same page. There are two ways a DAW can
+listen, and which one works depends on its settings, so **Transport Method** defaults to `Both`:
+
+| Method | What is sent |
+|---|---|
+| MMC (SysEx) | `F0 7F <MMC Device ID> 06 <cmd> F7` — Play `02`, Stop `01`, Record Strobe `06`, and Locate `44 06 01 00 00 00 00 00` for Return to Start |
+| MIDI Realtime | Continue `FB`, Stop `FC`, and Song Position Pointer `F2 00 00` for Return to Start |
+
+**In Logic Pro**, enable MMC input under Settings → MIDI → Sync, or slave Logic to MIDI Clock for
+the realtime path. If your DAW reacts twice, switch Transport Method from `Both` to one of them.
+
+`MMC Device ID` is 127 (all devices) by default, which is what most DAWs expect.
 
 ### Output channels
 
@@ -60,9 +75,12 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
 | Device | Destination, stored as its **UniqueID** so a replug re-binds to the same unit |
 | Refresh Devices | Re-enumerate by hand (normally unnecessary — hot-plug is automatic) |
 | Channel | MIDI channel 1–16 |
-| Note / Velocity / Note Duration | The test note |
+| Note / Velocity / Note Duration | The note sent by Send Note |
 | Send Note / Send CC / All Notes Off | Pulses |
-| CC Number / CC Value | The test CC |
+| CC Number / CC Value | The CC sent by Send CC |
+| Transport Method | `MMC (SysEx)` / `MIDI Realtime` / `Both` (default) |
+| MMC Device ID | 0–127, default 127 (all devices) |
+| Play / Stop / Record / Return to Start | DAW transport pulses |
 
 ### Notes
 
@@ -82,6 +100,9 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
   and `online` to 0 **without restarting TD**
 - **Hot-plug**: a newly created endpoint appeared in the menu, was selectable, and received a note
   — again with no restart
+- **Transport**: Play produced MMC `7F 7F 06 02` plus realtime `FB`; Stop produced `7F 7F 06 01`
+  plus `FC`; Record produced `7F 7F 06 06`; Return to Start produced the Locate SysEx plus
+  Song Position `0,0`
 
 ### Build
 
@@ -113,15 +134,30 @@ MIDIPacketListAdd / MIDISend / MIDIObjectGetStringProperty`(+ `kMIDIPropertyDisp
 **起動済みの DAW にノートを送るだけなら TD 標準で十分**で、そちらの方が統合されている。
 本番中に機材が抜き差しされる用途でこちらを使う。
 
-### スクリプトを書かずに送信テストする
+### スクリプトを書かずに送る
 
-接続確認に必要なものは全部パラメータにある。
+必要なものは全部 **Send** ページにある。
 
 1. **Device** で送り先を選ぶ
 2. **Send Note** を押す → Note On が出て、**Note Duration** 後に Note Off が出る
 3. **Send CC**、音が残ったら **All Notes Off**
 
 実際に出たかどうかは出力の `connected` / `online` / `sends` で分かる。
+
+### DAW のトランスポートを操作する
+
+同じページに **Play / Stop / Record / Return to Start** がある。DAW が聞く経路は2種類あり、
+どちらが有効かは DAW の設定次第なので、**Transport Method** の既定は `Both`(両方送る)。
+
+| 方式 | 送るもの |
+|---|---|
+| MMC (SysEx) | `F0 7F <MMC Device ID> 06 <cmd> F7` — Play `02` / Stop `01` / Record Strobe `06`、Return to Start は Locate `44 06 01 00 00 00 00 00` |
+| MIDI Realtime | Continue `FB` / Stop `FC`、Return to Start は Song Position Pointer `F2 00 00` |
+
+**Logic Pro なら**、設定 > MIDI > 同期 で MMC の受信を有効にする(リアルタイム側を使うなら
+Logic を MIDI クロックに同期させる)。二重に反応する DAW では `Both` から片方に絞る。
+
+`MMC Device ID` の既定は 127(全デバイス宛)で、たいていの DAW はこれで反応する。
 
 ### 出力チャンネル
 
@@ -151,9 +187,12 @@ Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online
 | Device | 送り先。**UniqueID で保持**するので挿し直しても同じ機材に繋ぎ直る |
 | Refresh Devices | 手動で再列挙(通常は不要。ホットプラグは自動) |
 | Channel | MIDI チャンネル 1〜16 |
-| Note / Velocity / Note Duration | テスト用のノート |
+| Note / Velocity / Note Duration | Send Note で送るノート |
 | Send Note / Send CC / All Notes Off | パルス |
-| CC Number / CC Value | テスト用の CC |
+| CC Number / CC Value | Send CC で送る CC |
+| Transport Method | `MMC (SysEx)` / `MIDI Realtime` / `Both`(既定) |
+| MMC Device ID | 0〜127。既定 127(全デバイス宛) |
+| Play / Stop / Record / Return to Start | DAW のトランスポート操作 |
 
 ### 注意
 
@@ -172,6 +211,8 @@ Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online
 - **抜いたとき**: 受信側を落とすとメニューから消え、`connected` と `online` が 0 になった。
   **TD の再起動なし**
 - **挿したとき**: 新しく作ったエンドポイントがメニューに現れ、選択して送信できた。こちらも再起動なし
+- **トランスポート**: Play で MMC `7F 7F 06 02` とリアルタイム `FB`、Stop で `7F 7F 06 01` と
+  `FC`、Record で `7F 7F 06 06`、Return to Start で Locate SysEx と Song Position `0,0` を確認
 
 ### ビルド
 

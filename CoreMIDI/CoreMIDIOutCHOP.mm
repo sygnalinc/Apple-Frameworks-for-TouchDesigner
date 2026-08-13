@@ -119,6 +119,7 @@ public:
         } else {
             myNoteOff.clear();
             myPendingNote = myPendingCC = myPendingPanic = false;
+            myPendingPlay = myPendingStop = myPendingRec = myPendingRewind = false;
         }
         flushNoteOffs(ch);
 
@@ -133,6 +134,10 @@ public:
         else if (!strcmp(name, "Sendcc")) myPendingCC = true;
         else if (!strcmp(name, "Allnotesoff")) myPendingPanic = true;
         else if (!strcmp(name, "Refreshdevices")) myRefresh = true;
+        else if (!strcmp(name, "Play")) myPendingPlay = true;
+        else if (!strcmp(name, "Stop")) myPendingStop = true;
+        else if (!strcmp(name, "Record")) myPendingRec = true;
+        else if (!strcmp(name, "Rewind")) myPendingRewind = true;
     }
 
     void setupParameters(OP_ParameterManager* m, void*) override
@@ -163,8 +168,8 @@ public:
             m->appendInt(p);
         }
 
-        // --- パラメータだけで送信テストできるようにする ---
-        const char* TEST = "Test";
+        // --- パラメータだけで送信できるようにする(スクリプト不要) ---
+        const char* TEST = "Send";
         auto ip = [&](const char* n, const char* l, int d, int lo, int hi) {
             OP_NumericParameter p(n);
             p.label = l; p.page = TEST; p.defaultValues[0] = d;
@@ -186,6 +191,33 @@ public:
         ip("Ccvalue", "CC Value (0-127)", 64, 0, 127);
         { OP_NumericParameter p("Sendcc"); p.label = "Send CC"; p.page = TEST; m->appendPulse(p); }
         { OP_NumericParameter p("Allnotesoff"); p.label = "All Notes Off (panic)"; p.page = TEST; m->appendPulse(p); }
+
+        // --- DAW のトランスポート操作 ---
+        // 経路が2つあり、どちらを聞くかは DAW 側の設定で決まる:
+        //   mmc      … MIDI Machine Control(SysEx)。Logic は環境設定 > MIDI > 同期 で
+        //              「MMC を受信」を有効にすると反応する
+        //   realtime … MIDI リアルタイム(FA/FB/FC)。DAW を MIDI クロックに同期させる設定が要る
+        // どちらが有効か分からないので既定は both(両方送る)。二重に反応する DAW では片方に絞る。
+        {
+            OP_StringParameter p("Transport");
+            p.label = "Transport Method"; p.page = TEST; p.defaultValue = "both";
+            const char* nm[] = {"mmc", "realtime", "both"};
+            const char* lb[] = {"MMC (SysEx)", "MIDI Realtime", "Both"};
+            m->appendMenu(p, 3, nm, lb);
+        }
+        {
+            OP_NumericParameter p("Mmcdevice");
+            p.label = "MMC Device ID"; p.page = TEST;
+            p.defaultValues[0] = 127;                  // 127 = all devices
+            p.minSliders[0] = 0; p.maxSliders[0] = 127;
+            p.minValues[0] = 0; p.maxValues[0] = 127;
+            p.clampMins[0] = true; p.clampMaxes[0] = true;
+            m->appendInt(p);
+        }
+        { OP_NumericParameter p("Play");   p.label = "Play";   p.page = TEST; m->appendPulse(p); }
+        { OP_NumericParameter p("Stop");   p.label = "Stop";   p.page = TEST; m->appendPulse(p); }
+        { OP_NumericParameter p("Record"); p.label = "Record"; p.page = TEST; m->appendPulse(p); }
+        { OP_NumericParameter p("Rewind"); p.label = "Return to Start"; p.page = TEST; m->appendPulse(p); }
     }
 
     void buildDynamicMenu(const OP_Inputs*, OP_BuildDynamicMenuInfo* info, void*) override
@@ -365,12 +397,60 @@ private:
         }
         if (myPendingCC.exchange(false))
             controlChange(ch, in->getParInt("Ccnumber"), in->getParInt("Ccvalue"));
+        handleTransport(in);
         if (myPendingPanic.exchange(false)) {
             myNoteOff.clear();
             for (int c = 0; c < 16; c++) {
                 uint8_t b[3] = {(uint8_t)(0xB0 | c), 123, 0};   // All Notes Off
                 sendBytes(b, 3);
             }
+        }
+    }
+
+    // MMC は SysEx: F0 7F <deviceID> 06 <cmd> F7
+    void mmc(int devId, uint8_t cmd)
+    {
+        uint8_t b[6] = {0xF0, 0x7F, (uint8_t)clampi(devId, 0, 127), 0x06, cmd, 0xF7};
+        sendBytes(b, 6);
+    }
+    void realtime(uint8_t status) { sendBytes(&status, 1); }
+
+    void handleTransport(const OP_Inputs* in)
+    {
+        const bool play = myPendingPlay.exchange(false);
+        const bool stop = myPendingStop.exchange(false);
+        const bool rec = myPendingRec.exchange(false);
+        const bool rew = myPendingRewind.exchange(false);
+        if (!play && !stop && !rec && !rew) return;
+
+        const char* mode = in->getParString("Transport");
+        const std::string mo = mode ? mode : "both";
+        const bool useMMC = (mo != "realtime");
+        const bool useRT = (mo != "mmc");
+        const int dev = in->getParInt("Mmcdevice");
+
+        if (rew) {
+            // MMC Locate: F0 7F <id> 06 44 06 01 hh mm ss ff sf F7 (00:00:00:00)
+            if (useMMC) {
+                uint8_t b[13] = {0xF0, 0x7F, (uint8_t)clampi(dev, 0, 127), 0x06, 0x44, 0x06, 0x01,
+                                 0, 0, 0, 0, 0, 0xF7};
+                sendBytes(b, 13);
+            }
+            if (useRT) {   // Song Position Pointer = 0
+                uint8_t b[3] = {0xF2, 0, 0};
+                sendBytes(b, 3);
+            }
+        }
+        if (stop) {
+            if (useMMC) mmc(dev, 0x01);
+            if (useRT) realtime(0xFC);
+        }
+        if (rec) {
+            if (useMMC) mmc(dev, 0x06);   // Record Strobe
+        }
+        if (play) {
+            if (useMMC) mmc(dev, 0x02);
+            if (useRT) realtime(0xFB);    // Continue(現在位置から。頭からは Return to Start と併用)
         }
     }
 
@@ -434,6 +514,7 @@ private:
 
     std::atomic<bool> myQuit{false}, myReady{false}, mySetupChanged{false}, myRefresh{false};
     std::atomic<bool> myPendingNote{false}, myPendingCC{false}, myPendingPanic{false};
+    std::atomic<bool> myPendingPlay{false}, myPendingStop{false}, myPendingRec{false}, myPendingRewind{false};
     std::atomic<uint64_t> myExec{0}, mySends{0};
 };
 

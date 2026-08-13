@@ -5714,3 +5714,24 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   cook 依存なので、止まると音が残る → All Notes Off)
 - `Device` は環境依存の UniqueID なので **(none) で保存**。利用者が自分の送り先を選ぶ
 - Script CHOP のコールバック内では `math` がそのまま使える(import 不要)ことを確認
+
+### 2026-08-13 CoreMIDI Out: Test ページを Send に改称 + DAW トランスポート操作を追加
+
+- ユーザー「op から直接送信できる機能の名前を test にしないで send に。send に DAW を
+  コントロールできる再生停止などのボタンを追加して」
+- パラメータページ `Test` → **`Send`**(パラメータ名は不変なので既存 .toe は無傷)
+- **Play / Stop / Record / Return to Start** のパルスを追加。**DAW が聞く経路は2種類あり、
+  どちらが有効かは DAW 側の設定で決まる**ので `Transport Method`(既定 **both**)で選ばせる:
+  - **MMC (SysEx)**: `F0 7F <MMC Device ID> 06 <cmd> F7`。Play=02 / Stop=01 /
+    Record Strobe=06 / Return to Start は Locate `44 06 01 00 00 00 00 00`
+  - **MIDI Realtime**: Continue=`FB` / Stop=`FC` / Return to Start は Song Position `F2 00 00`
+  - `MMC Device ID` 既定 127(全デバイス宛)
+- Logic Pro は 設定 > MIDI > 同期 で MMC 受信を有効にする必要がある(リアルタイム側を使うなら
+  MIDI クロック同期)。二重に反応する DAW 向けに片方へ絞れるようにした
+- **実測(M2)**: 仮想MIDIデスティネーションで4種すべて確認。Play→MMC `7F 7F 06 02`+`FB`、
+  Stop→`7F 7F 06 01`+`FC`、Record→`7F 7F 06 06`、Return to Start→Locate SysEx+Song Position 0,0。
+  ページ構成も `CoreMIDI Out`(Active/Device/Refresh/Channel)と `Send`(14個)に分かれた
+- 検証用リスナー(`/tmp/midi/listen2.swift`)に **UMP の mt=1(システムリアルタイム)と
+  mt=3(SysEx7)のデコード**を追加。SysEx は F0/F7 が剥がれて 6バイト/ワードで詰まるので、
+  生ワードを16進で出して読む
+- README(英日)+ demo.toe の note 2件を更新
