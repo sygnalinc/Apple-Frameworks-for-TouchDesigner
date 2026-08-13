@@ -6210,3 +6210,42 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - ベータ機の古い `LLMMLX/build`(8/5ビルド)は取り違え防止のため退避。
   SETUP.md §3 に「LLM MLX はベータ機でビルドしない・リリースは安定版機で切る・
   ベータ機で作業したら `rm -rf LLMMLX/build`」を追記
+
+### 2026-08-14 3DGSの「生成」は可能か調査 — Appleは非公開SPIに完成品を持っている
+
+- ユーザー「3dgsを作成する事はできるようになりそう?」→ 実機で3方向から確認
+- **① 公開API: macOS 27 でも生成はできない。** `GaussianSplatResource` の生成経路は
+  **`BufferResource(count:position:scale:...)` のバッファ投入だけ**。URLからのロードも
+  画像からの生成も無い(= 描画専用)
+- **② 非公開SPI(CorePhotogrammetry): 完全な3DGS生成APIが存在する。**
+  `dyld_info -exports` で **Gaussian関連118シンボル**を確認(バイナリは共有キャッシュ内なので
+  ディスク上はシンボリックリンク切れ。`dyld_info -exports <framework path>` なら読める)。
+  **ObjCクラスは0件で純C API**。全体像:
+  - **物体のsplat生成**: `CPGGaussianSplattingSessionCreate` /
+    `CPGGaussianSplattingOptionsCreate` + **`SetAppearanceModelingEnabled`(視点依存の外観)** /
+    **`SetEnableSparsification`** / `CPGGaussianSplattingCallbackBundleCreate` /
+    `CPGGaussianSplattingOutputGetGaussian3D(+Metadata)` / **`CPGGaussian3DSaveToURLWithMetadata`**
+  - **シーン全体のsplat生成(Environment GS)**: `CPGEnvironmentGSRequestDescriptionCreate` /
+    `CPGEnvironmentGSSessionOptionsCreate(+SetWorkingDirectory)` /
+    `CPGSessionCreateWithEnvironmentGSOptions` / `CPGSessionProcessGSRequestWithCallbacks` /
+    `CPGGSOutputGetGaussianSplattingPointCloudURL` / `CPGGSOutputGetFailure` /
+    **`CPGCheckDeviceCompatibilityForEnvironmentGS`**
+  - **データ表現は本物**: coordinates / scales / quaternions / opacities / colorDiffuse /
+    **colorRest(=高次SH)** / `GetSphericalHarmonicsDimension` / storageMode。
+    = 我々の等方・SH DCのみの簡易版とは別物で、視点依存の本物の3DGS
+  - `CPGAddSampleStreamProcessingOutputGetGaussian3D` もあり、**撮影ストリームから
+    直接Gaussianを出す経路**まで用意されている
+- **`CPGCheckDeviceCompatibilityForEnvironmentGS()` を実測すると 0 を返した**
+  (引数なしのbool想定で呼び出し・M2/macOS 27.0 26A5406e)。0=非対応の可能性が高いが、
+  **引数の正しいシグネチャが不明なので断定はできない**(要検証)
+- **結論(現時点の判断材料)**:
+  - **今すぐ本物の3DGSを作る手段は公開APIには無い**。非公開SPIは shipping プラグインには
+    使えない(無記載・OS更新で壊れる・引数仕様も不明)
+  - ただし **API表面の完成度が高い**(session/options/callback/output/save/デバイス判定が揃い、
+    物体用とシーン用の2系統、appearance modeling と sparsification のオプションまである)。
+    **macOS 27 で描画側(`GaussianSplatComponent`)が先に公開された流れ**を踏まえると、
+    生成側が後続で公開される見込みは高い。**次のbeta以降で
+    `dyld_info -exports` の GS 系が公開SDKへ出てくるかを毎回確認する**のが監視方法
+  - **今できる実用解は変わらず「外部ツール(INRIA実装 / Postshot 等)で学習した .ply を
+    RealityKit Splat TOP に直接読ませる」**。RealityKit Splat TOP は本物の3DGS .ply を
+    そのまま描画できる(36.9万splatで約44fps実測)ので、**描画側は既に用意できている**
