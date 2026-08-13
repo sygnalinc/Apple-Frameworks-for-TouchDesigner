@@ -5913,3 +5913,46 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
     `wValue = コントロールセレクタ<<8`、`wIndex = (unitID<<8) | インターフェイス番号`
   - これで明るさ・コントラスト・彩度・シャープネス・ゲイン・色温度・フォーカス・ズーム・
     パン/チルトも同じ方法で触れる見込み(Processing Unit / Camera Terminal のコントロール)
+
+### 2026-08-13 AVF Camera に UVC コントロールとビデオ通話機能を追加(途中・カメラを壊しかけた)
+
+- ユーザー「uvc control 追加したい。さらに mac に標準でついている webcam のビデオ通話用機能を
+  op から操作できないか」+「AppleIntents フレームワークには含まれてない?」
+- **AppleIntents(AppIntents)には無い**(SDK実測)。カメラ関連は `CameraCaptureIntent` /
+  `StartCameraCaptureIntent` / `FlipCameraIntent` だけで、これは**自分のアプリの機能を
+  Siri/ショートカットへ公開する**ための仕組み。`portrait` / `studioLight` / `centerStage` /
+  `reaction` はヒット0。ユーザー環境のショートカット一覧にも該当なし
+- **ビデオ通話機能で操作できるもの(コンパイル実測)**: **センターフレーム(`isCenterStageEnabled`)は
+  設定可 / リアクションは `performEffect(for:)` で発火可**。ポートレート・スタジオ照明・背景・
+  リアクション有効化は**すべて get のみ**(setter が無い)。読める状態は Info CHOP に出している
+
+**UVC(USB のコントロール転送)で判明したこと — 3つとも実測**
+
+1. **Processing Unit の ID は 2 とは限らない**。BRIO は **3**(Camera Terminal は 1)。
+   決め打ちすると明るさ・コントラスト等が丸ごと無効判定になる。**コンフィグレーション
+   ディスクリプタを歩いて拾う**(`GetConfigurationDescriptorPtr` は **open 不要**で読める。
+   VideoControl = class 0x0E / subclass 0x01、CS_INTERFACE 0x24 の subtype 0x02=INPUT_TERMINAL・
+   0x05=PROCESSING_UNIT)
+2. **コントロール転送はカメラがストリーミングしていないと `kIOReturnNotResponding`(0xe00002ed)**。
+   デバイスを選んだ時点でプローブすると全滅する。**最初のフレームが届いてからプローブする**
+3. **対応判定に GET_MIN/MAX を使ってはいけない**。AE モードのようなビットマップ型は MIN/MAX を
+   返さないので落ちる。GET_CUR を先に出し、GET_INFO(bit0=GET可/bit1=SET可)は後から補助に使う
+   (**GET_INFO は wLength=1 固定**。コントロールの長さで要求すると STALL する)
+
+**やらかし: ユーザーのカメラをバスから落とした**
+
+- `USBDeviceOpen` は排他アクセス。**開きっぱなしにしていた**ため macOS のビデオドライバと
+  取り合いになり、**BRIO が USB のバス上から完全に消え、AVFoundation の一覧からも消えた**
+  (`system_profiler` で VID 1133/PID 2142 が見つからない状態)。**抜き差しが必要**
+- 修正: `Session`(RAII)を入れ、**転送のあいだだけ開いて必ず閉じる**。ディスクリプタ読みは
+  open 不要なので attach 時には開かない。送る値が無ければ開かない
+- **教訓**: 他のドライバが使っている USB デバイスを排他で開いたまま保持しない。
+  必要な瞬間だけ開く。ユーザーのハードウェアを触る実装は、失敗したときの実害が大きい
+
+**次にやること(カメラを挿し直してから)**
+
+- 修正版で「プローブ → 対応コントロールだけ有効 → 値の読み書き」を実機確認する
+  (Info DAT の `Info DAT` メニューを `UVC Controls` にすると usb_status / unit_ids /
+  last_error / 各コントロールの min/max/current が読める)
+- Exposure/Focus の **Locked** が実際に絵を固定するかの視認確認(未実施)
+- demo.toe への利用例追加(未着手)

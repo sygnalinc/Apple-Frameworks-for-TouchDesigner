@@ -7,4 +7,4 @@ PYINC="/Applications/TouchDesigner.app/Contents/Frameworks/Python.framework/Vers
 export TD_EXTRA_CFLAGS="-I $PYINC -undefined dynamic_lookup"
 export TD_SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP"
 source ../common/build_plugin.sh
-build_td_plugin AVFCameraTOP avf-camera-top AVFCameraTOP.mm -- AVFoundation CoreMedia CoreVideo
+build_td_plugin AVFCameraTOP avf-camera-top AVFCameraTOP.mm -- AVFoundation CoreMedia CoreVideo IOKit

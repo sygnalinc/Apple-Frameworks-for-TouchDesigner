@@ -17,6 +17,8 @@
 // (ScreenCapture TOP と同じ型)。受信は専用キューで、cook は最新フレームを上げるだけ。
 #include "TOP_CPlusPlusBase.h"
 #include "../common/NonCommercialLimit.h"
+#include "UVCControl.h"
+#include "../common/PyCallbacksBootstrap.h"
 #import <AVFoundation/AVFoundation.h>
 #import <Foundation/Foundation.h>
 #include <atomic>
@@ -77,7 +79,7 @@ static void avfPushFrame(void* owner, const uint8_t* src, size_t rowBytes, uint3
 
 class AVFCameraTOP final : public TOP_CPlusPlusBase {
 public:
-    AVFCameraTOP(const OP_NodeInfo*, TOP_Context* c) : myContext(c)
+    AVFCameraTOP(const OP_NodeInfo* ni, TOP_Context* c) : myNode(ni), myContext(c)
     {
         myQueue = dispatch_queue_create("tdappleops.avfcamera", DISPATCH_QUEUE_SERIAL);
         mySink = [[AVFCamSink alloc] init];
@@ -114,6 +116,9 @@ public:
         else if (uid != myOpenUID || fmtIdx != myOpenFormat) { startSession(uid, fmtIdx); }
 
         if (myDevice) applyControls(in);
+        myInfoUVC = !strcmp(in->getParString("Infodatmode"), "uvc");
+        handleUVC(in);
+        if (myPendingReaction.exchange(false)) sendReaction(in);
 
         // 最新フレームをアップロード。
         // **1080p60 は 1フレーム 8MB。中間バッファを挟むとコピーが倍になる**ので、
@@ -156,6 +161,9 @@ public:
     void pulsePressed(const char* name, void*) override
     {
         if (!strcmp(name, "Refreshdevices")) myDevicesChanged = true;
+        else if (!strcmp(name, "Sendreaction")) myPendingReaction = true;
+        else if (!strcmp(name, "Uvcapply")) myUvcApply = true;
+        else if (!strcmp(name, "Uvcread")) myUvcRead = true;
     }
 
     void setupParameters(OP_ParameterManager* m, void*) override
@@ -193,6 +201,38 @@ public:
         // **Center Stage だけがアプリから設定できる**(実測)。Portrait / Studio Light は
         // setter が無く、コントロールセンター側でユーザーが決める。状態は Info CHOP に出す
         { OP_NumericParameter p("Centerstage"); p.label = "Center Stage"; p.page = CTRL; m->appendToggle(p); }
+        {
+            // リアクション(ハート等)は任意のタイミングで出せる。有効化自体はユーザー側の設定
+            OP_StringParameter p("Reaction");
+            p.label = "Reaction"; p.page = CTRL; p.defaultValue = "heart";
+            const char* n[] = {"thumbsUp", "thumbsDown", "balloons", "heart", "fireworks",
+                               "rain", "confetti", "lasers"};
+            const char* l[] = {"Thumbs Up", "Thumbs Down", "Balloons", "Heart", "Fireworks",
+                               "Rain", "Confetti", "Lasers"};
+            m->appendMenu(p, 8, n, l);
+        }
+        { OP_NumericParameter p("Sendreaction"); p.label = "Send Reaction"; p.page = CTRL; m->appendPulse(p); }
+
+        // --- UVC コントロール ---
+        // **macOS の AVFoundation には手動露出が無い**ので、ここは USB のコントロール転送で直接叩く。
+        // 対応していないコントロールは接続時のプローブで無効化する
+        const char* UVC = "UVC";
+        for (const tduvc::Control& c : tduvc::defaultControls()) {
+            OP_NumericParameter p(c.name);
+            p.label = c.label; p.page = UVC;
+            p.defaultValues[0] = 0;
+            p.minSliders[0] = 0; p.maxSliders[0] = 1000;
+            m->appendFloat(p);
+        }
+        { OP_NumericParameter p("Uvcapply"); p.label = "Apply UVC Values"; p.page = UVC; m->appendPulse(p); }
+        { OP_NumericParameter p("Uvcread"); p.label = "Read From Camera"; p.page = UVC; m->appendPulse(p); }
+        {
+            OP_StringParameter p("Infodatmode");
+            p.label = "Info DAT"; p.page = UVC; p.defaultValue = "formats";
+            const char* nm[] = {"formats", "uvc"};
+            const char* lb[] = {"Formats", "UVC Controls"};
+            m->appendMenu(p, 2, nm, lb);
+        }
     }
 
     void buildDynamicMenu(const OP_Inputs* in, OP_BuildDynamicMenuInfo* info, void*) override
@@ -247,16 +287,42 @@ public:
     bool getInfoDATSize(OP_InfoDATSize* s, void*) override
     {
         std::lock_guard<std::mutex> l(myMutex);
-        s->rows = (int32_t)myFormats.size() + 1;
         s->cols = 5;
         s->byColumn = false;
+        // UVC モードは 診断3行 + コントロール数 + ヘッダ
+        s->rows = myInfoUVC ? (int32_t)myUvcCtrls.size() + 4 : (int32_t)myFormats.size() + 1;
         return true;
     }
 
     void getInfoDATEntries(int32_t row, int32_t nCols, OP_InfoDATEntries* e, void*) override
     {
         static const char* hdr[5] = {"index", "width", "height", "pixel", "max_fps"};
+        static const char* uhdr[5] = {"control", "supported", "min", "max", "current"};
         std::lock_guard<std::mutex> l(myMutex);
+        if (myInfoUVC) {
+            auto put = [&](const char* a, const char* b, const char* c2, const char* d, const char* e2) {
+                const char* v[5] = {a, b, c2, d, e2};
+                for (int i = 0; i < nCols && i < 5; i++) e->values[i]->setString(v[i]);
+            };
+            char t[5][32] = {};
+            if (row == 0) { put(uhdr[0], uhdr[1], uhdr[2], uhdr[3], uhdr[4]); return; }
+            if (row == 1) { put("usb_status", myUVC.status().c_str(), "", "", ""); return; }
+            if (row == 2) {
+                snprintf(t[0], 32, "%d", myUVC.cameraUnit());
+                snprintf(t[1], 32, "%d", myUVC.processingUnit());
+                snprintf(t[2], 32, "%d", myUVC.vcInterface());
+                put("unit_ids", "camera / processing / interface", t[0], t[1], t[2]);
+                return;
+            }
+            if (row == 3) { put("last_error", myUVC.lastError().c_str(), "", "", ""); return; }
+            const int i = row - 4;
+            if (i < 0 || i >= (int)myUvcCtrls.size()) return;
+            const tduvc::Control& c = myUvcCtrls[i];
+            snprintf(t[2], 32, "%d", c.minV); snprintf(t[3], 32, "%d", c.maxV);
+            snprintf(t[4], 32, "%d", c.cur);
+            put(c.label, c.supported ? (c.canSet ? "get+set" : "get only") : "no", t[2], t[3], t[4]);
+            return;
+        }
         if (row == 0) {
             for (int i = 0; i < nCols && i < 5; i++) e->values[i]->setString(hdr[i]);
             return;
@@ -271,6 +337,25 @@ public:
         snprintf(d, sizeof d, "%.2f", f.maxFps);
         const char* vals[5] = {a, b, c, f.pixel.c_str(), d};
         for (int i = 0; i < nCols && i < 5; i++) e->values[i]->setString(vals[i]);
+    }
+
+    void sendReaction(const OP_Inputs* in)
+    {
+        if (@available(macOS 14.0, *)) {
+            AVCaptureDevice* d = myDevice;
+            if (!d || !d.canPerformReactionEffects) { setWarning("This camera cannot show reactions."); return; }
+            const char* r = in->getParString("Reaction");
+            const std::string rs = r ? r : "heart";
+            AVCaptureReactionType t = AVCaptureReactionTypeHeart;
+            if (rs == "thumbsUp") t = AVCaptureReactionTypeThumbsUp;
+            else if (rs == "thumbsDown") t = AVCaptureReactionTypeThumbsDown;
+            else if (rs == "balloons") t = AVCaptureReactionTypeBalloons;
+            else if (rs == "fireworks") t = AVCaptureReactionTypeFireworks;
+            else if (rs == "rain") t = AVCaptureReactionTypeRain;
+            else if (rs == "confetti") t = AVCaptureReactionTypeConfetti;
+            else if (rs == "lasers") t = AVCaptureReactionTypeLasers;
+            @try { [d performEffectForReaction:t]; } @catch (NSException*) {}
+        }
     }
 
     void getWarningString(OP_String* w, void*) override
@@ -303,6 +388,64 @@ public:
     }
 
 private:
+    // UVC は AVFoundation とは別経路。カメラを開いたときに一緒に開いてプローブする
+    void openUVC(const std::string& modelID)
+    {
+        myUVC.detach();
+        myUvcCtrls = tduvc::defaultControls();
+        int vid = 0, pid = 0;
+        if (!tduvc::Device::parseModelID(modelID, vid, pid)) return;
+        if (!myUVC.attach(vid, pid)) return;
+        // **プローブはここでやらない**。UVC のコントロール転送は
+        // カメラが実際にストリーミングしていないと kIOReturnNotResponding になる(実測)。
+        // 最初のフレームが届いてから handleUVC でプローブする
+        myUvcProbed = false;
+    }
+
+    void handleUVC(const OP_Inputs* in)
+    {
+        if (!myUVC.isOpen()) return;
+        if (!myUvcProbed) {
+            if (myFrames.load() == 0) return;      // 映像が流れるまで待つ
+            myUVC.probe(myUvcCtrls);
+            myUvcProbed = true;
+            myUvcNeedsPush = true;                 // 実機の現在値をパラメータへ反映する
+        }
+        // 対応していないコントロールはグレーアウトしておく
+        for (const tduvc::Control& c : myUvcCtrls) in->enablePar(c.name, c.supported);
+
+        if (myUvcRead.exchange(false)) {       // 明示的な読み直しはプローブからやり直す
+            myUVC.probe(myUvcCtrls);
+            myUvcNeedsPush = true;
+        }
+        if (myUvcNeedsPush.exchange(false)) {
+            // カメラの現在値をパラメータへ書き戻す(ユーザーはそこから編集する)
+            std::vector<std::pair<std::string, double>> vals;
+            tduvc::Device::Session s(myUVC);
+            for (tduvc::Control& c : myUvcCtrls) {
+                if (!c.supported) continue;
+                int32_t cur = 0;
+                if (myUVC.get(c, tduvc::kGetCur, cur)) { c.cur = cur; vals.push_back({c.name, (double)cur}); }
+            }
+            if (!vals.empty()) tdpycb::setFloatPars(myNode, vals);
+            return;   // 書き戻した直後は送り返さない
+        }
+
+        const bool force = myUvcApply.exchange(false);
+        // 送るものがあるときだけ開く(常時開いているとカメラがバスから落ちる)
+        std::vector<std::pair<tduvc::Control*, int32_t>> todo;
+        for (tduvc::Control& c : myUvcCtrls) {
+            if (!c.supported || !c.canSet) continue;
+            const int32_t want = (int32_t)llround(in->getParDouble(c.name));
+            if (!force && want == c.cur) continue;      // 変わったときだけ送る
+            todo.push_back({&c, want});
+        }
+        if (todo.empty()) return;
+        tduvc::Device::Session s(myUVC);
+        if (!s.ok) return;
+        for (auto& t : todo) if (myUVC.set(*t.first, t.second)) t.first->cur = t.second;
+    }
+
     void setWarning(const std::string& w) { std::lock_guard<std::mutex> l(myMutex); myWarning = w; }
 
     void rescan()
@@ -363,6 +506,7 @@ private:
             if (!d) return;
             myDevice = d;
             buildFormats(d);
+            openUVC(toStr(d.modelID));
 
             @try {
             AVCaptureSession* s = [[AVCaptureSession alloc] init];
@@ -475,6 +619,7 @@ private:
         myRunning = false;
     }
 
+    const OP_NodeInfo* myNode;
     TOP_Context* myContext;
     dispatch_queue_t myQueue = nullptr;
     AVFCamSink* mySink = nil;
@@ -495,7 +640,12 @@ private:
     int myPresetPath = 0, myFmtLocked = -1;
 
     std::atomic<uint64_t> myExec{0}, myFrames{0};
-    std::atomic<bool> myDevicesChanged{false};
+    std::atomic<bool> myDevicesChanged{false}, myPendingReaction{false};
+    std::atomic<bool> myUvcApply{false}, myUvcRead{false}, myUvcNeedsPush{false};
+    bool myUvcProbed = false;
+    tduvc::Device myUVC;
+    std::vector<tduvc::Control> myUvcCtrls;
+    bool myInfoUVC = false;
 };
 
 static void avfPushFrame(void* owner, const uint8_t* src, size_t rowBytes, uint32_t w, uint32_t h)
