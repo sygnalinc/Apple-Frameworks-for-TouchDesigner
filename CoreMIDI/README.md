@@ -79,6 +79,18 @@ With `MIDI Clock` the op sends 24 PPQN locked to TD's timeline:
 - **Tempo** is a plain parameter — bind it to the timeline with the expression `root.time.tempo`
   (the example does) and changing TD's tempo changes the clock
 
+**Following the timeline and driving the transport by hand are different goals**, so **Sync Source**
+picks which one runs the stream:
+
+| Sync Source | Position comes from | Play / Stop / Return to Start |
+|---|---|---|
+| `TD Timeline` | TD's timeline | Sent as MMC / realtime. A DAW that is slaved to the sync stream will ignore them |
+| `Manual` | This op, advancing on the real clock | **They run the stream itself** — Play starts it, Stop freezes it, Return to Start rewinds |
+
+`Manual` is what you want when the DAW stays slaved but you need to start it at an arbitrary
+moment: the DAW follows the stream, and the stream follows these buttons. It keeps running with
+TD's timeline stopped.
+
 With `MTC` it sends quarter frames carrying `hh:mm:ss:ff` derived from the timeline, at the frame
 rate chosen in **MTC Frame Rate** (24 / 25 / 29.97 drop / 30).
 
@@ -122,6 +134,7 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
 | MMC Device ID | 0–127, default 127 (all devices) |
 | Play / Stop / Record / Return to Start | DAW transport pulses |
 | Sync Mode | `Off` (default) / `MIDI Clock (24 PPQN)` / `MTC (MIDI Time Code)` |
+| Sync Source | `TD Timeline` (default) / `Manual (transport buttons)` |
 | MTC Frame Rate | 24 / 25 / 29.97 drop / 30 (MTC only). Match the DAW |
 | MTC Offset (hh:mm:ss:ff) | The DAW's project start. Default `01:00:00:00` (Logic's default) |
 | Tempo (BPM) | Clock tempo. Bind to `root.time.tempo` to follow the timeline |
@@ -129,8 +142,9 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
 
 ### Notes
 
-- **A CHOP does not cook unless its output is used.** The automatic Note Off is handled during cook,
-  so connect the output to a Null CHOP while testing, or notes will hang.
+- This op **cooks every frame whether or not its output is used**, and keeps cooking when the
+  timeline is stopped. A MIDI sink that only runs when someone looks at it is useless — pulses,
+  automatic Note Offs and the sync stream all need cook.
 - Notes are MIDI 1.0. MIDI 2.0 (UMP) is not implemented yet.
 - **Logic Pro publishes its own virtual input while it is running**, so you do not need the IAC
   Driver to send to it. The name is localised.
@@ -155,6 +169,9 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
   rate code 3 (30 fps) and a timecode of `00:00:03:06` matching the timeline
 - **MTC Offset**: with `01:00:00:00` and 29.97 drop, the reconstructed timecode was `01:00:06:00`
   with rate code 2 — offset and rate both land where Logic expects them
+- **Manual sync source**: with the TD timeline stopped and nothing pulling the output, Play produced
+  366 quarter frames in 3 s (360 in theory) and the timecode advanced `01:00:03:00` → `:08`; Stop
+  halted it completely (0 in 3 s); Return to Start rewound to `01:00:00:24`
 
 ### Build
 
@@ -242,6 +259,17 @@ MTC にする(MMC の**受信**設定も同じダイアログ内。同期タブ�
 - **Tempo** はただのパラメータなので、式で `root.time.tempo` に束ねるとタイムラインのテンポに
   追従する(利用例はそうしてある)
 
+**タイムラインに追従させることと、任意のタイミングでトランスポートを操作することは別の目的**
+なので、**Sync Source** でどちらがストリームを駆動するかを選ぶ。
+
+| Sync Source | 位置の出どころ | Play / Stop / Return to Start |
+|---|---|---|
+| `TD Timeline` | TD のタイムライン | MMC / リアルタイムとして送る。同期に従っている DAW はこれを無視する |
+| `Manual` | このOP(実時計で進む) | **ストリームそのものを制御する** — Play で走り出し、Stop で止まり、Return to Start で頭出し |
+
+**DAW を同期モードにしたまま、任意のタイミングで走らせたいときは `Manual`。** DAW はストリームに
+従い、ストリームはこのボタンに従う。**TD のタイムラインを止めていても動く。**
+
 `MTC` にすると、タイムラインから作った `hh:mm:ss:ff` をクォーターフレームで送る。
 フレームレートは **MTC Frame Rate**(24 / 25 / 29.97 drop / 30)で選ぶ。
 
@@ -285,6 +313,7 @@ Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online
 | MMC Device ID | 0〜127。既定 127(全デバイス宛) |
 | Play / Stop / Record / Return to Start | DAW のトランスポート操作 |
 | Sync Mode | `Off`(既定)/ `MIDI Clock (24 PPQN)` / `MTC (MIDI Time Code)` |
+| Sync Source | `TD Timeline`(既定)/ `Manual (transport buttons)` |
 | MTC Frame Rate | 24 / 25 / 29.97 drop / 30(MTC のみ)。DAW に合わせる |
 | MTC Offset (hh:mm:ss:ff) | DAW のプロジェクト開始位置。既定 `01:00:00:00`(Logic の既定) |
 | Tempo (BPM) | クロックのテンポ。`root.time.tempo` に束ねるとタイムラインに追従 |
@@ -292,8 +321,9 @@ Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online
 
 ### 注意
 
-- **CHOP は出力が使われていないと cook されない。** 自動 Note Off は cook で処理するので、
-  テスト中は出力を Null CHOP などに繋いでおく(繋がないと音が鳴りっぱなしになる)
+- このOPは**出力が使われていなくても毎フレーム cook する**。タイムラインを止めていても動く。
+  パルスも自動 Note Off も同期ストリームも cook が要るので、見られていないと動かない
+  MIDI 出力では困るため
 - 送信は MIDI 1.0。MIDI 2.0 (UMP) は未実装
 - **Logic Pro は起動していれば自前の仮想入力を公開する**ので、送るのに IAC ドライバは要らない。
   名前は言語設定で変わる
@@ -315,6 +345,9 @@ Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online
   タイムコード `00:00:03:06` がタイムライン位置と一致することを確認
 - **MTC Offset**: `01:00:00:00` + 29.97 drop で、復元したタイムコードが `01:00:06:00`・
   レートコード2。オフセットもレートも Logic が期待する値になることを確認
+- **Sync Source = Manual**: TD のタイムラインを止め、出力を誰も参照していない状態で Play →
+  3秒で 366個(理論360)、タイムコードは `01:00:03:00` → `:08` と実時間で進行。Stop で完全停止
+  (3秒で0個)、Return to Start で `01:00:00:24` へ頭出し
 
 ### ビルド
 

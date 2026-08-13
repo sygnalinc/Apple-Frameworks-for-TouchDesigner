@@ -83,7 +83,11 @@ public:
 
     void getGeneralInfo(CHOP_GeneralInfo* g, const OP_Inputs*, void*) override
     {
-        g->cookEveryFrameIfAsked = true;
+        // **MIDI 出力は「出力を誰も見ていなくても動かないと意味がない」種類のノード**。
+        // cookEveryFrameIfAsked だと下流が無いときに cook されず、パルスも自動 Note Off も
+        // 同期ストリームも止まる。さらに **タイムラインを止めると frame 系の駆動も消える**ため、
+        // 手動トランスポートが効かなくなる(実際に踏んだ)。cookEveryFrame で常に回す。
+        g->cookEveryFrame = true;
         g->timeslice = false;
     }
 
@@ -127,6 +131,7 @@ public:
             myPendingNote = myPendingCC = myPendingPanic = false;
             myPendingPlay = myPendingStop = myPendingRec = myPendingRewind = false;
             stopClock();
+            myManualRun = false;
         }
         flushNoteOffs(ch);
 
@@ -237,6 +242,17 @@ public:
             const char* nm[] = {"off", "clock", "mtc"};
             const char* lb[] = {"Off", "MIDI Clock (24 PPQN)", "MTC (MIDI Time Code)"};
             m->appendMenu(p, 3, nm, lb);
+        }
+        {
+            // 同期を何で駆動するか。**「タイムライン同期」と「任意のタイミングでの操作」は別目的**なので分ける。
+            //   timeline … TD のタイムラインに追従する(再生/停止もタイムライン任せ)
+            //   manual   … このOPが位置を持ち、Send ページの Play / Stop / Return to Start で動かす。
+            //              DAW を同期モードにしたまま好きなタイミングで走らせたいときはこちら
+            OP_StringParameter p("Syncsource");
+            p.label = "Sync Source"; p.page = SYNC; p.defaultValue = "timeline";
+            const char* nm[] = {"timeline", "manual"};
+            const char* lb[] = {"TD Timeline", "Manual (transport buttons)"};
+            m->appendMenu(p, 2, nm, lb);
         }
         {
             // TD のタイムラインのテンポを式で入れる: root.time.tempo
@@ -481,6 +497,11 @@ private:
         const bool useRT = (mo != "mmc");
         const int dev = in->getParInt("Mmcdevice");
 
+        // Sync Source = manual のときは、同じボタンが同期ストリームの走行も制御する
+        if (rew) myManualSec = 0;
+        if (stop) myManualRun = false;
+        if (play) myManualRun = true;
+
         if (rew) {
             // MMC Locate: F0 7F <id> 06 44 06 01 hh mm ss ff sf F7 (00:00:00:00)
             if (useMMC) {
@@ -550,11 +571,31 @@ private:
         const OP_TimeInfo* ti = in->getTimeInfo();
         if (!ti || ti->rate <= 0) return;
 
-        // タイムラインが進んでいるか = フレームが変化したか
-        const double frame = ti->frame;
-        const bool playing = (frame != myLastFrame);
-        myLastFrame = frame;
-        const double sec = frame / ti->rate;
+        const char* srcp = in->getParString("Syncsource");
+        const bool manual = (srcp && !strcmp(srcp, "manual"));
+
+        double sec;
+        bool playing;
+        if (manual) {
+            // このOPが位置を持つ。Play で走り出し、Stop で止まり、Return to Start で頭へ戻る。
+            // DAW を同期モードにしたまま、任意のタイミングで走らせられる。
+            //
+            // **時間は実時計で進める。** `ti->deltaMS` は deltaFrames×1フレームのミリ秒なので、
+            // **タイムラインを止めると 0 になり位置が進まない**(実際に踏んだ)。
+            // 手動トランスポートはタイムラインから独立しているべきなので mach 時計を使う。
+            const MIDITimeStamp nowHost = mach_absolute_time();
+            if (myManualRun && myManualLastHost)
+                myManualSec += (double)(nowHost - myManualLastHost) * hostToSec();
+            myManualLastHost = nowHost;
+            sec = myManualSec;
+            playing = myManualRun;
+        } else {
+            // タイムラインが進んでいるか = フレームが変化したか
+            const double frame = ti->frame;
+            playing = (frame != myLastFrame);
+            myLastFrame = frame;
+            sec = frame / ti->rate;
+        }
 
         if (mo == "mtc") { syncMTC(in, sec, playing); return; }
 
@@ -750,6 +791,9 @@ private:
     std::atomic<bool> myQuit{false}, myReady{false}, mySetupChanged{false}, myRefresh{false};
     std::atomic<bool> myPendingNote{false}, myPendingCC{false}, myPendingPanic{false};
     std::atomic<bool> myPendingPlay{false}, myPendingStop{false}, myPendingRec{false}, myPendingRewind{false};
+    bool myManualRun = false;      // Sync Source = manual のときの走行状態
+    double myManualSec = 0;        // 同 位置(秒)
+    MIDITimeStamp myManualLastHost = 0;   // 同 実時計の前回値
     std::atomic<uint64_t> myExec{0}, mySends{0}, myClocks{0};
     bool myClockRunning = false;
     long long myTick = -1;
@@ -770,6 +814,8 @@ DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* info)
     x.opIcon->setString("CMO");
     x.authorName->setString("SYGNAL Inc.");
     x.authorEmail->setString("info@sygnal.tokyo");
+    // 出力を誰も見ていないノードの cook を起動時に始動させる(SDK が MIDI/TCP 出力向けに案内している)
+    x.cookOnStart = true;
     x.minInputs = 0;
     x.maxInputs = 1;
     x.majorVersion = 0;
