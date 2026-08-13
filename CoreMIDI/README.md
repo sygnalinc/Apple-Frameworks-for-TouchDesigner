@@ -126,6 +126,7 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
 | Active | Off stops all sending and clears pending Note Offs |
 | Device | Destination, stored as its **UniqueID** so a replug re-binds to the same unit |
 | Refresh Devices | Re-enumerate by hand (normally unnecessary — hot-plug is automatic) |
+| Restart MIDI System | `MIDIRestart()` — ask the MIDI drivers to rescan for hardware |
 | Channel | MIDI channel 1–16 |
 | Note / Velocity / Note Duration | The note sent by Send Note |
 | Send Note / Send CC / All Notes Off | Pulses |
@@ -186,6 +187,27 @@ covers those. This op exists for the two things TD cannot do:
 
 Device selection is by **UniqueID** with hot-plug, exactly like CoreMIDI Out.
 
+### If a device does not appear in the Device menu
+
+Hot-plug is verified: with the op present, unplugging and replugging a Launchkey Mini MK4 took the
+device count 2 → 0 → 2 on its own, and a node created afterwards saw it immediately.
+
+One case was seen where a device that other applications could enumerate did **not** appear inside
+TouchDesigner — the count stayed at 0 even after **Refresh Devices**, and TD's own
+`/local/midi/midi_inputs` was empty too. Restarting TouchDesigner fixed it, and the same sequence
+could not be reproduced afterwards. If you hit it, in order of increasing disruption:
+
+1. **Refresh Devices** — re-enumerates
+2. **Restart MIDI System** — calls `MIDIRestart()`, which asks the MIDI drivers to rescan for
+   hardware. Verified not to disturb a working setup (2 devices before and after, no errors); it
+   has **not** been verified against the failure above, because the failure did not recur
+3. Restart TouchDesigner — this is what actually fixed it the one time it happened
+
+The op also re-enumerates on its own about every two seconds, so a missed notification heals itself.
+
+**Remember this op does not handle notes or CC.** A keyboard's keys and pads go through TD's own
+MIDI In CHOP; select the device here only for clock and MTC.
+
 ### Output channels
 
 | Channel | Meaning |
@@ -205,6 +227,7 @@ Device selection is by **UniqueID** with hot-plug, exactly like CoreMIDI Out.
 |---|---|
 | Device | Source, stored as its **UniqueID** |
 | Refresh Devices | Re-enumerate by hand (hot-plug is automatic) |
+| Restart MIDI System | `MIDIRestart()` — see "If a device does not appear" above |
 | Beats Per Bar | Divisor for `bar` |
 | BPM Smoothing (clocks) | How many clock ticks to average. Smaller follows faster, larger is steadier. Default 24 = one beat |
 
@@ -351,6 +374,7 @@ Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online
 | Active | Off で送信を止め、保留中の Note Off も破棄する |
 | Device | 送り先。**UniqueID で保持**するので挿し直しても同じ機材に繋ぎ直る |
 | Refresh Devices | 手動で再列挙(通常は不要。ホットプラグは自動) |
+| Restart MIDI System | `MIDIRestart()`。MIDI ドライバにハードウェアを再スキャンさせる |
 | Channel | MIDI チャンネル 1〜16 |
 | Note / Velocity / Note Duration | Send Note で送るノート |
 | Send Note / Send CC / All Notes Off | パルス |
@@ -408,6 +432,26 @@ DAW / 機材から**同期情報**を受け取る。ノートや CC はここで
 
 デバイスの選択は CoreMIDI Out と同じく **UniqueID**、ホットプラグも反映する。
 
+### デバイスが Device メニューに出ないとき
+
+ホットプラグは検証済み: op を置いた状態で Launchkey Mini MK4 を抜き挿しすると、デバイス数が
+自動で 2 → 0 → 2 と追従し、その後に新規作成したノードもすぐ認識した。
+
+一度だけ、**他のアプリからは列挙できるデバイスが TouchDesigner の中だけ見えない**ことがあった。
+**Refresh Devices** を押しても 0 のままで、TD 本体の `/local/midi/midi_inputs` も空だった。
+TouchDesigner を再起動したら直り、その後は同じ手順で再現しなかった。遭遇したら、影響の小さい順に:
+
+1. **Refresh Devices** — 列挙し直す
+2. **Restart MIDI System** — `MIDIRestart()` を呼び、MIDI ドライバにハードウェアの再スキャンを
+   させる。**正常な状態を壊さないことは確認済み**(前後とも 2 台・エラーなし)。ただし上記の
+   症状に効くかは**未検証**(再現しなくなったため)
+3. TouchDesigner を再起動する — 実際に直ったのはこれ
+
+なお op 自身も 2 秒に 1 回ほど列挙し直すので、通知を取りこぼしても自力で戻る。
+
+**このopはノートや CC を扱わない**ことに注意。鍵盤やパッドは TD 標準の MIDI In CHOP を使う。
+ここでデバイスを選ぶのは clock と MTC のためだけ。
+
 ### 出力チャンネル
 
 | チャンネル | 意味 |
@@ -427,6 +471,7 @@ DAW / 機材から**同期情報**を受け取る。ノートや CC はここで
 |---|---|
 | Device | 入力元。**UniqueID で保持** |
 | Refresh Devices | 手動で再列挙(ホットプラグは自動) |
+| Restart MIDI System | `MIDIRestart()`。上の「デバイスが出ないとき」を参照 |
 | Beats Per Bar | `bar` の割り算に使う拍数 |
 | BPM Smoothing (clocks) | 何 clock ぶんで平均するか。小さいと追従が速く、大きいと安定する。既定24 = 1拍 |
 

@@ -89,8 +89,16 @@ public:
         myExec++;
 
         // ホットプラグ、または Refresh パルスで一覧を作り直す
+        if (myRestart.exchange(false)) {
+            // **TD 起動時に MIDI デバイスが1つも無かった場合**、後から挿しても
+            // プロセスが気づかないことがある。ドライバに再スキャンさせて拾い直す
+            MIDIRestart();
+            rescan();
+        }
         if (mySetupChanged.exchange(false) || myRefresh.exchange(false))
             rescan();
+        // 通知を取りこぼしても自力で戻れるように、たまに列挙し直す(数msなので安い)
+        else if (++myRescanTick >= 120) { myRescanTick = 0; rescan(); }
         if (myDevices.empty() && myExec == 1) rescan();
 
         const bool active = in->getParInt("Active") != 0;
@@ -126,6 +134,7 @@ public:
         else if (!strcmp(name, "Sendcc")) myPendingCC = true;
         else if (!strcmp(name, "Allnotesoff")) myPendingPanic = true;
         else if (!strcmp(name, "Refreshdevices")) myRefresh = true;
+        else if (!strcmp(name, "Restartmidi")) myRestart = true;
         else if (!strcmp(name, "Play")) myPendingPlay = true;
         else if (!strcmp(name, "Stop")) myPendingStop = true;
         else if (!strcmp(name, "Record")) myPendingRec = true;
@@ -150,6 +159,11 @@ public:
         {
             OP_NumericParameter p("Refreshdevices");
             p.label = "Refresh Devices"; p.page = PAGE;
+            m->appendPulse(p);
+        }
+        {
+            OP_NumericParameter p("Restartmidi");
+            p.label = "Restart MIDI System"; p.page = PAGE;
             m->appendPulse(p);
         }
         {
@@ -749,6 +763,8 @@ private:
     std::vector<float> myLast;
 
     std::atomic<bool> myQuit{false}, myReady{false}, mySetupChanged{false}, myRefresh{false};
+    std::atomic<bool> myRestart{false};
+    int myRescanTick = 0;
     std::atomic<bool> myPendingNote{false}, myPendingCC{false}, myPendingPanic{false};
     std::atomic<bool> myPendingPlay{false}, myPendingStop{false}, myPendingRec{false}, myPendingRewind{false};
     bool myManualRun = false;      // Sync Source = manual のときの走行状態

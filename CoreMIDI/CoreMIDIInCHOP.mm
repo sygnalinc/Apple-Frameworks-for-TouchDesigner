@@ -84,7 +84,15 @@ public:
     void execute(CHOP_Output* out, const OP_Inputs* in, void*) override
     {
         myExec++;
+        if (myRestart.exchange(false)) {
+            // **TD 起動時に MIDI デバイスが1つも無かった場合**、後から挿しても
+            // プロセスが気づかないことがある。ドライバに再スキャンさせて拾い直す
+            MIDIRestart();
+            rescan();
+        }
         if (mySetupChanged.exchange(false) || myRefresh.exchange(false)) rescan();
+        // 通知を取りこぼしても自力で戻れるように、たまに列挙し直す(数msなので安い)
+        else if (++myRescanTick >= 120) { myRescanTick = 0; rescan(); }
 
         const char* sel = in->getParString("Device");
         const SInt32 wantUID = (sel && *sel) ? (SInt32)strtol(sel, nullptr, 10) : 0;
@@ -118,6 +126,7 @@ public:
     void pulsePressed(const char* name, void*) override
     {
         if (!strcmp(name, "Refreshdevices")) myRefresh = true;
+        else if (!strcmp(name, "Restartmidi")) myRestart = true;
         else if (!strcmp(name, "Reset")) myReset = true;
     }
 
@@ -130,6 +139,7 @@ public:
             m->appendDynamicStringMenu(p);
         }
         { OP_NumericParameter p("Refreshdevices"); p.label = "Refresh Devices"; p.page = PAGE; m->appendPulse(p); }
+        { OP_NumericParameter p("Restartmidi"); p.label = "Restart MIDI System"; p.page = PAGE; m->appendPulse(p); }
         {
             OP_NumericParameter p("Beatsperbar");
             p.label = "Beats Per Bar"; p.page = PAGE;
@@ -352,6 +362,8 @@ private:
     bool myPlaying = false, myMtcValid = false;
     int myQF[8] = {}, myQFSeen = 0, myTC[4] = {};
 
+    std::atomic<bool> myRestart{false};
+    int myRescanTick = 0;
     std::atomic<bool> myQuit{false}, myReady{false}, mySetupChanged{false},
                       myRefresh{false}, myReset{false};
     std::atomic<uint64_t> myExec{0};
