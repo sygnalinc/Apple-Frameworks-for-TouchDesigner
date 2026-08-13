@@ -1,4 +1,4 @@
-# CoreMIDI Out
+# CoreMIDI Out / In
 
 **English** | [日本語](#日本語)
 
@@ -173,10 +173,56 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
   366 quarter frames in 3 s (360 in theory) and the timecode advanced `01:00:03:00` → `:08`; Stop
   halted it completely (0 in 3 s); Return to Start rewound to `01:00:00:24`
 
-### Build
+
+## CoreMIDI In
+
+Receives **sync** from a DAW or a device. Notes and CC are not handled here — TD's own MIDI In CHOP
+covers those. This op exists for the two things TD cannot do:
+
+1. **Turn MIDI Clock into a tempo.** TD shows clock messages but never gives you a BPM. Make the DAW
+   the tempo master and follow it in TD. **MTC carries no tempo**, so this is the only path for
+   tempo sync
+2. **Receive MTC.** TD has no MTC support at all
+
+Device selection is by **UniqueID** with hot-plug, exactly like CoreMIDI Out.
+
+### Output channels
+
+| Channel | Meaning |
+|---|---|
+| `connected` / `online` | The selected source resolved / reports itself online |
+| `playing` | 1 between Start/Continue and Stop. Also falls back to 0 if clock stops arriving for 0.5 s |
+| `bpm` | Derived from the interval between clock ticks (24 PPQN) |
+| `beat` | Quarter notes since the last Start, or since the last Song Position Pointer |
+| `bar` | `beat / Beats Per Bar` |
+| `tc_hours` `tc_minutes` `tc_seconds` `tc_frames` | Incoming MTC |
+| `tc_position` | The same timecode in seconds |
+| `tc_valid` | 1 once a full timecode has been assembled |
+
+### Parameters
+
+| Parameter | Meaning |
+|---|---|
+| Device | Source, stored as its **UniqueID** |
+| Refresh Devices | Re-enumerate by hand (hot-plug is automatic) |
+| Beats Per Bar | Divisor for `bar` |
+| BPM Smoothing (clocks) | How many clock ticks to average. Smaller follows faster, larger is steadier. Default 24 = one beat |
+
+### Measured (M2 / macOS 26.6)
+
+Against a virtual source emitting clock and MTC at a known tempo:
+
+- 128 BPM source → `bpm` 127.39; 90 BPM source → `bpm` 89.9 / 89.4 (the residual is the test
+  sender's own timer jitter)
+- `beat` advanced 59.125 → 64.417 in 3.53 s — 5.29 quarter notes against 5.3 expected at 90 BPM
+- MTC assembled to `tc_valid` = 1 with `00:00:18:06` → `00:00:21:22`, and `tc_position`
+  18.200 → 21.733 matching real elapsed time
+- Killing the source dropped `playing`, `connected` and `online` to 0 without restarting TD
+
+## Build
 
 ```bash
-cd CoreMIDI && ./build.sh
+cd CoreMIDI && ./build.sh          # Out と In の両方が build/ にできる
 cp -R build/CoreMIDIOutCHOP.plugin ~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins/
 ```
 
@@ -349,9 +395,55 @@ Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online
   3秒で 366個(理論360)、タイムコードは `01:00:03:00` → `:08` と実時間で進行。Stop で完全停止
   (3秒で0個)、Return to Start で `01:00:00:24` へ頭出し
 
-### ビルド
+
+## CoreMIDI In
+
+DAW / 機材から**同期情報**を受け取る。ノートや CC はここでは扱わない(TD 標準の MIDI In CHOP で
+足りる)。このOPがあるのは、TD にできない次の2つのため。
+
+1. **MIDI Clock からテンポを出す。** TD は clock メッセージを見せるだけで BPM にはしてくれない。
+   DAW をテンポマスターにして TD を追従させられる。**MTC はテンポを運ばない**ので、
+   テンポ同期はこの経路でしか成立しない
+2. **MTC を受ける。** TD は MTC に一切対応していない
+
+デバイスの選択は CoreMIDI Out と同じく **UniqueID**、ホットプラグも反映する。
+
+### 出力チャンネル
+
+| チャンネル | 意味 |
+|---|---|
+| `connected` / `online` | 選択中のソースが解決できた / オンラインを申告している |
+| `playing` | Start/Continue から Stop まで1。clock が 0.5秒途切れても 0 に戻す |
+| `bpm` | clock(24 PPQN)の間隔から算出 |
+| `beat` | 直近の Start または Song Position Pointer からの4分音符数 |
+| `bar` | `beat / Beats Per Bar` |
+| `tc_hours` `tc_minutes` `tc_seconds` `tc_frames` | 受信した MTC |
+| `tc_position` | 同じタイムコードを秒に直したもの |
+| `tc_valid` | タイムコードが1つ揃ったら1 |
+
+### パラメータ
+
+| パラメータ | 意味 |
+|---|---|
+| Device | 入力元。**UniqueID で保持** |
+| Refresh Devices | 手動で再列挙(ホットプラグは自動) |
+| Beats Per Bar | `bar` の割り算に使う拍数 |
+| BPM Smoothing (clocks) | 何 clock ぶんで平均するか。小さいと追従が速く、大きいと安定する。既定24 = 1拍 |
+
+### 実測(M2 / macOS 26.6)
+
+既知のテンポで clock と MTC を流す仮想ソースに対して:
+
+- 128 BPM の源 → `bpm` 127.39、90 BPM の源 → `bpm` 89.9 / 89.4
+  (残差は送信側テストツールのタイマ揺らぎ)
+- `beat` が 3.53秒で 59.125 → 64.417。90 BPM での理論値 5.3 拍に対し 5.29 拍
+- MTC は `tc_valid` = 1 になり `00:00:18:06` → `00:00:21:22`、`tc_position` は
+  18.200 → 21.733 で実経過時間と一致
+- ソースを落とすと `playing` / `connected` / `online` が **TD 再起動なしで** 0 になった
+
+## ビルド
 
 ```bash
-cd CoreMIDI && ./build.sh
+cd CoreMIDI && ./build.sh          # Out と In の両方が build/ にできる
 cp -R build/CoreMIDIOutCHOP.plugin ~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins/
 ```

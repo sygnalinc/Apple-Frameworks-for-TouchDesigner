@@ -14,6 +14,7 @@
 // 注意: CHOP は出力がどこかで使われていないと cook されない。Note の自動 Note Off も
 // cook で処理するので、テスト時は Null CHOP などに繋いでおくこと。
 #include "CHOP_CPlusPlusBase.h"
+#include "CoreMIDIShared.h"
 #import <CoreMIDI/CoreMIDI.h>
 #import <Foundation/Foundation.h>
 #include <mach/mach_time.h>
@@ -30,28 +31,7 @@ using namespace TD;
 
 namespace {
 
-struct Device {
-    SInt32 uid = 0;
-    bool online = true;
-    std::string name, manufacturer, model;
-};
-
-std::string strProp(MIDIObjectRef obj, CFStringRef key)
-{
-    CFStringRef s = nullptr;
-    if (MIDIObjectGetStringProperty(obj, key, &s) != noErr || !s) return "";
-    char buf[256] = {};
-    CFStringGetCString(s, buf, sizeof buf, kCFStringEncodingUTF8);
-    CFRelease(s);
-    return buf;
-}
-
-SInt32 intProp(MIDIObjectRef obj, CFStringRef key)
-{
-    SInt32 v = 0;
-    MIDIObjectGetIntegerProperty(obj, key, &v);
-    return v;
-}
+using tdmidi::Device;
 
 constexpr int kOutChans = 3;   // connected / online / sends
 const char* kOutNames[kOutChans] = {"connected", "online", "sends"};
@@ -387,20 +367,7 @@ private:
 
     void rescan()
     {
-        std::vector<Device> devs;
-        const ItemCount n = MIDIGetNumberOfDestinations();
-        for (ItemCount i = 0; i < n; i++) {
-            MIDIEndpointRef ep = MIDIGetDestination(i);
-            if (!ep) continue;
-            Device d;
-            d.uid = intProp(ep, kMIDIPropertyUniqueID);
-            d.online = intProp(ep, kMIDIPropertyOffline) == 0;
-            d.name = strProp(ep, kMIDIPropertyDisplayName);
-            if (d.name.empty()) d.name = strProp(ep, kMIDIPropertyName);
-            d.manufacturer = strProp(ep, kMIDIPropertyManufacturer);
-            d.model = strProp(ep, kMIDIPropertyModel);
-            devs.push_back(d);
-        }
+        std::vector<Device> devs = tdmidi::enumerate(false);
         {
             std::lock_guard<std::mutex> l(myMutex);
             myDevices.swap(devs);
@@ -417,17 +384,10 @@ private:
         return false;
     }
 
-    // **UniqueID から実体を引き直す。TD が持っていない API**
     void bindDevice(SInt32 uid)
     {
         myBoundUID = uid;
-        myDest = 0;
-        if (!uid) return;
-        MIDIObjectRef obj = 0;
-        MIDIObjectType type = kMIDIObjectType_Other;
-        if (MIDIObjectFindByUniqueID(uid, &obj, &type) == noErr &&
-            (type == kMIDIObjectType_Destination || type == kMIDIObjectType_ExternalDestination))
-            myDest = (MIDIEndpointRef)obj;
+        myDest = tdmidi::findByUID(uid, false);   // UniqueID で引き直す(TD が持っていない API)
     }
 
     void sendBytes(const uint8_t* b, int n)

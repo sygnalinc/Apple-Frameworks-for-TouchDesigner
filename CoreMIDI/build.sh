@@ -1,5 +1,5 @@
 #!/bin/zsh
-# CoreMIDI Out CHOP のビルド → build/CoreMIDIOutCHOP.plugin
+# CoreMIDI Out / In CHOP のビルド → build/CoreMIDI{Out,In}CHOP.plugin
 #
 # 1フォルダから複数バンドルを作る型(Cinematic と同じ)。CoreMIDI In を足すときは
 # 末尾に build_one を1行足す。共通ヘルパ(common/build_plugin.sh)は毎回 `rm -rf build`
@@ -35,4 +35,5 @@ PLIST
 }
 
 build_one CoreMIDIOutCHOP CoreMIDIOutCHOP.mm coremidi-out-chop
+build_one CoreMIDIInCHOP  CoreMIDIInCHOP.mm  coremidi-in-chop
 td_stamp_all

@@ -5822,3 +5822,27 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   Return to Start → `01:00:00:24` へ頭出し
 - README の「出力を Null CHOP に繋がないと cook されない」注意は**不要になったので削除**
   (常に cook するようになった)
+
+### 2026-08-13 CoreMIDI In CHOP 実装(MIDI Clock → BPM / MTC 受信)
+
+- ユーザー「CoreMIDI In を作って」。テンポ同期の議論の流れで、**DAW をテンポマスターにする経路**として実装
+- **意図的にノート/CC は扱わない**。TD 標準の MIDI In CHOP で足りるため。このOPの存在理由は
+  TD にできない2点に絞った:
+  1. **MIDI Clock を BPM / 拍位置にする**(TD は clock を数値化しない)
+  2. **MTC を受ける**(TD は MTC 非対応)
+- 出力12ch: `connected online playing bpm beat bar tc_hours tc_minutes tc_seconds tc_frames
+  tc_position tc_valid`。Info DAT にデバイス表、Info CHOP に診断
+- 実装: `MIDIInputPortCreateWithBlock` の受信ブロックは**状態更新だけ**にし、cook で読む。
+  BPM は `BPM Smoothing`(既定24 = 1拍)ぶんのホスト時刻差から算出。SPP(`F2`)で拍位置を補正。
+  MTC はクォーターフレーム8個を組んで `hh:mm:ss:ff` に。**clock が 0.5秒途切れたら playing=0**
+  (FC を取りこぼしても復帰できるように)
+- **共通部分を `CoreMIDI/CoreMIDIShared.h` に切り出した**(Device 構造体・プロパティ取得・
+  列挙・`MIDIObjectFindByUniqueID`)。Out 側も寄せて重複を消し、両方リビルドして動作確認済み
+- **実測(M2・既知テンポの仮想ソース)**: 128BPM → `bpm` 127.39、90BPM → 89.9/89.4
+  (残差は送信側テストツールのタイマ揺らぎ)。`beat` は3.53秒で 59.125→64.417 = 5.29拍
+  (理論5.3)。MTC は `tc_valid`=1 で `00:00:18:06`→`00:00:21:22`、`tc_position` が実経過時間と一致。
+  ソースを落とすと `playing`/`connected`/`online` が **TD 再起動なしで** 0
+- 検証ツール `/tmp/midi/clocksrc.swift`(仮想ソースを作り、既知 BPM の clock と MTC を流す)を作成。
+  **受信系の検証には「送る側」を自作するのが確実**
+- README(CoreMIDI 英日に In の節)+ ルート一覧(英日)+ demo.toe `/project1/CoreMIDIIn` を追加。
+  `PLUGINS.tsv` は**フォルダ単位なので CoreMIDI の行のまま**(1行で2バンドル)
