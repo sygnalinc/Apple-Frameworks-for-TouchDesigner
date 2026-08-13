@@ -12,6 +12,30 @@ set -e
 cd "$(dirname "$0")"
 
 source ../common/version.sh
+
+# xcodebuild は**フルXcodeが必要**。xcode-select が CommandLineTools を指している環境では
+# 素で叩くと "requires Xcode, but active developer directory ... is a command line tools
+# instance" で落ちる。xcode-select --switch はグローバル変更で sudo が要るので、
+# **このビルドの間だけ DEVELOPER_DIR でフルXcodeを指す**(他プラグインのCLTビルドに影響しない)。
+# 既に DEVELOPER_DIR が設定されていればそれを尊重する。
+if ! xcodebuild -version >/dev/null 2>&1; then
+    for _xc in /Applications/Xcode.app /Applications/Xcode-beta.app \
+               "/Volumes/Macintosh HD - Data/Applications/Xcode.app" \
+               "/Volumes/Macintosh HD/Applications/Xcode.app"; do
+        if [ -x "$_xc/Contents/Developer/usr/bin/xcodebuild" ]; then
+            export DEVELOPER_DIR="$_xc/Contents/Developer"
+            echo "using DEVELOPER_DIR=$DEVELOPER_DIR"
+            break
+        fi
+    done
+fi
+if ! xcodebuild -version >/dev/null 2>&1; then
+    echo "ERROR: xcodebuild が見つかりません。LLMMLX は mlx-swift の Metal シェーダを"
+    echo "       コンパイルするためフルXcodeが必要です(swift build では metallib が作れない)。"
+    echo "       Xcode を入れるか、DEVELOPER_DIR=<Xcode.app>/Contents/Developer を指定してください。"
+    exit 1
+fi
+
 SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
 NAME=LLMMLXDAT
 OUT="build/$NAME.plugin/Contents"
@@ -20,6 +44,14 @@ PRODUCTS="helper/.xcbuild/Build/Products/Release"
 # ① Swiftヘルパ実行ファイル（xcodebuild。初回は mlx-swift の C++/Metal コンパイルで十数分）
 #    -skipPackagePluginValidation: mlx-swift の CudaBuild ビルドツールプラグインの対話承認を回避
 #    -skipMacroValidation:         swift-syntax マクロ（MLXHuggingFace）の対話承認を回避
+#    Metal Toolchain は Xcode 本体と別コンポーネント。無いと
+#    "cannot execute tool 'metal' due to missing Metal Toolchain" で失敗するので先に確認する。
+if ! xcrun metal --version >/dev/null 2>&1; then
+    echo "ERROR: Metal Toolchain が入っていません。次を実行してから再試行してください:"
+    echo "       xcodebuild -downloadComponent MetalToolchain   # 約840MB"
+    exit 1
+fi
+
 ( cd helper && xcodebuild build -scheme MLXLLMHelper -configuration Release \
     -destination 'platform=macOS,arch=arm64' -derivedDataPath .xcbuild \
     -skipPackagePluginValidation -skipMacroValidation )

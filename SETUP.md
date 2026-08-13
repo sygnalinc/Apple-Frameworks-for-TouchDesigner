@@ -53,7 +53,29 @@ grep -m1 'OP_CommonAPIVersion = ' \
 
 ### 2.2 Xcode
 
-`xcode-select -p` が Xcode を指していること。`clang++` と `swiftc` が使えれば足りる。
+**ほぼ全てのプラグインは Command Line Tools だけで足りる**(`clang++` と `swiftc` が使えればよい。
+`xcode-select -p` が CommandLineTools を指していても問題ない)。
+
+**例外は LLM MLX だけ**で、これには**フルXcode + Metal Toolchain** が要る:
+
+- 理由: mlx-swift の Metal シェーダ(`default.metallib`)は **SwiftPM の `swift build` では
+  作れない**(mlx-swift 公式README明記)。生成されないまま実行すると
+  `Failed to load the default metallib` で死ぬので、**`xcodebuild` でビルドする**必要がある。
+  `xcodebuild` はフルXcodeにしか入っていない
+- `xcode-select --switch` は sudo が要るグローバル変更なので、**LLMMLX/build.sh が
+  自分で `DEVELOPER_DIR` にフルXcodeを見つけて設定する**(他プラグインのCLTビルドに影響しない)。
+  自動検出が外れる場合は自分で `DEVELOPER_DIR=<Xcode.app>/Contents/Developer` を渡す
+- **Metal Toolchain は Xcode 本体と別コンポーネント**。未導入だと
+  `cannot execute tool 'metal' due to missing Metal Toolchain` になるので:
+
+  ```bash
+  xcodebuild -downloadComponent MetalToolchain   # 約840MB
+  ```
+
+  **OS や Xcode を更新すると無効化される**(アセットはディスクに残るが
+  `xcodebuild -showComponent MetalToolchain` が `Status: uninstalled` になる)。
+  更新後に LLMMLX をビルドするなら**再ダウンロードが必要**。実測でOS betaの更新
+  (26A5388g→26A5406e)で要求版が 27A5228f→27A5237l に変わり無効化された
 
 ### 2.3 ビルドの確認
 
