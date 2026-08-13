@@ -306,7 +306,11 @@ public:
             };
             char t[5][32] = {};
             if (row == 0) { put(uhdr[0], uhdr[1], uhdr[2], uhdr[3], uhdr[4]); return; }
-            if (row == 1) { put("usb_status", myUVC.status().c_str(), "", "", ""); return; }
+            if (row == 1) {
+                put("usb_status", myUvcNote.empty() ? myUVC.status().c_str() : myUvcNote.c_str(),
+                    "", "", "");
+                return;
+            }
             if (row == 2) {
                 snprintf(t[0], 32, "%d", myUVC.cameraUnit());
                 snprintf(t[1], 32, "%d", myUVC.processingUnit());
@@ -394,7 +398,9 @@ private:
         myUVC.detach();
         myUvcCtrls = tduvc::defaultControls();
         int vid = 0, pid = 0;
-        if (!tduvc::Device::parseModelID(modelID, vid, pid)) return;
+        // 内蔵カメラや仮想カメラは USB デバイスではないので modelID に VID/PID が無い
+        if (!tduvc::Device::parseModelID(modelID, vid, pid)) { myUvcNote = "not a USB camera"; return; }
+        myUvcNote.clear();
         if (!myUVC.attach(vid, pid)) return;
         // **プローブはここでやらない**。UVC のコントロール転送は
         // カメラが実際にストリーミングしていないと kIOReturnNotResponding になる(実測)。
@@ -404,7 +410,11 @@ private:
 
     void handleUVC(const OP_Inputs* in)
     {
-        if (!myUVC.isOpen()) return;
+        if (!myUVC.isOpen()) {
+            // USB カメラでないときは触れないことが分かるように全部グレーアウトする
+            for (const tduvc::Control& c : myUvcCtrls) in->enablePar(c.name, false);
+            return;
+        }
         if (!myUvcProbed) {
             if (myFrames.load() == 0) return;      // 映像が流れるまで待つ
             myUVC.probe(myUvcCtrls);
@@ -644,8 +654,9 @@ private:
     std::atomic<bool> myUvcApply{false}, myUvcRead{false}, myUvcNeedsPush{false};
     bool myUvcProbed = false;
     tduvc::Device myUVC;
-    std::vector<tduvc::Control> myUvcCtrls;
+    std::vector<tduvc::Control> myUvcCtrls = tduvc::defaultControls();
     bool myInfoUVC = false;
+    std::string myUvcNote;
 };
 
 static void avfPushFrame(void* owner, const uint8_t* src, size_t rowBytes, uint32_t w, uint32_t h)
