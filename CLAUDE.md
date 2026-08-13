@@ -5630,3 +5630,36 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   CLAUDE.md へのポインタ3行に置き換えた(2つの開発ガイドが分岐する事故を防ぐ)
 - **注意**: これで experimental のソースが公開リポジトリから見える。README で
   「未検証・DMG 非同梱・サポート対象外」と明示することで吸収する方針
+
+### 2026-08-13 CoreMIDI プラグインの要否を実測 + TD標準だけで Logic へ送るサンプル
+
+- ユーザー「CoreMIDI を plugin 化する意義は?」→ **TD の MIDI 実装が何を使っているかを実測**して判断した。
+  `Contents/Frameworks/libMIDI.dylib` の未定義シンボルが決定的:
+  `MIDIClientCreate / MIDIInputPortCreate / MIDIOutputPortCreate / MIDIGetSource / MIDIGetDestination /
+  MIDIPacketListInit / MIDIPacketListAdd / MIDISend / MIDIObjectGetStringProperty + kMIDIPropertyDisplayName`
+- **TD にできないこと(実測で確定)**:
+  1. **MIDI 2.0 / UMP 非対応**(`MIDIEventList` / `MIDISendEventList` / `MIDIUniversalMessage` を一切使わない)
+  2. **仮想 MIDI ポートを作れない**(`MIDISourceCreate` / `MIDIDestinationCreate` が無い)
+  3. **デバイス情報が表示名だけ**(UniqueID・製造元・オンライン状態が取れない。
+     `MIDIObjectFindByUniqueID` も無いので同名機材を区別できない)
+  4. **ホットプラグを反映しない** — `/local/midi/midi_outputs` は**起動時のスナップショット**。
+     実測: 仮想デスティネーションを作っても消しても一覧が変わらず、**死んだエンドポイントが残り続ける**
+     (TD を再起動して初めて反映)。SysEx は `identifySysex` があり対応済み
+- **結論**: 一般的な MIDI 入出力の代替としては意義なし(TD標準で足りる)。作る価値があるのは
+  **MIDI 2.0 / 仮想ポート作成 / デバイス識別+ホットプラグ**の3点に限られる
+
+- **TD標準だけで Logic Pro へ送るサンプル**を `demo.toe /project1/midi_to_logic` に作成:
+  `driver`(Execute DAT・onFrameEnd)→ `midiout1`(MIDI Out CHOP)。110 BPM で C メジャーを鳴らす
+- **Logic Pro を起動していれば「Logic Proの仮想入力」が自動で現れる**ので **IAC ドライバは不要**
+  (この名前は Logic の言語設定で変わる。候補は `/local/midi/midi_outputs` で確認できる)
+- **送り先の指定は `/local/midi/device` のテーブル DAT**(MIDI Device Mapper の実体)。
+  `id | indevice | outdevice | definition | channel` の行を書けば **Python から設定でき、GUI 不要**
+- **実測した既定値の落とし穴**(ここで必ずつまずく):
+  `onebased = True` → index が1始まりで `sendNoteOn(1,60,100)` が **ノート59** になる /
+  `notenorm = '0to1'` → velocity を 0..1 とみなし **100 が 127 に張り付く**。
+  両方 off にすると生の MIDI 値になる
+- **検証方法**: 仮想 MIDI デスティネーションを作る Swift CLI を書き、TD から送って受信内容を確認。
+  `20903C64`(note=60 vel=100)と一致。5秒で NoteOn 9件(110BPM相当)も確認
+- **踏んだ罠**: ①macOS は**死んだ仮想エンドポイントを保持し続ける**(プロセスを落としても一覧に残り、
+  同名が何個も並ぶ)。検証用エンドポイントは**毎回ユニークな名前**にする。②TD は起動時にしか
+  デバイスを解決しないので、**リスナーを先に立ててから TD を起動する**順序が必要
