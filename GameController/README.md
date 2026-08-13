@@ -24,6 +24,12 @@ menu options / lstickbtn rstickbtn` (plus `gravity xyz / accel xyz / rot xyz` wh
 | Pulse Style | `Tap` / `Click` / `Thud` / `Double Tap` / `Buzz` |
 | Pulse Intensity / Sharpness | Strength (0–1) and how hard-edged it feels (0–1) |
 | Pulse Gap | Spacing of `Double Tap`, in seconds. **Widen it until you hear two hits** — how long the actuator keeps ringing varies by pad |
+| Receive When Not Frontmost | Sets `shouldMonitorBackgroundEvents`. On by default — see below |
+
+Info DAT: one row per connected controller (`index / vendor / category / extended / micro /
+motion / battery`), followed by every input element of the selected controller with its live value.
+Use it to see what the pad actually has and which index it is.
+
 
 ### Motion sensors
 
@@ -75,6 +81,37 @@ continuous event (what the motors actually reproduce).
 
 Add your own by editing `playPulse`.
 
+### If nothing responds: the app must be frontmost (or opt in)
+
+**`GCController.shouldMonitorBackgroundEvents` defaults to NO on macOS 11.3 and later.** While it
+is NO and TouchDesigner is not the frontmost application, **every input from the pad is discarded** —
+`connected` still reads 1, the Info DAT still lists the controller, and every channel sits at 0. It
+looks exactly like an unmapped button.
+
+This plugin sets it from **Receive When Not Frontmost** (on by default), which is what you want for
+a show: the pad keeps working while you are in another window. Measured: holding A with the chat
+window in front read `a = 0.00` before the fix and `a = 1.00` after, with nothing else changed.
+
+Note that this is a *second*, deeper cause of "the button does not work" — the first being sampling
+the CHOP from outside TD too slowly (below). Rule out both before concluding a button is unmapped.
+
+### Nintendo Joy-Con
+
+Measured on macOS 26.6 with a Joy-Con (L) and (R) paired:
+
+| | Measured |
+|---|---|
+| Bluetooth | L and R are two separate devices (Nintendo VID `0x057E`, Minor Type Gamepad, HID) |
+| GameController | **The two are combined into one controller** — `vendor` = `Joy-Con (L/R)`, `productCategory` = `Nintendo Switch Joy-Con (L/R)` |
+| Profile | A standard `extendedGamepad`: A/B/X/Y, d-pad, both sticks, L/R, ZL/ZR, Menu/Options/Home all present |
+| Motion | **Not exposed** (`motion` is nil) even though Joy-Cons have gyros |
+| Battery | One value for the pair |
+
+There are no Joy-Con-specific symbols anywhere in the GameController SDK — macOS presents the pair
+as an ordinary extended gamepad, so no special-casing is needed in your patch. The R-side face
+buttons are `a` `b` `x` `y`, R and ZR are `r1` `r2`, `+` is `menu`; the L side supplies the d-pad,
+`l1` `l2` and `−` (`options`).
+
 ### Measured (M2 / macOS 26.6, XPT compact Bluetooth gamepad)
 
 `connected` goes to 1 (it is set only when `extendedGamepad` is non-nil, so it means a real pad
@@ -94,9 +131,9 @@ def onFrameEnd(frame):
         d[c.name] = max(d.get(c.name, 0.0), abs(c.eval()))
 ```
 
-**モーションは Nintendo Switch モードで確認済み**: `hasmotion` = 1 になり、パッドを傾けると
-`accel*` と `rot*` が反応する。Xbox モードは未実測だが、プロトコルにモーションが載らないので
-`hasmotion` = 0 になるはず。値が出ないときはまずモード切替を試す。
+**Motion confirmed in Nintendo Switch mode**: `hasmotion` becomes 1 and tilting the pad moves
+`accel*` and `rot*`. Xbox mode was not measured, but the Xbox controller protocol carries no
+motion, so `hasmotion` should be 0 there. If motion values stay at zero, try switching modes first.
 
 **Motion is confirmed in Nintendo Switch mode**: `hasmotion` = 1, and `accel*` and `rot*` both
 respond to tilting the pad. Xbox mode was not measured, but the protocol carries no motion, so
@@ -172,6 +209,12 @@ menu options / lstickbtn rstickbtn`(+ Motion時 `gravity xyz / accel xyz / rot x
 | Pulse Style | `Tap` / `Click` / `Thud` / `Double Tap` / `Buzz` |
 | Pulse Intensity / Sharpness | 強さ(0〜1)と当たりの硬さ(0〜1) |
 | Pulse Gap | `Double Tap` の間隔(秒)。**2回に聞こえるまで広げる** — 余韻の長さはパッドによって違う |
+| Receive When Not Frontmost | `shouldMonitorBackgroundEvents` を設定する。既定オン(後述) |
+
+Info DAT: 接続中のコントローラ1台=1行(`index / vendor / category / extended / micro / motion /
+battery`)と、その後ろに選択中パッドの入力要素を1件ずつ(生の値つき)。**そのパッドが実際に何を
+持っていて、何番なのか**を見るために使う。
+
 
 ### モーションセンサー
 
@@ -221,6 +264,38 @@ Nintendo Switch モードに切り替えるとセンサーが現れる。
 (モーターが実際に再現する部分)を重ねてある。
 
 増やしたいときは `playPulse` に足す。
+
+### 何も反応しないとき: 最前面である必要がある(またはオプトイン)
+
+**`GCController.shouldMonitorBackgroundEvents` は macOS 11.3 以降 既定 NO** です。NO のまま
+TouchDesigner が最前面でないと、**パッドの入力が丸ごと捨てられます**。`connected` は 1 のまま、
+Info DAT にもコントローラは並び、全チャンネルが 0 — 「ボタンが割り当てられていない」のと
+見分けがつきません。
+
+このプラグインは **Receive When Not Frontmost**(既定オン)でこれを設定します。別ウインドウを
+触っていてもパッドが効き続けるので、ショー用途ではこちらが望ましい挙動です。実測: チャット
+ウインドウを前面にしたまま A を押しっぱなしにすると、修正前は `a = 0.00`、修正後は `a = 1.00`。
+他は何も変えていません。
+
+これは「ボタンが反応しない」の**2つ目の、より根深い原因**です(1つ目は下記の、TD の外から
+CHOP を遅い間隔でサンプリングして押下を取りこぼすもの)。**ボタンが未対応だと結論する前に、
+必ず両方を潰してください。**
+
+### Nintendo Joy-Con
+
+macOS 26.6 で Joy-Con (L) と (R) をペアリングして実測:
+
+| | 実測 |
+|---|---|
+| Bluetooth | L と R は別々のデバイス(Nintendo VID `0x057E` / Minor Type Gamepad / HID) |
+| GameController | **2本が1台に合成される** — `vendor` = `Joy-Con (L/R)`、`productCategory` = `Nintendo Switch Joy-Con (L/R)` |
+| プロファイル | 標準の `extendedGamepad`。A/B/X/Y・十字・両スティック・L/R・ZL/ZR・Menu/Options/Home が全部ある |
+| モーション | **公開されない**(`motion` が nil)。Joy-Con 自体はジャイロを持つのに取れない |
+| バッテリー | ペアで1つの値 |
+
+GameController SDK には Joy-Con 専用のシンボルが一切ありません。macOS が**普通の拡張ゲームパッドとして
+見せている**ので、パッチ側で特別扱いする必要はありません。R 側の A/B/X/Y は `a` `b` `x` `y`、
+R と ZR は `r1` `r2`、`+` は `menu`。L 側が十字キー・`l1` `l2`・`−`(`options`)を担当します。
 
 ### 実測(M2 / macOS 26.6・XPTの小型Bluetoothパッドを接続)
 

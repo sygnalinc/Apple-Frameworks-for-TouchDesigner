@@ -154,10 +154,100 @@ public:
     void pulsePressed(const char* name, void*) override
     { if (!strcmp(name, "Pulse")) myPulse = true; }
 
+    // 接続中のコントローラの素性を出す。**どれが index 何番か**が分からないと
+    // Controller Index を選びようがない(Joy-Con のように複数繋がる場合に必要)
+    bool getInfoDATSize(OP_InfoDATSize* s, void*) override
+    {
+        @autoreleasepool {
+            NSArray<GCController*>* list = [GCController controllers];
+            myPadCount = (int)list.count;
+            myElemNames.clear();
+            // 選択中のコントローラが実際に持っている入力要素を全部並べる。
+            // パッドによってボタンの載る場所が違うので、これが無いと切り分けられない
+            const int idx = myLastIndex;
+            if (idx >= 0 && idx < myPadCount) {
+                GCPhysicalInputProfile* prof = list[idx].physicalInputProfile;
+                for (NSString* k in prof.elements.allKeys)
+                    myElemNames.push_back(k.UTF8String);
+                std::sort(myElemNames.begin(), myElemNames.end());
+            }
+        }
+        s->rows = myPadCount + (int)myElemNames.size() + 1;
+        s->cols = 7;
+        s->byColumn = false;
+        return true;
+    }
+
+    void getInfoDATEntries(int32_t row, int32_t nCols, OP_InfoDATEntries* e, void*) override
+    {
+        static const char* hdr[7] = {"index", "vendor", "category", "extended",
+                                     "micro", "motion", "battery"};
+        auto put = [&](const char* a, const char* b, const char* c, const char* d,
+                       const char* f2, const char* g, const char* h) {
+            const char* v[7] = {a, b, c, d, f2, g, h};
+            for (int i = 0; i < nCols && i < 7; i++) e->values[i]->setString(v[i]);
+        };
+        if (row == 0) { put(hdr[0], hdr[1], hdr[2], hdr[3], hdr[4], hdr[5], hdr[6]); return; }
+        @autoreleasepool {
+            NSArray<GCController*>* list = [GCController controllers];
+            const int i = row - 1;
+            // コントローラ一覧の後ろに、選択中パッドの入力要素を1行ずつ並べる
+            if (i >= (int)list.count) {
+                const int e2 = i - (int)list.count;
+                if (e2 < 0 || e2 >= (int)myElemNames.size()) return;
+                const std::string& key = myElemNames[e2];
+                const int idx = myLastIndex;
+                char val[24] = "?";
+                const char* kind = "?";
+                if (idx >= 0 && idx < (int)list.count) {
+                    GCControllerElement* el =
+                        list[idx].physicalInputProfile.elements[@(key.c_str())];
+                    if ([el isKindOfClass:GCControllerButtonInput.class]) {
+                        kind = "button";
+                        snprintf(val, sizeof val, "%.3f",
+                                 ((GCControllerButtonInput*)el).value);
+                    } else if ([el isKindOfClass:GCControllerAxisInput.class]) {
+                        kind = "axis";
+                        snprintf(val, sizeof val, "%.3f", ((GCControllerAxisInput*)el).value);
+                    } else if ([el isKindOfClass:GCControllerDirectionPad.class]) {
+                        GCControllerDirectionPad* d = (GCControllerDirectionPad*)el;
+                        kind = "dpad";
+                        snprintf(val, sizeof val, "%.2f,%.2f", d.xAxis.value, d.yAxis.value);
+                    }
+                    put("element", key.c_str(), kind, val, "", "", "");
+                }
+                return;
+            }
+            if (i < 0 || i >= (int)list.count) return;
+            GCController* gc = list[i];
+            char idx[8], bat[16];
+            snprintf(idx, sizeof idx, "%d", i);
+            if (gc.battery) snprintf(bat, sizeof bat, "%.0f%%", gc.battery.batteryLevel * 100.f);
+            else snprintf(bat, sizeof bat, "n/a");
+            put(idx,
+                gc.vendorName ? gc.vendorName.UTF8String : "?",
+                gc.productCategory ? gc.productCategory.UTF8String : "?",
+                gc.extendedGamepad ? "yes" : "no",
+                gc.microGamepad ? "yes" : "no",
+                gc.motion ? "yes" : "no",
+                bat);
+        }
+    }
+
     void execute(CHOP_Output* output, const OP_Inputs* inputs, void*) override
     {
         myExecCount++;
         const int idx = (int)inputs->getParInt("Controllerindex");
+        myLastIndex = idx;
+
+        // **macOS 11.3 以降、これは既定で NO**。NO のままだと TouchDesigner が
+        // 最前面でないときパッドの入力が丸ごと無視される(実際にこれで
+        // 「ボタンが反応しない」と誤診した)。演出用途では常に受けたいので YES にする
+        const bool bg = inputs->getParInt("Background") != 0;
+        if (bg != myBackgroundOn) {
+            @autoreleasepool { GCController.shouldMonitorBackgroundEvents = bg ? YES : NO; }
+            myBackgroundOn = bg;
+        }
         const float rumble = (float)inputs->getParDouble("Rumble");
 
         float v[kBaseChans + kMotionChans] = {};
@@ -299,6 +389,13 @@ public:
             p.label = "Pulse";
             p.page = "Game Controller";
             manager->appendPulse(p);
+        }
+        {
+            OP_NumericParameter p("Background");
+            p.label = "Receive When Not Frontmost";
+            p.page = "Game Controller";
+            p.defaultValues[0] = 1;
+            manager->appendToggle(p);
         }
         {
             OP_NumericParameter p("Rumble");
@@ -543,6 +640,10 @@ private:
         std::make_shared<std::atomic<bool>>(true);   // 破棄後にハンドラが触らないように
     std::atomic<bool> myPulse{false};
     std::atomic<int> myExecCount{0};
+    int myPadCount = 0;
+    int myLastIndex = 0;
+    bool myBackgroundOn = false;
+    std::vector<std::string> myElemNames;
 };
 
 }   // namespace

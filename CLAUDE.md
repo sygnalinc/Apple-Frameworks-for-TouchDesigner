@@ -5979,3 +5979,27 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - Exposure/Focus の **Locked**(AVFoundation 側)が実際に画を固定するかの視認確認(未実施)。
   USB カメラなら UVC ページの方が確実なので優先度は低い
 - demo.toe への利用例追加(未着手)
+
+### 2026-08-13 GameController: Joy-Con が反応しない → 真因は「最前面でないと入力が捨てられる」
+
+- ユーザー報告「Joy-Con R をペアリングしたが GameController op で反応しない」→ 実測で切り分け
+- **macOS の Joy-Con の扱い(実測)**: Bluetooth では L / R が別デバイス(Nintendo VID 0x057E)だが、
+  **GameController は2本を1台に合成**する(`vendor = Joy-Con (L/R)` /
+  `productCategory = Nintendo Switch Joy-Con (L/R)`)。プロファイルは**標準の extendedGamepad**で
+  A/B/X/Y・十字・両スティック・L/R・ZL/ZR・Menu/Options/Home が全部ある。
+  **モーションは公開されない**(`motion` が nil)。バッテリーはペアで1値。
+  SDK に Joy-Con 専用シンボルは無く、OS が普通のパッドとして見せている
+- **真因: `GCController.shouldMonitorBackgroundEvents` は macOS 11.3 以降 既定 NO**。
+  NO のままだと **TouchDesigner が最前面でないときパッドの入力が丸ごと捨てられる**。
+  `connected` は 1・Info DAT にも並ぶ・全チャンネル 0、という「未対応ボタン」と区別がつかない見え方になる
+  → **`Receive When Not Frontmost` トグル(既定オン)** を追加して解決。
+  実測: チャットを前面にして A を押しっぱなし → 修正前 `a=0.00` / 修正後 `a=1.00`
+- **これは「ボタンが反応しない」の2つ目の原因**。1つ目は 2026-08-12 に踏んだ「TD の外から遅い間隔で
+  サンプリングして押下を取りこぼす」。**未対応と結論する前に両方を潰すこと**
+- **Info DAT を新設**(このOPは診断情報を一切出していなかった): 接続中のコントローラ1台=1行
+  (index / vendor / category / extended / micro / motion / battery)+ 選択中パッドの**入力要素を
+  全部**(生の値つき)。これが無いと「どれが index 何番か」「そのパッドが何を持っているか」が
+  分からず切り分けられない。実際これで Joy-Con が合成ペアだと判明した
+- README(英日)に「最前面の話」「Joy-Con の扱い」「Info DAT」を追記。英語節に混ざっていた
+  日本語の段落も英訳した
+- 次にやること: Joy-Con で全19チャンネルのラッチ計測(対応表を README に載せる)
