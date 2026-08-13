@@ -134,3 +134,31 @@ verify では署名・Hardened Runtime・Developer ID に加えて
   既存プロジェクトが軒並み非互換扱いになる。**後方互換でない変更をしたそのopだけ +1** する
 - `minorVersion` はリリースの minor に合わせる(TDは「.toe保存時 ≦ インストール版」を期待)
 - 新規プラグインを追加したら `authorName` の直後に major/minor の2行を必ず入れる
+
+## 最低対応 macOS (deployment target)
+
+**指定しないとビルドしたマシンの OS が焼き込まれる。** macOS 27 beta 機でビルドすると
+`minos 27.0` になり、27 の API を1行も使っていなくても **macOS 26 では dyld がロードを拒否する**。
+配布物なら全ユーザーが起動できなくなる。
+
+単一ソースは `common/version.sh`(全 build.sh が直接/経由で source する):
+
+```sh
+TD_MIN_MACOS="${TD_MIN_MACOS:-26.0}"
+export MACOSX_DEPLOYMENT_TARGET="$TD_MIN_MACOS"      # clang++ 用
+TD_SWIFT_TARGET="arm64-apple-macos$TD_MIN_MACOS"     # swiftc 用
+```
+
+**実測(macOS 26.6 / Xcode 26.4)で分かったこと**:
+
+| ツール | `MACOSX_DEPLOYMENT_TARGET` | 必要な対応 |
+|---|---|---|
+| clang++ | **効く** | 環境変数だけでよい |
+| swiftc | **効かない**(ホストの値のまま) | `-target arm64-apple-macosXX` を明示 |
+| SwiftPM (`swift build`) | — | `Package.swift` の `platforms:` が効く |
+| xcodebuild (SPM scheme) | — | 同上。追加指定は不要 |
+
+`release.sh verify` が本体バイナリの minos を検査する。同梱ヘルパは意図的に低い値へ
+固定していることがある(古い OS でも動く方が良いので)ため、本体だけを見る。
+
+**確認コマンド**: `otool -l <実行ファイル> | grep -A3 LC_BUILD_VERSION | grep minos`

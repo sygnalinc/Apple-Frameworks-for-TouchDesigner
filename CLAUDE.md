@@ -5510,3 +5510,29 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   コミット・push していた**(0f16a50)。結果的に中身は承認済みのものと同一(sha一致)で実害は
   無かったが、**「判断待ち」の未追跡ファイルがある状態で `git add -A` を使ってはいけない**。
   パスを明示して add する
+
+### 2026-08-13 deployment target を全ビルドで固定(macOS 27 beta 機での開発に備える)
+
+- ユーザーが **macOS 27 beta 機でも別途開発したい**(27 の新フレームワークを使うプラグインを検証)
+  という方針。着手前に前提を実測したところ、**リポジトリのどの build.sh も deployment target を
+  指定していなかった**(実測 `minos 26.0` = ホストの OS が焼かれているだけ)
+- **これは実害のある地雷**: 27 beta 機でビルドすると `minos 27.0` になり、**27 の API を
+  1行も使っていなくても macOS 26 では dyld がロードを拒否する**。その機で `release.sh` を回すと
+  配布 DMG が全ユーザーの macOS 26 で起動しなくなる
+- **修正**: `common/version.sh`(**全 82 build.sh が直接/経由で source する**唯一の入口)に
+  `TD_MIN_MACOS`(既定 26.0)を追加し、`MACOSX_DEPLOYMENT_TARGET` を export。
+  `release.sh verify` に本体バイナリの minos 検査を追加
+- **実測で分かった重要な差**: `MACOSX_DEPLOYMENT_TARGET` は **clang++ には効くが swiftc には
+  効かない**(14.0 を指定しても swiftc は 26.0 のままだった)。swiftc は `-target` 明示のみ。
+  幸い**このリポジトリの swiftc は全 12 件とも既に `-target` を明示済み**だった。
+  SwiftPM / xcodebuild は `Package.swift` の `platforms: [.macOS(.v14)]` が効いており
+  (ホスト 26.6 でも生成物は 14.0)、追加指定は不要だった
+- **検証**: 全プラグインを再ビルドし、**本体バイナリ 90 個のうち 26.0 でないのは、意図的に
+  13.0 で固定している wifiscan-helper.app のみ**であることを確認。同梱 Swift ヘルパの
+  12.0/13.0/14.0 は明示指定によるもので、低い分には安全(問題は高い方向)
+- **踏んだミス2つ**: ①grep が **継続行(`\` 終わり)の `-target` を見落とし**、既に指定済みの
+  swiftc に二重指定を入れた(後の指定が勝つので気づきにくい)。**複数行のコマンドを検査する
+  ときは論理行に連結してから見る** ②SPM の `platforms` を確認せずに xcodebuild へ
+  `MACOSX_DEPLOYMENT_TARGET` を足しかけた(不要どころか 14→26 へ引き上げる変更だった)
+- ついでに **git 未追跡の残骸 build/**(削除済みの CreateMLImage / CreateMLMotion / Gemma /
+  RealityKitSplat)を掃除した。minos 調査でノイズになっていた

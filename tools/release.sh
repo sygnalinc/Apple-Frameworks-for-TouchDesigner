@@ -16,6 +16,8 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="$(cat "$REPO/VERSION")"
+# 配布物の最低対応 macOS。common/version.sh と同じ既定値にする
+EXPECT_MINOS="${TD_MIN_MACOS:-26.0}"
 SIGN_ID="${SIGN_ID:-Developer ID Application: SYGNAL INC. (2ZSD5ZZLKB)}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-tdappleops}"
 # 配布物は「main が追跡しているプラグインフォルダの build/ 成果物」だけを集める。
@@ -106,6 +108,16 @@ cmd_verify() {
         local sv; sv="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$b/Contents/Info.plist" 2>/dev/null)"
         if [ "$sv" != "$VERSION" ]; then
             echo "VERSION MISMATCH: $(basename "$b") -> $sv (expected $VERSION)"; fail=1
+        fi
+        # 最低対応 macOS。**未指定だとビルドしたマシンのOSが焼き込まれる**ため、
+        # macOS 27 beta 機で配布物を作ると全ユーザーの macOS 26 でロードできなくなる。
+        # 本体バイナリだけ見る(同梱ヘルパは意図的に低い値へ固定していることがある)
+        local exe="$b/Contents/MacOS/$(basename "$b" .plugin)"
+        if [ -f "$exe" ]; then
+            local mo; mo="$(otool -l "$exe" 2>/dev/null | awk '/LC_BUILD_VERSION/{f=1} f&&/minos/{print $2; exit}')"
+            if [ "$mo" != "$EXPECT_MINOS" ]; then
+                echo "MIN MACOS MISMATCH: $(basename "$b") -> $mo (expected $EXPECT_MINOS)"; fail=1
+            fi
         fi
         if [ -x "$scan" ]; then
             local api; api="$("$scan" "$b/Contents/MacOS/$(basename "$b" .plugin)" 2>/dev/null)"
