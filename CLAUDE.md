@@ -5846,3 +5846,6 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   **受信系の検証には「送る側」を自作するのが確実**
 - README(CoreMIDI 英日に In の節)+ ルート一覧(英日)+ demo.toe `/project1/CoreMIDIIn` を追加。
   `PLUGINS.tsv` は**フォルダ単位なので CoreMIDI の行のまま**(1行で2バンドル)
+- **ユーザー判断で CoreMIDI は `experimental` に変更**(released 58 / experimental 24 / blocked 1)。
+  ルート README のカタログ表から「実験中のプラグイン」の表へ Out / In の2行を移動。
+  `tools/release.sh` の収集対象から外れることを確認済み(DMG には入らない)
