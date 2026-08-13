@@ -175,6 +175,40 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [CoreWLAN Scan](CoreWLANScan/) | CHOP | **周辺Wi-Fiをスキャン→チャンネル別の混雑度/AP数/最大RSSI**と最も空いてるch(2.4/5GHz)。**SSID名は同梱の位置情報許可ヘルパーappで取得可**(Info DAT) |
 | [Network Discovery](NetworkDiscovery/) | DAT | **LAN上の全デバイスを発見**: Bonjour + **アクティブIPv4スキャン**(ARPスイープでBonjour非対応機器もMAC/ホスト名付き) → IP/MAC/**ベンダー(OUI)**/DNS名/mDNS名/**SMB名・ドメイン(NetBIOS)**/ポート/TXT(LanScan Pro相当) |
 
+
+## 実験中のプラグイン(リリースには含まれません)
+
+ビルドもロードもできますが、**実データでの検証をしていない**ため **DMG には含めず**、
+サポート対象外です。試したい場合はソースからビルドしてください(`cd <フォルダ> && ./build.sh`)。
+何が配布されるかは `PLUGINS.tsv` が唯一の正です。
+
+| プラグイン | Family | 状態 |
+|---|---|---|
+| [AVAudio Mixer CHOP](AVAudioMixer/) | CHOP | 実験中 |
+| [AVAudio Spatial CHOP](AVAudioSpatial/) | CHOP | 実験中 |
+| [AudioToolbox Mix CHOP](AudioToolboxMix/) | CHOP | 実験中 |
+| [Caption Author DAT](CaptionAuthor/) | DAT | 実験中 |
+| [ColorSync TOP](ColorSync/) | TOP | 実験中 |
+| [Vision Bokeh TOP](CoreImageBokeh/) | TOP | 実験中 |
+| [CoreImage Enhance TOP](CoreImageEnhance/) | TOP | 実験中 |
+| [Vision Keystone TOP](CoreImageKeystone/) | TOP | 実験中 |
+| [CoreLocation Beacon CHOP](CoreLocationBeacon/) | CHOP | 実験中 |
+| [GameplayKit Agents CHOP](GameplayKitAgents/) | CHOP | 実験中 |
+| [GameplayKit Path SOP](GameplayKitPath/) | SOP | 実験中 |
+| [Image Capture DAT](ImageCapture/) | DAT | 実験中 |
+| [Metal FrameInterp TOP](MetalFrameInterp/) | TOP | 実験中 |
+| [MPS Analyze CHOP](MetalMPSAnalyze/) | CHOP | 実験中 |
+| [PHASE CHOP](Phase/) | CHOP | 実験中 |
+| [Shazam DAT](Shazam/) | DAT | 実験中 |
+| [Speech Activity CHOP](SpeechActivity/) | CHOP | **動作しない** — 現行APIでは成立しないと実測で確定 |
+| [SwiftUI TOP](SwiftUI/) | TOP | 実験中 |
+| [SwiftUI Panel CHOP](SwiftUIPanel/) | CHOP | 実験中 |
+| [UI Widget DAT](UIWidget/) | DAT | 実験中 |
+| [VisionAesthetics CHOP](VisionAesthetics/) | CHOP | 実験中 |
+| [Vision Segment TOP — 人物セグメンテーション（macOS）](VisionSegment/) | TOP | 実験中 |
+| [Vision Similarity CHOP](VisionSimilarity/) | CHOP | 実験中 |
+| [VisionTrack CHOP](VisionTrack/) | CHOP | 実験中 |
+
 ## 使い方
 
 ### 1. 導入(リリースビルドを落とすだけ・ビルド不要)

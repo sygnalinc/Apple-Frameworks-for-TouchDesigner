@@ -23,6 +23,39 @@
   kMax=100・スライダー表示は10まで・既定値は控えめ、が家族の型
 - モデルバイナリはコミットしない(`models/` は gitignore)。README に入手先を書く
 
+## ブランチ運用(2026-08-13 に単一ブランチへ統合)
+
+**ブランチは `main` だけ。develop は廃止した。** 未検証プラグインを別ブランチへ隔離する運用は
+やめ、**リリース対象は `PLUGINS.tsv` で決める**。
+
+| status | 意味 |
+|---|---|
+| `released` | 実データ検証済み。DMG に入れて公開する |
+| `experimental` | 未検証 / 作りかけ。**ソースは公開するが DMG には入れない**。サポート対象外 |
+| `blocked` | 現行 API では成立しないと実測で確定したもの。記録として残す |
+
+- `tools/release.sh` は `PLUGINS.tsv` の `released` だけを集める。**表と追跡フォルダが
+  ずれていたら止まる**(黙って落とすと「全部入っている」と誤解されるため)
+- 昇格は `experimental` → `released` の1語を書き換えるだけ。条件は下記チェックリスト
+- `minos` 列はそのプラグインが要求する最低 macOS。**macOS 27 の新 API を使うものは 27.0**
+  にする(26 機ではビルド対象から外れる)
+
+**なぜ分岐をやめたか(実際に起きたこと)**: 共有コード(`common/*.h`・`build_plugin.sh`)の
+修正が片側にしか届かず、**develop 限定の9プラグインが数週間ビルド不能なまま気づかれなかった**
+(`#!/bin/bash` のまま残り、zsh 専用ヘルパを source して無言で中断していた)。
+git のブランチは「履歴の分岐」であって「ファイル集合の部分集合」を表す道具ではない。
+
+### released へ昇格する条件
+
+- `./build.sh` 成功 + ad-hoc 署名
+- **TD 再起動後**にロード・パラメータ生成・エラーなし
+- **実データ検証**(TOPは視認・CHOPは値・DATはテーブル)と**実測値**を README に記載
+- README 英日併記 + ルート README の一覧に1行
+- `demo.toe` に利用例(experimental の利用例は `demo.toe` に入れない。
+  リリース版だけ導入した人が Unknown operator type になるため)
+- `tools/release.sh verify` を通る(署名 / Hardened Runtime / Developer ID /
+  **OP_CommonAPIVersion** / 版一致 / **最低対応 macOS**)
+
 ## ディレクトリ構成と命名
 
 ```
@@ -5510,3 +5543,44 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   コミット・push していた**(0f16a50)。結果的に中身は承認済みのものと同一(sha一致)で実害は
   無かったが、**「判断待ち」の未追跡ファイルがある状態で `git add -A` を使ってはいけない**。
   パスを明示して add する
+
+### 2026-08-13 deployment target を全ビルドで固定(macOS 27 beta 機での開発に備える)
+
+- ユーザーが **macOS 27 beta 機でも別途開発したい**(27 の新フレームワークを使うプラグインを検証)
+  という方針。着手前に前提を実測したところ、**リポジトリのどの build.sh も deployment target を
+  指定していなかった**(実測 `minos 26.0` = ホストの OS が焼かれているだけ)
+- **これは実害のある地雷**: 27 beta 機でビルドすると `minos 27.0` になり、**27 の API を
+  1行も使っていなくても macOS 26 では dyld がロードを拒否する**。その機で `release.sh` を回すと
+  配布 DMG が全ユーザーの macOS 26 で起動しなくなる
+- **修正**: `common/version.sh`(**全 82 build.sh が直接/経由で source する**唯一の入口)に
+  `TD_MIN_MACOS`(既定 26.0)を追加し、`MACOSX_DEPLOYMENT_TARGET` を export。
+  `release.sh verify` に本体バイナリの minos 検査を追加
+- **実測で分かった重要な差**: `MACOSX_DEPLOYMENT_TARGET` は **clang++ には効くが swiftc には
+  効かない**(14.0 を指定しても swiftc は 26.0 のままだった)。swiftc は `-target` 明示のみ。
+  幸い**このリポジトリの swiftc は全 12 件とも既に `-target` を明示済み**だった。
+  SwiftPM / xcodebuild は `Package.swift` の `platforms: [.macOS(.v14)]` が効いており
+  (ホスト 26.6 でも生成物は 14.0)、追加指定は不要だった
+- **検証**: 全プラグインを再ビルドし、**本体バイナリ 90 個のうち 26.0 でないのは、意図的に
+  13.0 で固定している wifiscan-helper.app のみ**であることを確認。同梱 Swift ヘルパの
+  12.0/13.0/14.0 は明示指定によるもので、低い分には安全(問題は高い方向)
+- **踏んだミス2つ**: ①grep が **継続行(`\` 終わり)の `-target` を見落とし**、既に指定済みの
+  swiftc に二重指定を入れた(後の指定が勝つので気づきにくい)。**複数行のコマンドを検査する
+  ときは論理行に連結してから見る** ②SPM の `platforms` を確認せずに xcodebuild へ
+  `MACOSX_DEPLOYMENT_TARGET` を足しかけた(不要どころか 14→26 へ引き上げる変更だった)
+- ついでに **git 未追跡の残骸 build/**(削除済みの CreateMLImage / CreateMLMotion / Gemma /
+  RealityKitSplat)を掃除した。minos 調査でノイズになっていた
+
+### 2026-08-13 develop を廃止し main 一本へ統合(リリース対象は PLUGINS.tsv)
+
+- ユーザー判断で**単一ブランチ運用へ移行**。develop 限定だった24プラグインを main へ取り込み、
+  **公開対象は `PLUGINS.tsv` の status で決める**方式にした(詳細は本文「ブランチ運用」節)
+- 内訳: released 58 / experimental 23 / blocked 1(SpeechActivity = `SpeechDetector` が
+  結果を返さないと実測済み)。追跡プラグインは計 82
+- `tools/release.sh` は `td_released_plugins()` で TSV を読む。**TSV と追跡フォルダの
+  不一致で停止**することを、わざと1行消して確認済み
+- ルート README(英日)に「実験中のプラグイン(リリースには含まれません)」の表を追加。
+  ソースは公開するがサポート対象外・DMG 非同梱であることを明記
+- `AGENTS.md` は develop に残っていた **170行の古い CLAUDE.md 複製**だったので、
+  CLAUDE.md へのポインタ3行に置き換えた(2つの開発ガイドが分岐する事故を防ぐ)
+- **注意**: これで experimental のソースが公開リポジトリから見える。README で
+  「未検証・DMG 非同梱・サポート対象外」と明示することで吸収する方針

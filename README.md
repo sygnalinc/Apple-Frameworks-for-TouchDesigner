@@ -176,6 +176,40 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | [CoreWLAN Scan](CoreWLANScan/) | CHOP | **Scan nearby Wi-Fi → per-channel congestion / AP count / max RSSI** and the least-congested channel (2.4/5GHz). Optional **SSID names via a bundled Location-authorized helper app** (Info DAT) |
 | [Network Discovery](NetworkDiscovery/) | DAT | **Discover all LAN devices**: Bonjour services + **active IPv4 scan** (ARP sweep → MAC / hostname of every host, even non-Bonjour); merged IP / MAC / **vendor (OUI)** / DNS name / mDNS name / **SMB name & domain (NetBIOS)** / port / TXT (LanScan Pro-like) |
 
+
+## Experimental plugins (not in the release)
+
+These build and load, but they are **not verified against real data** — they are **not in the DMG**
+and are unsupported. The source is here so you can build and try them yourself
+(`cd <folder> && ./build.sh`). `PLUGINS.tsv` is the source of truth for what ships.
+
+| Plugin | Family | Status |
+|---|---|---|
+| [AVAudio Mixer CHOP](AVAudioMixer/) | CHOP | experimental |
+| [AVAudio Spatial CHOP](AVAudioSpatial/) | CHOP | experimental |
+| [AudioToolbox Mix CHOP](AudioToolboxMix/) | CHOP | experimental |
+| [Caption Author DAT](CaptionAuthor/) | DAT | experimental |
+| [ColorSync TOP](ColorSync/) | TOP | experimental |
+| [Vision Bokeh TOP](CoreImageBokeh/) | TOP | experimental |
+| [CoreImage Enhance TOP](CoreImageEnhance/) | TOP | experimental |
+| [Vision Keystone TOP](CoreImageKeystone/) | TOP | experimental |
+| [CoreLocation Beacon CHOP](CoreLocationBeacon/) | CHOP | experimental |
+| [GameplayKit Agents CHOP](GameplayKitAgents/) | CHOP | experimental |
+| [GameplayKit Path SOP](GameplayKitPath/) | SOP | experimental |
+| [Image Capture DAT](ImageCapture/) | DAT | experimental |
+| [Metal FrameInterp TOP](MetalFrameInterp/) | TOP | experimental |
+| [MPS Analyze CHOP](MetalMPSAnalyze/) | CHOP | experimental |
+| [PHASE CHOP](Phase/) | CHOP | experimental |
+| [Shazam DAT](Shazam/) | DAT | experimental |
+| [Speech Activity CHOP](SpeechActivity/) | CHOP | **blocked** — measured not to work with the current API |
+| [SwiftUI TOP](SwiftUI/) | TOP | experimental |
+| [SwiftUI Panel CHOP](SwiftUIPanel/) | CHOP | experimental |
+| [UI Widget DAT](UIWidget/) | DAT | experimental |
+| [VisionAesthetics CHOP](VisionAesthetics/) | CHOP | experimental |
+| [Vision Segment TOP — 人物セグメンテーション（macOS）](VisionSegment/) | TOP | experimental |
+| [Vision Similarity CHOP](VisionSimilarity/) | CHOP | experimental |
+| [VisionTrack CHOP](VisionTrack/) | CHOP | experimental |
+
 ## Getting started
 
 ### 1. Install (download the release — no build needed)

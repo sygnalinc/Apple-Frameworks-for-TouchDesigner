@@ -16,6 +16,24 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="$(cat "$REPO/VERSION")"
+
+# リリース対象は PLUGINS.tsv の status=released だけ。
+# 追跡している build.sh と表がずれていたら止める(黙って落とすと「全部入っている」と誤解される)。
+td_released_plugins() {
+    local tsv="$REPO/PLUGINS.tsv"
+    [ -f "$tsv" ] || { echo "PLUGINS.tsv が無い" >&2; exit 1; }
+    local tracked listed
+    tracked="$(cd "$REPO" && git ls-files '*/build.sh' | sed 's|/build.sh||' | sort)"
+    listed="$(grep -v '^#' "$tsv" | grep -v '^name' | awk -F'\t' 'NF{print $1}' | sort)"
+    if [ "$tracked" != "$listed" ]; then
+        echo "PLUGINS.tsv が追跡フォルダと一致しない:" >&2
+        comm -3 <(echo "$tracked") <(echo "$listed") | sed 's/^/  /' >&2
+        exit 1
+    fi
+    grep -v '^#' "$tsv" | awk -F'\t' '$2=="released"{print $1}' | sort
+}
+# 配布物の最低対応 macOS。common/version.sh と同じ既定値にする
+EXPECT_MINOS="${TD_MIN_MACOS:-26.0}"
 SIGN_ID="${SIGN_ID:-Developer ID Application: SYGNAL INC. (2ZSD5ZZLKB)}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-tdappleops}"
 # 配布物は「main が追跡しているプラグインフォルダの build/ 成果物」だけを集める。
@@ -64,7 +82,7 @@ cmd_sign() {
             cp -R "$b" "$DIST/"
             n=$((n+1))
         done
-    done < <(cd "$REPO" && git ls-files '*/build.sh' | sed 's|/build.sh||')
+    done < <(td_released_plugins)
     echo "copied $n bundles (from repo builds)"
     # 各プラグインのビルド時点の版が残らないよう、配布物へ現在の VERSION を焼き直す。
     # **署名より前**に行う(Info.plist を後から書き換えると署名が壊れるため)
@@ -106,6 +124,16 @@ cmd_verify() {
         local sv; sv="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$b/Contents/Info.plist" 2>/dev/null)"
         if [ "$sv" != "$VERSION" ]; then
             echo "VERSION MISMATCH: $(basename "$b") -> $sv (expected $VERSION)"; fail=1
+        fi
+        # 最低対応 macOS。**未指定だとビルドしたマシンのOSが焼き込まれる**ため、
+        # macOS 27 beta 機で配布物を作ると全ユーザーの macOS 26 でロードできなくなる。
+        # 本体バイナリだけ見る(同梱ヘルパは意図的に低い値へ固定していることがある)
+        local exe="$b/Contents/MacOS/$(basename "$b" .plugin)"
+        if [ -f "$exe" ]; then
+            local mo; mo="$(otool -l "$exe" 2>/dev/null | awk '/LC_BUILD_VERSION/{f=1} f&&/minos/{print $2; exit}')"
+            if [ "$mo" != "$EXPECT_MINOS" ]; then
+                echo "MIN MACOS MISMATCH: $(basename "$b") -> $mo (expected $EXPECT_MINOS)"; fail=1
+            fi
         fi
         if [ -x "$scan" ]; then
             local api; api="$("$scan" "$b/Contents/MacOS/$(basename "$b" .plugin)" 2>/dev/null)"
