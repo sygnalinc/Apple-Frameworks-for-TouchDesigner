@@ -6249,3 +6249,40 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   - **今できる実用解は変わらず「外部ツール(INRIA実装 / Postshot 等)で学習した .ply を
     RealityKit Splat TOP に直接読ませる」**。RealityKit Splat TOP は本物の3DGS .ply を
     そのまま描画できる(36.9万splatで約44fps実測)ので、**描画側は既に用意できている**
+
+### 2026-08-14 非公開3DGS学習API(CorePhotogrammetry)を実際に駆動できることを確認
+
+- ユーザー「非公開APIで試しに実装してみることはできる?」→ **プローブ専用プロセスに隔離**して
+  段階的に検証(引数仕様が不明なのでTDには絶対載せない)。**結論: 駆動できる。実物の3DGS学習器**
+- **調査の型**: バイナリは共有キャッシュ内でディスク上はリンク切れ → **`dyld_info -exports`**で
+  シンボル列挙、**lldb で `disassemble -n <symbol>`** して引数の数と型を確定
+  (host に `marker()` を置き **dlopen 後**にブレークするのがコツ。main で止めると未ロードで
+  シンボルが見つからない)
+- **判明した事実**:
+  - **`Photogrammetry_GaussianSplatting_Kernels.metallib` が同梱**されている(+ `Gess_Kernels.metallib`)。
+    カーネル名に **`Adam` / `AdamW` / `IdentifyTileRanges`(タイルラスタライザ) / `PruneGaussianPairings`**
+    = 本物の3DGS学習実装
+  - **`CPGGaussianSplattingSessionCreate(void** out)` → rc=0 で成功**(480バイトのセッション生成)。
+    **物体側のGSパスは macOS で生きている**
+  - **`CPGCheckDeviceCompatibilityForEnvironmentGS` は `mov w0,#0; ret` の完全なスタブ**
+    = **シーン全体(Environment GS)はこのプラットフォームで無効化**されている。呼んでも常に0
+  - **`CPGGaussianSplattingOptionsCreate()` は引数なし・戻り値がハンドル**(432バイト)。
+    最初 `int(void**)` で呼んで**ポインタを32bitに切り捨てて** opts=NULL と誤診した(戻り値型に注意)
+  - **Optionsの読み書きが完全に往復した**。Appleの既定値は **INRIA 3DGS論文の値そのまま**:
+    `iterations=10000 / shDegree=3 / lambdaSSIM=0.8 / appearanceModeling=1(既定ON) /
+    densifyFromIter=500 / densifyUntilIter=15000 / positionLR 0.00016→0.0000016`
+    (setterで7000/3/0.25/1に変更→getterで一致を確認)
+  - **`CallbackBundleSetDataLoaderCallback(bundle, fn, context)`** = `stp x1,x2,[x0,#0x38]` の
+    素直な (関数ポインタ, ユーザデータ) 形
+  - **`CPGGaussianSplattingSessionRunWithInitialPointCloud` は6引数**(x0..x5)。内部で
+    構造体を組んで実装本体へ委譲するサンク。**引数の並びと型は未確定**
+- **残る関門(ここが作業の本体)**: ①Run の6引数の正体 ②**DataLoaderCallback 自体のシグネチャと
+  学習ビュー(画像+カメラ内部/外部パラメータ)の構造体レイアウト** ③初期点群の型
+  (`RunWithInitialPointCloud` なので、公開APIの `PhotogrammetrySession` の `.pointCloud` と
+  `.poses` を材料にできる見込み)
+- **呼び出し元は見つからなかった**(Vista / RealityFoundation / CorePhotogrammetry 自身の
+  imports に無し)。=呼び出し側から引数構築を学ぶ手は使えない。**Object Capture の実アプリや
+  visionOS 側バイナリを当たるのが次の手**
+- **絶対の前提**: これは**配布物には載せられない**(無記載SPI・OS更新で壊れる・
+  引数仕様が推定)。**実験は scratchpad のプローブに限る**。実用は引き続き
+  「外部ツールで学習した .ply を RealityKit Splat TOP に読ませる」
