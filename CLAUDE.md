@@ -6327,3 +6327,50 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   - 引数当ては **fork 隔離 + 戻り値/シグナル判定**。`rc=-2` が内部のnull検査、
     SIGSEGV の**発生位置の深さ**が「どこまで通ったか」の指標になる
 - **前提は不変**: SPIなので**配布物には載せない**。実験は scratchpad のプローブに限る
+
+### 2026-08-14 Stage 2: 非公開3DGS学習APIの呼び出しシーケンスが rc=0 で通った
+
+- **到達点**: 一連の呼び出しが**成功(rc=0)し、`CPGGaussianSplattingOutput` と
+  `CPGGaussian3D` を取得できた**。Metalシェーダのコンパイルも走り、進捗コールバックも発火する。
+  **ただし splat数=0**(入力の点群が空・実画像を与えていないため)。
+  = 「APIは完全に駆動できる」ことの証明であって、**まだsplatを生成できたわけではない**
+- **確定した完全なシグネチャ**:
+  ```c
+  int CPGGaussianSplattingSessionRunWithInitialPointCloud(
+      void*  session,        // x0  CPGGaussianSplattingSessionCreate(&out) → rc=0
+      void*  sfmMap,         // x1  CPGSfmMapCreate() + SetCameraBySampleID + SetSampleIsRegistered
+      void*  pointCloud,     // x2  CPGDepthPointCloudCreate()(+AddPoint)。**NULLだと落ちる**
+      void*  options,        // x3  CPGGaussianSplattingOptionsCreate()
+      void*  callbackBundle, // x4  CPGGaussianSplattingCallbackBundleCreate()
+      void** outOutput);     // x5  出力(CPGGaussianSplattingOutput)を受け取る
+  ```
+- **各生成関数の作法(ここが罠だった)**:
+  - `CPGGaussianSplattingSessionCreate(void** out)` → **出力引数**、戻り値はrc
+  - `CPGGaussianSplattingOptionsCreate(void)` → **戻り値でハンドル**(引数なし)
+  - `CPGGaussianSplattingCallbackBundleCreate(void)` → 戻り値でハンドル
+  - `CPGSfmMapCreate(void)` / `CPGDepthPointCloudCreate(void)` → 戻り値でハンドル
+  - **`CPGCameraCreateWithIntrinsicsExtrinsicsResolution(const simd_double3x3* K,
+    const simd_double4x4* E, void** outCamera, simd_double2 resolution)`**
+    ← **第3引数が出力**。NULLを渡すと `str x21,[x19]` で即クラッシュ(これで一度落とした)。
+    intrinsics=96B(double3x3)/extrinsics=128B(double4x4)は逆アセンブルのロード幅から確定
+  - `CPGSfmMapSetCameraBySampleID(map, int sampleID, camera)` /
+    `CPGSfmMapSetSampleIsRegistered(map, int sampleID, bool)` ← **sampleIDは32bit整数**
+    (`mov w9, w1` から判明)
+- **CallbackBundle のレイアウト**(80バイト。各スロットに (fn, ctx) を格納):
+  `+0x08 MemoryWillChange / +0x18 MemoryDidChange / +0x28 Iteration / +0x38 DataLoader`
+- **DataLoaderCallback は「データ要求」ではなく進捗通知だった**(重要な誤解の訂正)。
+  実際の引数は `(loaderObj, progressObj, context, x3, …)` で **contextは第3引数**。
+  第2引数が `CPGGaussianSplattingDataLoaderProgress` で、
+  `GetPercentage`=`[obj+0x8]`(float)、メッセージは `obj+0x10` に **"Loaded image 0"** と入っていた。
+  = **画像の供給はパイプライン側が自前で行っている**
+- `IterationResult` のレイアウト: `+0x08 step(int32) / +0x0c loss(float) / +0x14 numGaussians(int32)`
+- **残る唯一の関門は「実データの投入経路」**:
+  ①`CPGDepthPointCloudAddPoint` の引数(float regs s3/v4 を使う。位置+法線+色と推定)
+  ②**画像をどこから読ませるか**。進捗が "Loaded image 0" と言うので sampleID 0 に対応する
+  画像を探しているはず。候補は options 内の作業ディレクトリ(options+8 が std::string)、
+  `CPGSampleCreateWithCVPixelBuffer`+`CPGSessionAddSample` 経由の別セッション、
+  `CPGSfmMapLoadFromURL` で読む保存済みSfM
+- **プローブ実装の教訓**: **stdout をリダイレクトするとクラッシュで出力が全て失われる**
+  → `setvbuf(stdout,NULL,_IONBF,0)` を先頭に入れる(これで「無出力」の謎が解けた)。
+  クラッシュ位置の**深さの変化**が「引数が正しくなったか」の最良の指標
+- **前提は不変**: SPI なので**配布物には載せない**。実験は scratchpad のプローブ限定
