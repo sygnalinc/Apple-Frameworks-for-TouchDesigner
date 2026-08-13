@@ -12,6 +12,7 @@
 name	status	minos
 AVAudioMixer	experimental	26.0
 AVAudioSpatial	experimental	26.0
+AVFoundationCamera	experimental	26.0
 AppleScript	released	26.0
 AudioToolboxMix	experimental	26.0
 CaptionAuthor	experimental	26.0
