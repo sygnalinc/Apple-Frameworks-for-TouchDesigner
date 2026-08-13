@@ -6062,3 +6062,26 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   music_sample_01.m4a=BPM135/E♭minor/14sections、music_sample_02.wav=BPM130/Gminor/9sections
   (曲ごとに異なる正しい解析)。検証ループの「前回結果を読むレース」に注意(fresh nodeで再確認した)
 - README(RealityKitCapture+ルート英日)更新。ビルド・署名・常設インストール済み
+
+### 2026-08-14 macos27ブランチを main へ統合(以後 main 一本で開発)
+
+- ユーザー「このosはbeta版のmacos27で、その新機能の開発用の環境だが、基本mainブランチのみで
+  開発していく事になった」→ `macos27/realitykit-splat` を **main へ --no-ff マージ**して以後 main で作業
+- **mainは別マシン側で大幅に進んでいた**(AVF Camera / CoreMIDI / demo.toe改称 / PLUGINS.tsv /
+  release.sh 公証パイプライン / READMEの英日併記化 等)ため ff 不可。6ファイルで競合し手動解決:
+  - `common/build_plugin.sh`: **mainの「zsh専用」方針を採用**(自分のbash互換パッチは捨てた)。
+    main側の結論は「各 build.sh も必ず `#!/bin/zsh`」で、実際に全87件が zsh shebang であることを
+    確認済み。一括ビルドも `zsh ./build.sh` で起動する運用に統一
+  - `CLAUDE.md`: 両者の作業ログを時系列で結合(union)
+  - `README.md` / `README.ja.md`: mainが英日併記+op絞り込み済みだったので、**main側の構成に
+    新規2行(Vision IterSeg / Music Understanding)だけ差し込む**形に。branch側が持っていた
+    「mainから外された op 行」(CoreImageBokeh/SpeechActivity/Shazam/AVAudio*/PHASE等)は復活させない
+  - `LLMAFM/README.md`: mainの英日併記構成を採用し、AFM3節を英語・日本語の両方へ追加
+  - `.gitignore`: 双方の追記を結合(macOS 27検証素材の除外を追加)
+- **mainの新ルールに追従**: 「新規プラグインは指示があるまで experimental」(a668882)に従い、
+  `PLUGINS.tsv` へ MusicUnderstanding / RealityKitSplat / VisionIterSeg を **experimental・minos 27.0**
+  で登録(minos 27 は release.sh がSDK不足時にビルド除外するため必須)。
+  `tools/release.sh` の整合検査(追跡フォルダ=表)を手動で回して **87件一致**を確認
+- マージ後のソースで新規3件+改修2件(RealityKitCapture / LLMAFM)を**再ビルドして全OK**
+- 注意: マージで main 側の `demo.toe`(旧 sample.toe)運用に変わったので、macOS 27 op の
+  利用例は今後 demo.toe 側へ追加する。RealityKitSplat の未検証項目(SH degree 1〜3)は据え置き
