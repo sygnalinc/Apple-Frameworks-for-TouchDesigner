@@ -94,7 +94,11 @@ AVFoundation でカメラを開いて映像を出し、あわせて TouchDesigne
   黙って無視され、どれを選んでも Info CHOP の `active_w` / `active_h` は 1920x1080 のまま。
   この種のカメラは旧来の CoreMediaIO **DAL** 経路(`AVCaptureDALDevice`)で見えており、
   `activeFormat` に対応していない
-- macOS での代替である `AVCaptureSession.sessionPreset` でも変わらなかった
+- macOS での代替である `AVCaptureSession.sessionPreset` でも変わらなかった。どの経路を通ったか
+  計測したところ、**プリセットは実際に適用されていた**(`canSetSessionPreset` が true を返し、
+  代入も実行された)にもかかわらず、届くフレームも `activeFormat` も 1920x1080 のままだった
+- **UVC / DAL 固有ではない。** 内蔵の FaceTime HD カメラでも同じで、約34fps で流れているが
+  1280x720 や 640x480 を選んでも 1920x1080 のまま変わらない
 - **iOS 専用の API**: `AVCaptureSessionPresetInputPriority`、ISO、露出時間、露出補正、
   レンズ位置、ホワイトバランスゲイン、ズームはいずれも macOS には存在しない
 

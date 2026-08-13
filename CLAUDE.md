@@ -5856,3 +5856,32 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   `tools/release.sh` の収集対象から外れることを確認済み(DMG には入らない)
 - **ルール化(ユーザー指示・2026-08-13)**: **新規プラグインは指示があるまで `experimental`**。
   検証を自分で通していても `released` に上げない。公開するかの判断はユーザーが持つ
+
+### 2026-08-13 AVF Camera TOP 実装(experimental・フォーマット選択が未達)
+
+- ユーザー「webcam(uvc)の設定を確認変更できる op を作りたい」→ 実測で切り分けてから設計:
+  - **AVFoundation の macOS 版は UVC 設定のごく一部しか触れない。** ISO / 露出補正 / 露出時間 /
+    レンズ位置 / WBゲイン / ズームは**すべて iOS 専用**(コンパイラが unavailable と言う)。
+    残るのは露出とフォーカスの auto/locked、フォーマット、Center Stage 等のエフェクト
+  - **TD の Video Device In は UVC カメラに対して露出等がすべてグレーアウト**(SDI 専用)。実測
+  - **TD が見るカメラは5台、AVFoundation は6台**(デスクビューカメラが TD に出ない)
+  - **BRIO は 35フォーマット = 212通り。60fps に届くのは 1280x720/420v の1通りだけ**で、
+    1920x1080 は 30fps 頭打ち。TD の「解像度 + fps 上限」方式ではこの事実に気づけない
+- **`AVF Camera` TOP** を実装(opType `Avfcamera` / icon AVF / フォルダ `AVFoundationCamera`)。
+  命名は `CI Glass` / `CA Process Tap` と同じ「略称 opLabel + 展開フォルダ」の型
+- **動くこと**: カメラ6台の列挙、212通りのフォーマット表(メニュー + Info DAT)、映像出力、
+  uniqueID によるデバイス識別、Info CHOP 14ch
+- **動かないこと(実測)**: **フォーマットを選んでも効かない。** `activeFormat` の指定が無視され、
+  `active_w`/`active_h` は 1920x1080 のまま。`sessionPreset` 経路も試し、計測したところ
+  **プリセットは実際に適用されている**(`canSetSessionPreset`=true で代入も実行)のに変わらない。
+  **UVC/DAL 固有ではなく、内蔵 FaceTime HD でも同じ**
+- **TD を1回クラッシュさせた(自分のバグ)**: **AVFoundation は不正値で NSError ではなく ObjC 例外を
+  投げる**(CoreHaptics と同じ型)。fps から自作した `CMTime` を `setActiveVideoMinFrameDuration:`
+  に渡して `-[AVCaptureDALDevice ...]` が投げ、TD ごと落ちた。フレーム持続時間は
+  **システムの `AVFrameRateRange` の値をそのまま使う**ようにし、設定呼び出しを全て `@try` で包んだ
+- **踏んだ罠**: ①**動的文字列メニューは `getParString` で読む**(`getParInt` だと 0 のままで
+  変更を検知できない)②`AVCaptureSessionPresetInputPriority` は **iOS 専用**で macOS に無い
+  ③**素の CLI はカメラ権限を取れない**(`notDetermined`)ので、検証は TD 内か署名 .app で行う
+- 次にやること: フォーマット選択の壁を越える。候補は ①`AVCaptureVideoDataOutput.videoSettings` に
+  幅/高さを入れる(出力側スケーリング。fps は変わらない)②CoreMediaIO の DAL プロパティを直接叩く
+  ③**署名した .app のプローブを作って TD 外で高速に試す**(TD 再起動を繰り返さずに済む)

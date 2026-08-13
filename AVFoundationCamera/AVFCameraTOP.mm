@@ -218,23 +218,27 @@ public:
         }
     }
 
-    int32_t getNumInfoCHOPChans(void*) override { return 12; }
+    int32_t getNumInfoCHOPChans(void*) override { return 14; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override
     {
         // width/height は**届いたフレーム**、active_* は**デバイスが今持っているフォーマット**。
         // 両者を分けて出すと「指定が効いていない」のか「フレームがまだ古い」のか判別できる
-        const char* n[12] = {"executes", "frames", "running", "width", "height", "formats", "cameras",
-                             "center_stage", "portrait_effect", "studio_light", "active_w", "active_h"};
+        const char* n[14] = {"executes", "frames", "running", "width", "height", "formats", "cameras",
+                             "center_stage", "portrait_effect", "studio_light", "active_w", "active_h",
+                             "preset_path", "fmt_locked"};
+        // preset_path: 1=プリセットを設定 / 2=プリセット非対応で activeFormat へ / 3=該当プリセット無し
+        // fmt_locked : applyFormat で lockForConfiguration が通ったか
         std::lock_guard<std::mutex> l(myMutex);
         CMVideoDimensions ad = {0, 0};
         if (myDevice && myDevice.activeFormat)
             ad = CMVideoFormatDescriptionGetDimensions(myDevice.activeFormat.formatDescription);
-        float v[12] = {(float)myExec.load(), (float)myFrames.load(), myRunning ? 1.f : 0.f,
+        float v[14] = {(float)myExec.load(), (float)myFrames.load(), myRunning ? 1.f : 0.f,
                       (float)myWidth, (float)myHeight, (float)myFormats.size(), (float)myCameras.size(),
                       AVCaptureDevice.centerStageEnabled ? 1.f : 0.f,
                       AVCaptureDevice.portraitEffectEnabled ? 1.f : 0.f,
                       AVCaptureDevice.studioLightEnabled ? 1.f : 0.f,
-                      (float)ad.width, (float)ad.height};
+                      (float)ad.width, (float)ad.height,
+                      (float)myPresetPath, (float)myFmtLocked};
         c->name->setString(n[i]);
         c->value = v[i];
     }
@@ -383,7 +387,8 @@ private:
                 else if (want.width == 960 && want.height == 540) preset = AVCaptureSessionPreset960x540;
                 else if (want.width == 640 && want.height == 480) preset = AVCaptureSessionPreset640x480;
                 else if (want.width == 352 && want.height == 288) preset = AVCaptureSessionPreset352x288;
-                if (preset && [s canSetSessionPreset:preset]) s.sessionPreset = preset;
+                myPresetPath = preset ? ([s canSetSessionPreset:preset] ? 1 : 2) : 3;
+                if (myPresetPath == 1) s.sessionPreset = preset;
                 else applyFormat(d, fmtIdx);
             }
             [s commitConfiguration];
@@ -409,7 +414,12 @@ private:
         NSArray<AVCaptureDeviceFormat*>* fmts = d.formats;
         if (want.index < 0 || want.index >= (int)fmts.count) return;
         NSError* e = nil;
-        if (![d lockForConfiguration:&e]) { setWarning("Could not lock the camera for configuration."); return; }
+        if (![d lockForConfiguration:&e]) {
+            myFmtLocked = 0;
+            setWarning("Could not lock the camera for configuration.");
+            return;
+        }
+        myFmtLocked = 1;
         // **AVFoundation は不正な値で NSError ではなく ObjC 例外を投げる。**
         // fps から自分で CMTime を作って渡したら -[AVCaptureDALDevice
         // setActiveVideoMinFrameDuration:] が投げて TD ごと落ちた(実際に踏んだ)。
@@ -487,6 +497,7 @@ private:
     int myOpenFormat = -1;
     std::string myExposure = "?", myFocus = "?";
     bool myCS = false;
+    int myPresetPath = 0, myFmtLocked = -1;
 
     std::atomic<uint64_t> myExec{0}, myFrames{0};
     std::atomic<bool> myDevicesChanged{false};
