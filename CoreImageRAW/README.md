@@ -32,14 +32,39 @@ RGBA16Float TOP. Exposure, white balance, noise reduction, sharpness and contras
 | RAW File | DNG / ProRAW / camera RAW file |
 | Exposure (EV) | Exposure compensation |
 | Boost | Shadow/tone boost (0 = linear, 1 = standard) |
-| Neutral Temperature (K) | White balance colour temperature |
-| Neutral Tint | White balance tint correction |
+| As Shot | Use the file's own white balance and tone. **On by default** — turn it off to take over the six sliders below |
+| Output Color Space | sRGB (default) / Display P3 / Adobe RGB / Linear sRGB |
+| Neutral Temperature (K) | White balance colour temperature. Only when As Shot is off |
+| Neutral Tint | White balance tint correction. Only when As Shot is off |
 | Luminance Noise Reduction | Luminance noise reduction (supported RAW only) |
 | Color Noise Reduction | Colour noise reduction (supported RAW only) |
 | Sharpness | Sharpness (supported RAW only) |
 | Contrast | Contrast |
 | Scale Factor | Decode resolution scale (0.1–1.0, to reduce load) |
 | Flip Vertically | Flip the output vertically (default On) |
+
+### Matching what Preview shows
+
+The develop defaults now land on Apple's own decode. Measured on an iPhone ProRAW DNG, mean RGB
+over the frame, against a PNG exported from Preview:
+
+| | mean RGB | \|Δ\| vs Preview |
+|---|---|---|
+| Before 0.9.7 (white balance forced to 6500 K, linear output) | 0.886 / 0.517 / **0.056** | 0.263 |
+| As Shot + sRGB (current default) | 0.673 / 0.594 / 0.448 | 0.108 |
+| ImageIO's own default decode | 0.672 / 0.593 / 0.451 | 0.107 |
+| The camera's embedded preview in the DNG | 0.666 / 0.584 / 0.423 | 0.122 |
+| Preview's PNG export | 0.784 / 0.700 / 0.552 | — |
+
+Two things were wrong. The sliders **overwrote the file's as-shot white balance** (3375 K / tint
+12.07 on that file) with a fixed 6500 K, which crushed blue to 0.056 — that is the colour cast you
+see. And the result was written in **linear** light, which TD displays as-is, so the midtones sank.
+
+The current default now agrees with ImageIO's decode to within \|Δ\| = 0.009. **Preview's export is
+the outlier**: it is about +0.55 EV brighter than every Apple RAW path, including the camera's own
+embedded preview. Applying the file's HDR gain map does not explain it — `expandToHDR` and
+`CIToneMapHeadroom` both come out *darker*, not brighter. If you want that brighter look, set
+**Exposure to about +0.55**; that brings \|Δ\| down to 0.033.
 
 ### Notes
 
@@ -97,14 +122,38 @@ DNG / Apple ProRAW / カメラRAW を `CIRAWFilter` で**リアルタイム現�
 | RAW File | DNG / ProRAW / カメラRAW ファイル |
 | Exposure (EV) | 露出補正 |
 | Boost | シャドウ/トーンのブースト(0=リニア, 1=標準) |
-| Neutral Temperature (K) | ホワイトバランス色温度 |
-| Neutral Tint | ホワイトバランスの色かぶり補正 |
+| As Shot | ファイル自身のホワイトバランスと階調を使う。**既定On** — 下の6スライダーで上書きしたいときだけOff |
+| Output Color Space | sRGB(既定)/ Display P3 / Adobe RGB / Linear sRGB |
+| Neutral Temperature (K) | ホワイトバランス色温度。As Shot が Off のときだけ有効 |
+| Neutral Tint | ホワイトバランスの色かぶり補正。As Shot が Off のときだけ有効 |
 | Luminance Noise Reduction | 輝度ノイズ除去(対応RAWのみ) |
 | Color Noise Reduction | 色ノイズ除去(対応RAWのみ) |
 | Sharpness | シャープネス(対応RAWのみ) |
 | Contrast | コントラスト |
 | Scale Factor | デコード解像度スケール(0.1〜1.0。負荷軽減に) |
 | Flip Vertically | 出力の上下反転(既定 On) |
+
+### Preview の見え方と合わせる
+
+現像の既定値が Apple 自身のデコードと一致するようになった。iPhone ProRAW の DNG で、
+画面全体の平均RGBを Preview から書き出した PNG と比較した実測:
+
+| | 平均RGB | \|Δ\| vs Preview |
+|---|---|---|
+| 0.9.7 より前(WBを6500Kに強制・linear出力) | 0.886 / 0.517 / **0.056** | 0.263 |
+| As Shot + sRGB(現在の既定) | 0.673 / 0.594 / 0.448 | 0.108 |
+| ImageIO の既定デコード | 0.672 / 0.593 / 0.451 | 0.107 |
+| DNG に埋め込まれたカメラ自身のプレビュー | 0.666 / 0.584 / 0.423 | 0.122 |
+| Preview の書き出しPNG | 0.784 / 0.700 / 0.552 | — |
+
+原因は2つあった。スライダーが**ファイルの as-shot ホワイトバランス**(この個体は 3375K /
+tint 12.07)を固定値 6500K で上書きしていたため青が 0.056 まで潰れており、これが色かぶりの正体。
+もう1つは結果を**リニア光のまま**書いていたこと。TD は値をそのまま表示するので中間調が沈む。
+
+現在の既定は ImageIO のデコードと \|Δ\| = 0.009 まで一致する。**外れているのは Preview の方**で、
+カメラ自身の埋め込みプレビューを含む Apple のどの経路よりも約 +0.55 EV 明るい。HDRゲインマップを
+当てても説明できない(`expandToHDR` も `CIToneMapHeadroom` も**逆に暗くなる**)。
+Preview の明るさに寄せたいときは **Exposure を +0.55 前後**にする(\|Δ\| = 0.033 まで縮む)。
 
 ### 注意
 

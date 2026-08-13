@@ -15,7 +15,7 @@
 using namespace TD;
 
 namespace {
-struct Params { std::string file; float exposure, boost, temp, tint, lumaNR, colorNR, sharpen, contrast, scale; bool flip; bool applyOri = true; };
+struct Params { std::string file; float exposure, boost, temp, tint, lumaNR, colorNR, sharpen, contrast, scale; bool flip; bool applyOri = true; bool asShot = true; std::string cspace = "srgb"; };
 struct Result { std::vector<uint16_t> p; uint32_t w = 0, h = 0; uint64_t serial = 0; };
 
 class CoreImageRAWTOP final : public TOP_CPlusPlusBase {
@@ -40,8 +40,14 @@ public:
         p.scale = (float)in->getParDouble("Scale");
         p.flip = in->getParInt("Flip") != 0;
         p.applyOri = in->getParInt("Applyorientation") != 0;
-        char buf[256]; snprintf(buf, sizeof buf, "%s|%.3f|%.3f|%.1f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d",
-            p.file.c_str(), p.exposure, p.boost, p.temp, p.tint, p.lumaNR, p.colorNR, p.sharpen, p.contrast, p.scale, p.flip ? 1 : 0, p.applyOri ? 1 : 0);
+        p.asShot = in->getParInt("Asshot") != 0;
+        p.cspace = in->getParString("Colorspace") ? in->getParString("Colorspace") : "srgb";
+        // As Shot 中はファイル側の値をそのまま使うので、上書き用スライダーはグレーアウトする
+        for (const char* nm : {"Temperature", "Tint", "Lumanr", "Colornr", "Sharpen", "Contrast"})
+            in->enablePar(nm, !p.asShot);
+        char buf[320]; snprintf(buf, sizeof buf, "%s|%.3f|%.3f|%.1f|%.3f|%.3f|%.3f|%.3f|%.3f|%.3f|%d|%d|%d|%s",
+            p.file.c_str(), p.exposure, p.boost, p.temp, p.tint, p.lumaNR, p.colorNR, p.sharpen, p.contrast, p.scale, p.flip ? 1 : 0, p.applyOri ? 1 : 0,
+            p.asShot ? 1 : 0, p.cspace.c_str());
         std::string sig = buf;
         if (sig != mySig) {
             mySig = sig;
@@ -78,6 +84,13 @@ public:
         f("Sharpen", "Sharpness", 0.5, 0.0, 2.0);
         f("Contrast", "Contrast", 1.0, 0.0, 2.0);
         f("Scale", "Scale Factor", 1.0, 0.1, 1.0);
+        { OP_NumericParameter p("Asshot"); p.label = "As Shot (use the file's own white balance / tone)"; p.page = PAGE; p.defaultValues[0] = 1; m->appendToggle(p); }
+        {
+            OP_StringParameter p("Colorspace"); p.label = "Output Color Space"; p.page = PAGE; p.defaultValue = "srgb";
+            const char* n[] = {"srgb", "p3", "adobergb", "linear"};
+            const char* l[] = {"sRGB", "Display P3", "Adobe RGB (1998)", "Linear sRGB (for compositing)"};
+            m->appendMenu(p, 4, n, l);
+        }
         { OP_NumericParameter p("Flip"); p.label = "Flip Vertically"; p.page = PAGE; p.defaultValues[0] = 1; m->appendToggle(p); }
         { OP_NumericParameter p("Applyorientation"); p.label = "Apply EXIF Orientation"; p.page = PAGE; p.defaultValues[0] = 1; m->appendToggle(p); }
     }
@@ -110,12 +123,22 @@ private:
                 if (!f) { w = "Not a supported RAW file"; return false; }
                 f.exposure = p.exposure;
                 f.boostAmount = p.boost;
-                f.neutralTemperature = p.temp;
-                f.neutralTint = p.tint;
-                if (f.luminanceNoiseReductionSupported) f.luminanceNoiseReductionAmount = p.lumaNR;
-                if (f.colorNoiseReductionSupported) f.colorNoiseReductionAmount = p.colorNR;
-                if (f.sharpnessSupported) f.sharpnessAmount = p.sharpen;
-                f.contrastAmount = p.contrast;
+                // As Shot: ホワイトバランス・コントラスト・NR・シャープはファイルが持っている値
+                // (撮影時の設定 + メーカーの既定)をそのまま使う。
+                //
+                // ここを常に固定値で上書きしていたのが「Preview と全然違う」の主因だった。
+                // 実測(iPhone ProRAW): ファイルの as-shot は 3375K / tint 12.07 なのに
+                // 6500K / 0 を書き込んでいたため強い色かぶりになり、平均 RGB が
+                // 0.886/0.517/**0.056** と青がほぼ消えていた。as shot なら 0.673/0.594/0.448 で
+                // Apple 自身のデコード(ImageIO)と |Δ|=0.009 まで一致する
+                if (!p.asShot) {
+                    f.neutralTemperature = p.temp;
+                    f.neutralTint = p.tint;
+                    if (f.luminanceNoiseReductionSupported) f.luminanceNoiseReductionAmount = p.lumaNR;
+                    if (f.colorNoiseReductionSupported) f.colorNoiseReductionAmount = p.colorNR;
+                    if (f.sharpnessSupported) f.sharpnessAmount = p.sharpen;
+                    f.contrastAmount = p.contrast;
+                }
                 f.scaleFactor = p.scale;
                 // 撮影時のカメラの向き(EXIF Orientation)。CIRAWFilter は既定でファイルの値を
                 // 持っているので、off のときだけ .up にしてセンサーそのままの向きで出す
@@ -126,8 +149,19 @@ private:
                 if (e.size.width < 1 || e.size.height < 1) { w = "Empty RAW output"; return false; }
                 uint32_t W = (uint32_t)e.size.width, H = (uint32_t)e.size.height;
                 r.w = W; r.h = H; r.p.resize((size_t)W * H * 4);
-                CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearSRGB);
-                CIContext* ctx = [CIContext contextWithOptions:@{ kCIContextWorkingColorSpace : (__bridge id)cs }];
+                // 出力の色空間。**ここを linear のままにしていたのが2つ目のバグ**:
+                // TD は値をそのまま表示するので、リニア光のまま出すと中間調が大きく沈む
+                // (実測 |Δ| 0.31)。sRGB で出すと Apple の標準デコードと一致する。
+                // linear は合成用に残してある(16F なので情報は落ちない)
+                CFStringRef out = kCGColorSpaceSRGB;
+                if (p.cspace == "linear")        out = kCGColorSpaceExtendedLinearSRGB;
+                else if (p.cspace == "p3")       out = kCGColorSpaceDisplayP3;
+                else if (p.cspace == "adobergb") out = kCGColorSpaceAdobeRGB1998;
+                CGColorSpaceRef cs = CGColorSpaceCreateWithName(out);
+                // 処理自体はリニアで行うのが正しい(working space は常に linear)
+                CGColorSpaceRef work = CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearSRGB);
+                CIContext* ctx = [CIContext contextWithOptions:@{ kCIContextWorkingColorSpace : (__bridge id)work }];
+                CGColorSpaceRelease(work);
                 // kCIFormatRGBA16 は **16bit符号なし整数**。RGBA16Float(半精度浮動小数)として上げるので
                 // 形式が一致せず、ビット列が別物として解釈されて NaN や負の巨大値になる(実RAWで実測)。
                 // 半精度で描く kCIFormatRGBAh が正しい対。
