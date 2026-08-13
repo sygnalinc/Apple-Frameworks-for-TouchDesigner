@@ -209,6 +209,8 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [Vision Similarity CHOP](VisionSimilarity/) | CHOP | 実験中 |
 | [VisionTrack CHOP](VisionTrack/) | CHOP | 実験中 |
 
+> 別の Mac(macOS ベータ機など)で環境を作る場合は **[SETUP.md](SETUP.md)** を参照。
+
 ## 使い方
 
 ### 1. 導入(リリースビルドを落とすだけ・ビルド不要)

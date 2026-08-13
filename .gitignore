@@ -40,8 +40,6 @@ demo_capture/
 ops_catalog.json
 
 # Codex 関連(ローカル専用・コミットしない)
-AGENTS.md
-.codex/
 
 # After Effects の作業ファイル(ローカル専用・33MB)
 AfterEffects/

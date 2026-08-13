@@ -210,6 +210,8 @@ and are unsupported. The source is here so you can build and try them yourself
 | [Vision Similarity CHOP](VisionSimilarity/) | CHOP | experimental |
 | [VisionTrack CHOP](VisionTrack/) | CHOP | experimental |
 
+> Setting the repo up on another Mac (or a macOS beta machine)? See **[SETUP.md](SETUP.md)**.
+
 ## Getting started
 
 ### 1. Install (download the release — no build needed)
