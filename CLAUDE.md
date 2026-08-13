@@ -5897,3 +5897,19 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   受信は二重バッファ化した(コールバックはロック外で裏バッファに詰め、交換だけロック内)が
   実効fpsは変わらなかった = ロック競合が原因ではなかった
 - **「UVC/DAL だから効かない」という私の推定は誤りだった**(内蔵 FaceTime HD でも同じ挙動)。訂正済み
+- **手動露出は AVFoundation では不可能、USB の UVC コントロールなら可能**(実測で確定):
+  - **macOS の AVFoundation は手動露出の API を持たない。** コンパイラが unavailable と言う:
+    `exposureDuration` / `iso` / `exposureTargetOffset` / `setExposureModeCustom` /
+    `setExposureTargetBias`。`.custom` モードも BRIO・内蔵カメラとも supported=false。
+    **AVFoundation でできるのは auto / locked の切り替えだけ**
+  - **IOKit の USB コントロール転送で UVC のコントロールを直接読み書きできる。**
+    `IOServiceMatching(kIOUSBDeviceClassName)` → `IOCreatePlugInInterfaceForService` →
+    `USBDeviceOpen` → `DeviceRequest`。**特別なエンタイトルメントも root も不要で通った**
+    (カメラが AppleUSBVideo に掴まれていても、コントロール転送は別)
+  - 実測(Logicool BRIO): 露出時間(CT_EXPOSURE_TIME_ABSOLUTE=0x04, unit 1, interface 0)を
+    GET_CUR=312 / GET_MIN=3 / GET_MAX=2047(100us単位)で読み、**AEモード(CT_AE_MODE=0x02)を
+    0x08(自動)→0x01(手動)にして露出を 100(10.0ms)に書き込み、読み戻しで一致**。復元も成功
+  - リクエストの形: GET は `bmRequestType=0xA1` / `bRequest=0x81(GET_CUR)`、SET は `0x21` / `0x01`。
+    `wValue = コントロールセレクタ<<8`、`wIndex = (unitID<<8) | インターフェイス番号`
+  - これで明るさ・コントラスト・彩度・シャープネス・ゲイン・色温度・フォーカス・ズーム・
+    パン/チルトも同じ方法で触れる見込み(Processing Unit / Camera Terminal のコントロール)
