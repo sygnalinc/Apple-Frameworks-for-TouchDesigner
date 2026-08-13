@@ -228,9 +228,12 @@ public:
         {
             OP_StringParameter p("Syncmode");
             p.label = "Sync Mode"; p.page = SYNC; p.defaultValue = "off";
-            const char* nm[] = {"off", "clock"};
-            const char* lb[] = {"Off", "MIDI Clock (follow timeline)"};
-            m->appendMenu(p, 2, nm, lb);
+            // Logic Pro は **MIDI クロックには追従しない**(受信側の設定が無い)。
+            // Logic をタイムラインに追従させるには mtc を選ぶ。
+            // clock は Ableton Live など MIDI クロック同期する DAW / 機材向け。
+            const char* nm[] = {"off", "clock", "mtc"};
+            const char* lb[] = {"Off", "MIDI Clock (24 PPQN)", "MTC (MIDI Time Code)"};
+            m->appendMenu(p, 3, nm, lb);
         }
         {
             // TD のタイムラインのテンポを式で入れる: root.time.tempo
@@ -241,6 +244,13 @@ public:
             p.minValues[0] = 1.0; p.maxValues[0] = 999.0;
             p.clampMins[0] = true; p.clampMaxes[0] = true;
             m->appendFloat(p);
+        }
+        {
+            OP_StringParameter p("Mtcrate");
+            p.label = "MTC Frame Rate"; p.page = SYNC; p.defaultValue = "30";
+            const char* nm[] = {"24", "25", "2997", "30"};
+            const char* lb[] = {"24 fps", "25 fps", "29.97 fps drop", "30 fps"};
+            m->appendMenu(p, 4, nm, lb);
         }
         {
             OP_NumericParameter p("Songposition");
@@ -523,18 +533,23 @@ private:
     void handleSync(const OP_Inputs* in)
     {
         const char* mode = in->getParString("Syncmode");
-        if (!mode || strcmp(mode, "clock") != 0) { stopClock(); return; }
+        const std::string mo = mode ? mode : "off";
+        if (mo == "off") { stopClock(); return; }
 
         const OP_TimeInfo* ti = in->getTimeInfo();
         if (!ti || ti->rate <= 0) return;
-        const double bpm = in->getParDouble("Tempo");
-        if (bpm <= 0) return;
 
         // タイムラインが進んでいるか = フレームが変化したか
         const double frame = ti->frame;
         const bool playing = (frame != myLastFrame);
         myLastFrame = frame;
-        myBeat = (frame / ti->rate) * bpm / 60.0;
+        const double sec = frame / ti->rate;
+
+        if (mo == "mtc") { syncMTC(in, sec, playing); return; }
+
+        const double bpm = in->getParDouble("Tempo");
+        if (bpm <= 0) return;
+        myBeat = sec * bpm / 60.0;
 
         if (!playing) { stopClock(); return; }
 
@@ -567,6 +582,86 @@ private:
             if (dt > kLookahead) break;
             const double at = dt > 0 ? dt : 0;
             sendAt(now + (MIDITimeStamp)(at * toHost), &clock, 1);
+            myTick = next;
+            myClocks++;
+        }
+    }
+
+    // --- MTC(MIDI Time Code) ---
+    // Logic はこちらで追従する(MIDI クロックの受信設定を持たない)。
+    // クォーターフレームを 4×fps の頻度で送り、8個で1つのタイムコード(2フレームぶん)を伝える。
+    static double mtcFps(const std::string& r)
+    {
+        if (r == "24") return 24.0;
+        if (r == "25") return 25.0;
+        if (r == "2997") return 30.0 / 1.001;
+        return 30.0;
+    }
+    static int mtcRateCode(const std::string& r)
+    {
+        if (r == "24") return 0;
+        if (r == "25") return 1;
+        if (r == "2997") return 2;
+        return 3;
+    }
+
+    void syncMTC(const OP_Inputs* in, double sec, bool playing)
+    {
+        const char* r = in->getParString("Mtcrate");
+        const std::string rate = r ? r : "30";
+        const double fps = mtcFps(rate);
+        const int rc = mtcRateCode(rate);
+        myBeat = sec;
+
+        if (!playing) {
+            if (myClockRunning) { realtime(0xFC); myClockRunning = false; }
+            myTick = -1;
+            return;
+        }
+
+        const long long qf = (long long)std::floor(sec * fps * 4.0);   // クォーターフレーム番号
+        const bool jumped = myClockRunning && std::llabs(qf - myTick) > 16;
+        if (!myClockRunning || jumped) {
+            // 位置を一発で伝える Full Frame メッセージ: F0 7F 7F 01 01 hh mm ss ff F7
+            const long long fr = qf / 4;
+            const int ff = (int)(fr % (long long)std::llround(fps));
+            const long long tot = fr / (long long)std::llround(fps);
+            uint8_t b[10] = {0xF0, 0x7F, 0x7F, 0x01, 0x01,
+                             (uint8_t)(((rc << 5) | (int)((tot / 3600) % 24)) & 0x7F),
+                             (uint8_t)((tot / 60) % 60), (uint8_t)(tot % 60), (uint8_t)ff, 0xF7};
+            sendBytes(b, 10);
+            myClockRunning = true;
+            myTick = qf - 1;
+        }
+
+        // クォーターフレームを先読みして予約する(クロックと同じ理由)
+        const MIDITimeStamp now = mach_absolute_time();
+        const double toHost = 1.0 / hostToSec();
+        int guard = 0;
+        while (guard++ < 256) {
+            const long long next = myTick + 1;
+            const double dt = next / (fps * 4.0) - sec;
+            if (dt > kLookahead) break;
+            const int piece = (int)(next % 8);
+            // 8個で1組。組の先頭は偶数フレームを指す
+            const long long baseFrame = (next / 8) * 2;
+            const long long fpsI = (long long)std::llround(fps);
+            const int ff = (int)(baseFrame % fpsI);
+            const long long tot = baseFrame / fpsI;
+            const int ss = (int)(tot % 60), mm = (int)((tot / 60) % 60), hh = (int)((tot / 3600) % 24);
+            int v = 0;
+            switch (piece) {
+                case 0: v = ff & 0xF; break;
+                case 1: v = (ff >> 4) & 0xF; break;
+                case 2: v = ss & 0xF; break;
+                case 3: v = (ss >> 4) & 0xF; break;
+                case 4: v = mm & 0xF; break;
+                case 5: v = (mm >> 4) & 0xF; break;
+                case 6: v = hh & 0xF; break;
+                case 7: v = ((hh >> 4) & 0x1) | (rc << 1); break;
+            }
+            uint8_t b[2] = {0xF1, (uint8_t)((piece << 4) | (v & 0xF))};
+            sendAt(now + (MIDITimeStamp)((dt > 0 ? dt : 0) * toHost), b, 2);
             myTick = next;
             myClocks++;
         }

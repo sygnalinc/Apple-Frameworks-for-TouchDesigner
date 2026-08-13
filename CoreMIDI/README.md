@@ -49,7 +49,18 @@ the realtime path. If your DAW reacts twice, switch Transport Method from `Both`
 
 ### Following TouchDesigner's timeline
 
-Set **Sync Mode** to `MIDI Clock` and the op sends 24 PPQN clock locked to TD's timeline:
+Two ways to send position, because **which one a DAW understands is not a matter of preference**:
+
+| Sync Mode | For |
+|---|---|
+| `MTC (MIDI Time Code)` | **Logic Pro.** Logic has no setting for receiving MIDI Clock — its Sync tab only exposes MTC on the receive side. Quarter frames at 4 × frame rate, plus a Full Frame message on start and after a jump |
+| `MIDI Clock (24 PPQN)` | Ableton Live and hardware that slaves to MIDI clock |
+
+**For Logic**, open Settings → MIDI → Sync → **「MIDI同期プロジェクト設定...」** and set the sync
+source to MTC. (The MMC *receive* setting lives in that same dialog — the MMC section on the Sync
+tab itself is only about what Logic *transmits*.)
+
+With `MIDI Clock` the op sends 24 PPQN locked to TD's timeline:
 
 - Timeline play/stop becomes Start `FA` / Continue `FB` / Stop `FC`
 - Position is announced with Song Position Pointer, and re-announced when the timeline loops or
@@ -57,7 +68,8 @@ Set **Sync Mode** to `MIDI Clock` and the op sends 24 PPQN clock locked to TD's 
 - **Tempo** is a plain parameter — bind it to the timeline with the expression `root.time.tempo`
   (the example does) and changing TD's tempo changes the clock
 
-Set the DAW to slave to external MIDI clock for this to have any effect.
+With `MTC` it sends quarter frames carrying `hh:mm:ss:ff` derived from the timeline, at the frame
+rate chosen in **MTC Frame Rate** (24 / 25 / 29.97 drop / 30).
 
 **On accuracy.** Cook only happens at frame rate, so sending clock naively bunches every tick onto
 frame boundaries. This op **schedules one frame ahead with CoreMIDI timestamps**
@@ -98,7 +110,8 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
 | Transport Method | `MMC (SysEx)` / `MIDI Realtime` / `Both` (default) |
 | MMC Device ID | 0–127, default 127 (all devices) |
 | Play / Stop / Record / Return to Start | DAW transport pulses |
-| Sync Mode | `Off` (default) / `MIDI Clock (follow timeline)` |
+| Sync Mode | `Off` (default) / `MIDI Clock (24 PPQN)` / `MTC (MIDI Time Code)` |
+| MTC Frame Rate | 24 / 25 / 29.97 drop / 30 (MTC only) |
 | Tempo (BPM) | Clock tempo. Bind to `root.time.tempo` to follow the timeline |
 | Send Song Position | Announce the position on start and after a jump (default on) |
 
@@ -126,6 +139,8 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
 - **Clock**: 120 BPM for 5 s produced 245 ticks (240 in theory) and 90 BPM for 6 s produced 217
   (216 in theory); stopping the timeline produced 0 ticks and a `FC`. Looping the timeline
   re-announced the position, as intended
+- **MTC**: 30 fps for 5 s produced 608 quarter frames (600 in theory), cycling pieces 0–7 with
+  rate code 3 (30 fps) and a timecode of `00:00:03:06` matching the timeline
 
 ### Build
 
@@ -184,14 +199,26 @@ Logic を MIDI クロックに同期させる)。二重に反応する DAW で�
 
 ### TouchDesigner のタイムラインに追従させる
 
-**Sync Mode** を `MIDI Clock` にすると、TD のタイムラインに同期した 24 PPQN のクロックを送る。
+送り方が2つあるのは、**どちらを理解するかが DAW 側で決まっていて選べない**ため。
+
+| Sync Mode | 用途 |
+|---|---|
+| `MTC (MIDI Time Code)` | **Logic Pro。** Logic には MIDI クロックを受信する設定が無く、同期タブの受信側は MTC しか無い。クォーターフレームを 4×フレームレートで送り、開始時と位置が飛んだときに Full Frame メッセージを送る |
+| `MIDI Clock (24 PPQN)` | Ableton Live など、MIDI クロックに同期する DAW / 機材 |
+
+**Logic の設定**: 設定 > MIDI > 同期 の **「MIDI同期プロジェクト設定...」**を開き、同期ソースを
+MTC にする(MMC の**受信**設定も同じダイアログ内。同期タブに見えている MMC 欄は Logic が
+**送信**する側の設定)。
+
+`MIDI Clock` にすると、TD のタイムラインに同期した 24 PPQN のクロックを送る。
 
 - タイムラインの再生/停止がそのまま Start `FA` / Continue `FB` / Stop `FC` になる
 - 再生位置は Song Position Pointer で伝え、ループやスクラブで飛んだら貼り直す
 - **Tempo** はただのパラメータなので、式で `root.time.tempo` に束ねるとタイムラインのテンポに
   追従する(利用例はそうしてある)
 
-効かせるには DAW 側を「外部 MIDI クロックに同期」に設定しておく必要がある。
+`MTC` にすると、タイムラインから作った `hh:mm:ss:ff` をクォーターフレームで送る。
+フレームレートは **MTC Frame Rate**(24 / 25 / 29.97 drop / 30)で選ぶ。
 
 **精度について。** cook はフレームレートでしか回らないので、素直に送るとクロックがフレーム境界に
 固まる。このOPは **CoreMIDI のタイムスタンプ付き送信で1フレームぶん先まで予約する**
@@ -232,7 +259,8 @@ Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online
 | Transport Method | `MMC (SysEx)` / `MIDI Realtime` / `Both`(既定) |
 | MMC Device ID | 0〜127。既定 127(全デバイス宛) |
 | Play / Stop / Record / Return to Start | DAW のトランスポート操作 |
-| Sync Mode | `Off`(既定)/ `MIDI Clock (follow timeline)` |
+| Sync Mode | `Off`(既定)/ `MIDI Clock (24 PPQN)` / `MTC (MIDI Time Code)` |
+| MTC Frame Rate | 24 / 25 / 29.97 drop / 30(MTC のみ) |
 | Tempo (BPM) | クロックのテンポ。`root.time.tempo` に束ねるとタイムラインに追従 |
 | Send Song Position | 開始時と位置が飛んだときに再生位置を伝える(既定On) |
 
@@ -257,6 +285,8 @@ Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online
   `FC`、Record で `7F 7F 06 06`、Return to Start で Locate SysEx と Song Position `0,0` を確認
 - **クロック**: 120BPM 5秒で 245個(理論240)、90BPM 6秒で 217個(理論216)、タイムライン停止で
   0個 + `FC`。タイムラインがループしたときは位置を貼り直すことも確認
+- **MTC**: 30fps 5秒で 608個(理論600)。piece 0〜7 が巡回し、レートコード 3(30fps)、
+  タイムコード `00:00:03:06` がタイムライン位置と一致することを確認
 
 ### ビルド
 
