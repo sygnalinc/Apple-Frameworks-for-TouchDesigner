@@ -6374,3 +6374,43 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   → `setvbuf(stdout,NULL,_IONBF,0)` を先頭に入れる(これで「無出力」の謎が解けた)。
   クラッシュ位置の**深さの変化**が「引数が正しくなったか」の最良の指標
 - **前提は不変**: SPI なので**配布物には載せない**。実験は scratchpad のプローブ限定
+
+### 2026-08-14 Stage 3: 画像を渡す経路が無く、外部から本物のsplatは生成できないと判明(調査終了)
+
+- **結論: 非公開APIで学習器は駆動できるが、画像を供給する経路が公開されていないため、
+  外部から本物の3DGSを生成することはできない。** ここで調査を打ち切る
+- **画像がどう探されているか(実測)**: カメラを3台登録して Run すると、DataLoader が
+  **33% / 67% / 100% で sampleID 0,1,2 の "Loaded image N"** を報告した
+  = **SfmMap の登録サンプルを列挙して、sampleIDごとに画像を引きに行っている**
+- **引きに行く先を逆アセンブルで特定**: 画像ロード関数(ワーカースレッドから呼ばれる)は
+  `[x0+0x8]` の内部オブジェクトを見て、`+0x50`(バケット配列)/`+0x58`(バケット数)/
+  `+0x78`(配列)を使い **`udiv`/`msub` によるハッシュ探索で sampleID → 画像**を引いている。
+  つまり**内部に per-sample の画像ハッシュマップがある**
+- **ここが構造的な壁**:
+  - **この画像マップに挿入する公開(export)関数が存在しない**。`CPGGaussianSplatting*` の
+    エクスポート79個を全数確認したが、画像/ピクセルバッファを渡す口は無い
+  - `Run` の**6引数は全て用途が確定済み**(session / sfmMap / pointCloud / options /
+    callbackBundle / outOutput)で、**画素を運ぶ引数が無い**
+  - `SfmMap` 側にも画像URLのsetterは無い(cameras と tracks だけ)
+  - 画像を持つのは `CPGSample`(`CPGSampleCreateWithCVPixelBuffer`)+ `CPGSessionAddSample` で、
+    これは**別系統の本体セッション(`CPGSessionCreate`)**に属する。本体セッションから
+    オブジェクトGSへ繋ぐ関数は `CPGSessionProcessGSRequestWithCallbacks`(= Environment GS 系)
+    しかなく、**そちらは `CPGCheckDeviceCompatibilityForEnvironmentGS` が
+    `mov w0,#0; ret` のスタブで macOS では無効**
+  - = **Appleの上位内部コードだけが画像プロバイダを構築できる**設計。外部からは
+    内部C++オブジェクトを手で捏造するしかなく、それは現実的でない(OS更新で即壊れる)
+- **今回の調査で得られた確定情報(将来Appleが公開したら即使える)**:
+  - `Run` の完全なシグネチャと各生成関数の作法(出力引数方式か戻り値方式か)
+  - Options = INRIA 3DGS のハイパーパラメータそのまま(既定 iterations=10000 / SH=3 /
+    λSSIM=0.8 / positionLR 0.00016→0.0000016 / densify 500〜15000)。読み書き可能
+  - CallbackBundle レイアウト(+0x08/+0x18/+0x28/+0x38)、
+    IterationResult(+0x08 step / +0x0c loss / +0x14 numGaussians)、
+    DataLoaderProgress(+0x08 割合 / +0x10 メッセージ)
+  - Camera 生成: `(const simd_double3x3* K, const simd_double4x4* E, void** out, simd_double2 res)`
+  - 出力は `colorRest`(高次SH)まで読める → INRIA .ply に書けば **RealityKit Splat TOP で描画可能**
+- **監視方法(次にやること)**: OS/SDK 更新のたびに
+  `dyld_info -exports` の `CPGGaussianSplatting*` と、公開SDK側に splat **生成**APIが
+  出てきたかを確認する(描画側 `GaussianSplatComponent` が macOS 27 で先に公開された流れ)。
+  **画像を渡す口が公開された瞬間に、上記の確定情報でそのまま実装できる**
+- **実用解は変わらず**: 外部ツール(INRIA実装 / Postshot 等)で学習した .ply を
+  **RealityKit Splat TOP に直接読ませる**(36.9万splatで約44fps実測済み)
