@@ -103,6 +103,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 |---|---|---|
 | [Vision Subject](VisionSubject/) | TOP | **Cut out any subject** (same API as Photos' "Copy Subject"). Soft mask / transparent background |
 | [CoreML SAM2](CoreMLSAM2/) | TOP | **Point-prompted segmentation of any object** (SAM 2.1). Cut out whatever the audience touches |
+| [Vision IterSeg](VisionIterSeg/) | TOP | **Apple-native interactive segmentation** (macOS 27): seed point / box / **scribble** prompts → soft mask. No external model (OS-managed assets). SAM2 alternative |
 
 ### Tracking, motion & camera work
 
@@ -143,12 +144,13 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | [Sound Features](SoundFeatures/) | CHOP | Audio features (RMS / peak / centroid / onset / beat / BPM / 16 bands) |
 | [Speech Transcribe](SpeechTranscribe/) | DAT | **Live transcription.** Apple SpeechAnalyzer (macOS 26+) / WhisperKit (macOS 14+, multilingual, translate) |
 | [Speech Synth](SpeechSynth/) | CHOP | On-device **speech synthesis** → PCM stereo |
+| [Music Understanding](MusicUnderstanding/) | DAT | **On-device music analysis** (macOS 27): beats / bars / **BPM**, key, **song structure (sections)**, pace, loudness, **per-instrument activity** (vocal/drum/bass/other). Measured: 123BPM / G minor detected correctly |
 
 ### Language & text
 
 | Plugin | Family | What it does |
 |---|---|---|
-| [LLM AFM](LLMAFM/) | DAT | **Apple Intelligence on-device LLM** (macOS 26+). **Structured output (JSON schema)** + **Tool Calling** (the LLM calls a tool, TouchDesigner executes it and returns the result) straight into show control |
+| [LLM AFM](LLMAFM/) | DAT | **Apple Intelligence LLM** (macOS 26+). macOS 27: **model select (On-Device AFM / Private Cloud Compute)**, **image input (vision)**, **reasoning levels**. **Structured output (JSON schema)** + **Tool Calling** (the LLM calls a tool, TouchDesigner executes it and returns the result) straight into show control |
 | [LLM MLX](LLMMLX/) | DAT | **Local LLM via Apple MLX** (mlx-swift-lm). Runs any mlx-community model (Gemma 4 / Qwen / Llama) fully on-device with token streaming. No API key; model auto-downloads from Hugging Face on first use |
 | [Translate](Translate/) | DAT | **On-device translation.** Wire to Speech Transcribe for real-time subtitle translation |
 | [Text Analyze](TextAnalyze/) | DAT | Sentiment / language ID / named entities / semantic similarity (JA supported) + **tokens (token / POS / lemma)** and **embedding vectors** (numeric). "Drive visuals from speech mood/topic" |
@@ -157,7 +159,8 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 
 | Plugin | Family | What it does |
 |---|---|---|
-| [RealityKit Capture](RealityKitCapture/) | SOP | **Photo folder → 3D mesh** (RealityKit Object Capture). Textured OBJ output |
+| [RealityKit Capture](RealityKitCapture/) | SOP | **Photo folder → 3D mesh** (RealityKit Object Capture). Textured OBJ output + **splat PLY export** (photos → Gaussian-splat-style .ply for RealityKit Splat TOP) |
+| [RealityKit Splat](RealityKitSplat/) | TOP | **True 3D Gaussian Splatting render** of 3DGS `.ply` (macOS 27 `GaussianSplatComponent`) + USD / USDZ scenes, offscreen via RealityRenderer. 369k splats ≈ 44fps @720p (M2) |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **Photo depth → 3D point cloud** (unproject via camera calibration / FOV). Colors sampled from RGB |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic video** (macOS 26+): depth (disparity) map or **re-render with adjustable focus / aperture**. **Plays automatically like a Movie File In** (Play Mode: Sequential / Locked to Timeline / Specify Index, plus Speed / Loop / Cue). `Mode = All` emits **colour, depth and rendered as three colour buffers** (`Color + Depth` is the lighter two-buffer variant with the same indices); `Info DAT` lists the file's own metadata; metadata (focus depth, subjects) on its **Info CHOP** |
 | [Spatial Video](SpatialVideo/) | TOP | **MV-HEVC spatial video** from iPhone / Vision Pro: pull out the **left or right eye**, side-by-side, or **both as two colour buffers** (buffer 1 read with a Render Select TOP — one decode, and the eyes are guaranteed to be the same frame). **Plays like a Movie File In** (Play Mode / Speed / Loop / Cue). Baseline, field of view and hero eye on the **Info CHOP / Info DAT** |

@@ -5913,3 +5913,152 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
     `wValue = コントロールセレクタ<<8`、`wIndex = (unitID<<8) | インターフェイス番号`
   - これで明るさ・コントラスト・彩度・シャープネス・ゲイン・色温度・フォーカス・ズーム・
     パン/チルトも同じ方法で触れる見込み(Processing Unit / Camera Terminal のコントロール)
+### 2026-08-05 RealityKit Splat TOP 再実装(macOS 27 GaussianSplatComponent・真のsplat描画)
+
+- 環境が **macOS 27.0 実機+SDK 27.0** になり、待っていた公開API
+  `GaussianSplatComponent` / `GaussianSplatResource` / `LowLevelBuffer` がSDKに入ったことを確認
+  (RealityFoundation.swiftmodule の swiftinterface で実確認)。記録済み方針どおり
+  **RealityKit Splat TOP を真のGaussian Splat描画で再実装**(ブランチ `macos27/realitykit-splat`)
+- **ヘッドレスharnessで先に実証**: 3DGS .ply 自前パース → LowLevelBuffer 投入 →
+  `RealityRenderer` オフスクリーン描画 → PNG。**macOS 26で不可能だったオフスクリーンsplat描画が
+  27では動く**(山岳ジオラマの実3DGSシーンを精細に視認)
+- プラグインは旧実装(削除済み・git履歴 89d1b41^ から回収)の RealityRenderer +MainActor +
+  オービットカメラ構成を土台に、.ply ロード経路を追加。USD/USDZ メッシュ描画は従来どおり共存
+  (temple_scan.usdz でリグレッション確認済み)
+- **実測(M2・TD実機・MCP HTTP直送)**: gs_sample.ply(369,085 splats・91MB)を丸ごとロード、
+  1280×720 で **splatレンダ約44fps・TD本体60fps維持・cook約0.8ms**。Yaw/Pitch/Distance オービット、
+  Info CHOP(executes/frames/render_rc/loaded/splats)、警告なし
+- **踏んだ地雷(pitfalls.md反映)**: ①**opacityにNaN/Infが1つでも混ざると全体が描画されない**
+  (`GSAsset: NaN/Inf detected`)→パースで除去必須 ②**LowLevelBufferのcapacityはアライメント要件
+  あり**(count×12素のままだと invalid(bufferCapacity:)→256B切り上げ)③plyの rot_0..3 は wxyz →
+  RealityKitへは xyzw ④scale/opacityは生値+.exponential/.sigmoid activation ⑤SHはdegree 0
+  (f_dc)で投入(f_rest_* の高次レイアウトは非公開・未対応)⑥3DGSはY下向き→X軸π回転で正立、
+  フレーミングは中央値+70パーセンタイル(bboxは背景splatで数百単位に暴れる)
+- **重要(環境)**: macOS 27 移行でホームが新規になり、**常設Plugins(約80個)と各 build/ 成果物が
+  消失**。今回 RealityKitSplatTOP のみ再ビルド・再インストール済み。**sample.toe は現在
+  大量の "Unknown operator type" 状態なので絶対に保存しないこと**(全プラグイン再ビルド・
+  再インストール後に開き直す)。TouchDesigner.app は /Applications に存在(SDKヘッダも従来パス)
+- **sample.toe がTDにより自動保存され(17:30・プラグイン欠損状態のまま)壊れた** → 規約どおり
+  git HEAD から復旧済み(壊れた版と sample.3.toe はscratchpadに退避)。検証でTDを開く際は
+  自動保存に注意(既知: 終了時以外にも保存が走ることがある)
+- 次にやること: 全プラグインの一括再ビルド+再インストール(xargs -P 6 並列で約20分)、
+  sample.toe への RealityKitSplat 利用例追加、SH degree 1〜3 レイアウトの調査(視覚差分で推定可能)
+
+### 2026-08-05 全84プラグインを macOS 27 環境で一括再ビルド・常設再インストール
+
+- ユーザー指示「開発しているpluginはすべてbuildしてpluginsフォルダに入れて」。macOS 27移行で
+  消えた常設Pluginsを全量復旧: **84バンドル全てビルド成功・署名検証OK・インストール完了**。
+  TD再起動後に全型の登録と sample.toe の全ノード0エラーを確認(68例コンテナ)
+- **踏んだ罠(環境系)**:
+  1. **common/build_plugin.sh の zsh専用構文(`${(%):-%N}`・`${=VAR}`)が #!/bin/bash の
+     build.sh から source されると bad substitution で全滅**。自己位置解決は BASH_SOURCE
+     フォールバック付きに修正済み。**一括ビルドは `zsh ./build.sh` で起動するのが安全**
+  2. **macOS の `xargs -I{}` は置換後コマンドが長いと "command line cannot be assembled"**
+     で静かに死ぬ(scratchpadの長いパス×複数置換で発生)→ 引数1個のヘルパースクリプト+
+     `xargs -P 6 -n 1` 方式に変更
+  3. **LLMMLX は Xcode 27 beta の Metal Toolchain が別コンポーネント**。
+     `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer xcodebuild
+     -downloadComponent MetalToolchain`(839MB)を先に実行しないと
+     "cannot execute tool 'metal'" で失敗する。xcode-select は CLT のままでよい
+     (DEVELOPER_DIR 環境変数だけで xcodebuild が使える・sudo不要)
+  4. **84バンドル一括入れ替え後の初回TD起動は一部プラグインの登録を取りこぼすことがある**
+     (今回 CoreWLAN 2件が未登録・バイナリは cplusplusCHOP 経由で正常動作)→ **TD再起動で解消**
+     (既知の「初回はプラグイン再検証」挙動の亜種)
+- ユーザーが `Assets/oowaku.ply` / `oowaku.spz` を追加(oowaku.ply は gs_sample.ply と同一
+  内容の山岳ジオラマ・gitignore済み)。登録済み RealityKit Splat TOP で oowaku.ply の
+  369,085 splats 描画を視認確認。**.spz(Niantic圧縮形式)は現行パーサ非対応**(将来課題:
+  gzip+固定小数の独自形式なのでデコーダ追加は可能)
+- 次にやること: .spz 対応の検討、sample.toe への RealityKitSplat 例追加、SH degree 1〜3
+
+### 2026-08-05 LLM AFM を macOS 27(AFM3)対応に拡張(26互換維持)
+
+- ユーザー「LLM AFMをMacOS27のAFM3対応にしたい」「MacOS26でも使えるように互換性は残したい」。
+  SDK実確認の結論: **AFM3という型は無く、macOS 27では FoundationModels が新世代モデルを自動使用**。
+  「AFM3対応」の実質は macOS 27 の新API採用 = 以下を実装:
+  - **Model メニュー**(ondevice/pcc): `LanguageModelSession(model:)` に
+    `PrivateCloudComputeLanguageModel()`(Appleサーバ側大型モデル)を渡せる
+  - **画像入力(Vision ページ: Image TOP + Use Image)**: Submit時に TOP を BGRA8/top-down で
+    ダウンロード → helper が CGImage 化 → `Attachment(cgImage)` を PromptBuilder に置いて生成。
+    LLM MLX と同じ「DATはTOPをパラメータ参照」パターン
+  - **Reasoning メニュー**(off/light/moderate/deep): `ContextOptions.ReasoningLevel`
+  - **診断**: Info DAT に model/capabilities 行、Info CHOP に context_size/input_tokens/
+    output_tokens、poll JSON に capabilities 配列
+- **26互換**: 27専用APIは全て `#available(macOS 27.0, *)` ガード。26では従来動作
+  (テキスト/構造化/Tool Calling)のまま、27専用機能を選ぶと status にエラーが出るだけ
+- **SDK実確認の要点(pitfalls反映)**: `capabilities` は LanguageModel プロトコル要件
+  (vision/reasoning/toolCalling/guidedGeneration)、**`contextSize` は PCCモデル専用**
+  (LanguageModelSession には無い・ビルドエラーで発見)、usage は session.usage(27)
+- **検証(M2・TD実機)**: 新パラメータ生成(Model/Reasoning/Imagetop/Useimage・メニュー項目とも
+  正しい)、Info DAT 3行(status/model/capabilities)。**この新macOS 27環境は Apple Intelligence
+  未有効のため生成テストは未実施**(status="unavailable: Apple Intelligence not enabled" が正しく
+  出ることを確認。PCC は "device not eligible (PCC)")。**ユーザーがシステム設定で
+  Apple Intelligence を有効化したら、テキスト生成・画像入力・Reasoning・PCC の実データ検証が必要**
+- ビルド・署名・常設インストール済み。README(LLMAFM+ルート英日)更新
+- 注意: TD検証セッション中に sample.toe がまた自動保存された(全プラグイン登録済み状態)。
+  規約どおり git HEAD へ復旧済み
+
+### 2026-08-05 macOS 27 新機能の横断調査(op候補)
+
+- SDK 27.0 実機走査。新フレームワーク: **MediaIntelligence**(FaceGroupAnalyzer=顔クラスタリング/
+  VideoAnalyzer+HighlightAnalysisRequest=ハイライト区間+盛り上がりlevel曲線/KeyFrameAnalysisRequest)、
+  **VisualIntelligence**(SemanticContentDescriptor)、**SpatialPreview**(DocumentPreviewSession=
+  接続中Vision Proへ文書/USDをライブプッシュ)、**CoreAI**(調査済み・別記)、
+  **_Vision_FoundationModels**(OCRTool/BarcodeReaderTool=FoundationModels用の純正Visionツール)、
+  **_CoreSpotlight_FoundationModels**(SpotlightSearchTool)
+- 既存フレームワークの27追加: **Vision: GenerateIterativeSegmentationRequest**(seed point/box/
+  **scribble** の3プロンプト・fast/balanced/accurate・DL資産=SAM相当の純正API)、
+  **ImagePlayground: ImagePlaygroundOptions**(sizeSpecification=任意解像度・creationStrategy/variety/
+  personalization)、**MetalFX**(distortionTexture/contentWidth動的解像度/requiresPrevColorTexture)、
+  **RealityFoundation**(BloomComponent・NavigationMesh・BehaviorTree・AnimationGraph・Lightmap・
+  SkeletonResource+Retargeting 等27で大量追加)。SoundAnalysis/Speech/Translation/NL/SCK/VTは27追加なし
+- 提案の優先順位(ユーザーへ提示): ①Vision IterativeSegment TOP(SAM2の外部モデル不要版・
+  scribble入力が新規性)②MediaIntelligence Highlight DAT/CHOP ③MediaIntelligence FaceGroup DAT
+  ④ImagePlayground/Metal Upscale/LLM AFM(純正ツール)/RealityKit Splat(Bloom)の27アップグレード
+  ⑤SpatialPreview Out(Vision Pro実機待ち)⑥CoreAI(ツールチェーン待ち)
+
+### 2026-08-06 Vision IterSeg TOP + Music Understanding DAT 実装(macOS 27新機能・実データ検証済み)
+
+- **Vision IterSeg TOP**(`Visioniterseg`・icon VIS・CPUMem TOP+Swiftヘルパ vi_):
+  macOS 27 の `GenerateIterativeSegmentationRequest` = Apple純正の対話的セグメンテーション
+  (SAM相当・外部モデル不要)。プロンプト3種(seed point / seed box / **scribble**=入力1のTOPを
+  なぞり書きとして使用・Rチャンネル)。**モデルはOS管理のダウンロード資産**
+  (`DownloadableAssetsRequest`・Download Assetsパルス+asset_readyチャンネル)。
+  ユーザー指定の短名「VisionSegment」は**既存の人物セグメンテーションTOPと衝突**するため
+  「Vision IterSeg」に。実測(M2・640×426): 点2箇所・box・scribble全て正しい人物を個別マスク
+  (座標=TD uvと無変換一致)、解析1〜2秒、submits=results=5でフレーム落ちなし
+- **Music Understanding DAT**(`Musicunderstanding`・icon MUN・DAT+Swiftヘルパ mu_):
+  macOS 27 新フレームワーク MusicUnderstanding で音楽ファイルをオンデバイス楽曲解析。
+  Modeメニューで Summary/Rhythm(ビート・小節)/Key(調)/Structure(セクション)/Pace/
+  Loudness/Instruments(vocal・drum・bass・otherの区間+レベル曲線)のテーブル切替。
+  実測(M2・TD同梱テクノ曲70秒): **BPM123・144ビート・36小節・5セクション・G minor を正検出**
+  (ビート間隔0.488s=123BPMと整合)、loudness -11.4 LUFS、bass区間検出。解析は数十秒・非同期
+- **踏んだ罠**: ①MusicUnderstanding framework自体が27新規なので **-weak_framework でリンク**
+  (26でもdylibロード可能に。@availableガードと併用)②Vision新Swift APIの
+  `DownloadableAssetsRequestStatus` は notReady/downloading/ready/error(availableではない)
+  ③86バンドル入れ替え後のTD初回起動は10分超固まることがある→強制終了→再起動(既知の亜種)
+- 2件ともビルド・署名・常設インストール・TD実機検証済み。README(各+ルート英日)更新
+- 検証中に scratchpad が一度クリアされ tdmcp.py を再作成した(セッション横断の一時ファイルは消える前提で)
+
+### 2026-08-06 RealityKit Capture に Splat PLY 書き出しを追加(写真→splatパイプライン)
+
+- ユーザー「RealityKitCaptureをアップデートしてsplat対応にしたい」。**macOS 27 でも
+  PhotogrammetrySession に Gaussian Splat 学習出力は無い**(SDK実確認: Request は
+  modelFile/modelEntity/bounds/pointCloud/poses のみ・splat学習は CorePhotogrammetry 内部の非公開のまま)
+  → **pointCloud リクエスト(macOS 14+)で点群を取得し、3DGS形式(INRIA互換)の .ply に変換して
+  書き出す**方式で実装。RealityKit Splat TOP がそのまま真のsplatとして描画できる
+  =完全オンデバイスの「写真→splat」パイプライン
+- 実装: ph_start に splatPath/splatScale を追加。modelFile と pointCloud を同時リクエスト
+  (pendingRequests カウントで完了判定)。writeSplatPLY は f_dc=(c/255-0.5)/C0 の SH DC逆変換、
+  opacity=logit(0.95)、scale=log(最近傍距離中央値×係数・2000点サンプル総当り)、rot=恒等。
+  パラメータ Export Splat PLY / Splat PLY File / Splat Scale。Info DAT に splat / splat_points
+- **踏んだ罠**: ①Object Capture は Y上向き・3DGS ply 慣例は Y下向き → **書き出し時に y,z を反転**
+  (しないと Splat TOP のX軸180°自動正立で上下逆になる・実測)②pointCloud の点群密度は
+  Detail 非依存(SfM疎点群・templeRing 47枚で約1650点)③自前パッチスクリプトのガード条件ミスで
+  パラメータ定義だけ未挿入→「バイナリに文字列はあるのにTDにパラメータが出ない」状態を踏んだ
+  (lsofでロード確認→ソース確認で発見)
+- **実測(M2・templeRing 47枚)**: 再構成+点群→ 1656 splat の .ply、RealityKit Splat TOP で
+  **正立の神殿がsplat描画**されることを視認(等方ガウシアン・疎点群なのでぼかし気味=READMEに簡易版と明記)
+- あわせて **Music Understanding をユーザー追加の実サンプルで追検証**(gitignore済み):
+  music_sample_01.m4a=BPM135/E♭minor/14sections、music_sample_02.wav=BPM130/Gminor/9sections
+  (曲ごとに異なる正しい解析)。検証ループの「前回結果を読むレース」に注意(fresh nodeで再確認した)
+- README(RealityKitCapture+ルート英日)更新。ビルド・署名・常設インストール済み

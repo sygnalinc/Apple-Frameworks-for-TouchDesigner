@@ -47,3 +47,9 @@ AfterEffects/
 # モーション評価用の動画置き場。素材は再配布できないものが多く、README も含めて
 # まるごとローカル専用にする(評価手順とベースラインは CLAUDE.md に記録済み)
 eval/
+
+# macOS 27 検証用のローカル素材(大容量・コミットしない)
+Assets/oowaku.ply
+Assets/oowaku.spz
+Assets/music_sample_01.m4a
+Assets/music_sample_02.wav

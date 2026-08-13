@@ -30,7 +30,8 @@ using namespace TD;
 
 extern "C" {
 void* ph_create(void);
-void ph_start(void* h, const char* folder, const char* output, int32_t detail);
+void ph_start(void* h, const char* folder, const char* output, int32_t detail,
+              const char* splatOut, double splatScale);
 void ph_poll(void* h, char* buf, int32_t n);
 void ph_cancel(void* h);
 void ph_destroy(void* h);
@@ -89,10 +90,18 @@ public:
                          : (strcmp(d, "reduced") == 0) ? 1
                          : (strcmp(d, "full") == 0)    ? 3 : 2;
 
+        std::string splatfile;
+        if (inputs->getParInt("Exportsplat")) {
+            if (const char* sp = inputs->getParString("Splatfile"))
+                splatfile = sp;
+        }
+        const double splatscale = inputs->getParDouble("Splatscale");
+
         if (myStartRequested && mySession && !folder.empty() && !outfile.empty()) {
             myStartRequested = false;
             myLoadedObj = false;
-            ph_start(mySession, folder.c_str(), outfile.c_str(), detail);
+            ph_start(mySession, folder.c_str(), outfile.c_str(), detail,
+                     splatfile.c_str(), splatscale);
         } else {
             myStartRequested = false;
         }
@@ -108,6 +117,8 @@ public:
         myStatusJson = buf;
         myProgress = (float)extractNum(buf, "progress");
         myTexturePath = extractStr(buf, "texture");
+        mySplatPath = extractStr(buf, "splat");
+        mySplatPoints = (int)extractNum(buf, "splat_points");
         const bool done = strstr(buf, "\"done\":true") != nullptr;
         if (done && !myLoadedObj && !outfile.empty() &&
             outfile.size() > 4 && outfile.substr(outfile.size() - 4) == ".obj") {
@@ -163,6 +174,30 @@ public:
             manager->appendMenu(p, 4, names, labels);
         }
         {
+            // 点群を3DGS形式 .ply で書き出す(RealityKit Splat TOP がそのまま描画できる)
+            OP_NumericParameter p("Exportsplat");
+            p.label = "Export Splat PLY";
+            p.page = "Photogrammetry";
+            p.defaultValues[0] = 0;
+            manager->appendToggle(p);
+        }
+        {
+            OP_StringParameter p("Splatfile");
+            p.label = "Splat PLY File";
+            p.page = "Photogrammetry";
+            manager->appendFile(p);
+        }
+        {
+            // 等方ガウシアンの半径 = 最近傍距離の中央値 × この係数
+            OP_NumericParameter p("Splatscale");
+            p.label = "Splat Scale (x NN dist)";
+            p.page = "Photogrammetry";
+            p.defaultValues[0] = 1.5;
+            p.minSliders[0] = 0.1;
+            p.maxSliders[0] = 10;
+            manager->appendFloat(p);
+        }
+        {
             OP_NumericParameter p("Start");
             p.label = "Start Reconstruction";
             p.page = "Photogrammetry";
@@ -195,7 +230,7 @@ public:
 
     bool getInfoDATSize(OP_InfoDATSize* infoSize, void*) override
     {
-        infoSize->rows = 2;
+        infoSize->rows = 4;
         infoSize->cols = 2;
         infoSize->byColumn = false;
         return true;
@@ -203,12 +238,26 @@ public:
 
     void getInfoDATEntries(int32_t index, int32_t, OP_InfoDATEntries* entries, void*) override
     {
-        if (index == 0) {
-            entries->values[0]->setString("texture");
-            entries->values[1]->setString(myTexturePath.c_str());
-        } else {
-            entries->values[0]->setString("status");
-            entries->values[1]->setString(myStatusJson.c_str());
+        switch (index) {
+            case 0:
+                entries->values[0]->setString("texture");
+                entries->values[1]->setString(myTexturePath.c_str());
+                break;
+            case 1:
+                entries->values[0]->setString("splat");
+                entries->values[1]->setString(mySplatPath.c_str());
+                break;
+            case 2: {
+                static char nbuf[32];
+                snprintf(nbuf, sizeof(nbuf), "%d", mySplatPoints);
+                entries->values[0]->setString("splat_points");
+                entries->values[1]->setString(nbuf);
+                break;
+            }
+            default:
+                entries->values[0]->setString("status");
+                entries->values[1]->setString(myStatusJson.c_str());
+                break;
         }
     }
 
@@ -371,7 +420,8 @@ private:
     bool myStartRequested = false;
     bool myCancelRequested = false;
     bool myLoadedObj = false;
-    std::string myPendingObj, myStatusJson, myTexturePath;
+    std::string myPendingObj, myStatusJson, myTexturePath, mySplatPath;
+    int mySplatPoints = 0;
     Mesh myMesh;
     uint64_t mySerial = 0;
 

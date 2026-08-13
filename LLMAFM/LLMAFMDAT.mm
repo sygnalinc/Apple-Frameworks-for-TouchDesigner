@@ -28,6 +28,10 @@ using namespace TD;
 // libFMHelper.dylib（Swift）の C API
 extern "C" {
 void* fm_create(const char* instructions);
+void fm_set_config(void* handle, int32_t model, int32_t reasoning);
+bool fm_submit_image(void* handle, const char* prompt, const uint8_t* bgra,
+                     int32_t width, int32_t height, double temperature,
+                     int32_t maxTokens, bool keepContext);
 bool fm_submit_structured(void* handle, const char* prompt, const char* schema,
                           double temperature, int32_t maxTokens, bool keepContext);
 bool fm_submit(void* handle, const char* prompt, double temperature, int32_t maxTokens,
@@ -79,13 +83,22 @@ public:
             myInstructions = instructions;
         }
 
+        // AFM3(macOS 27)設定: モデル(on-device/PCC)と reasoning レベルを毎cook反映
+        if (mySession) {
+            fm_set_config(mySession, (int32_t)inputs->getParInt("Model"),
+                          (int32_t)inputs->getParInt("Reasoning"));
+        }
+
         // Submit パルス
         if (myWantSubmit && mySession) {
             myWantSubmit = false;
             const char* prompt = inputs->getParString("Prompt");
             const char* schema = inputs->getParString("Schema");
             const bool useTools = inputs->getParInt("Enabletools") != 0;
-            if (useTools) {
+            const bool useImage = inputs->getParInt("Useimage") != 0;
+            if (useImage && !useTools && submitWithImage(inputs, prompt)) {
+                // 画像つき生成(Vision)。成功したら通常経路はスキップ
+            } else if (useTools) {
                 // ツール呼び出し: LLM がツールを要求 → TD がツールを実行して結果を返す
                 const char* tn = inputs->getParString("Toolname");
                 const char* td = inputs->getParString("Tooldesc");
@@ -203,6 +216,26 @@ public:
             manager->appendInt(p);
         }
         {
+            // AFM3(macOS 27): 生成に使うモデル。PCCはAppleサーバ側の大型モデル
+            OP_StringParameter p("Model");
+            p.label = "Model";
+            p.page = "LLM AFM";
+            p.defaultValue = "ondevice";
+            const char* names[] = {"ondevice", "pcc"};
+            const char* labels[] = {"On-Device (AFM)", "Private Cloud Compute"};
+            manager->appendMenu(p, 2, names, labels);
+        }
+        {
+            // AFM3(macOS 27): reasoning レベル(ContextOptions.ReasoningLevel)
+            OP_StringParameter p("Reasoning");
+            p.label = "Reasoning";
+            p.page = "LLM AFM";
+            p.defaultValue = "off";
+            const char* names[] = {"off", "light", "moderate", "deep"};
+            const char* labels[] = {"Off", "Light", "Moderate", "Deep"};
+            manager->appendMenu(p, 4, names, labels);
+        }
+        {
             OP_NumericParameter p("Keepcontext");
             p.label = "Keep Context (Multi-turn)";
             p.page = "LLM AFM";
@@ -225,6 +258,20 @@ public:
             p.minSliders[0] = 1;
             p.maxSliders[0] = 200;
             manager->appendInt(p);
+        }
+        // ---- Vision(画像入力・AFM3/macOS 27)----
+        {
+            OP_StringParameter p("Imagetop");
+            p.label = "Image TOP";
+            p.page = "Vision";
+            manager->appendTOP(p);
+        }
+        {
+            OP_NumericParameter p("Useimage");
+            p.label = "Use Image";
+            p.page = "Vision";
+            p.defaultValues[0] = 0;
+            manager->appendToggle(p);
         }
         // ---- Tool Calling(TDがツール実行系になる)----
         {
@@ -294,31 +341,72 @@ public:
             myWantToolResult = true;
     }
 
-    int32_t getNumInfoCHOPChans(void*) override { return 4; }
+    int32_t getNumInfoCHOPChans(void*) override { return 7; }
     void getInfoCHOPChan(int32_t index, OP_InfoCHOPChan* chan, void*) override
     {
-        const char* names[4] = {"executes", "busy", "turns", "tool_pending"};
-        float values[4] = {(float)myExecCount, (float)myBusy, (float)myTurnCount,
-                           (float)(myPendingTool.empty() ? 0 : 1)};
+        const char* names[7] = {"executes", "busy", "turns", "tool_pending",
+                                "context_size", "input_tokens", "output_tokens"};
+        float values[7] = {(float)myExecCount, (float)myBusy, (float)myTurnCount,
+                           (float)(myPendingTool.empty() ? 0 : 1),
+                           (float)myContextSize, (float)myInputTokens,
+                           (float)myOutputTokens};
         chan->name->setString(names[index]);
         chan->value = values[index];
     }
 
     bool getInfoDATSize(OP_InfoDATSize* infoSize, void*) override
     {
-        infoSize->rows = 1;
+        infoSize->rows = 3;
         infoSize->cols = 2;
         infoSize->byColumn = false;
         return true;
     }
 
-    void getInfoDATEntries(int32_t, int32_t, OP_InfoDATEntries* entries, void*) override
+    void getInfoDATEntries(int32_t index, int32_t, OP_InfoDATEntries* entries,
+                           void*) override
     {
-        entries->values[0]->setString("status");
-        entries->values[1]->setString(myStatus.c_str());
+        switch (index) {
+            case 0:
+                entries->values[0]->setString("status");
+                entries->values[1]->setString(myStatus.c_str());
+                break;
+            case 1:
+                entries->values[0]->setString("model");
+                entries->values[1]->setString(myModelName.c_str());
+                break;
+            default:
+                entries->values[0]->setString("capabilities");
+                entries->values[1]->setString(myCapabilities.c_str());
+                break;
+        }
     }
 
 private:
+    // Image TOP パラメータを BGRA8(top-down)でダウンロードして画像つき生成へ渡す。
+    // downloadTexture の getData() はブロックするが Submit パルス時の1回のみ(LLM MLXと同型)
+    bool submitWithImage(const OP_Inputs* inputs, const char* prompt)
+    {
+        const OP_TOPInput* top = inputs->getParTOP("Imagetop");
+        if (!top)
+            return false;
+        OP_TOPInputDownloadOptions opts;
+        opts.pixelFormat = OP_PixelFormat::BGRA8Fixed;
+        opts.verticalFlip = true;   // TDは bottom-up。正立画像にして vision へ
+        OP_SmartRef<OP_TOPDownloadResult> res = top->downloadTexture(opts, nullptr);
+        if (!res)
+            return false;
+        const uint8_t* data = (const uint8_t*)res->getData();
+        int w = (int)res->textureDesc.width;
+        int h = (int)res->textureDesc.height;
+        if (!data || w <= 0 || h <= 0)
+            return false;
+        return fm_submit_image(mySession, prompt ? prompt : "", data,
+                               (int32_t)w, (int32_t)h,
+                               inputs->getParDouble("Temperature"),
+                               (int32_t)inputs->getParInt("Maxtokens"),
+                               inputs->getParInt("Keepcontext") != 0);
+    }
+
     void parsePoll(const char* json, std::vector<Turn>& history)
     {
         @autoreleasepool {
@@ -331,6 +419,25 @@ private:
             if ([status isKindOfClass:[NSString class]])
                 myStatus = status.UTF8String;
             myBusy = [dict[@"busy"] boolValue] ? 1 : 0;
+            // AFM3(macOS 27)診断
+            NSString* model = dict[@"model"];
+            if ([model isKindOfClass:[NSString class]])
+                myModelName = model.UTF8String ?: "";
+            NSArray* caps = dict[@"capabilities"];
+            if ([caps isKindOfClass:[NSArray class]]) {
+                std::string joined;
+                for (NSString* c in caps) {
+                    if (![c isKindOfClass:[NSString class]])
+                        continue;
+                    if (!joined.empty())
+                        joined += " ";
+                    joined += c.UTF8String ?: "";
+                }
+                myCapabilities = joined;
+            }
+            myContextSize = [dict[@"context_size"] intValue];
+            myInputTokens = [dict[@"input_tokens"] intValue];
+            myOutputTokens = [dict[@"output_tokens"] intValue];
             // ツール呼び出し待ち(pending_tool)を取り出す
             myPendingTool.clear();
             myPendingToolArgs.clear();
@@ -378,6 +485,11 @@ private:
     std::atomic<bool> myWantToolResult{false};
     std::string myStatus = "no session";
     std::string myPendingTool, myPendingToolArgs;
+    std::string myModelName = "ondevice";
+    std::string myCapabilities;
+    int myContextSize = 0;
+    int myInputTokens = 0;
+    int myOutputTokens = 0;
     int myBusy = 0;
     int myTurnCount = 0;
     std::atomic<int> myExecCount{0};
