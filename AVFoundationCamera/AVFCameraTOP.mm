@@ -286,12 +286,19 @@ public:
     // 受信スレッドから呼ばれる
     void pushFrame(const uint8_t* src, size_t rowBytes, uint32_t w, uint32_t h)
     {
-        std::lock_guard<std::mutex> l(myMutex);
-        myWidth = w; myHeight = h;
-        myPixels.resize((size_t)w * h * 4);
+        // **詰め替えはロックの外で行う。** 受信スレッドがロックを持ったまま1フレーム分
+        // コピーしていたら、cook 側と奪い合って**取りこぼしで実効fpsが半分近くまで落ちた**
+        // (実測: 1080p30 で 17fps)。裏バッファへ書いてから、交換だけをロック内でやる。
+        // myBack は受信スレッドしか触らないので排他は要らない
+        myBack.resize((size_t)w * h * 4);
         // **TD は下から上。CoreVideo は上から下**なので行を反転して詰める
         for (uint32_t y = 0; y < h; y++)
-            memcpy(myPixels.data() + (size_t)(h - 1 - y) * w * 4, src + y * rowBytes, (size_t)w * 4);
+            memcpy(myBack.data() + (size_t)(h - 1 - y) * w * 4, src + y * rowBytes, (size_t)w * 4);
+        {
+            std::lock_guard<std::mutex> l(myMutex);
+            myPixels.swap(myBack);
+            myWidth = w; myHeight = h;
+        }
         myFrames++;
     }
 
@@ -373,28 +380,15 @@ private:
             if ([s canAddOutput:o]) [s addOutput:o];
             // **フォーマット指定はセッションの設定ブロックの中で行う。**
             // (iOS の AVCaptureSessionPresetInputPriority は macOS に存在しない)
-            // **UVC(DAL)デバイスは activeFormat を無視する**(実測: 指定しても 1920x1080 のまま)。
-            // macOS で解像度を選ぶ道は sessionPreset。該当するプリセットがあればそちらを使い、
-            // 無ければ activeFormat を試す
-            {
-                Format want;
-                { std::lock_guard<std::mutex> l(myMutex);
-                  if (fmtIdx >= 0 && fmtIdx < (int)myFormats.size()) want = myFormats[fmtIdx]; }
-                NSString* preset = nil;
-                if (want.width == 3840 && want.height == 2160) preset = AVCaptureSessionPreset3840x2160;
-                else if (want.width == 1920 && want.height == 1080) preset = AVCaptureSessionPreset1920x1080;
-                else if (want.width == 1280 && want.height == 720) preset = AVCaptureSessionPreset1280x720;
-                else if (want.width == 960 && want.height == 540) preset = AVCaptureSessionPreset960x540;
-                else if (want.width == 640 && want.height == 480) preset = AVCaptureSessionPreset640x480;
-                else if (want.width == 352 && want.height == 288) preset = AVCaptureSessionPreset352x288;
-                myPresetPath = preset ? ([s canSetSessionPreset:preset] ? 1 : 2) : 3;
-                if (myPresetPath == 1) s.sessionPreset = preset;
-                else applyFormat(d, fmtIdx);
-            }
             [s commitConfiguration];
 
             mySession = s;
             [s startRunning];
+            // **フォーマットの指定は startRunning の後でないと効かない。**
+            // セッション開始時に AVFoundation がフォーマットを決め直すので、それより前
+            // (入力追加前 / 設定ブロック内 / commit 後)の指定はすべて上書きされる。
+            // 8通りの順序を総当たりして確認した(CamProbe.app)。sessionPreset も同様に効かない。
+            applyFormat(d, fmtIdx);
             { std::lock_guard<std::mutex> l(myMutex); myRunning = s.isRunning; }
             } @catch (NSException* ex) {
                 setWarning(std::string("Could not open the camera: ") +
@@ -490,7 +484,8 @@ private:
     std::mutex myMutex;
     std::vector<Camera> myCameras;
     std::vector<Format> myFormats;
-    std::vector<uint8_t> myPixels;
+    std::vector<uint8_t> myPixels;        // cook が読む(要ロック)
+    std::vector<uint8_t> myBack;          // 受信スレッド専用の裏バッファ
     uint32_t myWidth = 0, myHeight = 0;
     bool myRunning = false;
     std::string myOpenUID, myWarning;

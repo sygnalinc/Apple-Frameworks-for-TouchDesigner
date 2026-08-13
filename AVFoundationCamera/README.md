@@ -7,8 +7,8 @@
 Opens a camera with AVFoundation and outputs video, with device/format information and camera
 controls that TouchDesigner's Video Device In TOP does not expose.
 
-> **Status: experimental, and the headline feature does not work yet.** Explicit format selection is
-> ignored by UVC cameras on macOS — see "What does not work" below. Read that before using this.
+> **Status: experimental.** Format selection works, but it only works if the format is applied
+> **after** `startRunning` — see "Choosing a format" below.
 
 ### What works (measured on M2 / macOS 26.6)
 
@@ -19,26 +19,39 @@ controls that TouchDesigner's Video Device In TOP does not expose.
   **only one combination reaches 60 fps** (1280x720 / 420v); 1920x1080 tops out at 30
 - Video output (BGRA, CPU upload) and device identity by `uniqueID`
 
-### What does not work
+### Choosing a format
 
-- **Selecting a format has no effect on a UVC camera.** Setting `AVCaptureDevice.activeFormat`
-  is silently ignored — `active_w` / `active_h` in the Info CHOP stay at 1920x1080 no matter which
-  entry is chosen. These cameras surface through the legacy CoreMediaIO **DAL** path
-  (`AVCaptureDALDevice`), which does not honour `activeFormat`
-- The macOS alternative, `AVCaptureSession.sessionPreset`, did not change it either. Instrumenting
-  the code path showed the preset **was** applied (`canSetSessionPreset` returned true and the
-  assignment ran), yet both the delivered frames and `activeFormat` stayed at 1920x1080
-- **It is not specific to UVC/DAL.** The built-in FaceTime HD camera behaves the same: streaming at
-  ~34 fps, 1920x1080, unchanged by selecting 1280x720 or 640x480
-- **iOS-only APIs**: `AVCaptureSessionPresetInputPriority`, ISO, exposure duration, exposure target
-  bias, lens position, white-balance gains and zoom are all unavailable on macOS
+**`activeFormat` only takes effect if you set it after `startRunning`.** AVFoundation re-decides the
+format when the session starts, so anything set earlier is overwritten. All eight orderings were
+tried in a signed probe app; only one works:
+
+| When the format is applied | Result |
+|---|---|
+| Session preset, before adding the input / inside the configuration block / after commit | 1920x1080 — ignored |
+| `activeFormat`, before adding the input / inside the configuration block / after commit | 1920x1080 — ignored |
+| **`activeFormat`, after `startRunning`** | **1280x720 — works** |
+| `videoSettings` width/height keys | 1280x720, but that is output scaling: the camera still runs at its old format and frame rate |
+
+`sessionPreset` never worked, even though `canSetSessionPreset` returned true and the assignment
+ran. This is not specific to UVC — the built-in FaceTime HD camera behaves identically.
+
+### What is not available on macOS
+
+**iOS-only APIs**: `AVCaptureSessionPresetInputPriority`, ISO, exposure duration, exposure target
+bias, lens position, white-balance gains and zoom. Exposure and focus can only be switched between
+continuous-auto and locked.
+
+### Frame rate
+
+Selecting `1280x720 / 420v / 60 fps` yields about **33 fps** in TD. The signed probe app, with a
+delegate that does almost nothing, measured **39 fps** on the same format — so the ceiling is the
+camera or its driver, not this plugin. Receiving is double-buffered (the callback fills a back
+buffer outside the lock and only swaps under it), which is the right shape regardless.
 
 ### Not yet verified
 
-- Whether Exposure / Focus **Locked** actually holds the image. `lockForConfiguration` succeeds, but
-  the standalone probe used to check it had no camera permission, so the visual effect is unproven
-- Frame rate is about 19 fps at 1920x1080. Whether that is the camera, the CPU copy or the cook
-  is not yet isolated
+- Whether Exposure / Focus **Locked** actually holds the image. `lockForConfiguration` succeeds and
+  the mode reads back correctly, but the visual effect has not been confirmed
 
 ### Parameters
 
@@ -47,7 +60,7 @@ controls that TouchDesigner's Video Device In TOP does not expose.
 | Active | Opens / closes the capture session |
 | Device | Camera, held by `uniqueID` |
 | Refresh Devices | Re-enumerate |
-| Format | Resolution × pixel format × fps. **Currently ignored by UVC cameras** |
+| Format | Resolution × pixel format × fps, from the device's own list |
 | Exposure / Focus | Continuous Auto or Locked |
 | Center Stage | The only video effect an app can set. Portrait Effect and Studio Light are read-only (no setter on macOS) and are reported on the Info CHOP |
 
@@ -80,8 +93,8 @@ cd AVFoundationCamera && ./build.sh
 AVFoundation でカメラを開いて映像を出し、あわせて TouchDesigner の Video Device In TOP が
 持っていないデバイス情報とカメラ制御を扱う。
 
-> **状態: experimental。しかも主目的の機能がまだ動いていない。** フォーマットの明示指定は
-> macOS の UVC カメラでは無視される(下記「動かないこと」)。使う前にそこを読むこと。
+> **状態: experimental。** フォーマット選択は動く。ただし **`startRunning` の後**に適用しないと
+> 効かない(下記「フォーマットの選び方」)。
 
 ### 動くこと(M2 / macOS 26.6 で実測)
 
@@ -92,25 +105,38 @@ AVFoundation でカメラを開いて映像を出し、あわせて TouchDesigne
   (1280x720 / 420v)で、1920x1080 は 30fps 頭打ち
 - 映像出力(BGRA・CPUアップロード)と `uniqueID` によるデバイス識別
 
-### 動かないこと
+### フォーマットの選び方
 
-- **UVC カメラではフォーマットを選んでも効かない。** `AVCaptureDevice.activeFormat` の指定が
-  黙って無視され、どれを選んでも Info CHOP の `active_w` / `active_h` は 1920x1080 のまま。
-  この種のカメラは旧来の CoreMediaIO **DAL** 経路(`AVCaptureDALDevice`)で見えており、
-  `activeFormat` に対応していない
-- macOS での代替である `AVCaptureSession.sessionPreset` でも変わらなかった。どの経路を通ったか
-  計測したところ、**プリセットは実際に適用されていた**(`canSetSessionPreset` が true を返し、
-  代入も実行された)にもかかわらず、届くフレームも `activeFormat` も 1920x1080 のままだった
-- **UVC / DAL 固有ではない。** 内蔵の FaceTime HD カメラでも同じで、約34fps で流れているが
-  1280x720 や 640x480 を選んでも 1920x1080 のまま変わらない
-- **iOS 専用の API**: `AVCaptureSessionPresetInputPriority`、ISO、露出時間、露出補正、
-  レンズ位置、ホワイトバランスゲイン、ズームはいずれも macOS には存在しない
+**`activeFormat` は `startRunning` の後に設定しないと効かない。** セッション開始時に
+AVFoundation がフォーマットを決め直すため、それより前の指定はすべて上書きされる。
+署名したプローブアプリで8通りの順序を総当たりし、通るのは1つだけだと確認した。
+
+| フォーマットを適用する場所 | 結果 |
+|---|---|
+| sessionPreset を 入力追加前 / 設定ブロック内 / commit 後 | 1920x1080 — 無視される |
+| `activeFormat` を 入力追加前 / 設定ブロック内 / commit 後 | 1920x1080 — 無視される |
+| **`activeFormat` を `startRunning` の後** | **1280x720 — 効く** |
+| `videoSettings` に幅高さ | 1280x720 になるが出力側のスケーリング。カメラは元のフォーマットと fps のまま |
+
+`sessionPreset` は最後まで効かなかった(`canSetSessionPreset` が true を返し代入も実行されている
+にもかかわらず)。UVC 固有ではなく、内蔵の FaceTime HD カメラでも同じ挙動だった。
+
+### macOS に無いもの
+
+**iOS 専用の API**: `AVCaptureSessionPresetInputPriority`、ISO、露出時間、露出補正、レンズ位置、
+ホワイトバランスゲイン、ズーム。露出とフォーカスは auto / locked の切り替えだけができる。
+
+### フレームレート
+
+`1280x720 / 420v / 60 fps` を選ぶと TD で約 **33 fps**。ほとんど何もしないデリゲートを持つ
+プローブアプリでも同じフォーマットで **39 fps** だったので、**上限はカメラ側**でありこの
+プラグインの問題ではない。受信は二重バッファにしてある(コールバックはロックの外で裏バッファに
+詰め、交換だけをロック内で行う)。これは実効fpsに関わらず正しい形。
 
 ### まだ検証できていないこと
 
-- Exposure / Focus の **Locked** が実際に画を固定するか。`lockForConfiguration` は成功するが、
-  確認に使った単体プローブにカメラ権限が無く、映像上の効果は未確認
-- 1920x1080 で約 19 fps。カメラ側か、CPU コピーか、cook かの切り分けが未了
+- Exposure / Focus の **Locked** が実際に画を固定するか。`lockForConfiguration` は成功し、
+  モードの読み戻しも正しいが、映像上の効果は未確認
 
 ### パラメータ
 
@@ -119,7 +145,7 @@ AVFoundation でカメラを開いて映像を出し、あわせて TouchDesigne
 | Active | キャプチャセッションの開閉 |
 | Device | カメラ。`uniqueID` で保持 |
 | Refresh Devices | 再列挙 |
-| Format | 解像度 × 画素形式 × fps。**現状 UVC カメラでは無視される** |
+| Format | 解像度 × 画素形式 × fps。デバイス自身が申告する一覧から選ぶ |
 | Exposure / Focus | Continuous Auto または Locked |
 | Center Stage | アプリから設定できる唯一のビデオエフェクト。Portrait / Studio Light は setter が無く読み取り専用で、状態は Info CHOP に出る |
 

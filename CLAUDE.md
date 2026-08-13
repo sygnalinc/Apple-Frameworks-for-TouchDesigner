@@ -5882,6 +5882,18 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **踏んだ罠**: ①**動的文字列メニューは `getParString` で読む**(`getParInt` だと 0 のままで
   変更を検知できない)②`AVCaptureSessionPresetInputPriority` は **iOS 専用**で macOS に無い
   ③**素の CLI はカメラ権限を取れない**(`notDetermined`)ので、検証は TD 内か署名 .app で行う
-- 次にやること: フォーマット選択の壁を越える。候補は ①`AVCaptureVideoDataOutput.videoSettings` に
-  幅/高さを入れる(出力側スケーリング。fps は変わらない)②CoreMediaIO の DAL プロパティを直接叩く
-  ③**署名した .app のプローブを作って TD 外で高速に試す**(TD 再起動を繰り返さずに済む)
+- **解決した**: **`activeFormat` は `startRunning` の後に設定しないと効かない。**
+  セッション開始時に AVFoundation がフォーマットを決め直すので、それより前(入力追加前 /
+  設定ブロック内 / commit 後)の指定はすべて上書きされる。**私は commit 後までしか試しておらず、
+  一手前で止まっていた**
+- **切り分け方が効いた**: **署名した .app のプローブ**(`NSCameraUsageDescription` 付き)を作り、
+  8通りの順序を総当たりして数十秒で確定させた。**素の CLI はカメラ権限を取れない**(notDetermined)
+  ので TD 内でしか試せず、1試行に TD 再起動込みで約2分かかっていた。**遅さの主因はこれ**で、
+  .app 化した時点で解決した
+  - 結果: sessionPreset は**どの位置でも効かない**(`canSetSessionPreset` が true を返し代入も
+    実行されているのに変わらない)。`videoSettings` の幅高さは効くが**出力側スケーリング**なので
+    カメラの fps は変わらない(実測 22fps)
+- **fps はカメラ側の上限**: 720p60 指定で TD 33fps、ほぼ何もしないプローブでも 39fps。
+  受信は二重バッファ化した(コールバックはロック外で裏バッファに詰め、交換だけロック内)が
+  実効fpsは変わらなかった = ロック競合が原因ではなかった
+- **「UVC/DAL だから効かない」という私の推定は誤りだった**(内蔵 FaceTime HD でも同じ挙動)。訂正済み
