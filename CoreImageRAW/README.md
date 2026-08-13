@@ -32,10 +32,10 @@ RGBA16Float TOP. Exposure, white balance, noise reduction, sharpness and contras
 | RAW File | DNG / ProRAW / camera RAW file |
 | Exposure (EV) | Exposure compensation |
 | Boost | Shadow/tone boost (0 = linear, 1 = standard) |
-| As Shot | Use the file's own white balance and tone. **On by default** — turn it off to take over the six sliders below |
+| Reload Settings From File | Pull the file's own settings into the parameters again, discarding your edits |
 | Output Color Space | sRGB (default) / Display P3 / Adobe RGB / Linear sRGB |
-| Neutral Temperature (K) | White balance colour temperature. Only when As Shot is off |
-| Neutral Tint | White balance tint correction. Only when As Shot is off |
+| Neutral Temperature (K) | White balance colour temperature. Filled in from the file |
+| Neutral Tint | White balance tint correction. Filled in from the file |
 | Luminance Noise Reduction | Luminance noise reduction (supported RAW only) |
 | Color Noise Reduction | Colour noise reduction (supported RAW only) |
 | Sharpness | Sharpness (supported RAW only) |
@@ -51,7 +51,7 @@ over the frame, against a PNG exported from Preview:
 | | mean RGB | \|Δ\| vs Preview |
 |---|---|---|
 | Before 0.9.7 (white balance forced to 6500 K, linear output) | 0.886 / 0.517 / **0.056** | 0.263 |
-| As Shot + sRGB (current default) | 0.673 / 0.594 / 0.448 | 0.108 |
+| The file's own settings + sRGB (current default) | 0.673 / 0.594 / 0.448 | 0.108 |
 | ImageIO's own default decode | 0.672 / 0.593 / 0.451 | 0.107 |
 | The camera's embedded preview in the DNG | 0.666 / 0.584 / 0.423 | 0.122 |
 | Preview's PNG export | 0.784 / 0.700 / 0.552 | — |
@@ -59,6 +59,11 @@ over the frame, against a PNG exported from Preview:
 Two things were wrong. The sliders **overwrote the file's as-shot white balance** (3375 K / tint
 12.07 on that file) with a fixed 6500 K, which crushed blue to 0.056 — that is the colour cast you
 see. And the result was written in **linear** light, which TD displays as-is, so the midtones sank.
+
+**Opening a file now loads that file's own settings into the parameters** — white balance,
+contrast, noise reduction and sharpness — so the sliders start where the camera left them and you
+edit from there. Nothing is hidden behind a toggle. Use **Reload Settings From File** to go back to
+the file's values after editing.
 
 The current default now agrees with ImageIO's decode to within \|Δ\| = 0.009. **Preview's export is
 the outlier**: it is about +0.55 EV brighter than every Apple RAW path, including the camera's own
@@ -122,10 +127,10 @@ DNG / Apple ProRAW / カメラRAW を `CIRAWFilter` で**リアルタイム現�
 | RAW File | DNG / ProRAW / カメラRAW ファイル |
 | Exposure (EV) | 露出補正 |
 | Boost | シャドウ/トーンのブースト(0=リニア, 1=標準) |
-| As Shot | ファイル自身のホワイトバランスと階調を使う。**既定On** — 下の6スライダーで上書きしたいときだけOff |
+| Reload Settings From File | ファイル自身の設定をもう一度パラメータへ読み込む(編集内容は破棄) |
 | Output Color Space | sRGB(既定)/ Display P3 / Adobe RGB / Linear sRGB |
-| Neutral Temperature (K) | ホワイトバランス色温度。As Shot が Off のときだけ有効 |
-| Neutral Tint | ホワイトバランスの色かぶり補正。As Shot が Off のときだけ有効 |
+| Neutral Temperature (K) | ホワイトバランス色温度。ファイルから流し込まれる |
+| Neutral Tint | ホワイトバランスの色かぶり補正。ファイルから流し込まれる |
 | Luminance Noise Reduction | 輝度ノイズ除去(対応RAWのみ) |
 | Color Noise Reduction | 色ノイズ除去(対応RAWのみ) |
 | Sharpness | シャープネス(対応RAWのみ) |
@@ -141,7 +146,7 @@ DNG / Apple ProRAW / カメラRAW を `CIRAWFilter` で**リアルタイム現�
 | | 平均RGB | \|Δ\| vs Preview |
 |---|---|---|
 | 0.9.7 より前(WBを6500Kに強制・linear出力) | 0.886 / 0.517 / **0.056** | 0.263 |
-| As Shot + sRGB(現在の既定) | 0.673 / 0.594 / 0.448 | 0.108 |
+| ファイル自身の設定 + sRGB(現在の既定) | 0.673 / 0.594 / 0.448 | 0.108 |
 | ImageIO の既定デコード | 0.672 / 0.593 / 0.451 | 0.107 |
 | DNG に埋め込まれたカメラ自身のプレビュー | 0.666 / 0.584 / 0.423 | 0.122 |
 | Preview の書き出しPNG | 0.784 / 0.700 / 0.552 | — |
@@ -149,6 +154,11 @@ DNG / Apple ProRAW / カメラRAW を `CIRAWFilter` で**リアルタイム現�
 原因は2つあった。スライダーが**ファイルの as-shot ホワイトバランス**(この個体は 3375K /
 tint 12.07)を固定値 6500K で上書きしていたため青が 0.056 まで潰れており、これが色かぶりの正体。
 もう1つは結果を**リニア光のまま**書いていたこと。TD は値をそのまま表示するので中間調が沈む。
+
+**ファイルを開くと、そのファイルが持っている設定がパラメータに入る**ようになった
+(ホワイトバランス・コントラスト・ノイズ除去・シャープネス)。撮影時の値からスライダーが始まるので、
+そこから編集すればよい。トグルの裏に隠れる値は無い。編集後にファイルの値へ戻したいときは
+**Reload Settings From File** を押す。
 
 現在の既定は ImageIO のデコードと \|Δ\| = 0.009 まで一致する。**外れているのは Preview の方**で、
 カメラ自身の埋め込みプレビューを含む Apple のどの経路よりも約 +0.55 EV 明るい。HDRゲインマップを

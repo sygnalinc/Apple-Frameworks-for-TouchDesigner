@@ -5478,9 +5478,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
      **0.886/0.517/0.056**(青がほぼ消失)になっていた。**これが色かぶりの主因**
   2. **出力が extended linear sRGB のまま**。TD は値をそのまま表示するのでリニア光だと中間調が沈む
      (|Δ| 0.31)
-- **修正**: `As Shot` トグル(既定On・ファイルの WB/コントラスト/NR/シャープをそのまま使う。
-  Off のときだけ6スライダーが効き、On 中は `enablePar` でグレーアウト)+
-  `Output Color Space` メニュー(**srgb 既定** / p3 / adobergb / linear)。working space は常に linear
+- **修正**: **ファイルを開いた時点で、そのファイルの設定をパラメータへ流し込む**
+  (WB / コントラスト / NR / シャープ)。ユーザーはそのスライダーから編集する。`Reload Settings From
+  File` パルスでファイルの値へ戻せる。+ `Output Color Space` メニュー(**srgb 既定** / p3 /
+  adobergb / linear)。working space は常に linear
+  - 当初 `As Shot` トグルで実装したが、ユーザー指示「トグルではなく、ファイルを開いた時に
+    パラメータへ適用して」で作り直した。**値が見えて編集できる方が良い**(トグルの裏に隠れない)
+  - **C++ SDK には自分のパラメータを書く API が無い**ので、埋め込み Python で書く。
+    `common/PyCallbacksBootstrap.h` に汎用の **`tdpycb::setFloatPars(node, {{名前,値},...})`** を
+    追加した(`createArgumentsTuple` の args[0] を `__main__` に渡す既存の型)。cook スレッドから呼ぶ
+  - ワーカーは新ファイルのとき、上書きする**前**に CIRAWFilter から値を読み、**その値で現像しつつ**
+    Result に載せて返す。cook 側が一度だけパラメータへ書き戻す(`myAppliedFile` で二重適用を防ぐ)
 - **実測(平均RGB / Preview PNG との |Δ|)**: 修正前 0.886/0.517/0.056(0.263)→ **As Shot+sRGB
   0.673/0.594/0.448(0.108)**。**ImageIO の既定デコードとは |Δ|=0.009** で一致、DNG 埋め込みの
   カメラ自身のプレビューとも 0.024。**つまり我々の現像は Apple 標準と一致しており、外れているのは

@@ -18,9 +18,49 @@
 #pragma once
 #include <Python.h>
 #include <string>
+#include <vector>
+#include <utility>
 #include "CPlusPlus_Common.h"
 
 namespace tdpycb {
+
+// 自ノードの数値パラメータへ書き戻す。
+//
+// C++ SDK には「自分のパラメータを設定する」APIが無い(読むのは OP_Inputs、書く口は無い)。
+// 埋め込み Python 経由で書くのが唯一の手。cook スレッドから呼ぶこと
+// (AppKit のコールバック等、別スレッドから触ると THREAD CONFLICT になる。CoreText で踏んだ)。
+//
+// 用途例: ファイルを開いたとき、そのファイルが持っている設定(RAWの as-shot ホワイトバランス等)を
+// パラメータに流し込んで、ユーザーがそこから編集できるようにする。
+inline bool setFloatPars(const TD::OP_NodeInfo* node,
+                         const std::vector<std::pair<std::string, double>>& vals)
+{
+    if (!node || !node->context || vals.empty()) return false;
+    PyGILState_STATE g = PyGILState_Ensure();
+    std::string py = "__tdsp_ok = False\ntry:\n\tn = __tdsp_node\n";
+    for (const auto& kv : vals) {
+        char line[128];
+        snprintf(line, sizeof line, "\tn.par.%s = %.6f\n", kv.first.c_str(), kv.second);
+        py += line;
+    }
+    py += "\t__tdsp_ok = True\nexcept Exception:\n";
+    py += "\timport traceback as __tdsp_tb\n\t__tdsp_err = __tdsp_tb.format_exc()\n";
+    bool ok = false;
+    PyObject* main = PyImport_AddModule("__main__");
+    PyObject* dict = main ? PyModule_GetDict(main) : nullptr;
+    PyObject* args = node->context->createArgumentsTuple(0, nullptr);
+    if (dict && args) {
+        PyDict_SetItemString(dict, "__tdsp_node", PyTuple_GET_ITEM(args, 0));
+        PyObject* r = PyRun_String(py.c_str(), Py_file_input, dict, dict);
+        if (r) Py_DECREF(r); else PyErr_Clear();
+        PyObject* v = PyDict_GetItemString(dict, "__tdsp_ok");
+        ok = v && PyObject_IsTrue(v) == 1;
+        PyDict_DelItemString(dict, "__tdsp_node");
+    }
+    if (args) Py_DECREF(args);
+    PyGILState_Release(g);
+    return ok;
+}
 
 // Callbacks DAT が未接続なら、雛形入り Text DAT を生成してホストへドック接続(閉じた↓チップ)。
 // 戻り値: callbacks が接続済みなら true(以後呼ばなくてよい)
