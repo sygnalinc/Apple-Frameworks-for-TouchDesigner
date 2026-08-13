@@ -6105,3 +6105,58 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 検算: PLUGINS.tsv の experimental 集合と README 実験中表が一致(blocked の SpeechActivity は
   同表に別ラベルで載る仕様なので差分に出るのが正)、英日の表が同件数・同集合(30行)、
   本表に非released opの混入なし — をスクリプトで確認
+
+### 2026-08-14 OS beta 更新後のSDK差分を確認(旧SDKとの実差分が取れた)
+
+- ユーザー「os beta をアップデートしたSDKに違いがあるか確認して」
+- **環境の変化**: OS `26A5388g` → **`26A5406e`**、CLT SDK build `26A5406c`、
+  Swift `swiftlang-6.4.0.27.1/clang-2100.3.27.1` → **`6.4.0.30.4/clang-2100.3.30.1`**。
+  **Xcode-beta は 27A5228h のまま更新されず、旧SDKを保持していた**
+- **これが強力**: `/Applications/Xcode-beta.app/.../MacOSX27.0.sdk`(旧)と
+  `/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk`(新)の swiftinterface を
+  **直接diffできる**。指紋でも確認(FoundationModels の user-module-version
+  2.0.62.1.402→2.0.68.1.401、CoreAI 3600.79.1→3600.83.2.14.1)。
+  **今後もOS更新のたびにこの2つを diff すれば「何が変わったか」が確定する**
+- **差分の実態(swiftinterface diff行数)**: FoundationModels 341 / RealityFoundation 165 /
+  Vision 30 / **MusicUnderstanding 0 / CoreAI 0 / ImagePlayground 0**
+  - **Vision**: `RecognizeAnimalsRequest` に **revision3** と **`Identifier` enum
+    (dog/cat/dogHead/catHead)** + `supportedIdentifiers` が追加(= VisionAnimalPose を
+    犬猫/頭部で絞れる)。`GenerateIterativeSegmentationRequest` に
+    `supportedComputeStageDevices` 追加。**我々が使う seedPoint/seedBox/seedScribbleBuffer・
+    QualityLevel・DownloadableAssetsRequestStatus は無変更**
+  - **FoundationModels**: **`SystemLanguageModel.variant` が新規**で、値は
+    **`.core3` / `.coreAdvanced3`(= AFM3世代のバリアント識別)**。ただし **getter のみで
+    variant を指定する init は無い**(選択不可・識別だけ)。ほかに `supportedLanguages` /
+    `supportsLocale(_:)`、`Transcript.HistoryView`。**破壊的変更は `metadata:` 引数の型が
+    `[String: any Codable&Sendable&Equatable]` → `[String: any ConvertibleToGeneratedContent]`**
+    (既定値なので渡していない我々は無影響)。`CustomSegment` プロトコルは削除
+  - **RealityFoundation**: `PortalComponent.BoundaryMode` の **`.disabled` → `.none` に改名**、
+    `Entity.write(_ scenes:)` → `(_ entities:)` のラベル変更(いずれも未使用)。
+    **GaussianSplat* / LowLevelBuffer は差分ゼロ** = splat経路は無変更
+- **検証**: 影響する5件(RealityKitCapture / VisionIterSeg / MusicUnderstanding /
+  RealityKitSplat / LLMAFM)を新SDKで**全てビルド成功**。minos も全件 26.0 のまま
+  (`TD_MIN_MACOS` ガードが効いている)。= **SDK更新による破壊的影響なし**
+- **前回の記述を訂正**: FMHelper のコメントに「contextSize は PCC モデル専用」と書いたが、
+  **`SystemLanguageModel.contextSize` も公開されている**(旧SDKにも存在。@backDeployed で
+  26.4以前は 4096 を返す)。`LanguageModelSession` に無いだけ。オンデバイス側の
+  context_size も出せる = 改善の余地
+
+### 2026-08-14 開発環境のPluginsがmain時点へ巻き戻っていた(splatが消えていた原因)
+
+- ユーザー「RealityKit Captureにsplatの作成はついてない?」→ **実装済みだがインストール済み
+  バイナリに入っていなかった**。調査結果:
+  - ソースには splat 機能あり(`Exportsplat`/`Splatfile`/`Splatscale`・`writeSplatPLY`)
+  - **インストール済みバンドルは 8/13 00:23 ビルドで splat 文字列ゼロ**。
+    同時刻に LLMAFM も入れ替わっており(AFM3機能なし)、
+    **VisionIterSeg / MusicUnderstanding / RealityKitSplat は未インストール**
+  - = **8/13 に Plugins フォルダ全体が「main時点(macos27ブランチ統合前)」の状態で
+    入れ直されていた**。ブランチで作った機能は当然入っていない
+- 5件を新SDKでリビルドして再インストール。`Exportsplat/Splatfile/Splatscale` が
+  バイナリに入り、署名検証も通ることを確認
+- **教訓**: 「ソースにあるか」と「インストール済みバイナリにあるか」は別問題。
+  TDで機能が見えないときは `strings <installed>/Contents/MacOS/<exe> | grep <ParName>` で
+  まずインストール済みを疑う(ブランチ作業と一括再ビルドが交差すると起きる)
+- **未着手の申し送り**: `GenerateIterativeSegmentationRequest` には
+  **`addIncludedPoint` / `addExcludedPoint`(新旧SDK両方に存在)** があり、これが
+  op名の "Iterative" の本体(マスクを対話的に足し引きして詰める)。現実装は単発プロンプトのみで
+  未使用。TD側は点リストのDAT/CHOP入力を足せば実装できる
