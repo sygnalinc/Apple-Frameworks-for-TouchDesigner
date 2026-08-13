@@ -25,7 +25,11 @@ controls that TouchDesigner's Video Device In TOP does not expose.
   is silently ignored — `active_w` / `active_h` in the Info CHOP stay at 1920x1080 no matter which
   entry is chosen. These cameras surface through the legacy CoreMediaIO **DAL** path
   (`AVCaptureDALDevice`), which does not honour `activeFormat`
-- The macOS alternative, `AVCaptureSession.sessionPreset`, did not change it either
+- The macOS alternative, `AVCaptureSession.sessionPreset`, did not change it either. Instrumenting
+  the code path showed the preset **was** applied (`canSetSessionPreset` returned true and the
+  assignment ran), yet both the delivered frames and `activeFormat` stayed at 1920x1080
+- **It is not specific to UVC/DAL.** The built-in FaceTime HD camera behaves the same: streaming at
+  ~34 fps, 1920x1080, unchanged by selecting 1280x720 or 640x480
 - **iOS-only APIs**: `AVCaptureSessionPresetInputPriority`, ISO, exposure duration, exposure target
   bias, lens position, white-balance gains and zoom are all unavailable on macOS
 
