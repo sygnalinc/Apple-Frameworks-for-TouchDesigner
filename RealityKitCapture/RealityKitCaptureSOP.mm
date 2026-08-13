@@ -174,23 +174,25 @@ public:
             manager->appendMenu(p, 4, names, labels);
         }
         {
-            // 点群を3DGS形式 .ply で書き出す(RealityKit Splat TOP がそのまま描画できる)
+            // Object Capture の疎な点群を「3DGSのファイル形式」で書き出すだけ。
+            // 3DGSの生成(学習)ではない(等方・不透明度固定・無回転・SH DCのみ)。
+            // 目的は RealityKit Splat TOP で点群を粒として表示すること
             OP_NumericParameter p("Exportsplat");
-            p.label = "Export Splat PLY";
+            p.label = "Export Point Cloud (3DGS PLY)";
             p.page = "Photogrammetry";
             p.defaultValues[0] = 0;
             manager->appendToggle(p);
         }
         {
             OP_StringParameter p("Splatfile");
-            p.label = "Splat PLY File";
+            p.label = "Point Cloud PLY File";
             p.page = "Photogrammetry";
             manager->appendFile(p);
         }
         {
-            // 等方ガウシアンの半径 = 最近傍距離の中央値 × この係数
+            // 粒(等方ガウシアン)の半径 = 最近傍距離の中央値 × この係数
             OP_NumericParameter p("Splatscale");
-            p.label = "Splat Scale (x NN dist)";
+            p.label = "Point Size (x NN dist)";
             p.page = "Photogrammetry";
             p.defaultValues[0] = 1.5;
             p.minSliders[0] = 0.1;

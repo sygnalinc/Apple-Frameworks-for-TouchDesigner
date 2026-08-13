@@ -157,7 +157,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 
 | Plugin | Family | What it does |
 |---|---|---|
-| [RealityKit Capture](RealityKitCapture/) | SOP | **Photo folder → 3D mesh** (RealityKit Object Capture). Textured OBJ output. *(Experimental: splat PLY export, for the experimental RealityKit Splat TOP)* |
+| [RealityKit Capture](RealityKitCapture/) | SOP | **Photo folder → 3D mesh** (RealityKit Object Capture). Textured OBJ output. *(Experimental: exports the sparse point cloud as a 3DGS-**format** PLY — this is **not** Gaussian-splat generation — for the experimental RealityKit Splat TOP)* |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **Photo depth → 3D point cloud** (unproject via camera calibration / FOV). Colors sampled from RGB |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic video** (macOS 26+): depth (disparity) map or **re-render with adjustable focus / aperture**. **Plays automatically like a Movie File In** (Play Mode: Sequential / Locked to Timeline / Specify Index, plus Speed / Loop / Cue). `Mode = All` emits **colour, depth and rendered as three colour buffers** (`Color + Depth` is the lighter two-buffer variant with the same indices); `Info DAT` lists the file's own metadata; metadata (focus depth, subjects) on its **Info CHOP** |
 | [Spatial Video](SpatialVideo/) | TOP | **MV-HEVC spatial video** from iPhone / Vision Pro: pull out the **left or right eye**, side-by-side, or **both as two colour buffers** (buffer 1 read with a Render Select TOP — one decode, and the eyes are guaranteed to be the same frame). **Plays like a Movie File In** (Play Mode / Speed / Loop / Cue). Baseline, field of view and hero eye on the **Info CHOP / Info DAT** |

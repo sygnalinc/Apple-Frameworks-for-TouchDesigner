@@ -156,7 +156,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
-| [RealityKit Capture](RealityKitCapture/) | SOP | **写真フォルダ→3Dメッシュ**(RealityKit Object Capture)。テクスチャ付きOBJ出力。*(実験中: splat PLY書き出し — 実験中の RealityKit Splat TOP 用)* |
+| [RealityKit Capture](RealityKitCapture/) | SOP | **写真フォルダ→3Dメッシュ**(RealityKit Object Capture)。テクスチャ付きOBJ出力。*(実験中: 疎な点群を3DGS**形式**のPLYで書き出す — **3DGSの生成ではない**。実験中の RealityKit Splat TOP 用)* |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **写真の深度→3Dポイントクラウド**(カメラ較正/画角で逆投影)。RGBから色サンプル |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic動画**(macOS 26+): 深度(視差)マップ/**f値・ピント差し替え再レンダ**。**Movie File In と同じく自動再生**(Play Mode: Sequential / Locked to Timeline / Specify Index、Speed/Loop/Cue)。`Mode = All` で**色・深度・再レンダを3色バッファ同時出力**(`Color + Depth` は同じ番号のまま軽い2バッファ版)。`Info DAT` で素材のメタデータも出せる。メタデータ(フォーカス深度・被写体)は**Info CHOP**で出力 |
 | [Spatial Video](SpatialVideo/) | TOP | **iPhone / Vision Pro の空間ビデオ(MV-HEVC)** から**左眼 / 右眼**を取り出す。左右連結、または**2つのカラーバッファ**に出して Render Select TOP で取る(デコード1回で済み、左右が必ず同じフレームになる)。**再生は Movie File In と同じ**(Play Mode / Speed / Loop / Cue)。基線・画角・hero eye は **Info CHOP / Info DAT** |

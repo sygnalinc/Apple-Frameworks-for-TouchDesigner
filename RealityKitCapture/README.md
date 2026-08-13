@@ -85,30 +85,43 @@ Start をパルス → 数分の処理後、メッシュを**SOPジオメトリ�
 | Image Folder | 写真フォルダ(JPEG/HEIC。iPhoneで一周撮影したもの等) |
 | Output File | 保存先。**`.obj` 推奨(SOP表示は obj のみ)**。`.usdz` も可 |
 | Detail | Preview / Reduced / Medium(既定)/ Full |
-| Export Splat PLY | **点群を3DGS形式 .ply で書き出す**(macOS 14+)。RealityKit Splat TOP がそのまま真のsplatとして描画できる |
-| Splat PLY File | splat .ply の保存先 |
-| Splat Scale | 等方ガウシアンの半径 = 最近傍距離の中央値 × この係数(既定1.5) |
+| Export Point Cloud (3DGS PLY) | **点群を3DGS形式の .ply で書き出す**(macOS 14+)。**3DGSの生成ではない**(下記) |
+| Point Cloud PLY File | .ply の保存先 |
+| Point Size | 粒(等方ガウシアン)の半径 = 最近傍距離の中央値 × この係数(既定1.5) |
 | Start / Cancel | 再構成の開始・中断(パルス) |
 
 Info CHOP: `executes / progress(0〜1)/ points`。
 Info DAT: `texture`(抽出テクスチャのパス)/ `splat`(書き出したplyパス)/ `splat_points` / `status`(JSON)。進捗は警告文にも出る。
 
-## Splat出力(写真→ガウシアンスプラット)
+## 点群を 3DGS形式の .ply で書き出す
 
-> **この機能は実験中です。** 出力先の描画に使う RealityKit Splat TOP が実験中(macOS 27+)のため。
-> メッシュ再構成(本体機能)は従来どおり検証済みです。
+> **これは「3DGS(ガウシアンスプラッティング)の生成」ではありません。**
+> Object Capture が出す**疎な点群を、3DGSのファイル形式に詰めて書き出すだけ**の機能です。
+> 目的は RealityKit Splat TOP(3DGSレンダラ)で点群を柔らかい粒として表示すること。
+> 実験中(出力先の Splat TOP が macOS 27+ で実験中)。メッシュ再構成は従来どおり検証済み。
 
-`Export Splat PLY` をオンにすると、メッシュと同時に `PhotogrammetrySession` の
-**pointCloud リクエスト**を実行し、点群を **3DGS形式(INRIA互換)の .ply** に変換して書き出す。
-これを **RealityKit Splat TOP** に読ませると、キャプチャした被写体を真のガウシアン
-スプラットとして描画できる(完全オンデバイスの「写真→splat」パイプライン)。
+`Export Point Cloud (3DGS PLY)` をオンにすると、メッシュと同時に `PhotogrammetrySession` の
+**pointCloud リクエスト**を実行し、点群を **3DGS形式(INRIA互換)の .ply** として書き出す。
 
-- 色はSH DC項へ逆変換して格納(splat描画で元色が再現される)
-- 各点は**等方ガウシアン**(半径=最近傍距離の中央値×Splat Scale・view-dependent無し)。
-  学習ベースの3DGS(異方性・高密度)とは品質が異なる簡易版
+**本物の3DGSとの違い(実装が何をしていないか)**:
+
+| 3DGSの要素 | 本物(学習ベース) | この機能 |
+|---|---|---|
+| 生成手順 | 多視点画像から**最適化(学習)** | **学習なし**(SfMの疎点群をそのまま座標に) |
+| 共分散(形) | 点ごとに**異方性**を学習 | **等方の固定値**(半径=最近傍距離の中央値×係数) |
+| 不透明度 | 点ごとに学習 | **全点固定**(0.95) |
+| 回転 | 点ごとに学習 | **恒等**(無回転) |
+| 色 | 高次SHで**視点依存** | **SH DC項のみ**(どの角度でも同じ色) |
+| 点数 | 数十万〜数百万 | **SfM疎点群のまま**(templeRing 47枚で約1650点) |
+
+つまり中身は**点群**で、3DGSを名乗れるのは**ファイルレイアウトだけ**です。見た目も
+「柔らかい丸い粒の集まり」で、学習ベース3DGSのような精細な再現にはなりません。
+
 - 座標は3DGS慣例のY下向きで書くため、RealityKit Splat TOP・他の3DGSビューアでそのまま正立
-- **AppleのGaussian Splat学習API(写真→本物の3DGS)はmacOS 27でも非公開**
-  (CorePhotogrammetry内部のみ)。公開されたら置き換える
+- **Appleの Gaussian Splat 学習API(写真→本物の3DGS)は macOS 27 でも非公開**
+  (`CorePhotogrammetry` 内部のみ)。本物が欲しい場合は現時点では外部ツール
+  (INRIA実装・Postshot 等)で学習した .ply を **RealityKit Splat TOP に直接読ませる**のが正解。
+  公開されたらこの機能を置き換える
 
 ### 注意
 
