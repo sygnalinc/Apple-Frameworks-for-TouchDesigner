@@ -187,10 +187,25 @@ public:
         return true;
     }
 
+    // 生の値 <-> パラメータ用の値。AE モードはビットマップなので 0/1 に畳む
+    static int32_t toParam(const Control& c, int32_t raw)
+    {
+        if (c.kind == Kind::AEMode) return (raw == 0x01) ? 0 : 1;
+        return raw;
+    }
+
+    // パラメータの値をコントロールの範囲へ収める(範囲外を送ると失敗する)
+    static int32_t clampToRange(const Control& c, int32_t v)
+    {
+        if (c.kind != Kind::Range) return v ? 1 : 0;
+        if (c.minV < c.maxV) { if (v < c.minV) v = c.minV; if (v > c.maxV) v = c.maxV; }
+        return v;
+    }
+
     bool set(const Control& c, int32_t value) const
     {
         if (!myUSB || !c.canSet) return false;
-        int32_t v = value;
+        int32_t v = clampToRange(c, value);
         if (c.kind == Kind::AEMode) v = value ? myAutoAE : 0x01;   // 自動 / 手動
         uint8_t buf[8] = {};
         for (int i = 0; i < c.length; i++) buf[i] = (uint8_t)((v >> (8 * i)) & 0xFF);

@@ -50,8 +50,9 @@ buffer outside the lock and only swaps under it), which is the right shape regar
 
 ### Not yet verified
 
-- Whether Exposure / Focus **Locked** actually holds the image. `lockForConfiguration` succeeds and
-  the mode reads back correctly, but the visual effect has not been confirmed
+- Whether AVFoundation's Exposure / Focus **Locked** actually holds the image. `lockForConfiguration`
+  succeeds and the mode reads back correctly, but the visual effect has not been confirmed. On a USB
+  camera the UVC page is the better route anyway — that one is measured
 
 ### UVC controls (USB cameras)
 
@@ -61,6 +62,21 @@ the standard USB Video Class control requests (IOKit). **No entitlement and no r
 Measured on a Logicool BRIO: reading the exposure time gave `GET_CUR=312` / `MIN=3` / `MAX=2047`
 (units of 100 µs), switching AE Mode to manual and writing `100` (10.0 ms) read back correctly, and
 the original values restored cleanly.
+
+Verified end to end on a Logicool BRIO. All 13 controls came back `get+set` with real ranges —
+exposure `3..2047` (units of 100 µs), focus `0..255`, zoom `100..500`, the Processing Unit group
+`0..255`, white balance `2000..7500` K. Writing a value and reading it back matched exactly, and the
+image responded:
+
+| Exposure Time | Mean brightness of the frame |
+|---|---|
+| 100 (10 ms) | 0.040 |
+| 300 | 0.135 |
+| 900 | 0.276 |
+| 1800 | 0.372 |
+
+Saturation — a Processing Unit control, the group that a hardcoded unit ID silently breaks — moved
+the per-pixel chroma from 0.004 at 0, through 0.006 at 128, to 0.013 at 255.
 
 Three things about UVC that are easy to get wrong, all found the hard way:
 
@@ -193,8 +209,9 @@ AVFoundation がフォーマットを決め直すため、それより前の指�
 
 ### まだ検証できていないこと
 
-- Exposure / Focus の **Locked** が実際に画を固定するか。`lockForConfiguration` は成功し、
-  モードの読み戻しも正しいが、映像上の効果は未確認
+- AVFoundation 側の Exposure / Focus の **Locked** が実際に画を固定するか。`lockForConfiguration` は
+  成功しモードの読み戻しも正しいが、映像上の効果は未確認。USB カメラなら UVC ページの方が確実
+  (こちらは実測済み)
 
 ### UVC コントロール(USB カメラ)
 
@@ -203,6 +220,20 @@ macOS はアプリに手動露出を許していないので、標準の USB Vid
 
 Logicool BRIO で実測: 露出時間が `GET_CUR=312` / `MIN=3` / `MAX=2047`(100µs 単位)で読め、
 AE モードを手動にして `100`(10.0ms)を書き込むと読み戻しも一致、元の値への復元もできました。
+
+**Logicool BRIO で通しで確認済み**。13 コントロールすべてが `get+set` で、範囲も実物どおり —
+露出 `3..2047`(100µs 単位)、フォーカス `0..255`、ズーム `100..500`、Processing Unit 群 `0..255`、
+色温度 `2000..7500` K。書いた値は読み戻しても一致し、映像も追従しました。
+
+| Exposure Time | フレームの平均輝度 |
+|---|---|
+| 100 (10 ms) | 0.040 |
+| 300 | 0.135 |
+| 900 | 0.276 |
+| 1800 | 0.372 |
+
+彩度(Processing Unit 側 = ユニット ID を決め打ちすると黙って壊れる側)も、0 で 0.004・128 で 0.006・
+255 で 0.013 と画素ごとの彩度が動きました。
 
 **間違えやすい点が3つ**あります。いずれも実際に踏んだものです。
 

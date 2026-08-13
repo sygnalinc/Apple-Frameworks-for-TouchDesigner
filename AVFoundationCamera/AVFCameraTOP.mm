@@ -435,7 +435,10 @@ private:
             for (tduvc::Control& c : myUvcCtrls) {
                 if (!c.supported) continue;
                 int32_t cur = 0;
-                if (myUVC.get(c, tduvc::kGetCur, cur)) { c.cur = cur; vals.push_back({c.name, (double)cur}); }
+                if (myUVC.get(c, tduvc::kGetCur, cur)) {
+                    c.cur = tduvc::Device::toParam(c, cur);   // AE モードは 0/1 に畳む
+                    vals.push_back({c.name, (double)c.cur});
+                }
             }
             if (!vals.empty()) tdpycb::setFloatPars(myNode, vals);
             return;   // 書き戻した直後は送り返さない
@@ -446,7 +449,8 @@ private:
         std::vector<std::pair<tduvc::Control*, int32_t>> todo;
         for (tduvc::Control& c : myUvcCtrls) {
             if (!c.supported || !c.canSet) continue;
-            const int32_t want = (int32_t)llround(in->getParDouble(c.name));
+            const int32_t want = tduvc::Device::clampToRange(
+                c, (int32_t)llround(in->getParDouble(c.name)));
             if (!force && want == c.cur) continue;      // 変わったときだけ送る
             todo.push_back({&c, want});
         }
