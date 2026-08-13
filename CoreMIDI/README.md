@@ -56,9 +56,20 @@ Two ways to send position, because **which one a DAW understands is not a matter
 | `MTC (MIDI Time Code)` | **Logic Pro.** Logic has no setting for receiving MIDI Clock — its Sync tab only exposes MTC on the receive side. Quarter frames at 4 × frame rate, plus a Full Frame message on start and after a jump |
 | `MIDI Clock (24 PPQN)` | Ableton Live and hardware that slaves to MIDI clock |
 
-**For Logic**, open Settings → MIDI → Sync → **「MIDI同期プロジェクト設定...」** and set the sync
-source to MTC. (The MMC *receive* setting lives in that same dialog — the MMC section on the Sync
-tab itself is only about what Logic *transmits*.)
+**For Logic**, open Settings → MIDI → Sync → **「MIDI同期プロジェクト設定...」** and set 同期モード
+to MTC. (The MMC *receive* setting lives in that same dialog — the MMC section on the Sync tab
+itself is only about what Logic *transmits*.)
+
+Two things in that dialog have to match, or Logic locks but never moves:
+
+| Logic | This op |
+|---|---|
+| **SMPTE オフセット** (Logic's default is `01:00:00:00`) | **MTC Offset** — must be the same |
+| **フレームレート** (Logic's default is `29.97`) | **MTC Frame Rate** |
+
+The offset is the one that bites. Logic's bar 1 sits one hour in by default, so sending timecode
+from `00:00:00:00` points an hour *before* the project — Logic chases, shows a negative bar and
+appears frozen. `MTC Offset` defaults to `01:00:00:00` to match Logic out of the box.
 
 With `MIDI Clock` the op sends 24 PPQN locked to TD's timeline:
 
@@ -111,7 +122,8 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
 | MMC Device ID | 0–127, default 127 (all devices) |
 | Play / Stop / Record / Return to Start | DAW transport pulses |
 | Sync Mode | `Off` (default) / `MIDI Clock (24 PPQN)` / `MTC (MIDI Time Code)` |
-| MTC Frame Rate | 24 / 25 / 29.97 drop / 30 (MTC only) |
+| MTC Frame Rate | 24 / 25 / 29.97 drop / 30 (MTC only). Match the DAW |
+| MTC Offset (hh:mm:ss:ff) | The DAW's project start. Default `01:00:00:00` (Logic's default) |
 | Tempo (BPM) | Clock tempo. Bind to `root.time.tempo` to follow the timeline |
 | Send Song Position | Announce the position on start and after a jump (default on) |
 
@@ -141,6 +153,8 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
   re-announced the position, as intended
 - **MTC**: 30 fps for 5 s produced 608 quarter frames (600 in theory), cycling pieces 0–7 with
   rate code 3 (30 fps) and a timecode of `00:00:03:06` matching the timeline
+- **MTC Offset**: with `01:00:00:00` and 29.97 drop, the reconstructed timecode was `01:00:06:00`
+  with rate code 2 — offset and rate both land where Logic expects them
 
 ### Build
 
@@ -206,9 +220,20 @@ Logic を MIDI クロックに同期させる)。二重に反応する DAW で�
 | `MTC (MIDI Time Code)` | **Logic Pro。** Logic には MIDI クロックを受信する設定が無く、同期タブの受信側は MTC しか無い。クォーターフレームを 4×フレームレートで送り、開始時と位置が飛んだときに Full Frame メッセージを送る |
 | `MIDI Clock (24 PPQN)` | Ableton Live など、MIDI クロックに同期する DAW / 機材 |
 
-**Logic の設定**: 設定 > MIDI > 同期 の **「MIDI同期プロジェクト設定...」**を開き、同期ソースを
+**Logic の設定**: 設定 > MIDI > 同期 の **「MIDI同期プロジェクト設定...」**を開き、同期モードを
 MTC にする(MMC の**受信**設定も同じダイアログ内。同期タブに見えている MMC 欄は Logic が
 **送信**する側の設定)。
+
+そのダイアログの2つを合わせないと、**Logic はロックするのに進まない**:
+
+| Logic | このOP |
+|---|---|
+| **SMPTE オフセット**(既定 `01:00:00:00`) | **MTC Offset** — 同じ値にする |
+| **フレームレート**(既定 `29.97`) | **MTC Frame Rate** |
+
+引っかかるのはオフセット。**Logic の1小節目は既定で1時間の位置**にあるので、`00:00:00:00` から
+送るとプロジェクト開始の1時間前を指してしまい、Logic は追従しようとして負の小節に張り付き、
+止まって見える。`MTC Offset` の既定は Logic に合わせて `01:00:00:00` にしてある。
 
 `MIDI Clock` にすると、TD のタイムラインに同期した 24 PPQN のクロックを送る。
 
@@ -260,7 +285,8 @@ Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online
 | MMC Device ID | 0〜127。既定 127(全デバイス宛) |
 | Play / Stop / Record / Return to Start | DAW のトランスポート操作 |
 | Sync Mode | `Off`(既定)/ `MIDI Clock (24 PPQN)` / `MTC (MIDI Time Code)` |
-| MTC Frame Rate | 24 / 25 / 29.97 drop / 30(MTC のみ) |
+| MTC Frame Rate | 24 / 25 / 29.97 drop / 30(MTC のみ)。DAW に合わせる |
+| MTC Offset (hh:mm:ss:ff) | DAW のプロジェクト開始位置。既定 `01:00:00:00`(Logic の既定) |
 | Tempo (BPM) | クロックのテンポ。`root.time.tempo` に束ねるとタイムラインに追従 |
 | Send Song Position | 開始時と位置が飛んだときに再生位置を伝える(既定On) |
 
@@ -287,6 +313,8 @@ Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online
   0個 + `FC`。タイムラインがループしたときは位置を貼り直すことも確認
 - **MTC**: 30fps 5秒で 608個(理論600)。piece 0〜7 が巡回し、レートコード 3(30fps)、
   タイムコード `00:00:03:06` がタイムライン位置と一致することを確認
+- **MTC Offset**: `01:00:00:00` + 29.97 drop で、復元したタイムコードが `01:00:06:00`・
+  レートコード2。オフセットもレートも Logic が期待する値になることを確認
 
 ### ビルド
 

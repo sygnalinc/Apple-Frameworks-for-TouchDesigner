@@ -67,6 +67,9 @@ public:
         // クライアントができるまで待つ(最初の cook で送信できるように)
         for (int i = 0; i < 100 && !myReady.load(); i++)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        // ここで一覧を作っておかないと、**まだ cook していないノードの Device メニューが空**になる
+        // (buildDynamicMenu は execute より先に呼ばれうる)。実際に踏んだ。
+        rescan();
     }
 
     ~CoreMIDIOutCHOP() override
@@ -251,6 +254,14 @@ public:
             const char* nm[] = {"24", "25", "2997", "30"};
             const char* lb[] = {"24 fps", "25 fps", "29.97 fps drop", "30 fps"};
             m->appendMenu(p, 4, nm, lb);
+        }
+        {
+            // DAW のプロジェクト開始位置(SMPTE オフセット)に合わせる。
+            // **Logic Pro の既定は 01:00:00:00** なので、0 のまま送るとプロジェクト開始より
+            // 1時間前を指してしまい、Logic はロックするが負の小節に張り付いて進まない(実際に踏んだ)。
+            OP_StringParameter p("Mtcoffset");
+            p.label = "MTC Offset (hh:mm:ss:ff)"; p.page = SYNC; p.defaultValue = "01:00:00:00";
+            m->appendString(p);
         }
         {
             OP_NumericParameter p("Songposition");
@@ -597,6 +608,16 @@ private:
         if (r == "2997") return 30.0 / 1.001;
         return 30.0;
     }
+    // "hh:mm:ss:ff" を、そのフレームレートでの総フレーム数に直す
+    static long long parseOffset(const char* s, double fps)
+    {
+        if (!s || !*s) return 0;
+        int hh = 0, mm = 0, ss = 0, ff = 0;
+        if (sscanf(s, "%d:%d:%d:%d", &hh, &mm, &ss, &ff) < 3) return 0;
+        const long long fpsI = (long long)std::llround(fps);
+        return ((long long)hh * 3600 + mm * 60 + ss) * fpsI + ff;
+    }
+
     static int mtcRateCode(const std::string& r)
     {
         if (r == "24") return 0;
@@ -612,6 +633,7 @@ private:
         const double fps = mtcFps(rate);
         const int rc = mtcRateCode(rate);
         myBeat = sec;
+        const long long offFrames = parseOffset(in->getParString("Mtcoffset"), fps);
 
         if (!playing) {
             if (myClockRunning) { realtime(0xFC); myClockRunning = false; }
@@ -623,7 +645,7 @@ private:
         const bool jumped = myClockRunning && std::llabs(qf - myTick) > 16;
         if (!myClockRunning || jumped) {
             // 位置を一発で伝える Full Frame メッセージ: F0 7F 7F 01 01 hh mm ss ff F7
-            const long long fr = qf / 4;
+            const long long fr = qf / 4 + offFrames;
             const int ff = (int)(fr % (long long)std::llround(fps));
             const long long tot = fr / (long long)std::llround(fps);
             uint8_t b[10] = {0xF0, 0x7F, 0x7F, 0x01, 0x01,
@@ -644,7 +666,7 @@ private:
             if (dt > kLookahead) break;
             const int piece = (int)(next % 8);
             // 8個で1組。組の先頭は偶数フレームを指す
-            const long long baseFrame = (next / 8) * 2;
+            const long long baseFrame = (next / 8) * 2 + offFrames;
             const long long fpsI = (long long)std::llround(fps);
             const int ff = (int)(baseFrame % fpsI);
             const long long tot = baseFrame / fpsI;
