@@ -46,8 +46,10 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | **[CoreML](CoreML/)** — monocular depth with Depth Anything V2 | **[Vision Subject](VisionSubject/)** — subject cutout, no green screen |
 | <img src="docs/demo/coretext.gif" width="400" alt="CoreText"> | <img src="docs/demo/imageplayground.jpg" width="400" alt="ImagePlayground"> |
 | **[CoreText](CoreText/)** — vertical Japanese typesetting, revealed a character at a time | **[ImagePlayground](ImagePlayground/)** — a face photo (left) turned into an illustration (right) |
-| <img src="docs/demo/llmafm-chat.gif" width="400" alt="LLM AFM"> | |
-| **[LLM AFM](LLMAFM/)** — Apple Intelligence's on-device model (~3B) answering in English and Japanese at once. Note the wrong answer: mixing red and blue gives *purple*, but the Japanese side says *blue* | |
+| <img src="docs/demo/llmafm-chat.gif" width="400" alt="LLM AFM"> | <img src="docs/demo/gamecontroller.gif" width="400" alt="GameController"> |
+| **[LLM AFM](LLMAFM/)** — Apple Intelligence's on-device model (~3B) answering in English and Japanese at once. Note the wrong answer: mixing red and blue gives *purple*, but the Japanese side says *blue* | **[GameController](GameController/)** — flying a camera through a city with a gamepad. The face buttons switch the scene: wireframe, colour palette, and building heights driven by audio |
+| <img src="docs/demo/ciglass.gif" width="400" alt="CI Glass"> | |
+| **[CI Glass](CoreImageGlass/)** — macOS's Liquid Glass rebuilt in Core Image. The border refracts the street behind it and the rim lights up along the letterforms | |
 
 ## Table of contents
 
@@ -158,6 +160,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | [RealityKit Capture](RealityKitCapture/) | SOP | **Photo folder → 3D mesh** (RealityKit Object Capture). Textured OBJ output |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **Photo depth → 3D point cloud** (unproject via camera calibration / FOV). Colors sampled from RGB |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic video** (macOS 26+): depth (disparity) map or **re-render with adjustable focus / aperture**. **Plays automatically like a Movie File In** (Play Mode: Sequential / Locked to Timeline / Specify Index, plus Speed / Loop / Cue). `Mode = All` emits **colour, depth and rendered as three colour buffers** (`Color + Depth` is the lighter two-buffer variant with the same indices); `Info DAT` lists the file's own metadata; metadata (focus depth, subjects) on its **Info CHOP** |
+| [Spatial Video](SpatialVideo/) | TOP | **MV-HEVC spatial video** from iPhone / Vision Pro: pull out the **left or right eye**, side-by-side, or **both as two colour buffers** (buffer 1 read with a Render Select TOP — one decode, and the eyes are guaranteed to be the same frame). **Plays like a Movie File In** (Play Mode / Speed / Loop / Cue). Baseline, field of view and hero eye on the **Info CHOP / Info DAT** |
 | [Vision Contours](VisionContours/) | SOP | Image contours → **closed Line geometry** (wire into Sweep / Extrude / Particle) |
 | [Screen Capture](ScreenCapture/) | TOP | **Screen recording** of a display or **a single window picked by name from a dropdown** (up to 120fps) |
 | [CA Process Tap](CoreAudioProcessTap/) | CHOP | **Tap a single app's audio** (Core Audio Process Tap, macOS 14.4+) or all system audio → 48kHz stereo. Finer-grained than Screen Capture |
@@ -185,13 +188,13 @@ Open it and drag **only the `.plugin` bundles you actually need** into
 `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/`.
 
 > **Start with a few.** TouchDesigner asks you to approve **each new plugin individually**
-> on the next launch, so copying all 59 means dismissing 59 dialogs before you reach the
+> on the next launch, so copying all 60 means dismissing 60 dialogs before you reach the
 > network. You can always add more later — the approval is remembered per plugin.
 
 If you do want everything:
 
 ```sh
-cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.9.5/"*.plugin \
+cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.9.6/"*.plugin \
       ~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins/
 ```
 
@@ -244,11 +247,13 @@ For *writing* plugins rather than using them, see
 
 ## Versioning
 
-Current release: **0.9.4** (see [`VERSION`](VERSION))
+Current release: **0.9.6** (see [`VERSION`](VERSION))
 
 | Version | Date | Operators | Highlights |
 |---|---|---|---|
-| **[0.9.4](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.4)** | 2026-08-10 | 59 | **Vision Pose 3D reworked.** Frames are now fed as a sequence — detection 56–59/60 → 60/60 and the body-facing flip 16–18 % → 0–8 %. Analysis is ~2× faster. New `Coordinate Space` (root/camera), `Camera FOV`, `body:facing/pitch/roll`, `cam:distance/fov`; `bodyheight`, `heightestimation` and the old `camera:*` sextet removed (**breaking for that operator**). Metal Denoise now warns and passes through on unsupported hardware instead of erroring. Six plugins that silently failed to build since 07-23 are fixed. |
+| **[0.9.6](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.6)** | 2026-08-13 | 60 | **Two new operators.** **CI Glass** — macOS frosted glass and macOS 26 Liquid Glass rebuilt in Core Image from presets measured off the real views; edge refraction follows any mask on input 1. **Spatial Video** — MV-HEVC spatial video from iPhone / Vision Pro: left / right / side-by-side, or **both eyes as two colour buffers from one decode** (read buffer 1 with a Render Select TOP), with Movie File In-style playback. The GameController example is now a drone-flight + VJ demo, verified against a real gamepad. |
+| [0.9.5](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.5) | 2026-08-12 | 58 | **Cinematic Video overhauled** — plays automatically (Play Mode / Speed / Loop / Cue), new `Color` mode, `All` / `Color + Depth` multi-buffer output, `Info DAT` for the file's own metadata, and a memory blow-up during playback fixed. **CI RAW pixel-format mismatch fixed** (real RAW produced NaN). `Apply EXIF Orientation` on CI RAW / CI HDR. CoreWLAN Scan now explains why the SSID list is empty. Speech Activity withdrawn — `SpeechDetector` returns no results on macOS 26.6. |
+| [0.9.4](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.4) | 2026-08-10 | 59 | **Vision Pose 3D reworked.** Frames are now fed as a sequence — detection 56–59/60 → 60/60 and the body-facing flip 16–18 % → 0–8 %. Analysis is ~2× faster. New `Coordinate Space` (root/camera), `Camera FOV`, `body:facing/pitch/roll`, `cam:distance/fov`; `bodyheight`, `heightestimation` and the old `camera:*` sextet removed (**breaking for that operator**). Metal Denoise now warns and passes through on unsupported hardware instead of erroring. Six plugins that silently failed to build since 07-23 are fixed. |
 | [0.9.3](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.3)** | 2026-08-09 | 59 | Fixes garbled output under the Non-Commercial resolution cap (10 TOPs). **Vision Face landmarks 76 → 85** — the old layout truncated each region, so `p` indices shift (breaking for that operator). `Aspect Correct UVs` on Vision Contours. CoreText line-height fix. |
 | [0.9.2](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.2) | 2026-08-08 | 59 | Fixes a TOP left black after bypass (all 17 CPUMem TOPs) and 6 plugins that had silently stopped building. Vision Face landmark order, Vision AnimalPose skeleton. `Aspect Correct UVs` on Vision Text. |
 | [0.9.1](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.1) | 2026-08-08 | 66 | `Aspect Correct UVs` across 10 Vision operators. Fixes the startup load error caused by an SDK version mismatch. |
@@ -256,7 +261,7 @@ Current release: **0.9.4** (see [`VERSION`](VERSION))
 
 | Layer | Value | Rule |
 |---|---|---|
-| Repository (git tag) | `v0.9.4` | Adding operators / features bumps **minor**, fixes bump **patch**. Renaming or removing an `opType` is a **breaking** change and is called out in the release notes. |
+| Repository (git tag) | `v0.9.6` | **Operators are added continuously, so an addition on its own is a patch** — as are fixes and improvements. **Minor** is reserved for a change in what the collection is (a broad rework, or a batch of breaking changes). Renaming or removing an `opType` is a **breaking** change and is always called out in the release notes. |
 | Bundle (`Info.plist`) | `CFBundleShortVersionString` = repo version, `CFBundleVersion` = git commit count | Stamped automatically by `common/version.sh` at build time. |
 | Operator (`customOPInfo`) | `majorVersion = 0`, `minorVersion = 9` (Vision Face is `majorVersion = 1`) | **Per operator.** TouchDesigner compares these with the values saved in a `.toe`. Bump `majorVersion` **only** for that one operator when a change is not backwards compatible (parameter removed / semantics changed). |
 

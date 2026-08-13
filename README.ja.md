@@ -45,8 +45,10 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | **[CoreML](CoreML/)** — Depth Anything V2 で単眼深度推定 | **[Vision Subject](VisionSubject/)** — グリーンバック無しの被写体切り抜き |
 | <img src="docs/demo/coretext.gif" width="400" alt="CoreText"> | <img src="docs/demo/imageplayground.jpg" width="400" alt="ImagePlayground"> |
 | **[CoreText](CoreText/)** — 日本語の縦組みを一文字ずつ表示 | **[ImagePlayground](ImagePlayground/)** — 顔写真(左)からイラスト(右)を生成 |
-| <img src="docs/demo/llmafm-chat.gif" width="400" alt="LLM AFM"> | |
-| **[LLM AFM](LLMAFM/)** — Apple Intelligence のオンデバイスモデル(~3B)が英語と日本語で同時に応答。日本語側の「赤と青を混ぜると青」は**誤答**(正しくは紫。英語側は purple と正答) | |
+| <img src="docs/demo/llmafm-chat.gif" width="400" alt="LLM AFM"> | <img src="docs/demo/gamecontroller.gif" width="400" alt="GameController"> |
+| **[LLM AFM](LLMAFM/)** — Apple Intelligence のオンデバイスモデル(~3B)が英語と日本語で同時に応答。日本語側の「赤と青を混ぜると青」は**誤答**(正しくは紫。英語側は purple と正答) | **[GameController](GameController/)** — ゲームパッドでカメラを街に飛ばす。ボタンでシーンを切り替える(ワイヤーフレーム / カラーパレット / ビルの高さが音に連動) |
+| <img src="docs/demo/ciglass.gif" width="400" alt="CI Glass"> | |
+| **[CI Glass](CoreImageGlass/)** — macOS の Liquid Glass を Core Image で組み直したもの。縁で背後の街が歪み、文字の輪郭に沿ってリムが光る | |
 
 ## 目次
 
@@ -157,6 +159,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [RealityKit Capture](RealityKitCapture/) | SOP | **写真フォルダ→3Dメッシュ**(RealityKit Object Capture)。テクスチャ付きOBJ出力 |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **写真の深度→3Dポイントクラウド**(カメラ較正/画角で逆投影)。RGBから色サンプル |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic動画**(macOS 26+): 深度(視差)マップ/**f値・ピント差し替え再レンダ**。**Movie File In と同じく自動再生**(Play Mode: Sequential / Locked to Timeline / Specify Index、Speed/Loop/Cue)。`Mode = All` で**色・深度・再レンダを3色バッファ同時出力**(`Color + Depth` は同じ番号のまま軽い2バッファ版)。`Info DAT` で素材のメタデータも出せる。メタデータ(フォーカス深度・被写体)は**Info CHOP**で出力 |
+| [Spatial Video](SpatialVideo/) | TOP | **iPhone / Vision Pro の空間ビデオ(MV-HEVC)** から**左眼 / 右眼**を取り出す。左右連結、または**2つのカラーバッファ**に出して Render Select TOP で取る(デコード1回で済み、左右が必ず同じフレームになる)。**再生は Movie File In と同じ**(Play Mode / Speed / Loop / Cue)。基線・画角・hero eye は **Info CHOP / Info DAT** |
 | [Vision Contours](VisionContours/) | SOP | 画像の輪郭を**閉じたLineジオメトリ**へ(Sweep/Extrude/Particle 直結) |
 | [Screen Capture](ScreenCapture/) | TOP | ディスプレイ/**名前で選べる単一ウインドウ**の**画面収録**(最大120fps) |
 | [CA Process Tap](CoreAudioProcessTap/) | CHOP | **指定アプリの音だけ**をタップ(Core Audio Process Tap・macOS 14.4+)or 全システム音→48kHz stereo。Screen Captureより粒度が細かい |
@@ -184,14 +187,14 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 `~/Library/Application Support/Derivative/TouchDesigner099/Plugins/` へドラッグしてください。
 
 > **まずは必要なものだけを推奨。** TouchDesigner は次の起動時に**プラグイン1つずつ
-> 許可のダイアログ**を出します。59個すべてコピーすると、ネットワークに辿り着く前に
-> 59回ダイアログを閉じることになります。あとから足せますし、許可はプラグインごとに
+> 許可のダイアログ**を出します。60個すべてコピーすると、ネットワークに辿り着く前に
+> 60回ダイアログを閉じることになります。あとから足せますし、許可はプラグインごとに
 > 記憶されます。
 
 まとめて入れる場合は:
 
 ```sh
-cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.9.5/"*.plugin \
+cp -R "/Volumes/Apple Frameworks for TouchDesigner v0.9.6/"*.plugin \
       ~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins/
 ```
 
@@ -242,11 +245,13 @@ ln -s "$PWD/.claude/skills/td-apple-ops" ~/.claude/skills/td-apple-ops
 
 ## バージョン
 
-現在のリリース: **0.9.4**([`VERSION`](VERSION))
+現在のリリース: **0.9.6**([`VERSION`](VERSION))
 
 | バージョン | 日付 | OP数 | 主な内容 |
 |---|---|---|---|
-| **[0.9.4](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.4)** | 2026-08-10 | 59 | **Vision Pose 3D を全面的に見直し。** 連続フレームとして処理するようにして検出率 56〜59/60 → 60/60、体の向きの反転 16〜18% → 0〜8%。解析は約2倍速。`Coordinate Space`(root/camera)・`Camera FOV`・`body:facing/pitch/roll`・`cam:distance/fov` を追加し、`bodyheight` / `heightestimation` と旧 `camera:*` 6chを削除(**このopに関して後方非互換**)。Metal Denoise は非対応ハードでエラーではなく警告+素通しに。07-23 から黙ってビルドされていなかった6プラグインを修復 |
+| **[0.9.6](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.6)** | 2026-08-13 | 60 | **オペレータを2つ追加。** **CI Glass** — macOSのすりガラスと macOS 26 の Liquid Glass を Core Image で組み直したもの。プリセットは実物を画面に出して実測。縁の屈折は入力1の任意のマスクに追従する。**Spatial Video** — iPhone / Vision Pro の空間ビデオ(MV-HEVC)から左眼 / 右眼 / 左右連結、または**1回のデコードで両眼を2つのカラーバッファへ**(バッファ1は Render Select TOP で取る)。再生は Movie File In 相当。GameController の利用例をドローン飛行 + VJ デモに作り替え、実機パッドで検証 |
+| [0.9.5](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.5) | 2026-08-12 | 58 | **Cinematic Video を刷新** — 自動再生(Play Mode / Speed / Loop / Cue)、`Color` モード、`All` / `Color + Depth` の複数カラーバッファ出力、`Info DAT` でファイル自身のメタデータ、再生中のメモリ暴走を修正。**CI RAW のピクセル形式不一致を修正**(実RAWで NaN になっていた)。CI RAW / CI HDR に `Apply EXIF Orientation`。CoreWLAN Scan は SSID 一覧が空の理由を警告で出すように。Speech Activity は `SpeechDetector` が結果を返さないため取り下げ |
+| [0.9.4](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.4) | 2026-08-10 | 59 | **Vision Pose 3D を全面的に見直し。** 連続フレームとして処理するようにして検出率 56〜59/60 → 60/60、体の向きの反転 16〜18% → 0〜8%。解析は約2倍速。`Coordinate Space`(root/camera)・`Camera FOV`・`body:facing/pitch/roll`・`cam:distance/fov` を追加し、`bodyheight` / `heightestimation` と旧 `camera:*` 6chを削除(**このopに関して後方非互換**)。Metal Denoise は非対応ハードでエラーではなく警告+素通しに。07-23 から黙ってビルドされていなかった6プラグインを修復 |
 | [0.9.3](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.3)** | 2026-08-09 | 59 | Non-Commercial の解像度上限で絵が崩れる不具合を修正(10 TOP)。**Vision Face のランドマークを 76 → 85 点に**(旧レイアウトは各領域を切り捨てていた。`p` インデックスがずれる**後方非互換**)。Vision Contours に `Aspect Correct UVs`。CoreText の行送り修正 |
 | [0.9.2](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.2) | 2026-08-08 | 59 | bypass から戻すと黒画像になる不具合を全17 TOP で修正、ビルド不能だった6件を修復。Vision Face のランドマーク並び、Vision AnimalPose の骨格接続。Vision Text に `Aspect Correct UVs` |
 | [0.9.1](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.1) | 2026-08-08 | 66 | Vision系10opに `Aspect Correct UVs`。SDKバージョン不一致による起動時ロードエラーを修正 |
@@ -254,7 +259,7 @@ ln -s "$PWD/.claude/skills/td-apple-ops" ~/.claude/skills/td-apple-ops
 
 | 層 | 値 | ルール |
 |---|---|---|
-| リポジトリ(gitタグ) | `v0.9.4` | op追加・機能追加で **minor**、修正で **patch**。`opType` のリネーム/削除は**破壊的変更**としてリリースノートに明記 |
+| リポジトリ(gitタグ) | `v0.9.6` | **opは継続的に増えていくので、op追加だけなら patch**。修正・改善も patch。**minor** は「集合としての性格が変わるとき」(全体的な作り直しや、破壊的変更がまとまったとき)に取っておく。`opType` のリネーム/削除は**破壊的変更**として必ずリリースノートに明記 |
 | バンドル(`Info.plist`) | `CFBundleShortVersionString` = リポジトリ版 / `CFBundleVersion` = gitコミット数 | ビルド時に `common/version.sh` が自動で焼き込む |
 | オペレータ(`customOPInfo`) | `majorVersion = 0` / `minorVersion = 9`(Vision Face のみ `majorVersion = 1`) | **opごと**。TDが `.toe` 保存値と比較する。後方互換でない変更(パラメータ削除・意味変更)をした**そのopだけ** `majorVersion` を +1 する |
 

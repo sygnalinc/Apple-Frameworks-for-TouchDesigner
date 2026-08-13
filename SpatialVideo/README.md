@@ -17,7 +17,8 @@ GLSL TOP のシェーダDATと同じ**閉じた↓チップ**としてノード�
 要求してデコードし、`CMTaggedBufferGroup` から左眼/右眼の CVPixelBuffer を分離して BGRA8 出力。
 
 - `Eye` = **Left / Right / Side-by-Side**(左右連結)
-- `Time`(0..1)でスクラブ。デコードはワーカースレッド(cook 非ブロック)
+- 再生は **Movie File In と同じ** `Play` / `Speed` / `Loop` / `Cue` / `Play Mode`。
+  デコードはワーカースレッド(cook 非ブロック)
 
 ## メタデータ(旧 Spatial Video DAT)
 
@@ -44,7 +45,42 @@ Info CHOP / Info DAT をこのノードに向けるだけで旧DATと同じ情�
 |---|---|
 | Spatial Video File | MV-HEVC .MOV/.MP4 |
 | Eye | Left / Right / Side-by-Side |
-| Time (0..1) | スクラブ位置 |
+| Eye | Left / Right / Side-by-Side / **Left + Right (2 buffers)** |
+| Play Mode | Sequential(自前の時計)/ Locked to Timeline(タイムライン追従)/ Specify Index |
+| Play / Speed / Loop | 再生・速度(負で逆再生)・ループ |
+| Cue / Cue Point / Cue Pulse | キュー保持・キュー点(秒)・ジャンプ |
+| Position (0..1) | Play が Off のときの手動スクラブ |
+
+## 1つのTOPから左右を別々に取り出す
+
+`Eye = Left + Right (2 buffers)` にすると、**1回のデコードで**カラーバッファ
+**0 = 左眼 / 1 = 右眼** に出す。バッファ1以降は **Render Select TOP** で取り出す。
+
+インスタンスを2つ置いて Left / Right にするより有利な点:
+
+- **デコードが1回で済む**(2インスタンスは同じファイルを2回デコードする)
+- **左右が必ず同じフレーム**になる(別インスタンスだと1フレームずれ得る)
+
+> **Render Select TOP は参照で読むだけで cook を引っ張らない。** 下流が Render Select だけだと
+> 参照元がほとんど cook されず再生が這う。**バッファ0(このノードの出力)は Null TOP などで
+> ワイヤに繋いでおくこと。**
+
+## 再生(Movie File In 相当)
+
+`Play Mode` は Movie File In と同じ3種:
+
+| モード | 内容 |
+|---|---|
+| `Sequential` | `deltaMS` ぶんだけ自前で進める。TDのタイムラインを止めれば止まる |
+| `Locked to Timeline` | タイムライン位置をそのまま尺へ写す。スクラブに追従し、フレーム単位で再現する |
+| `Specify Index` | `Position`(0..1)で手動指定 |
+
+要求時刻は**ソースのfpsでフレーム量子化**している(しないと同じ絵を何度もデコードし直す)。
+Info CHOP に `position`(秒)と `playing` を出す。
+
+> **以前は `Time`(0..1)だけだった。** 秒だと思って秒の式を入れると 1.0 にクランプされ、
+> 末尾にフレームが無く `No frame at requested time` のまま止まる。この落とし穴ごと
+> Movie File In 互換の再生に置き換えた。
 
 ## 注意
 

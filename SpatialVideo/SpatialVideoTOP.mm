@@ -2,8 +2,10 @@
 // AVAssetReader + AVAssetReaderTrackOutput に MV-HEVC の両レイヤー(VideoLayerID 0/1)を
 // 要求してデコードし、CMTaggedBufferGroup から左眼/右眼の CVPixelBuffer を分離する。
 //
-//   Eye = Left / Right / Side-by-Side(左右連結)を選べる。
-//   Time(0..1)でスクラブ。デコードはワーカースレッド(cook 非ブロック)。
+//   Eye = Left / Right / Side-by-Side(左右連結)/ Left + Right(2バッファ)を選べる。
+//   both は 1回のデコードで 0=左 / 1=右 のカラーバッファへ出す(Render Select TOP で取る)。
+//   再生は Movie File In と同じ Play / Speed / Loop / Cue / Play Mode で行う。
+//   デコードはワーカースレッド(cook 非ブロック)。
 //
 // これで空間ビデオの各眼を TD の映像として扱える(立体視の分解・視差合成の素材)。
 //
@@ -15,7 +17,9 @@
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
 #import <VideoToolbox/VideoToolbox.h>
+#include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <condition_variable>
 #include <cstring>
 #include <mutex>
@@ -54,6 +58,10 @@ struct Frame
 {
     std::vector<uint8_t> bgra;
     uint32_t w = 0, h = 0;
+    // Eye = both のとき、2枚目(右眼)をカラーバッファ1へ出す
+    std::vector<uint8_t> bgra2;
+    uint32_t w2 = 0, h2 = 0;
+    bool has2 = false;
     uint64_t serial = 0;
     bool ok = false;
     bool spatial = false;
@@ -103,7 +111,44 @@ public:
         myPrevInfoDat = infoDat;
         std::string path = in->getParFilePath("File") ? in->getParFilePath("File") : "";
         std::string eye = in->getParString("Eye") ? in->getParString("Eye") : "left";
-        double t = in->getParDouble("Time");
+        // 再生位置(秒)。Movie File In と同じ Play Mode 3種:
+        //   Sequential        … deltaMS ぶんだけ自前で進める(TDのタイムラインを止めれば止まる)
+        //   Locked to Timeline… タイムライン位置をそのまま尺へ写す(スクラブに追従する)
+        //   Specify Index     … Position(0..1)で手動指定
+        const double dur = myMetaDur.load();
+        const double fps = myMetaFps.load();
+        const int playMode = (int)in->getParInt("Playmode");
+        const double speed = in->getParDouble("Speed");
+        const bool loop = in->getParInt("Loop") != 0;
+        bool play = in->getParInt("Play") != 0;
+        const double cuePoint = in->getParDouble("Cuepoint");
+        auto wrap = [&](double v) {
+            if (dur <= 0) return v;
+            if (loop) { v = std::fmod(v, dur); if (v < 0) v += dur; return v; }
+            return std::clamp(v, 0.0, dur);
+        };
+        if (myCuePulse.exchange(false)) myTime = cuePoint;
+        if (playMode == 2) {
+            myTime = std::clamp((double)in->getParDouble("Position"), 0.0, 1.0) * dur;
+            play = false;
+        } else if (in->getParInt("Cue") != 0) {
+            myTime = cuePoint;                        // Cue On の間はキュー点で保持
+            play = false;
+        } else if (playMode == 1) {
+            const OP_TimeInfo* ti = in->getTimeInfo();
+            double sec = (ti && ti->rate > 0) ? ti->frame / ti->rate : 0.0;
+            myTime = wrap(sec * speed + cuePoint);
+        } else if (play) {
+            const OP_TimeInfo* ti = in->getTimeInfo();
+            myTime = wrap(myTime + (ti ? ti->deltaMS / 1000.0 : 0.0) * speed);
+        } else {
+            myTime = std::clamp((double)in->getParDouble("Position"), 0.0, 1.0) * dur;
+        }
+        myPlaying = (playMode == 1) || (play && in->getParInt("Cue") == 0);
+        // ソースのフレーム境界へ量子化する。しないと同じ絵を何度もデコードし直すことになる
+        const double tsec = (fps > 0) ? std::round(myTime * fps) / fps : myTime;
+        // worker は 0..1 の正規化位置を受け取る
+        double t = (dur > 0) ? std::clamp(tsec / dur, 0.0, 1.0) : 0.0;
         std::string sig = path + "|" + eye + "|" + std::to_string(t);
         if (sig != mySig) {
             mySig = sig;
@@ -129,17 +174,35 @@ public:
             r = myResult;
             myUploaded = r.serial;
         }
+        // Eye = both なら 0=左 / 1=右 の2つのカラーバッファへ出す。
+        // バッファ1以降は Render Select TOP で取り出す。
+        // 注意: Render Select は参照で読むだけで cook を引っ張らない。
+        //       バッファ0(=このノードの出力)を Null TOP などでワイヤに繋いでおくこと。
+        uploadPlane(out, r.bgra, r.w, r.h, 0);
+        if (r.has2)
+            uploadPlane(out, r.bgra2, r.w2, r.h2, 1);
+    }
+
+    void uploadPlane(TOP_Output* out, const std::vector<uint8_t>& px,
+                     uint32_t w, uint32_t h, uint32_t bufIndex)
+    {
+        if (px.empty() || !w || !h)
+            return;
         TOP_UploadInfo ui;
         ui.textureDesc.texDim = OP_TexDim::e2D;
-        ui.textureDesc.width = r.w;
-        ui.textureDesc.height = r.h;
+        ui.textureDesc.width = w;
+        ui.textureDesc.height = h;
         ui.textureDesc.pixelFormat = OP_PixelFormat::BGRA8Fixed;
-        auto b = myContext->createOutputBuffer((size_t)r.w * r.h * 4, TOP_BufferFlags::None, nullptr);
+        ui.colorBufferIndex = bufIndex;
+        auto b = myContext->createOutputBuffer((size_t)w * h * 4, TOP_BufferFlags::None, nullptr);
         if (!b)
             return;
-        memcpy(b->data, r.bgra.data(), r.bgra.size());
+        memcpy(b->data, px.data(), px.size());
         out->uploadBuffer(&b, ui, nullptr);
     }
+
+    void pulsePressed(const char* name, void*) override
+    { if (!strcmp(name, "Cuepulse")) myCuePulse = true; }
 
     void setupParameters(OP_ParameterManager* m, void*) override
     {
@@ -155,17 +218,36 @@ public:
             p.label = "Eye";
             p.page = P;
             p.defaultValue = "left";
-            const char* n[] = {"left", "right", "sbs"};
-            const char* l[] = {"Left", "Right", "Side-by-Side"};
+            const char* n[] = {"left", "right", "sbs", "both"};
+            const char* l[] = {"Left", "Right", "Side-by-Side", "Left + Right (2 buffers)"};
+            m->appendMenu(p, 4, n, l);
+        }
+        // 再生は Movie File In に合わせる
+        {
+            OP_StringParameter p("Playmode");
+            p.label = "Play Mode";
+            p.page = P;
+            p.defaultValue = "sequential";
+            const char* n[] = {"sequential", "locked", "specify"};
+            const char* l[] = {"Sequential", "Locked to Timeline", "Specify Index"};
             m->appendMenu(p, 3, n, l);
         }
+        { OP_NumericParameter p("Play"); p.label="Play"; p.page=P; p.defaultValues[0]=1; m->appendToggle(p); }
+        { OP_NumericParameter p("Speed"); p.label="Speed"; p.page=P; p.defaultValues[0]=1;
+          p.minSliders[0]=-2; p.maxSliders[0]=2; m->appendFloat(p); }
+        { OP_NumericParameter p("Loop"); p.label="Loop"; p.page=P; p.defaultValues[0]=1; m->appendToggle(p); }
+        { OP_NumericParameter p("Cue"); p.label="Cue"; p.page=P; p.defaultValues[0]=0; m->appendToggle(p); }
+        { OP_NumericParameter p("Cuepoint"); p.label="Cue Point (sec)"; p.page=P; p.defaultValues[0]=0;
+          p.minSliders[0]=0; p.maxSliders[0]=60; m->appendFloat(p); }
+        { OP_NumericParameter p("Cuepulse"); p.label="Cue Pulse"; p.page=P; m->appendPulse(p); }
         {
-            OP_NumericParameter p("Time");
-            p.label = "Time (0..1)";
+            OP_NumericParameter p("Position");
+            p.label = "Position (0..1, when Play is off)";
             p.page = P;
             p.defaultValues[0] = 0.0;
-            p.minSliders[0] = 0;
-            p.maxSliders[0] = 1;
+            p.minSliders[0] = 0; p.maxSliders[0] = 1;
+            p.minValues[0] = 0;  p.maxValues[0] = 1;
+            p.clampMins[0] = p.clampMaxes[0] = true;
             m->appendFloat(p);
         }
         {
@@ -178,19 +260,20 @@ public:
     }
 
     // Info CHOP: 診断 + 旧 Spatial Video DAT の数値メタデータ
-    int32_t getNumInfoCHOPChans(void*) override { return 13; }
+    int32_t getNumInfoCHOPChans(void*) override { return 15; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override
     {
-        const char* n[13] = {"executes", "submits", "decodes", "is_spatial",
+        const char* n[15] = {"executes", "submits", "decodes", "is_spatial",
                              "width", "height", "duration", "fps",
                              "baseline_mm", "horizontal_fov_deg", "disparity_adjustment",
-                             "has_left_eye", "has_right_eye"};
-        float v[13] = {(float)myExec.load(), (float)mySubmit.load(),
+                             "has_left_eye", "has_right_eye", "position", "playing"};
+        float v[15] = {(float)myExec.load(), (float)mySubmit.load(),
                        (float)myDecodes.load(), (float)mySpatial.load(),
                        (float)myMetaW.load(), (float)myMetaH.load(),
                        myMetaDur.load(), myMetaFps.load(),
                        myBaselineMm.load(), myFovDeg.load(), (float)myDispAdj.load(),
-                       (float)myHasL.load(), (float)myHasR.load()};
+                       (float)myHasL.load(), (float)myHasR.load(),
+                       (float)myTime, myPlaying ? 1.f : 0.f};
         c->name->setString(n[i]);
         c->value = v[i];
     }
@@ -473,7 +556,11 @@ private:
             CFRelease(sample);
             [reader cancelReading];
 
-            if (eye == "right" && haveRight) {
+            if (eye == "both" && haveLeft && haveRight) {
+                r.bgra = std::move(left);  r.w = lw;  r.h = lh;
+                r.bgra2 = std::move(right); r.w2 = rw; r.h2 = rh; r.has2 = true;
+                r.ok = true;
+            } else if (eye == "right" && haveRight) {
                 r.bgra = std::move(right);
                 r.w = rw;
                 r.h = rh;
@@ -511,6 +598,9 @@ private:
     bool myPending = false, myBusy = false, myQuit = false;
     std::string myPath, myEye, mySig, myWarn;
     double myT = 0;
+    double myTime = 0;              // 再生位置(秒)。Play On のとき deltaMS ぶん進む
+    bool myPlaying = false;
+    std::atomic<bool> myCuePulse{false};
     Frame myResult;
     uint64_t myUploaded = 0;
     std::atomic<uint64_t> mySerial{0};
