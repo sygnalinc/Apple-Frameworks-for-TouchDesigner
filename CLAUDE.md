@@ -6179,3 +6179,34 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   **RealityKit Splat TOP に直接読ませる**のが正解、と誘導を追加
 - **教訓**: ファイル形式を満たすことと、その形式が表す**手法を実装したこと**は別。
   形式変換に手法の名前を付けると誇張になる。「何をしていないか」を表で書くのが誠実
+
+### 2026-08-14 LLM MLX は macOS 26 機でビルドする方針 + release.sh の「黙って落とす」バグ修正
+
+- ユーザー「LLMMLXのビルドはmacos26環境でやる予定」。**なぜLLMMLXだけ特別なのか**を実物で確認:
+  1. mlx-swift の Metal(`default.metallib`)は **SwiftPM の `swift build` では作れない**
+     (公式README明記)。生成されないと実行時 `Failed to load the default metallib`。
+     → **`xcodebuild` 必須**。他のSPMプラグイン(CoreMLImageGen / SpeechTranscribe)は
+     Metalシェーダを持たないので `swift build` で足る = **LLMMLXだけ**の理由
+  2. `xcodebuild` は**フルXcode専用**。この機の `xcode-select` は CommandLineTools を
+     指しているので素で叩くと失敗。`xcode-select --switch` は sudo が要るグローバル変更なので
+     **`DEVELOPER_DIR` でそのビルドの間だけフルXcodeを指す**
+- **見つけた穴①(修正済み)**: `LLMMLX/build.sh` は **自分で `DEVELOPER_DIR` を設定していなかった**。
+  呼び出し側で export して初めて通る状態で、素の `./build.sh` は失敗する(他マシンで再現できない罠)。
+  → **build.sh がフルXcodeを自動検出して設定**するようにした(既設定は尊重・不在なら理由を出して終了)。
+  **Metal Toolchain 不在の事前チェック**も追加(`xcrun metal --version`)。SETUP.md §2.2 に明文化
+- **Metal Toolchain は OS/Xcode 更新で無効化される**(実測): OS 26A5388g→26A5406e で
+  要求版が 27A5228f→**27A5237l** に変わり `xcodebuild -showComponent MetalToolchain` が
+  `Status: uninstalled` に。アセットはディスクに残るが使えない。再ダウンロード(約840MB):
+  `DEVELOPER_DIR=<Xcode.app>/Contents/Developer xcodebuild -downloadComponent MetalToolchain`
+  (この27機はユーザー要望で再導入済み・`Status: installed` / metalfe-32023.921.3 を確認)
+- **見つけた穴②(修正済み・こちらが重大)**: `release.sh cmd_sign` は
+  **`released` なのに `build/` 成果物が無いプラグインを無言でスキップ**していた
+  (`[ -d "$b" ] || continue` だけで、欠けを報告しない)。
+  リポジトリの方針「黙って落とすと『全部入っている』と誤解される」に反する。
+  → **欠けているものを列挙して exit 1** にした。**入れた直後に実害が判明**:
+  この機では **CoreImageGlass / LLMMLX / SpeechTranscribe の3件が欠けていた**
+  (前2件は別マシンで追加されmergeで入ったのでこの機で一度もビルドされていない)。
+  修正前にこの機でリリースを切っていたら**released 3件が欠けたDMGを黙って配っていた**
+- ベータ機の古い `LLMMLX/build`(8/5ビルド)は取り違え防止のため退避。
+  SETUP.md §3 に「LLM MLX はベータ機でビルドしない・リリースは安定版機で切る・
+  ベータ機で作業したら `rm -rf LLMMLX/build`」を追記
