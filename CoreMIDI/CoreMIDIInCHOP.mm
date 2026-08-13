@@ -1,4 +1,5 @@
 // CoreMIDI In CHOP — DAW / 機材から**同期情報**を受け取る。
+#include <map>
 //
 // **ノートや CC の入力は TD 標準の MIDI In CHOP で足りる**ので、ここでは扱わない。
 // このOPがあるのは、TD にできない次の2つのため:
@@ -68,9 +69,17 @@ public:
         g->timeslice = false;
     }
 
+    // 届いたノート / CC を**その場でチャンネルにする**。TD 標準の MIDI In CHOP は
+    // 欲しいノート番号を事前に列挙する必要があるが、こちらは触れば生える。
+    // 名前は TD と同じ書式(ch1n60 / ch1c74)にして差し替えが効くようにしている。
+    // **getOutputInfo で名前を固定**し、getChannelName / execute は同じ並びを見る
     bool getOutputInfo(CHOP_OutputInfo* info, const OP_Inputs*, void*) override
     {
-        info->numChannels = kChans;
+        {
+            std::lock_guard<std::mutex> l(myMutex);
+            mySnapNames = myVoiceNames;
+        }
+        info->numChannels = kChans + (int32_t)mySnapNames.size();
         info->numSamples = 1;
         info->startIndex = 0;
         return true;
@@ -78,7 +87,9 @@ public:
 
     void getChannelName(int32_t i, OP_String* name, const OP_Inputs*, void*) override
     {
-        name->setString(kNames[i]);
+        if (i < kChans) { name->setString(kNames[i]); return; }
+        const size_t k = (size_t)(i - kChans);
+        name->setString(k < mySnapNames.size() ? mySnapNames[k].c_str() : "");
     }
 
     void execute(CHOP_Output* out, const OP_Inputs* in, void*) override
@@ -93,6 +104,19 @@ public:
         if (mySetupChanged.exchange(false) || myRefresh.exchange(false)) rescan();
         // 通知を取りこぼしても自力で戻れるように、たまに列挙し直す(数msなので安い)
         else if (++myRescanTick >= 120) { myRescanTick = 0; rescan(); }
+
+        // 受信スレッドが読むので、cook のたびに写しておく
+        myWantNotes = in->getParInt("Notes") != 0;
+        myGate      = in->getParInt("Gate") != 0;
+        myWantCC    = in->getParInt("Controls") != 0;
+        myWantBend  = in->getParInt("Bend") != 0;
+        myWantTouch = in->getParInt("Touch") != 0;
+        myWantProg  = in->getParInt("Program") != 0;
+        myNorm      = in->getParInt("Normalize") != 0;
+        if (myResetChans.exchange(false)) {
+            std::lock_guard<std::mutex> l(myMutex);
+            myVoiceNames.clear(); myVoiceVals.clear(); myVoiceIndex.clear();
+        }
 
         const char* sel = in->getParString("Device");
         const SInt32 wantUID = (sel && *sel) ? (SInt32)strtol(sel, nullptr, 10) : 0;
@@ -120,6 +144,14 @@ public:
             out->channels[10][0] = (float)(myTC[0] * 3600 + myTC[1] * 60 + myTC[2] +
                                            (myMtcFps > 0 ? myTC[3] / myMtcFps : 0.0));
             out->channels[11][0] = myMtcValid ? 1.f : 0.f;
+
+            // 動的チャンネル。**getOutputInfo で固定した並び(mySnapNames)を正とする**
+            // (この間に受信スレッドが新しい名前を足しても、この cook では出さない)
+            for (size_t k = 0; k < mySnapNames.size() && (int)k < out->numChannels - kChans; k++) {
+                auto it = myVoiceIndex.find(mySnapNames[k]);
+                out->channels[kChans + (int)k][0] =
+                    (it != myVoiceIndex.end()) ? myVoiceVals[it->second] : 0.f;
+            }
         }
     }
 
@@ -127,6 +159,7 @@ public:
     {
         if (!strcmp(name, "Refreshdevices")) myRefresh = true;
         else if (!strcmp(name, "Restartmidi")) myRestart = true;
+        else if (!strcmp(name, "Resetchans")) myResetChans = true;
         else if (!strcmp(name, "Reset")) myReset = true;
     }
 
@@ -140,6 +173,16 @@ public:
         }
         { OP_NumericParameter p("Refreshdevices"); p.label = "Refresh Devices"; p.page = PAGE; m->appendPulse(p); }
         { OP_NumericParameter p("Restartmidi"); p.label = "Restart MIDI System"; p.page = PAGE; m->appendPulse(p); }
+        // 鍵盤 / パッド / ノブ。届いたものが自動でチャンネルになる
+        const char* INP = "Input";
+        { OP_NumericParameter p("Notes");      p.label = "Notes";               p.page = INP; p.defaultValues[0] = 1; m->appendToggle(p); }
+        { OP_NumericParameter p("Gate");       p.label = "Notes As Gate";       p.page = INP; m->appendToggle(p); }
+        { OP_NumericParameter p("Controls");   p.label = "Controllers (CC)";    p.page = INP; p.defaultValues[0] = 1; m->appendToggle(p); }
+        { OP_NumericParameter p("Bend");       p.label = "Pitch Bend";          p.page = INP; m->appendToggle(p); }
+        { OP_NumericParameter p("Touch");      p.label = "Aftertouch";          p.page = INP; m->appendToggle(p); }
+        { OP_NumericParameter p("Program");    p.label = "Program Change";      p.page = INP; m->appendToggle(p); }
+        { OP_NumericParameter p("Normalize");  p.label = "Normalize To 0-1";    p.page = INP; p.defaultValues[0] = 1; m->appendToggle(p); }
+        { OP_NumericParameter p("Resetchans"); p.label = "Reset Channels";      p.page = INP; m->appendPulse(p); }
         {
             OP_NumericParameter p("Beatsperbar");
             p.label = "Beats Per Bar"; p.page = PAGE;
@@ -247,12 +290,89 @@ private:
         }
     }
 
+    // ノート / CC 等を値に落とす。**受信スレッドなのでマップを更新するだけ**にする
+    void onVoice(uint8_t status, uint8_t d1, uint8_t d2)
+    {
+        const int ch = (status & 0x0F) + 1;      // 表示は 1 始まり(TD と同じ)
+        const uint8_t kind = status & 0xF0;
+        char nm[24];
+        float v = 0.0f;
+        switch (kind) {
+            case 0x90:                            // Note On(velocity 0 は Note Off)
+            case 0x80:
+                if (!myWantNotes) return;
+                snprintf(nm, sizeof nm, "ch%dn%d", ch, d1);
+                v = (kind == 0x80 || d2 == 0) ? 0.0f
+                                              : (myGate ? 1.0f : scale7(d2));
+                break;
+            case 0xB0:
+                if (!myWantCC) return;
+                snprintf(nm, sizeof nm, "ch%dc%d", ch, d1);
+                v = scale7(d2);
+                break;
+            case 0xA0:                            // ポリフォニックアフタータッチ
+                if (!myWantTouch) return;
+                snprintf(nm, sizeof nm, "ch%dp%d", ch, d1);
+                v = scale7(d2);
+                break;
+            case 0xD0:                            // チャンネルプレッシャー
+                if (!myWantTouch) return;
+                snprintf(nm, sizeof nm, "ch%dpress", ch);
+                v = scale7(d1);
+                break;
+            case 0xC0:
+                if (!myWantProg) return;
+                snprintf(nm, sizeof nm, "ch%dprog", ch);
+                v = (float)d1;                    // プログラム番号はそのまま
+                break;
+            case 0xE0: {                          // ピッチベンド(14bit・中央が 0)
+                if (!myWantBend) return;
+                snprintf(nm, sizeof nm, "ch%dbend", ch);
+                const int raw = (int)d1 | ((int)d2 << 7);
+                v = myNorm ? (float)(raw - 8192) / 8192.0f : (float)raw;
+                break;
+            }
+            default: return;
+        }
+        std::lock_guard<std::mutex> l(myMutex);
+        auto it = myVoiceIndex.find(nm);
+        if (it == myVoiceIndex.end()) {
+            if (myVoiceNames.size() >= kMaxVoiceChans) return;   // 暴走よけ
+            myVoiceIndex[nm] = myVoiceNames.size();
+            myVoiceNames.push_back(nm);
+            myVoiceVals.push_back(v);
+        } else {
+            myVoiceVals[it->second] = v;
+        }
+    }
+
+    float scale7(uint8_t v) const { return myNorm ? (float)v / 127.0f : (float)v; }
+
     void receive(const MIDIPacketList* pl)
     {
         const MIDIPacket* p = &pl->packet[0];
         for (UInt32 i = 0; i < pl->numPackets; i++) {
             for (UInt16 j = 0; j < p->length; j++) {
                 const uint8_t b = p->data[j];
+                // チャンネルボイス。**ランニングステータス**(status を省いて data だけ続く)に対応する
+                if (b >= 0x80 && b < 0xF0) {
+                    myRunning = b;
+                    const int need = (b >= 0xC0 && b < 0xE0) ? 1 : 2;
+                    if (j + need < p->length) {
+                        onVoice(b, p->data[j + 1], need == 2 ? p->data[j + 2] : 0);
+                        j += need;
+                    }
+                    continue;
+                }
+                if (b < 0x80 && myRunning) {      // ランニングステータスの続き
+                    const int need = (myRunning >= 0xC0 && myRunning < 0xE0) ? 1 : 2;
+                    if (j + need - 1 < p->length) {
+                        onVoice(myRunning, b, need == 2 ? p->data[j + 1] : 0);
+                        j += need - 1;
+                    }
+                    continue;
+                }
+                if (b >= 0xF0 && b < 0xF8) myRunning = 0;   // システムコモンで解除
                 if (b == 0xF8) onClock();
                 else if (b == 0xFA) { onStart(true); }
                 else if (b == 0xFB) { onStart(false); }
@@ -362,7 +482,15 @@ private:
     bool myPlaying = false, myMtcValid = false;
     int myQF[8] = {}, myQFSeen = 0, myTC[4] = {};
 
-    std::atomic<bool> myRestart{false};
+    std::atomic<bool> myRestart{false}, myResetChans{false};
+    // 動的チャンネル。受信スレッドが書き、cook が読む(どちらも myMutex の下)
+    static constexpr size_t kMaxVoiceChans = 512;
+    std::vector<std::string> myVoiceNames, mySnapNames;
+    std::vector<float> myVoiceVals;
+    std::map<std::string, size_t> myVoiceIndex;
+    uint8_t myRunning = 0;
+    bool myWantNotes = true, myWantCC = true, myWantBend = false;
+    bool myWantTouch = false, myWantProg = false, myNorm = true, myGate = false;
     int myRescanTick = 0;
     std::atomic<bool> myQuit{false}, myReady{false}, mySetupChanged{false},
                       myRefresh{false}, myReset{false};

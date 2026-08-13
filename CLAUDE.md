@@ -6022,3 +6022,22 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   **このopはノート/CCを扱わない**(鍵盤やパッドは TD標準の MIDI In CHOP)を明記
 - **教訓**: 「他アプリでは見えるのに TD で見えない」ときは、まず **TD本体の `/local/midi/*`** を
   見る。そこも空ならプラグインではなく TDプロセス側の問題と切り分けられる
+
+### 2026-08-14 CoreMIDI In をノート/CC 対応に(届いた分を自動でチャンネル化)
+
+- ユーザー「midiコンのキーボードとかpadとかノブの入力も全て扱いたい」→ 同期専用だった In を拡張
+- **TD 標準との違いを確認してから設計**: TD の MIDI In CHOP は `notescope` / `controlind` で
+  **欲しいノート番号・CC番号を事前に列挙する必要がある**。CoreMIDI In は**届いたものが自動で
+  チャンネルになる**方式にした。名前は TD と同じ書式(`ch1n60` / `ch1c74`)にして差し替えが効くように
+- 実装: 受信スレッドで `onVoice()` がマップを更新するだけ、cook が読む。
+  **`getOutputInfo` で名前を固定(mySnapNames)** し、`getChannelName` / `execute` は同じ並びを見る
+  (Multipeer In と同じ型。この間に新しい名前が来てもその cook では出さない)。
+  **ランニングステータス**(status を省いて data だけ続く)に対応。上限 512ch で暴走よけ
+- パラメータ(Input ページ): Notes / Notes As Gate / Controllers / Pitch Bend / Aftertouch /
+  Program Change / Normalize To 0-1 / Reset Channels
+- **実測(Novation Launchkey Mini MK4 37)**: 鍵盤・パッド・ノブを一通り触ると **101チャンネル**が
+  自動生成。パッド16個 `ch10n36-51`(ベロシティ)、そのアフタータッチ `ch10p36-51`、
+  鍵盤 `ch14n36-101`、ノブ8個 `ch14c21-28`、`ch14c1`(モジュレーション)、`ch14bend`、`ch16c102/103`。
+  **MIDIチャンネル番号は機材が送ってきたそのまま**(この個体は鍵盤が ch14)
+- README(英日)の「何のためにあるか」を書き換え、「鍵盤・パッド・ノブ」節と実測を追加
+- 次にやること: demo.toe への利用例追加(未着手)。MIDI 2.0(UMP)対応は将来

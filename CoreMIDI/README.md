@@ -177,15 +177,43 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
 
 ## CoreMIDI In
 
-Receives **sync** from a DAW or a device. Notes and CC are not handled here — TD's own MIDI In CHOP
-covers those. This op exists for the two things TD cannot do:
+Receives everything a controller or DAW sends: **keys, pads, knobs, wheels** and **sync**.
 
-1. **Turn MIDI Clock into a tempo.** TD shows clock messages but never gives you a BPM. Make the DAW
+1. **Channels appear as you play.** Touch a key and `ch1n60` exists; turn a knob and `ch1c21`
+   exists. TD's own MIDI In CHOP makes you list the note numbers and controller indices you want up
+   front — here you just play. Names follow TD's format (`ch1n60`, `ch1c74`) so a patch built
+   against one can be pointed at the other
+2. **Turn MIDI Clock into a tempo.** TD shows clock messages but never gives you a BPM. Make the DAW
    the tempo master and follow it in TD. **MTC carries no tempo**, so this is the only path for
    tempo sync
-2. **Receive MTC.** TD has no MTC support at all
+3. **Receive MTC.** TD has no MTC support at all
 
 Device selection is by **UniqueID** with hot-plug, exactly like CoreMIDI Out.
+
+### Keys, pads and knobs
+
+Every note, controller, bend and aftertouch that arrives becomes its own channel, named the same way
+TD names them:
+
+| Channel | Message |
+|---|---|
+| `ch1n60` | Note 60 on MIDI channel 1 — velocity while held, 0 on release |
+| `ch1c74` | Controller 74 |
+| `ch1bend` | Pitch bend, −1 to 1 |
+| `ch1press` | Channel pressure |
+| `ch1p60` | Polyphonic aftertouch for note 60 |
+| `ch1prog` | Program number (always raw, never normalized) |
+
+Turn off the message types you do not want — fewer channels, less to wire. **Notes As Gate** gives 1
+while a key is held instead of its velocity. **Normalize To 0-1** off gives raw 0–127. **Reset
+Channels** forgets everything discovered so far, which is how you get rid of channels from a device
+you no longer use. A cap of 512 discovered channels keeps a misbehaving device from filling the CHOP.
+
+Measured with a Novation Launchkey Mini MK4 37: playing the keys, hitting the pads and sweeping the
+knobs produced **101 channels** — `ch10n36`–`n51` for the 16 pads with velocity, `ch10p36`–`p51`
+for their aftertouch, `ch14n36`–`n101` for the keyboard, `ch14c21`–`c28` for the eight knobs, plus
+`ch14c1` (modulation) and `ch14bend`. The MIDI channel numbers come straight from the device, so
+check the controller's own settings if they are not what you expect.
 
 ### If a device does not appear in the Device menu
 
@@ -204,9 +232,6 @@ could not be reproduced afterwards. If you hit it, in order of increasing disrup
 3. Restart TouchDesigner — this is what actually fixed it the one time it happened
 
 The op also re-enumerates on its own about every two seconds, so a missed notification heals itself.
-
-**Remember this op does not handle notes or CC.** A keyboard's keys and pads go through TD's own
-MIDI In CHOP; select the device here only for clock and MTC.
 
 ### Output channels
 
@@ -228,6 +253,10 @@ MIDI In CHOP; select the device here only for clock and MTC.
 | Device | Source, stored as its **UniqueID** |
 | Refresh Devices | Re-enumerate by hand (hot-plug is automatic) |
 | Restart MIDI System | `MIDIRestart()` — see "If a device does not appear" above |
+| Notes / Controllers (CC) / Pitch Bend / Aftertouch / Program Change | Which message types become channels |
+| Notes As Gate | 1 while held instead of velocity |
+| Normalize To 0-1 | Off gives raw 0–127 |
+| Reset Channels | Forget every discovered channel |
 | Beats Per Bar | Divisor for `bar` |
 | BPM Smoothing (clocks) | How many clock ticks to average. Smaller follows faster, larger is steadier. Default 24 = one beat |
 
@@ -432,6 +461,31 @@ DAW / 機材から**同期情報**を受け取る。ノートや CC はここで
 
 デバイスの選択は CoreMIDI Out と同じく **UniqueID**、ホットプラグも反映する。
 
+### 鍵盤・パッド・ノブ
+
+届いたノート / コントローラ / ベンド / アフタータッチが、そのままチャンネルになる。名前は TD と
+同じ書式:
+
+| チャンネル | メッセージ |
+|---|---|
+| `ch1n60` | MIDI チャンネル 1 のノート 60。押している間はベロシティ、離すと 0 |
+| `ch1c74` | コントローラ 74 |
+| `ch1bend` | ピッチベンド。−1〜1 |
+| `ch1press` | チャンネルプレッシャー |
+| `ch1p60` | ノート 60 のポリフォニックアフタータッチ |
+| `ch1prog` | プログラム番号(常に生値。正規化しない) |
+
+要らないメッセージ種別は切る。チャンネルが減って配線が楽になる。**Notes As Gate** は押している間 1
+(ベロシティではなく)。**Normalize To 0-1** を切ると 0〜127 の生値。**Reset Channels** は
+それまでに見つけたチャンネルを忘れる(使わなくなった機材のチャンネルを消すのに使う)。
+上限は 512 チャンネルで、暴れる機材で CHOP が埋まらないようにしてある。
+
+Novation Launchkey Mini MK4 37 で実測: 鍵盤を弾き、パッドを叩き、ノブを回すと **101 チャンネル**
+生えた — パッド16個が `ch10n36`〜`n51`(ベロシティ付き)、そのアフタータッチが `ch10p36`〜`p51`、
+鍵盤が `ch14n36`〜`n101`、ノブ8個が `ch14c21`〜`c28`、ほかに `ch14c1`(モジュレーション)と
+`ch14bend`。**MIDI チャンネル番号は機材が送ってきたそのまま**なので、思った番号でなければ
+コントローラ側の設定を見ること。
+
 ### デバイスが Device メニューに出ないとき
 
 ホットプラグは検証済み: op を置いた状態で Launchkey Mini MK4 を抜き挿しすると、デバイス数が
@@ -448,9 +502,6 @@ TouchDesigner を再起動したら直り、その後は同じ手順で再現し
 3. TouchDesigner を再起動する — 実際に直ったのはこれ
 
 なお op 自身も 2 秒に 1 回ほど列挙し直すので、通知を取りこぼしても自力で戻る。
-
-**このopはノートや CC を扱わない**ことに注意。鍵盤やパッドは TD 標準の MIDI In CHOP を使う。
-ここでデバイスを選ぶのは clock と MTC のためだけ。
 
 ### 出力チャンネル
 
@@ -472,6 +523,10 @@ TouchDesigner を再起動したら直り、その後は同じ手順で再現し
 | Device | 入力元。**UniqueID で保持** |
 | Refresh Devices | 手動で再列挙(ホットプラグは自動) |
 | Restart MIDI System | `MIDIRestart()`。上の「デバイスが出ないとき」を参照 |
+| Notes / Controllers (CC) / Pitch Bend / Aftertouch / Program Change | どのメッセージをチャンネルにするか |
+| Notes As Gate | ベロシティではなく押している間 1 |
+| Normalize To 0-1 | 切ると 0〜127 の生値 |
+| Reset Channels | 見つけたチャンネルを全部忘れる |
 | Beats Per Bar | `bar` の割り算に使う拍数 |
 | BPM Smoothing (clocks) | 何 clock ぶんで平均するか。小さいと追従が速く、大きいと安定する。既定24 = 1拍 |
 
