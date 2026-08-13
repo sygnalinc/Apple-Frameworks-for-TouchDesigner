@@ -5735,3 +5735,27 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   mt=3(SysEx7)のデコード**を追加。SysEx は F0/F7 が剥がれて 6バイト/ワードで詰まるので、
   生ワードを16進で出して読む
 - README(英日)+ demo.toe の note 2件を更新
+
+### 2026-08-13 CoreMIDI Out: TouchDesigner のタイムラインに DAW を追従させる(MIDI Clock)
+
+- ユーザー「TouchDesigner のタイムラインと連動させる機能をつけたい」。MMC が Logic で効かない
+  という報告もあり、**タイムライン同期は MIDI Clock が本筋**なのでそちらを実装
+- `Sync` ページ: `Sync Mode`(off / clock)/ `Tempo (BPM)` / `Send Song Position`
+- **タイムラインの再生状態は `getTimeInfo()->frame` が進むかどうかで判定する**
+  (`OP_TimeInfo` に tempo/beat は無く frame と rate だけ。TD の Python 側には
+  `root.time.tempo` があるので Tempo は式で束ねる)。
+  再生開始→ SPP + `FA`(頭)/`FB`(途中)、停止→ `FC`、位置が飛んだら貼り直し
+- **精度の要**: cook は 60fps しか回らないので素直に送るとクロックがフレーム境界に固まる。
+  **`MIDIPacketListAdd` のパケット単位タイムスタンプで1フレームぶん先まで予約**する
+  (`mach_absolute_time` + `mach_timebase_info`)。**TD 標準の MIDI Out は timestamp 0 =
+  即時送信しかできない**ので、ここが実質的な差になる
+- **実測(M2・仮想MIDIデスティネーションで計数)**: 120BPM 5秒 → **245個**(理論240)、
+  90BPM 6秒 → **217個**(理論216)、タイムライン停止 → **0個 + `FC`**。
+  TD のタイムラインがループしたときに `FC` → SPP → `FB` で貼り直すことも確認
+- **踏んだ罠**: プラグインを差し替えた直後の TD 起動で **「New Plugin Detected」承認ダイアログ**と
+  **終了時の保存ダイアログが同時に出て、保存ダイアログがモーダルで手前に居るため承認側を
+  クリックできない**。さらに通知センターが重なってクリック位置が塞がれた。
+  **`pkill -9` で強制終了 → 再起動 → 単独で出た承認ダイアログを OK**、が確実
+- **未解決**: Logic の MMC トランスポートが反応しない。Logic 側の MMC 受信設定の正確な場所を
+  こちらで確認できていない(以前書いた「設定 > MIDI > 同期」は未検証)。
+  タイムライン連動が要件なら MIDI Clock 経路の方が確実

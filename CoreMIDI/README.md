@@ -47,6 +47,23 @@ the realtime path. If your DAW reacts twice, switch Transport Method from `Both`
 
 `MMC Device ID` is 127 (all devices) by default, which is what most DAWs expect.
 
+### Following TouchDesigner's timeline
+
+Set **Sync Mode** to `MIDI Clock` and the op sends 24 PPQN clock locked to TD's timeline:
+
+- Timeline play/stop becomes Start `FA` / Continue `FB` / Stop `FC`
+- Position is announced with Song Position Pointer, and re-announced when the timeline loops or
+  is scrubbed
+- **Tempo** is a plain parameter — bind it to the timeline with the expression `root.time.tempo`
+  (the example does) and changing TD's tempo changes the clock
+
+Set the DAW to slave to external MIDI clock for this to have any effect.
+
+**On accuracy.** Cook only happens at frame rate, so sending clock naively bunches every tick onto
+frame boundaries. This op **schedules one frame ahead with CoreMIDI timestamps**
+(`MIDIPacketListAdd` takes a per-packet host time), so the clock does not inherit the frame rate's
+jitter. TD's own MIDI Out sends with timestamp 0 — immediate only — and cannot do this.
+
 ### Output channels
 
 | Channel | Meaning |
@@ -55,7 +72,7 @@ the realtime path. If your DAW reacts twice, switch Transport Method from `Both`
 | `online` | 1 when that device reports itself online |
 | `sends` | Total MIDI messages sent since the node was created |
 
-Info CHOP: `executes / sends / devices / connected / online`.
+Info CHOP: `executes / sends / devices / connected / online / clock_running / clocks / beat`.
 Info DAT: one row per destination — `uniqueid / name / manufacturer / model / online`.
 
 ### Input CHOP (optional)
@@ -81,6 +98,9 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
 | Transport Method | `MMC (SysEx)` / `MIDI Realtime` / `Both` (default) |
 | MMC Device ID | 0–127, default 127 (all devices) |
 | Play / Stop / Record / Return to Start | DAW transport pulses |
+| Sync Mode | `Off` (default) / `MIDI Clock (follow timeline)` |
+| Tempo (BPM) | Clock tempo. Bind to `root.time.tempo` to follow the timeline |
+| Send Song Position | Announce the position on start and after a jump (default on) |
 
 ### Notes
 
@@ -103,6 +123,9 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
 - **Transport**: Play produced MMC `7F 7F 06 02` plus realtime `FB`; Stop produced `7F 7F 06 01`
   plus `FC`; Record produced `7F 7F 06 06`; Return to Start produced the Locate SysEx plus
   Song Position `0,0`
+- **Clock**: 120 BPM for 5 s produced 245 ticks (240 in theory) and 90 BPM for 6 s produced 217
+  (216 in theory); stopping the timeline produced 0 ticks and a `FC`. Looping the timeline
+  re-announced the position, as intended
 
 ### Build
 
@@ -159,6 +182,22 @@ Logic を MIDI クロックに同期させる)。二重に反応する DAW で�
 
 `MMC Device ID` の既定は 127(全デバイス宛)で、たいていの DAW はこれで反応する。
 
+### TouchDesigner のタイムラインに追従させる
+
+**Sync Mode** を `MIDI Clock` にすると、TD のタイムラインに同期した 24 PPQN のクロックを送る。
+
+- タイムラインの再生/停止がそのまま Start `FA` / Continue `FB` / Stop `FC` になる
+- 再生位置は Song Position Pointer で伝え、ループやスクラブで飛んだら貼り直す
+- **Tempo** はただのパラメータなので、式で `root.time.tempo` に束ねるとタイムラインのテンポに
+  追従する(利用例はそうしてある)
+
+効かせるには DAW 側を「外部 MIDI クロックに同期」に設定しておく必要がある。
+
+**精度について。** cook はフレームレートでしか回らないので、素直に送るとクロックがフレーム境界に
+固まる。このOPは **CoreMIDI のタイムスタンプ付き送信で1フレームぶん先まで予約する**
+(`MIDIPacketListAdd` はパケットごとにホスト時刻を持てる)ため、フレームレートのジッタを引き継がない。
+TD 標準の MIDI Out は timestamp 0 = 即時送信しかできないのでこれができない。
+
 ### 出力チャンネル
 
 | チャンネル | 意味 |
@@ -167,7 +206,7 @@ Logic を MIDI クロックに同期させる)。二重に反応する DAW で�
 | `online` | そのデバイスがオンラインを申告していれば1 |
 | `sends` | ノード生成からの累計送信数 |
 
-Info CHOP: `executes / sends / devices / connected / online`。
+Info CHOP: `executes / sends / devices / connected / online / clock_running / clocks / beat`。
 Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online`。
 
 ### 入力CHOP(任意)
@@ -193,6 +232,9 @@ Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online
 | Transport Method | `MMC (SysEx)` / `MIDI Realtime` / `Both`(既定) |
 | MMC Device ID | 0〜127。既定 127(全デバイス宛) |
 | Play / Stop / Record / Return to Start | DAW のトランスポート操作 |
+| Sync Mode | `Off`(既定)/ `MIDI Clock (follow timeline)` |
+| Tempo (BPM) | クロックのテンポ。`root.time.tempo` に束ねるとタイムラインに追従 |
+| Send Song Position | 開始時と位置が飛んだときに再生位置を伝える(既定On) |
 
 ### 注意
 
@@ -213,6 +255,8 @@ Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online
 - **挿したとき**: 新しく作ったエンドポイントがメニューに現れ、選択して送信できた。こちらも再起動なし
 - **トランスポート**: Play で MMC `7F 7F 06 02` とリアルタイム `FB`、Stop で `7F 7F 06 01` と
   `FC`、Record で `7F 7F 06 06`、Return to Start で Locate SysEx と Song Position `0,0` を確認
+- **クロック**: 120BPM 5秒で 245個(理論240)、90BPM 6秒で 217個(理論216)、タイムライン停止で
+  0個 + `FC`。タイムラインがループしたときは位置を貼り直すことも確認
 
 ### ビルド
 

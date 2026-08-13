@@ -16,6 +16,8 @@
 #include "CHOP_CPlusPlusBase.h"
 #import <CoreMIDI/CoreMIDI.h>
 #import <Foundation/Foundation.h>
+#include <mach/mach_time.h>
+#include <cmath>
 #include <atomic>
 #include <chrono>
 #include <cstring>
@@ -116,10 +118,12 @@ public:
         if (active && myDest) {
             handleInput(in, ch);
             handlePulses(in, ch);
+            handleSync(in);
         } else {
             myNoteOff.clear();
             myPendingNote = myPendingCC = myPendingPanic = false;
             myPendingPlay = myPendingStop = myPendingRec = myPendingRewind = false;
+            stopClock();
         }
         flushNoteOffs(ch);
 
@@ -218,6 +222,31 @@ public:
         { OP_NumericParameter p("Stop");   p.label = "Stop";   p.page = TEST; m->appendPulse(p); }
         { OP_NumericParameter p("Record"); p.label = "Record"; p.page = TEST; m->appendPulse(p); }
         { OP_NumericParameter p("Rewind"); p.label = "Return to Start"; p.page = TEST; m->appendPulse(p); }
+
+        // --- TouchDesigner のタイムラインに DAW を追従させる ---
+        const char* SYNC = "Sync";
+        {
+            OP_StringParameter p("Syncmode");
+            p.label = "Sync Mode"; p.page = SYNC; p.defaultValue = "off";
+            const char* nm[] = {"off", "clock"};
+            const char* lb[] = {"Off", "MIDI Clock (follow timeline)"};
+            m->appendMenu(p, 2, nm, lb);
+        }
+        {
+            // TD のタイムラインのテンポを式で入れる: root.time.tempo
+            OP_NumericParameter p("Tempo");
+            p.label = "Tempo (BPM)"; p.page = SYNC;
+            p.defaultValues[0] = 120.0;
+            p.minSliders[0] = 20.0; p.maxSliders[0] = 300.0;
+            p.minValues[0] = 1.0; p.maxValues[0] = 999.0;
+            p.clampMins[0] = true; p.clampMaxes[0] = true;
+            m->appendFloat(p);
+        }
+        {
+            OP_NumericParameter p("Songposition");
+            p.label = "Send Song Position"; p.page = SYNC; p.defaultValues[0] = 1;
+            m->appendToggle(p);
+        }
     }
 
     void buildDynamicMenu(const OP_Inputs*, OP_BuildDynamicMenuInfo* info, void*) override
@@ -234,13 +263,15 @@ public:
         }
     }
 
-    int32_t getNumInfoCHOPChans(void*) override { return 5; }
+    int32_t getNumInfoCHOPChans(void*) override { return 8; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override
     {
-        const char* n[5] = {"executes", "sends", "devices", "connected", "online"};
+        const char* n[8] = {"executes", "sends", "devices", "connected", "online",
+                            "clock_running", "clocks", "beat"};
         std::lock_guard<std::mutex> l(myMutex);
-        float v[5] = {(float)myExec.load(), (float)mySends.load(), (float)myDevices.size(),
-                      myDest ? 1.f : 0.f, myOnline ? 1.f : 0.f};
+        float v[8] = {(float)myExec.load(), (float)mySends.load(), (float)myDevices.size(),
+                      myDest ? 1.f : 0.f, myOnline ? 1.f : 0.f,
+                      myClockRunning ? 1.f : 0.f, (float)myClocks.load(), (float)myBeat};
         c->name->setString(n[i]);
         c->value = v[i];
     }
@@ -454,6 +485,93 @@ private:
         }
     }
 
+    // MIDI Clock は 24 PPQN。cook は 60fps しか無いので、**1フレームぶん先まで
+    // ホスト時刻付きでまとめて予約する**(MIDIPacketListAdd はパケットごとに
+    // タイムスタンプを持てる)。TD 標準の MIDI Out は timestamp 0 = 即時送信しかできず、
+    // フレーム境界にクロックが固まるので、ここが実質的な差になる。
+    static constexpr double kLookahead = 0.08;   // 何秒先まで予約するか
+
+    static double hostToSec()
+    {
+        static double f = 0;
+        if (f == 0) {
+            mach_timebase_info_data_t tb; mach_timebase_info(&tb);
+            f = (double)tb.numer / (double)tb.denom * 1e-9;
+        }
+        return f;
+    }
+
+    void sendAt(MIDITimeStamp ts, const uint8_t* b, int n)
+    {
+        if (!myPort || !myDest) return;
+        Byte storage[256];
+        MIDIPacketList* pl = (MIDIPacketList*)storage;
+        MIDIPacket* p = MIDIPacketListInit(pl);
+        p = MIDIPacketListAdd(pl, sizeof storage, p, ts, n, b);
+        if (p && MIDISend(myPort, myDest, pl) == noErr) mySends++;
+    }
+
+    void stopClock()
+    {
+        if (myClockRunning) {
+            realtime(0xFC);
+            myClockRunning = false;
+        }
+        myTick = -1;
+    }
+
+    void handleSync(const OP_Inputs* in)
+    {
+        const char* mode = in->getParString("Syncmode");
+        if (!mode || strcmp(mode, "clock") != 0) { stopClock(); return; }
+
+        const OP_TimeInfo* ti = in->getTimeInfo();
+        if (!ti || ti->rate <= 0) return;
+        const double bpm = in->getParDouble("Tempo");
+        if (bpm <= 0) return;
+
+        // タイムラインが進んでいるか = フレームが変化したか
+        const double frame = ti->frame;
+        const bool playing = (frame != myLastFrame);
+        myLastFrame = frame;
+        myBeat = (frame / ti->rate) * bpm / 60.0;
+
+        if (!playing) { stopClock(); return; }
+
+        const double secPerTick = 60.0 / (bpm * 24.0);
+        const double nowBeat = myBeat;
+        const long long curTick = (long long)std::floor(nowBeat * 24.0);
+
+        // 開始、または再生位置が飛んだとき(スクラブ等)は貼り直す
+        const bool jumped = myClockRunning && std::llabs(curTick - myTick) > 48;
+        if (!myClockRunning || jumped) {
+            if (jumped) realtime(0xFC);
+            if (in->getParInt("Songposition") != 0) {
+                const int spp = (int)(nowBeat * 4.0);   // SPP は16分音符単位
+                uint8_t b[3] = {0xF2, (uint8_t)(spp & 0x7F), (uint8_t)((spp >> 7) & 0x7F)};
+                sendBytes(b, 3);
+            }
+            realtime(nowBeat < 1e-6 ? 0xFA : 0xFB);     // 頭からなら Start、途中なら Continue
+            myClockRunning = true;
+            myTick = curTick;
+        }
+
+        // 先読みぶんのクロックをホスト時刻付きで予約する
+        const MIDITimeStamp now = mach_absolute_time();
+        const double toHost = 1.0 / hostToSec();
+        const uint8_t clock = 0xF8;
+        int guard = 0;
+        while (guard++ < 256) {
+            const long long next = myTick + 1;
+            const double dt = (next / 24.0 - nowBeat) * 60.0 / bpm;   // 何秒後か
+            if (dt > kLookahead) break;
+            const double at = dt > 0 ? dt : 0;
+            sendAt(now + (MIDITimeStamp)(at * toHost), &clock, 1);
+            myTick = next;
+            myClocks++;
+        }
+    }
+
     void flushNoteOffs(int ch)
     {
         const double t = now();
@@ -515,7 +633,10 @@ private:
     std::atomic<bool> myQuit{false}, myReady{false}, mySetupChanged{false}, myRefresh{false};
     std::atomic<bool> myPendingNote{false}, myPendingCC{false}, myPendingPanic{false};
     std::atomic<bool> myPendingPlay{false}, myPendingStop{false}, myPendingRec{false}, myPendingRewind{false};
-    std::atomic<uint64_t> myExec{0}, mySends{0};
+    std::atomic<uint64_t> myExec{0}, mySends{0}, myClocks{0};
+    bool myClockRunning = false;
+    long long myTick = -1;
+    double myLastFrame = -1, myBeat = 0;
 };
 
 } // namespace
