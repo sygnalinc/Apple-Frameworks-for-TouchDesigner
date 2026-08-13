@@ -13,16 +13,23 @@ RGBA16Float TOP. Exposure, white balance, noise reduction, sharpness and contras
 
 ### Measured (M2)
 
-- Plugin load, parameter creation, the development pipeline, parameter response (Exposure etc.)
-  and the output upload were all confirmed
-- **Not yet verified visually on real RAW (DNG/ProRAW) — no sample RAW on hand.** `CIRAWFilter`
-  also accepts JPEG/TIFF, but a non-RAW input is developed as if it were sensor data (it blows
-  out), so it cannot be used to judge the result. A real DNG/ProRAW in the File parameter
-  develops correctly
+- **Verified on real ProRAW.** `Assets/sample_raw.DNG` (iPhone ProRAW, 4032x3024) ships with the
+  repo, so the example works straight after cloning
+- Opening it fills the parameters from the file: **Temperature 3374.6 K, Tint 12.07,
+  Contrast 0.10**
+- A full-size develop at Scale 1.0 takes about 10 s the first time on a 48 MP file; Scale 0.25 is
+  light
+- **The output used to be broken (fixed).** `[CIContext render:...]` was told `kCIFormatRGBA16`
+  (**16-bit unsigned integer**) while the TOP was declared `RGBA16Float` (**half float**). The bits
+  were reinterpreted, giving NaN and values like -4696 on a real RAW — the image came out white.
+  `kCIFormatRGBAh` is the matching pair. **A non-RAW JPEG hides this; it only showed up once a real
+  RAW went in**
+- `CIRAWFilter` also accepts JPEG/TIFF, but a non-RAW input is developed as if it were sensor data
+  (it blows out), so it cannot be used to judge the result
 
 ### Output
 
-- TOP: **RGBA16Float** (extended linear sRGB)
+- TOP: **RGBA16Float**, in the space chosen by Output Color Space (sRGB by default)
 - Info CHOP: `executes / submits / develops / valid`
 
 ### Parameters
@@ -99,8 +106,10 @@ DNG / Apple ProRAW / カメラRAW を `CIRAWFilter` で**リアルタイム現�
 
 ### 実測(M2)
 
-- **実 ProRAW(iPhone 17 Pro・8064x6048 DNG)で現像結果を視認確認**。Scale=1.0 のフル現像は
-  初回に約10秒(48MP)。Scale=0.25 なら 2016x1512 で軽い
+- **実 ProRAW で確認済み**。`Assets/sample_raw.DNG`(iPhone ProRAW・4032x3024)を同梱しているので、
+  clone した直後から利用例が動く
+- 開くとパラメータがファイルの値で埋まる: **Temperature 3374.6K / Tint 12.07 / Contrast 0.10**
+- Scale=1.0 のフル現像は 48MP で初回に約10秒。Scale=0.25 なら軽い
 - **かつて出力が壊れていた(修正済み)**: `[CIContext render:...]` の format が
   `kCIFormatRGBA16`(**16bit符号なし整数**)なのに、TOP へは `RGBA16Float`(**半精度浮動小数**)として
   上げていた。ビット列が別物として解釈され、実RAWで NaN や -4696 のような値になっていた
@@ -117,7 +126,7 @@ DNG / Apple ProRAW / カメラRAW を `CIRAWFilter` で**リアルタイム現�
 
 ### 出力仕様
 
-- TOP: **RGBA16Float**(拡張リニアsRGB)
+- TOP: **RGBA16Float**。色空間は Output Color Space で選ぶ(既定 sRGB)
 - Info CHOP: `executes / submits / develops / valid`
 
 ### パラメータ
