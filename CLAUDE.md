@@ -5663,3 +5663,36 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **踏んだ罠**: ①macOS は**死んだ仮想エンドポイントを保持し続ける**(プロセスを落としても一覧に残り、
   同名が何個も並ぶ)。検証用エンドポイントは**毎回ユニークな名前**にする。②TD は起動時にしか
   デバイスを解決しないので、**リスナーを先に立ててから TD を起動する**順序が必要
+
+### 2026-08-13 CoreMIDI Out CHOP 実装(デバイス識別 + ホットプラグ + パラメータだけで送信テスト)
+
+- ユーザー「デバイス識別とホットプラグに意義を感じた。CoreMIDI Out CHOP を作って。
+  **CHOP のプロパティだけである程度 MIDI 信号が送れることを確認できるようにしたい**」
+- フォルダは `CoreMIDI/`(CoreMIDI In を後から足す前提。Cinematic と同じ1フォルダ複数バンドルの型で
+  build.sh を手組み。共通ヘルパは毎回 `rm -rf build` するので2回呼べない)
+- opType `Coremidiout` / opLabel "CoreMIDI Out" / icon CMO(CoreMLMotion と重複するが
+  **opIcon の重複は許容**。CML は既に4件で重複している)
+- **TD 標準にできない3点だけを埋めた**(置き換えではない):
+  1. **ホットプラグ** — `MIDIClientCreateWithBlock` の setup 変更通知で一覧を作り直す
+  2. **UniqueID でデバイスを保持** — `MIDIObjectFindByUniqueID` で引き直すので挿し直しても同じ実機。
+     同じ表示名の機材も区別できる(TD は表示名しか持たない)
+  3. **Info DAT に素性** — uniqueid / name / manufacturer / model / online
+- **パラメータだけで送信テスト**: Device メニュー → Send Note(Note Duration 後に自動 Note Off)/
+  Send CC / All Notes Off の各パルス。出力 `connected` / `online` / `sends` で結果が分かる
+- 入力CHOPは `note<n>` / `cc<n>` を名前で対応づけ、**変化したときだけ送る**(毎フレーム垂れ流さない)
+- **実測(M2)**: `Send Note` → `20903C64`(note60/vel100)+ 対の Note Off、`Send CC` →
+  `20B04A40`(CC74=64)を仮想MIDIデスティネーションで受信確認。**受信側を落とすと TD 再起動なしで
+  メニューから消え connected/online が 0 に**、新しく立てると**再起動なしで**現れて送信できた。
+  同名 `TD MIDI Test` が6個あっても UniqueID で個別に選べた。Info DAT 9x5
+- **踏んだ罠**: ①`OP_CHOPInput` にチャンネル名の配列 `names` は無い。**`getChannelName(i)`** を使う
+  ②`CHOP_PluginInfo::apiVersion` は private。**`info->setAPIVersion(...)`** を呼ぶ
+  ③動的メニューは `appendMenu(p,0,nullptr,nullptr)` ではなく **`appendDynamicStringMenu`**。
+  静的メニューだと `buildDynamicMenu` が呼ばれず、候補が空のままになる
+  ④**CoreMIDI の通知はクライアントを作ったスレッドのランループへ届く**。cook スレッドで作ると
+  通知が来ないので、専用スレッド+ランループで作る(Bonjour と同じ型)
+  ⑤検証用の仮想エンドポイントは**毎回ユニークな名前**にする。macOS は死んだエンドポイントを
+  保持し続けるため、同名が積み上がって「どれに送っているか」が分からなくなる
+- README(英日併記)+ ルート一覧(英日)+ `PLUGINS.tsv`(released)+ demo.toe の
+  `/project1/CoreMIDIOut` 利用例を追加。**公開 59 / experimental 23 / blocked 1**
+- 次にやること: **CoreMIDI In CHOP**(同じフォルダに追加)、MIDI 2.0 (UMP) 対応、
+  実機材での UniqueID 再接続の確認(仮想エンドポイントは挿し直すと UID が変わるため未検証)

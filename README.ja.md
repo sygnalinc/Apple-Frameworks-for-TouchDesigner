@@ -156,6 +156,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
+| [CoreMIDI Out](CoreMIDI/) | CHOP | **抜き差しに強い MIDI 送信。** デバイスを **UniqueID** で保持し、一覧はホットプラグで更新される(TD標準は起動時のスナップショット)。テスト送信はパラメータだけで完結 |
 | [RealityKit Capture](RealityKitCapture/) | SOP | **写真フォルダ→3Dメッシュ**(RealityKit Object Capture)。テクスチャ付きOBJ出力 |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **写真の深度→3Dポイントクラウド**(カメラ較正/画角で逆投影)。RGBから色サンプル |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic動画**(macOS 26+): 深度(視差)マップ/**f値・ピント差し替え再レンダ**。**Movie File In と同じく自動再生**(Play Mode: Sequential / Locked to Timeline / Specify Index、Speed/Loop/Cue)。`Mode = All` で**色・深度・再レンダを3色バッファ同時出力**(`Color + Depth` は同じ番号のまま軽い2バッファ版)。`Info DAT` で素材のメタデータも出せる。メタデータ(フォーカス深度・被写体)は**Info CHOP**で出力 |

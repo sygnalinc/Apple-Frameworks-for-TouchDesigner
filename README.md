@@ -157,6 +157,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 
 | Plugin | Family | What it does |
 |---|---|---|
+| [CoreMIDI Out](CoreMIDI/) | CHOP | **MIDI out that survives replugs.** Devices are held by **UniqueID** and the list updates on hot-plug — TD's own MIDI list is a snapshot taken at launch. Test notes and CC straight from the parameters |
 | [RealityKit Capture](RealityKitCapture/) | SOP | **Photo folder → 3D mesh** (RealityKit Object Capture). Textured OBJ output |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **Photo depth → 3D point cloud** (unproject via camera calibration / FOV). Colors sampled from RGB |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic video** (macOS 26+): depth (disparity) map or **re-render with adjustable focus / aperture**. **Plays automatically like a Movie File In** (Play Mode: Sequential / Locked to Timeline / Specify Index, plus Speed / Loop / Cue). `Mode = All` emits **colour, depth and rendered as three colour buffers** (`Color + Depth` is the lighter two-buffer variant with the same indices); `Info DAT` lists the file's own metadata; metadata (focus depth, subjects) on its **Info CHOP** |
