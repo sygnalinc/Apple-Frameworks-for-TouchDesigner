@@ -6286,3 +6286,44 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **絶対の前提**: これは**配布物には載せられない**(無記載SPI・OS更新で壊れる・
   引数仕様が推定)。**実験は scratchpad のプローブに限る**。実用は引き続き
   「外部ツールで学習した .ply を RealityKit Splat TOP に読ませる」
+
+### 2026-08-14 Stage 1 完了: 非公開3DGS学習APIの引数配置を実験で確定
+
+- 前項の続き。**プローブを fork 隔離**して総当りし(クラッシュしても次の試行へ進む設計)、
+  `CPGGaussianSplattingSessionRunWithInitialPointCloud` の引数を実験で絞り込んだ
+- **確定した呼び出し規約**(6引数。lldb逆アセンブル + 実呼び出しの併用で確定):
+
+  | reg | 引数 | 生成元 | 確度 |
+  |---|---|---|---|
+  | x0 | session | `CPGGaussianSplattingSessionCreate(&out)` → rc=0 | **確定** |
+  | x1 | **SfmMap**(必須・非NULL) | `CPGSfmMapCreate()` | 高(null検査+奥まで進行) |
+  | x2 | 初期点群 | `CPGDepthPointCloudCreate` + `AddPoint` | 中(NULLでも進む) |
+  | x3 | **options**(必須・非NULL) | `CPGGaussianSplattingOptionsCreate()` | **確定** |
+  | x4 | callbackBundle | `CPGGaussianSplattingCallbackBundleCreate()` | 中 |
+  | x5 | 未特定(NULL可) | — | 低 |
+
+- **x3=options の確定の仕方**: 最初 `Run(s, opts, 0,0,0,0)` は impl+272 で
+  `x3+8` を std::string として無条件参照して落ちた(公開x3がNULLだったため `0+8=0x8` を参照)。
+  `OptionsCreate` の逆アセンブルで **options+8 が初期化されている**ことを確認し、
+  x3にoptionsを入れたら**クラッシュ位置が impl+272 → impl+1864(4段ネストの奥)へ移動** =
+  metallibパスのコピーを通過して実処理に入った、と判定できた
+- **残る関門は「データを詰めること」だけで、入力は全て公開APIから作れる**見通しが立った:
+  - `CPGSfmMapSetCameraBySampleID` / `SetSampleIsRegistered` / `SetBoundingBox` で SfmMap を構築
+  - `CPGCameraCreateWithIntrinsicsExtrinsicsResolution` ← **公開 `PhotogrammetrySession` の
+    `.poses` リクエストがカメラ姿勢を返す**ので材料が揃う
+  - `CPGDepthPointCloudCreate`/`AddPoint` ← 公開 `.pointCloud` の点をそのまま入れられる
+  - `CPGSfmMapLoadFromURL` もあるので、保存済みSfMを読む手も残っている
+  - 出力は `CPGGaussianSplattingOutputGetGaussian3D` → coordinates/scales/quaternions/
+    opacities/colorDiffuse/**colorRest(高次SH)** を読んで INRIA .ply に書けば
+    **既存の RealityKit Splat TOP でそのまま描画できる**
+- **今の未確定**: ①x5 の正体 ②**DataLoaderCallback のコールバック自身のシグネチャ**
+  (sampleID→画像を返す契約と思われる)③intrinsics/extrinsics の構造体レイアウト
+  (simd float3x3 / float4x4 の見込み)④sampleID の型
+- **プローブ手法の再現メモ**(次セッション用):
+  - `dyld_info -exports <framework>` でシンボル列挙(ディスク上のバイナリはリンク切れ・
+    共有キャッシュ内なので nm は不可)
+  - lldb は host に `marker()` を置き **dlopen 後**にブレーク → `disassemble -n <sym>`
+  - **戻り値でハンドルを返す関数を `int` で受けるとポインタが32bitに切り捨てられる**(実際に誤診)
+  - 引数当ては **fork 隔離 + 戻り値/シグナル判定**。`rc=-2` が内部のnull検査、
+    SIGSEGV の**発生位置の深さ**が「どこまで通ったか」の指標になる
+- **前提は不変**: SPIなので**配布物には載せない**。実験は scratchpad のプローブに限る
