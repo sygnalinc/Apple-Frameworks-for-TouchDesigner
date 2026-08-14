@@ -1,4 +1,4 @@
-# Vision Keystone TOP
+# CI Keystone TOP
 
 VisionRect CHOPが検出した四隅、または手動指定した四隅から入力画像を正対させる透視補正TOP。
 紙面、スクリーン、看板、プロジェクション面の自動補正に使う。

@@ -1,4 +1,4 @@
-# GameController CHOP
+# Game Controller CHOP
 
 **English** | [日本語](#日本語)
 

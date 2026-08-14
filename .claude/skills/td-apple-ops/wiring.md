@@ -41,7 +41,7 @@ Cinematic Video / Spatial Video / PDFKit は **Info DAT トグルを On** にす
 `Flip Image Vertically` は **Vision / Core ML など「意味を読む」系だけ**にあり、**既定 On が正しい**。
 TDのテクスチャは bottom-up なので、Off にすると Vision が検出0になる。
 
-向きに依存しない幾何変換系(Metal Upscale / Metal FrameInterp)は、そもそもこのパラメータを持たない。
+向きに依存しない幾何変換系(Metal Upscale / Metal Frame Interp)は、そもそもこのパラメータを持たない。
 
 ## Aspect Correct UVs → Ortho Width = 1 で映像に重ねる
 

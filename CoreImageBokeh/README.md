@@ -1,4 +1,4 @@
-# Vision Bokeh TOP
+# CI Bokeh TOP
 
 入力画像とグレースケールマスクをCore ImageのMasked Variable Blurへ渡す非同期TOP。
 VisionSubject/VisionSegmentのマスクから被写体を保った背景ぼかしを作れる。

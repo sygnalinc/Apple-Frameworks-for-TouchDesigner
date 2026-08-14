@@ -41,7 +41,7 @@
 - Image Playground(ImageCreator)は**人物をテキストのみから生成できない**(顔ソース画像必須)。
   Steps/Seed/img2img等も無効。スタイル3種のみ
 
-## VideoToolbox / MetalFX(Metal FrameInterp / Metal Upscale / Metal Denoise)
+## VideoToolbox / MetalFX(Metal Frame Interp / Metal Upscale / Metal Denoise)
 
 - **VTFrameProcessor系の対応ピクセル形式は 64RGBAHalf('RGhA')のみ**(FRC/MotionBlur/SuperRes 全て)。
   TDのRGBA16Floatダウンロード/アップロードと直結すれば無変換

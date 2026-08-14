@@ -1,4 +1,4 @@
-# CoreImage Enhance TOP
+# CI Enhance TOP
 
 Core Imageの`autoAdjustmentFilters`が画像内容に応じて露出、彩度、コントラスト、色かぶり等の補正filterを自動選択するTOP。追加モデル不要。
 

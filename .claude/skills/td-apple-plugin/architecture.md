@@ -36,7 +36,7 @@ worker loop:
 - TDのGLテクスチャは bottom-up。**Vision/Core ML など「向きに意味がある推論」は
   `BGRA8Fixed` + `verticalFlip=true` でダウンロードしないと検出0になる**
 - flip は `Flip` トグル(既定On)としてユーザーに露出する
-- **向きに依存しない幾何処理(Metal Upscale / Metal FrameInterp の補間・拡大)は flip を持たない**
+- **向きに依存しない幾何処理(Metal Upscale / Metal Frame Interp の補間・拡大)は flip を持たない**
   (`verticalFlip=false` 固定・出力もそのまま)。片側だけ flip すると出力が上下逆になる
 - 判定基準: **正立画像でないと検出/推論が劣化するか?** Yes→flip必要(Vision全部・CoreML)。
   No→flip不要(Upscale/FrameInterp等の幾何変換系)

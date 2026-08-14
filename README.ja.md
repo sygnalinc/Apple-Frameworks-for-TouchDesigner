@@ -36,7 +36,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | | |
 |:--:|:--:|
 | <img src="docs/demo/visionpose.gif" width="400" alt="Vision Pose"> | <img src="docs/demo/visionhand.gif" width="400" alt="Vision Hand"> |
-| **[Vision Pose](VisionPose/)** — 1人34キーポイント・同時5人 | **[Vision Hand](VisionHand/)** — 片手21関節 |
+| **[Vision Pose](VisionPose/)** — 1人19関節(Body Track 互換の34枠)・同時5人 | **[Vision Hand](VisionHand/)** — 片手21関節 |
 | <img src="docs/demo/visionface.gif" width="400" alt="Vision Face"> | <img src="docs/demo/coreml-yolo.gif" width="400" alt="CoreML"> |
 | **[Vision Face](VisionFace/)** — 1顔85ランドマーク・同時10顔 | **[CoreML](CoreMLDAT/)** — YOLOv3 で物体検出 |
 | <img src="docs/demo/visiontext.gif" width="400" alt="Vision Text"> | <img src="docs/demo/visionanimalpose.gif" width="400" alt="Vision AnimalPose"> |
@@ -76,8 +76,8 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 
 | プラグイン | 種類 | 内容 |
 |---|---|---|
-| [Vision Pose](VisionPose/) | CHOP | 多人数の2Dボディポーズ(34キーポイント)。**Body Track CHOP と互換のチャンネル形式**。5人60fps |
-| [Vision Pose3D](VisionPose3D/) | CHOP | 単一人物の**3Dポーズ**(17関節・メートル単位+2D投影・身長推定)。毎秒6〜9回 |
+| [Vision Pose](VisionPose/) | CHOP | 多人数の2Dボディポーズ。**Body Track CHOP と互換のチャンネル形式**(34キーポイント枠。実際に Vision が返すのは **19関節**で、つま先・かかと・指は confidence=0)。5人60fps |
+| [Vision Pose 3D](VisionPose3D/) | CHOP | 単一人物の**3Dポーズ**(17関節・メートル単位+2D投影・身長推定)。毎秒6〜9回 |
 | [Vision Hand](VisionHand/) | CHOP | 手指トラッキング(21関節×最大100手・左右判定) |
 | [Vision Face](VisionFace/) | CHOP | 顔検出+bbox・roll/yaw/pitch・ランドマーク(最大85点)・顔写りスコア。**Face Track CHOP 代替** |
 
@@ -87,7 +87,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 |---|---|---|
 | [CoreML](CoreMLDAT/) | DAT | **物体検出**。YOLO等のCore MLモデルで「何が・どこに」を label/confidence/bbox で出力 |
 | [Vision Classify](VisionClassify/) | DAT | **画像分類**(追加モデル不要)。上位N件の identifier/confidence |
-| [Vision AnimalPose](VisionAnimalPose/) | CHOP | 犬・猫の2D姿勢推定(25関節・複数匹) |
+| [Vision Animal Pose](VisionAnimalPose/) | CHOP | 犬・猫の2D姿勢推定(25関節・複数匹) |
 | [Vision Rect](VisionRect/) | CHOP | 矩形検出→bbox/投影四隅(Corner Pin 直結) |
 | [Vision Barcode](VisionBarcode/) | DAT | QR・各種バーコード検出→payload / symbology / bbox / 四隅 |
 | [Vision Text](VisionText/) | DAT | **OCR / テキスト認識**(多言語・読み順ソート・Accurate/Fast) |
@@ -116,8 +116,8 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 |---|---|---|
 | [Metal Upscale](MetalUpscale/) | TOP | **リアルタイム超解像**。**Nvidia Upscaler TOP 代替**(MetalFX 2x / VT SuperRes 4x / VT LowLatency) |
 | [Metal Denoise](MetalDenoise/) | TOP | ML テンポラルノイズ除去(対応ハードのみ。M2では警告を出して入力を素通し) |
-| [CoreImage RAW](CoreImageRAW/) | TOP | **DNG / ProRAW のリアルタイム現像**(露出/WB/ノイズ/シャープ)。CIRAWFilter |
-| [CoreImage HDR](CoreImageHDR/) | TOP | HEICの**HDRゲインマップ抽出**＋SDR/HDR(EDR)変換 |
+| [CI RAW](CoreImageRAW/) | TOP | **DNG / ProRAW のリアルタイム現像**(露出/WB/ノイズ/シャープ)。CIRAWFilter |
+| [CI HDR](CoreImageHDR/) | TOP | HEICの**HDRゲインマップ抽出**＋SDR/HDR(EDR)変換 |
 | [ImageIO File In](ImageIOFileIn/) | TOP | **任意の画像ファイルを表示(TDが開けないHEIF/HEICも)** → Color と、埋め込みの**深度/視差/Portrait Matte/セマンティックマット**。EXIFの向きを補正 |
 
 ### 汎用ML推論・画像生成
@@ -129,7 +129,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [CoreML ImageGen](CoreMLImageGen/) | TOP | **外部 Core ML モデルで text2img / img2img**(Stable Diffusion / SDXL / SD Turbo) |
 | [ImagePlayground](ImagePlayground/) | TOP | **Apple Image Playground でテキスト→画像**(`ImageCreator`・macOS 15.4+)。外部モデル不要。Animation / Illustration / Sketch。人物は入力0に顔画像を接続 |
 | [CI Glass](CoreImageGlass/) | TOP | **macOSのすりガラスとmacOS 26のLiquid Glass**。プリセットは実物から実測。縁の屈折は形のマスクから生成 |
-| [CoreImage Code](CoreImageCode/) | TOP | QR / Aztec / PDF417 / Code128 の**生成**(外部ライブラリ不要) |
+| [CI Code](CoreImageCode/) | TOP | QR / Aztec / PDF417 / Code128 の**生成**(外部ライブラリ不要) |
 | [CreateML](CreateML/) | DAT | **統合オンデバイストレーナ**。`Task`メニューで Image / Hand Pose / Action(体)/ Hand Action / Sound / Activity(CHOP時系列)/ Tabular分類・回帰 を切替→`.mlmodel`。出力は CoreML TOP / CoreML Motion CHOP / SoundClass 等が推論 |
 | [CreateML Training Recorder](CreateMLTrainingRecorder/) | CHOP | **CHOP時系列 → CreateML学習用CSV**(recording / label / 特徴列)。VisionPose/Hand等をTD内で収録・ラベル付けし、CreateML(Activity)へ直結 |
 | [CoreML Motion](CoreMLMotion/) | CHOP | 入力CHOP(VisionPose等)を予測窓ぶんバッファして**ライブでジェスチャ分類**(クラス別確率+confidence)。CreateMLのActivityタスクと対 |
@@ -190,33 +190,33 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | プラグイン | Family | 状態 |
 |---|---|---|
 | [AVF Camera](AVFoundationCamera/) | TOP | 実験中 |
-| [AVAudio Mixer CHOP](AVAudioMixer/) | CHOP | 実験中 |
-| [AVAudio Spatial CHOP](AVAudioSpatial/) | CHOP | 実験中 |
-| [AudioToolbox Mix CHOP](AudioToolboxMix/) | CHOP | 実験中 |
-| [Caption Author DAT](CaptionAuthor/) | DAT | 実験中 |
-| [ColorSync TOP](ColorSync/) | TOP | 実験中 |
-| [Vision Bokeh TOP](CoreImageBokeh/) | TOP | 実験中 |
-| [CoreImage Enhance TOP](CoreImageEnhance/) | TOP | 実験中 |
-| [Vision Keystone TOP](CoreImageKeystone/) | TOP | 実験中 |
-| [CoreLocation Beacon CHOP](CoreLocationBeacon/) | CHOP | 実験中 |
-| [GameplayKit Agents CHOP](GameplayKitAgents/) | CHOP | 実験中 |
-| [GameplayKit Path SOP](GameplayKitPath/) | SOP | 実験中 |
-| [Image Capture DAT](ImageCapture/) | DAT | 実験中 |
-| [Metal FrameInterp TOP](MetalFrameInterp/) | TOP | 実験中 |
-| [MPS Analyze CHOP](MetalMPSAnalyze/) | CHOP | 実験中 |
-| [Music Understanding DAT](MusicUnderstanding/) | DAT | 実験中 — macOS 27+ |
-| [PHASE CHOP](Phase/) | CHOP | 実験中 |
-| [RealityKit Splat TOP](RealityKitSplat/) | TOP | 実験中 — macOS 27+ |
-| [Shazam DAT](Shazam/) | DAT | 実験中 |
-| [Speech Activity CHOP](SpeechActivity/) | CHOP | **動作しない** — 現行APIでは成立しないと実測で確定 |
-| [SwiftUI TOP](SwiftUI/) | TOP | 実験中 |
-| [SwiftUI Panel CHOP](SwiftUIPanel/) | CHOP | 実験中 |
-| [UI Widget DAT](UIWidget/) | DAT | 実験中 |
-| [VisionAesthetics CHOP](VisionAesthetics/) | CHOP | 実験中 |
-| [Vision IterSeg TOP](VisionIterSeg/) | TOP | 実験中 — macOS 27+ |
-| [Vision Segment TOP — 人物セグメンテーション（macOS）](VisionSegment/) | TOP | 実験中 |
-| [Vision Similarity CHOP](VisionSimilarity/) | CHOP | 実験中 |
-| [VisionTrack CHOP](VisionTrack/) | CHOP | 実験中 |
+| [AVAudio Mixer](AVAudioMixer/) | CHOP | 実験中 |
+| [AVAudio Spatial](AVAudioSpatial/) | CHOP | 実験中 |
+| [AudioToolbox Mix](AudioToolboxMix/) | CHOP | 実験中 |
+| [Caption Author](CaptionAuthor/) | DAT | 実験中 |
+| [ColorSync](ColorSync/) | TOP | 実験中 |
+| [CI Bokeh](CoreImageBokeh/) | TOP | 実験中 |
+| [CI Enhance](CoreImageEnhance/) | TOP | 実験中 |
+| [CI Keystone](CoreImageKeystone/) | TOP | 実験中 |
+| [CoreLocation Beacon](CoreLocationBeacon/) | CHOP | 実験中 |
+| [GameKit Agents](GameplayKitAgents/) | CHOP | 実験中 |
+| [GameKit Path](GameplayKitPath/) | SOP | 実験中 |
+| [Image Capture](ImageCapture/) | DAT | 実験中 |
+| [Metal Frame Interp](MetalFrameInterp/) | TOP | 実験中 |
+| [Metal MPS Analyze](MetalMPSAnalyze/) | CHOP | 実験中 |
+| [Music Understanding](MusicUnderstanding/) | DAT | 実験中 — macOS 27+ |
+| [PHASE](Phase/) | CHOP | 実験中 |
+| [RealityKit Splat](RealityKitSplat/) | TOP | 実験中 — macOS 27+ |
+| [Shazam](Shazam/) | DAT | 実験中 |
+| [Speech Activity](SpeechActivity/) | CHOP | **動作しない** — 現行APIでは成立しないと実測で確定 |
+| [SwiftUI](SwiftUI/) | TOP | 実験中 |
+| [SwiftUI Panel](SwiftUIPanel/) | CHOP | 実験中 |
+| [UI Widget](UIWidget/) | DAT | 実験中 |
+| [Vision Aesthetics](VisionAesthetics/) | CHOP | 実験中 |
+| [Vision IterSeg](VisionIterSeg/) | TOP | 実験中 — macOS 27+ |
+| [Vision Segment](VisionSegment/) | TOP | 実験中 |
+| [Vision Similarity](VisionSimilarity/) | CHOP | 実験中 |
+| [Vision Track](VisionTrack/) | CHOP | 実験中 |
 
 > 別の Mac(macOS ベータ機など)で環境を作る場合は **[SETUP.md](SETUP.md)** を参照。
 
@@ -342,7 +342,7 @@ ln -s "$PWD/.claude/skills/td-apple-ops" ~/.claude/skills/td-apple-ops
 |---|---|
 | [Metal Upscale](MetalUpscale/) | 2x / 4x の出力は必ず上限を超える(このOPの用途そのもの) |
 | [Cinematic Video](Cinematic/) | 再レンダ出力が実測 3840x2160 |
-| [ImageIO File In](ImageIOFileIn/) / [CoreImage RAW](CoreImageRAW/) / [CoreImage HDR](CoreImageHDR/) | 実機写真は通常 4000px 級(実測 3024x4032) |
+| [ImageIO File In](ImageIOFileIn/) / [CI RAW](CoreImageRAW/) / [CI HDR](CoreImageHDR/) | 実機写真は通常 4000px 級(実測 3024x4032) |
 | [Screen Capture](ScreenCapture/) | ネイティブ解像度のディスプレイ取り込み(実測 1710x1112) |
 | [PDFKit](PDFKit/) | ページ描画が実測 1275x1650 |
 | [CoreText](CoreText/) | 指定した出力解像度しだい |

@@ -1,4 +1,4 @@
-# VisionAesthetics CHOP
+# Vision Aesthetics CHOP
 
 画像の「写真としての良さ」を推定(VNCalculateImageAestheticsScoresRequest・macOS 15+)。
 複数カメラ/候補カットからの**自動ベストショット選択**、スクリーンショット等の

@@ -1,4 +1,4 @@
-# Metal FrameInterp TOP
+# Metal Frame Interp TOP
 
 Apple の動画ML処理 **VTFrameProcessor**(VideoToolbox・macOS 15.4+)による
 フレーム補間とモーションブラー。

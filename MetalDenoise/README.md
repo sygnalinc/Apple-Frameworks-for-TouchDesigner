@@ -59,7 +59,7 @@ and returned in whatever orientation it arrives).
 - Input and output are 64RGBAHalf (a direct match for TD's RGBA16Float). The config's
   `previousFrameCount` previous frames are retained and passed along (the first call sets
   hasDiscontinuity = true)
-- The same VTFrameProcessor pipeline (session, CVPixelBufferPool) as Metal FrameInterp
+- The same VTFrameProcessor pipeline (session, CVPixelBufferPool) as Metal Frame Interp
 
 ### Build
 
@@ -121,7 +121,7 @@ Flip パラメータは無い(ノイズ除去は向きに依存しないため�
 
 - 入出力 64RGBAHalf(TD の RGBA16Float 直結)。config の
   `previousFrameCount` ぶん前フレームを保持して渡す(初回は hasDiscontinuity=true)
-- Metal FrameInterp と同じ VTFrameProcessor パイプライン(セッション・CVPixelBufferPool)
+- Metal Frame Interp と同じ VTFrameProcessor パイプライン(セッション・CVPixelBufferPool)
 
 ### ビルド
 

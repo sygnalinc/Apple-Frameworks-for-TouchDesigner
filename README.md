@@ -37,7 +37,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | | |
 |:--:|:--:|
 | <img src="docs/demo/visionpose.gif" width="400" alt="Vision Pose"> | <img src="docs/demo/visionhand.gif" width="400" alt="Vision Hand"> |
-| **[Vision Pose](VisionPose/)** — 34 keypoints per person, 5 people at once | **[Vision Hand](VisionHand/)** — 21 joints per hand |
+| **[Vision Pose](VisionPose/)** — 19 joints per person (34 Body-Track-compatible slots), 5 people at once | **[Vision Hand](VisionHand/)** — 21 joints per hand |
 | <img src="docs/demo/visionface.gif" width="400" alt="Vision Face"> | <img src="docs/demo/coreml-yolo.gif" width="400" alt="CoreML"> |
 | **[Vision Face](VisionFace/)** — 85 landmarks per face, 10 faces at once | **[CoreML](CoreMLDAT/)** — object detection with YOLOv3 |
 | <img src="docs/demo/visiontext.gif" width="400" alt="Vision Text"> | <img src="docs/demo/visionanimalpose.gif" width="400" alt="Vision AnimalPose"> |
@@ -77,8 +77,8 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 
 | Plugin | Family | What it does |
 |---|---|---|
-| [Vision Pose](VisionPose/) | CHOP | Multi-person 2D body pose (34 keypoints). **Channel format compatible with Body Track CHOP.** 5 people @ 60fps |
-| [Vision Pose3D](VisionPose3D/) | CHOP | Single-person **3D pose** (17 joints in meters + 2D projection + height estimate). About 6–9 analyses per second |
+| [Vision Pose](VisionPose/) | CHOP | Multi-person 2D body pose. **Channel format compatible with Body Track CHOP** — 34 keypoint slots, of which Vision actually provides **19 joints** (the toes / heels / finger points come out at confidence 0). 5 people @ 60fps |
+| [Vision Pose 3D](VisionPose3D/) | CHOP | Single-person **3D pose** (17 joints in meters + 2D projection + height estimate). About 6–9 analyses per second |
 | [Vision Hand](VisionHand/) | CHOP | Hand tracking (21 joints × up to 100 hands, left/right) |
 | [Vision Face](VisionFace/) | CHOP | Face detection + bbox, roll/yaw/pitch, landmarks (up to 85), capture-quality score. **Face Track CHOP alternative** |
 
@@ -88,7 +88,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 |---|---|---|
 | [CoreML](CoreMLDAT/) | DAT | **Object detection.** YOLO-style Core ML models → label / confidence / bbox ("what & where") |
 | [Vision Classify](VisionClassify/) | DAT | **Image classification** (no extra model). Top-N identifier / confidence |
-| [Vision AnimalPose](VisionAnimalPose/) | CHOP | Dog / cat 2D pose (25 joints, multiple animals) |
+| [Vision Animal Pose](VisionAnimalPose/) | CHOP | Dog / cat 2D pose (25 joints, multiple animals) |
 | [Vision Rect](VisionRect/) | CHOP | Rectangle detection → bbox / projected corners (wire straight into Corner Pin) |
 | [Vision Barcode](VisionBarcode/) | DAT | QR / various barcodes → payload / symbology / bbox / corners |
 | [Vision Text](VisionText/) | DAT | **OCR / text recognition** (multilingual, reading-order sort, Accurate/Fast) |
@@ -117,8 +117,8 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 |---|---|---|
 | [Metal Upscale](MetalUpscale/) | TOP | **Real-time super-resolution.** **Nvidia Upscaler TOP alternative** (MetalFX 2x / VT SuperRes 4x / VT LowLatency) |
 | [Metal Denoise](MetalDenoise/) | TOP | ML temporal noise reduction (supported hardware only; on M2 it warns and passes the input through) |
-| [CoreImage RAW](CoreImageRAW/) | TOP | **Develop DNG / ProRAW** in real time (exposure / WB / noise / sharpness) via CIRAWFilter |
-| [CoreImage HDR](CoreImageHDR/) | TOP | **HDR gain map** extraction + SDR/HDR (EDR) conversion from HEIC |
+| [CI RAW](CoreImageRAW/) | TOP | **Develop DNG / ProRAW** in real time (exposure / WB / noise / sharpness) via CIRAWFilter |
+| [CI HDR](CoreImageHDR/) | TOP | **HDR gain map** extraction + SDR/HDR (EDR) conversion from HEIC |
 | [ImageIO File In](ImageIOFileIn/) | TOP | **Read any image file (incl. HEIF/HEIC that TD can't show)** → Color, plus embedded **depth / disparity / Portrait Matte / semantic mattes**. Applies EXIF orientation |
 
 ### General ML inference & image generation
@@ -130,7 +130,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | [CoreML ImageGen](CoreMLImageGen/) | TOP | **text2img / img2img** with an **external Core ML model** (Stable Diffusion / SDXL / SD Turbo) |
 | [ImagePlayground](ImagePlayground/) | TOP | **text→image via Apple Image Playground** (`ImageCreator`, macOS 15.4+). No external model; Animation / Illustration / Sketch. Wire a face image into input 0 to generate people |
 | [CI Glass](CoreImageGlass/) | TOP | **macOS frosted glass and macOS 26 Liquid Glass**. Presets measured from the real views; edge refraction driven by the shape mask |
-| [CoreImage Code](CoreImageCode/) | TOP | **Generate** QR / Aztec / PDF417 / Code128 (no external library) |
+| [CI Code](CoreImageCode/) | TOP | **Generate** QR / Aztec / PDF417 / Code128 (no external library) |
 | [CreateML](CreateML/) | DAT | **Unified on-device trainer** — one `Task` menu for Image / Hand Pose / Action (body) / Hand Action / Sound / Activity (CHOP series) / Tabular classifier & regressor → `.mlmodel`. Output models are read by CoreML TOP / CoreML Motion CHOP / SoundClass etc. |
 | [CreateML Training Recorder](CreateMLTrainingRecorder/) | CHOP | **Record a CHOP time-series → CreateML dataset CSV** (recording / label / feature columns). Capture VisionPose/Hand takes in TD, label them, feed straight to CreateML (Activity) |
 | [CoreML Motion](CoreMLMotion/) | CHOP | **Live gesture inference** — buffer an input CHOP (VisionPose etc.) over the prediction window and classify motion in real time (per-class prob + confidence). Pairs with CreateML's Activity task |
@@ -191,33 +191,33 @@ and are unsupported. The source is here so you can build and try them yourself
 | Plugin | Family | Status |
 |---|---|---|
 | [AVF Camera](AVFoundationCamera/) | TOP | experimental |
-| [AVAudio Mixer CHOP](AVAudioMixer/) | CHOP | experimental |
-| [AVAudio Spatial CHOP](AVAudioSpatial/) | CHOP | experimental |
-| [AudioToolbox Mix CHOP](AudioToolboxMix/) | CHOP | experimental |
-| [Caption Author DAT](CaptionAuthor/) | DAT | experimental |
-| [ColorSync TOP](ColorSync/) | TOP | experimental |
-| [Vision Bokeh TOP](CoreImageBokeh/) | TOP | experimental |
-| [CoreImage Enhance TOP](CoreImageEnhance/) | TOP | experimental |
-| [Vision Keystone TOP](CoreImageKeystone/) | TOP | experimental |
-| [CoreLocation Beacon CHOP](CoreLocationBeacon/) | CHOP | experimental |
-| [GameplayKit Agents CHOP](GameplayKitAgents/) | CHOP | experimental |
-| [GameplayKit Path SOP](GameplayKitPath/) | SOP | experimental |
-| [Image Capture DAT](ImageCapture/) | DAT | experimental |
-| [Metal FrameInterp TOP](MetalFrameInterp/) | TOP | experimental |
-| [MPS Analyze CHOP](MetalMPSAnalyze/) | CHOP | experimental |
-| [Music Understanding DAT](MusicUnderstanding/) | DAT | experimental — macOS 27+ |
-| [PHASE CHOP](Phase/) | CHOP | experimental |
-| [RealityKit Splat TOP](RealityKitSplat/) | TOP | experimental — macOS 27+ |
-| [Shazam DAT](Shazam/) | DAT | experimental |
-| [Speech Activity CHOP](SpeechActivity/) | CHOP | **blocked** — measured not to work with the current API |
-| [SwiftUI TOP](SwiftUI/) | TOP | experimental |
-| [SwiftUI Panel CHOP](SwiftUIPanel/) | CHOP | experimental |
-| [UI Widget DAT](UIWidget/) | DAT | experimental |
-| [VisionAesthetics CHOP](VisionAesthetics/) | CHOP | experimental |
-| [Vision IterSeg TOP](VisionIterSeg/) | TOP | experimental — macOS 27+ |
-| [Vision Segment TOP — 人物セグメンテーション（macOS）](VisionSegment/) | TOP | experimental |
-| [Vision Similarity CHOP](VisionSimilarity/) | CHOP | experimental |
-| [VisionTrack CHOP](VisionTrack/) | CHOP | experimental |
+| [AVAudio Mixer](AVAudioMixer/) | CHOP | experimental |
+| [AVAudio Spatial](AVAudioSpatial/) | CHOP | experimental |
+| [AudioToolbox Mix](AudioToolboxMix/) | CHOP | experimental |
+| [Caption Author](CaptionAuthor/) | DAT | experimental |
+| [ColorSync](ColorSync/) | TOP | experimental |
+| [CI Bokeh](CoreImageBokeh/) | TOP | experimental |
+| [CI Enhance](CoreImageEnhance/) | TOP | experimental |
+| [CI Keystone](CoreImageKeystone/) | TOP | experimental |
+| [CoreLocation Beacon](CoreLocationBeacon/) | CHOP | experimental |
+| [GameKit Agents](GameplayKitAgents/) | CHOP | experimental |
+| [GameKit Path](GameplayKitPath/) | SOP | experimental |
+| [Image Capture](ImageCapture/) | DAT | experimental |
+| [Metal Frame Interp](MetalFrameInterp/) | TOP | experimental |
+| [Metal MPS Analyze](MetalMPSAnalyze/) | CHOP | experimental |
+| [Music Understanding](MusicUnderstanding/) | DAT | experimental — macOS 27+ |
+| [PHASE](Phase/) | CHOP | experimental |
+| [RealityKit Splat](RealityKitSplat/) | TOP | experimental — macOS 27+ |
+| [Shazam](Shazam/) | DAT | experimental |
+| [Speech Activity](SpeechActivity/) | CHOP | **blocked** — measured not to work with the current API |
+| [SwiftUI](SwiftUI/) | TOP | experimental |
+| [SwiftUI Panel](SwiftUIPanel/) | CHOP | experimental |
+| [UI Widget](UIWidget/) | DAT | experimental |
+| [Vision Aesthetics](VisionAesthetics/) | CHOP | experimental |
+| [Vision IterSeg](VisionIterSeg/) | TOP | experimental — macOS 27+ |
+| [Vision Segment](VisionSegment/) | TOP | experimental |
+| [Vision Similarity](VisionSimilarity/) | CHOP | experimental |
+| [Vision Track](VisionTrack/) | CHOP | experimental |
 
 > Setting the repo up on another Mac (or a macOS beta machine)? See **[SETUP.md](SETUP.md)**.
 
@@ -346,7 +346,7 @@ blank with no error. The operators that hit the cap:
 |---|---|
 | [Metal Upscale](MetalUpscale/) | 2x / 4x output always exceeds the cap — this is the whole point of the OP |
 | [Cinematic Video](Cinematic/) | Re-rendered output measured at 3840x2160 |
-| [ImageIO File In](ImageIOFileIn/) / [CoreImage RAW](CoreImageRAW/) / [CoreImage HDR](CoreImageHDR/) | Camera photos are routinely 4000px+ (measured 3024x4032) |
+| [ImageIO File In](ImageIOFileIn/) / [CI RAW](CoreImageRAW/) / [CI HDR](CoreImageHDR/) | Camera photos are routinely 4000px+ (measured 3024x4032) |
 | [Screen Capture](ScreenCapture/) | Native display capture (measured 1710x1112) |
 | [PDFKit](PDFKit/) | Page render (measured 1275x1650) |
 | [CoreText](CoreText/) | Whatever output resolution you set |

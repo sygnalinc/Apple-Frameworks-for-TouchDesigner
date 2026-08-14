@@ -7038,3 +7038,35 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **判断の型**: 尺や解像度を削る前に「毎フレーム何割の画素が変わるか」と
   「なめらかなグラデが主役か」を見る。グラデが主役なら**色数とディザ**、実写全面なら**fpsと尺**
 - README のキャプションは新素材でもそのまま正しいので変更なし
+
+### 2026-08-14 ドキュメントのop名を実際の opLabel に総点検・統一
+
+- ユーザー「Vision Bokeh は CI Bokeh という名前にした方が良いのでは」→ 調べると**op 自体は
+  2026-07-21 の CI 接頭辞リネームで既に `CI Bokeh`(opType `Cibokeh`)になっており、
+  ドキュメントだけが旧名で取り残されていた**
+- **機械的に総点検した**: `PLUGINS.tsv` の各フォルダから `.mm` の `opLabel->setString("...")` を
+  抜き出し、ルート README(英日)のリンク名と突き合わせ。**32行 × 英日 = 64件のずれ**を検出・修正:
+  - CI 系: Vision Bokeh→**CI Bokeh** / Vision Keystone→**CI Keystone** / CoreImage RAW・HDR・
+    Code・Enhance→**CI RAW / CI HDR / CI Code / CI Enhance**
+  - GameplayKit Agents・Path→**GameKit Agents / GameKit Path**、MPS Analyze→**Metal MPS Analyze**、
+    Metal FrameInterp→**Metal Frame Interp**
+  - 連結名: VisionAesthetics→**Vision Aesthetics**、VisionTrack→**Vision Track**、
+    Vision Pose3D→**Vision Pose 3D**、Vision AnimalPose→**Vision Animal Pose**、
+    TextAnalyze→**Text Analyze**、GameController→**Game Controller**
+  - 実験中の表は family 列があるので**末尾の TOP/CHOP/DAT/SOP を落とす**(表記が揃う)。
+    `Vision Segment TOP — 人物セグメンテーション（macOS）` のように**リンク文字列に説明が
+    紛れ込んでいた行**も修正。Multipeer は1フォルダ2opなので `Multipeer In / Out` の併記のまま
+- 各opの README のタイトルも15件修正(名前が古いものだけ。`Vision Face CHOP — face detection…`
+  のように**説明が付いたタイトルはそのまま**)。skill 2つと MetalDenoise の本文参照も追随
+- **検算**: 突き合わせスクリプトで**ずれ0件**、英日のリンク行が**完全一致**を確認
+- **教訓**: opLabel を変えるリネームは、ソース・バンドル・PLUGINS.tsv までは手が回っても
+  **README の表と各opのタイトルが取り残される**。リネーム時は
+  「`opLabel->setString` を正としてドキュメントを突き合わせる」検算を必ず走らせる
+
+- あわせて **Vision Pose の「34 keypoints」表記を訂正**(ユーザー指摘「そんなにキーポイントある?」)。
+  実装を確認すると **34 は Body Track CHOP(NVIDIA Maxine)互換のチャンネル枠**で、
+  **Vision が実際に返すのは 19 関節**。内訳は 19(実測)+ `torso` 1(neck と root の中点で導出)
+  + **14 はプレースホルダ**(つま先4・かかと2・手指8 を同側の足首/手首の位置に **confidence=0** で
+  流用)。各opの README には元から正確に書いてあったが、**ルート README の1行紹介が
+  「34キーポイント」とだけ書いていて誤解を招いていた**ので、19関節であることと
+  confidence=0 で判別できることを明記した

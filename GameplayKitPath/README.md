@@ -1,4 +1,4 @@
-# GameplayKit Path SOP
+# GameKit Path SOP
 
 GameplayKit の `GKObstacleGraph` で、始点→終点の**障害物回避最短経路**を計算し、1本の Line primitive
 として出力する。障害物は**入力SOPの各点(中心)**を半径 Obstacle Radius の多角形(既定8角形)として扱う。

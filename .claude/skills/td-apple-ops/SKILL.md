@@ -87,6 +87,6 @@ body1/nose:confidence
 ## Non-Commercial 版の制限
 
 無償の Non-Commercial は**解像度が 1280x1280 に制限される**。Metal Upscale・
-Cinematic Video・ImageIO File In・CoreImage RAW/HDR・Screen Capture・PDFKit・CoreText は
+Cinematic Video・ImageIO File In・CI RAW/HDR・Screen Capture・PDFKit・CoreText は
 これを超える出力をしうる。**このリポジトリは NC 環境で検証していない** ので、
 問題が出たら出力解像度を下げる。詳細はルートREADMEの「必要環境」節。

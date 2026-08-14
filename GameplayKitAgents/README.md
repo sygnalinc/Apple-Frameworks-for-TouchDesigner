@@ -1,4 +1,4 @@
-# GameplayKit Agents CHOP
+# GameKit Agents CHOP
 
 GameplayKit の `GKAgent2D` 群を `GKGoal`(seek/flee/separate/align/cohere/avoid/wander/reach-speed)で
 駆動する**群集シミュレーション**。各エージェントの位置/速度/角度を出力する。障害物は任意の入力CHOP

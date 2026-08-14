@@ -78,7 +78,7 @@ c.allowCooking = False
 
 - カメラ不要の映像テストは分散素材(5人・5ゾーン級)をループ再生
 - 音声テストは `say -v Kyoko` で生成。音楽はTD同梱サンプル
-- QR等が要るテストは CoreImage Code TOP で生成して入力(著作物mp3の同梱は避ける)
+- QR等が要るテストは CI Code TOP で生成して入力(著作物mp3の同梱は避ける)
 - 実写真セット(Photogrammetry)は Middlebury templeRing 等の非著作データセット
 
 ## 検証しきれないものは正直に書く

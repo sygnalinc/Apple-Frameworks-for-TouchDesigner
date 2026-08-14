@@ -1,4 +1,4 @@
-# TextAnalyze DAT
+# Text Analyze DAT
 
 **English** | [日本語](#日本語)
 

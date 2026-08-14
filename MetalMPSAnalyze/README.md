@@ -1,4 +1,4 @@
-# MPS Analyze CHOP
+# Metal MPS Analyze CHOP
 
 Metal Performance ShadersのGPU histogramと軽量な輝度統計を出力する画像解析CHOP。
 

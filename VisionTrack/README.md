@@ -1,4 +1,4 @@
-# VisionTrack CHOP
+# Vision Track CHOP
 
 初期バウンディングボックスで指定した**任意のオブジェクト**を映像内で追跡する。
 `VNTrackObjectRequest` + `VNSequenceRequestHandler`。人以外も追える点で

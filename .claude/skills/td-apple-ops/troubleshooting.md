@@ -100,7 +100,7 @@ Vision Pose3D は仕様上遅い(初回モデルロード約17秒・定常0.5秒
 ## 解像度が頭打ちになる / 出力が崩れる
 
 **Non-Commercial 版は 1280x1280 制限**。Metal Upscale・Cinematic Video・ImageIO File In・
-CoreImage RAW/HDR・Screen Capture・PDFKit・CoreText が該当しうる。
+CI RAW/HDR・Screen Capture・PDFKit・CoreText が該当しうる。
 このリポジトリは NC 環境で検証できていないので、出力解像度を下げて回避する。
 
 ## 権限で止まる

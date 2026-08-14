@@ -1,4 +1,4 @@
-# Vision Segment TOP — 人物セグメンテーション（macOS）
+# Vision Segment TOP — person segmentation (macOS)
 
 入力 TOP の映像から人物マスクを生成する TD ネイティブのカスタム TOP。
 Windows+NVIDIA 専用の **Nvidia Background TOP の macOS 代替**を想定。

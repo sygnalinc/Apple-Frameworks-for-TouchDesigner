@@ -1,4 +1,4 @@
-# CoreImage HDR TOP
+# CI HDR TOP
 
 **English** | [日本語](#日本語)
 
