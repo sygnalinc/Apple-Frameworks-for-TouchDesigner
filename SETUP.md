@@ -53,7 +53,29 @@ grep -m1 'OP_CommonAPIVersion = ' \
 
 ### 2.2 Xcode
 
-`xcode-select -p` が Xcode を指していること。`clang++` と `swiftc` が使えれば足りる。
+**ほぼ全てのプラグインは Command Line Tools だけで足りる**(`clang++` と `swiftc` が使えればよい。
+`xcode-select -p` が CommandLineTools を指していても問題ない)。
+
+**例外は LLM MLX だけ**で、これには**フルXcode + Metal Toolchain** が要る:
+
+- 理由: mlx-swift の Metal シェーダ(`default.metallib`)は **SwiftPM の `swift build` では
+  作れない**(mlx-swift 公式README明記)。生成されないまま実行すると
+  `Failed to load the default metallib` で死ぬので、**`xcodebuild` でビルドする**必要がある。
+  `xcodebuild` はフルXcodeにしか入っていない
+- `xcode-select --switch` は sudo が要るグローバル変更なので、**LLMMLX/build.sh が
+  自分で `DEVELOPER_DIR` にフルXcodeを見つけて設定する**(他プラグインのCLTビルドに影響しない)。
+  自動検出が外れる場合は自分で `DEVELOPER_DIR=<Xcode.app>/Contents/Developer` を渡す
+- **Metal Toolchain は Xcode 本体と別コンポーネント**。未導入だと
+  `cannot execute tool 'metal' due to missing Metal Toolchain` になるので:
+
+  ```bash
+  xcodebuild -downloadComponent MetalToolchain   # 約840MB
+  ```
+
+  **OS や Xcode を更新すると無効化される**(アセットはディスクに残るが
+  `xcodebuild -showComponent MetalToolchain` が `Status: uninstalled` になる)。
+  更新後に LLMMLX をビルドするなら**再ダウンロードが必要**。実測でOS betaの更新
+  (26A5388g→26A5406e)で要求版が 27A5228f→27A5237l に変わり無効化された
 
 ### 2.3 ビルドの確認
 
@@ -111,6 +133,15 @@ MCP ツールがセッションに登録されていないときも、この `to
    止めるようにしてあるが、そもそも回さないこと。
 2. **ベータ機でビルドしたバンドルを安定版機の Plugins フォルダに入れない。**
    SDK 混在は §2.1 の症状を引き起こす。
+3. **LLM MLX はベータ機でビルドしない**(2026-08-14 の方針)。フルXcode + Metal Toolchain が
+   要るうえ、**Metal Toolchain は OS / Xcode 更新のたびに無効化されて 840MB の再ダウンロードに
+   なる**ため、**安定版 macOS 26 機でビルドする**。
+   - **リリース時の落とし穴**: `LLMMLX` は `PLUGINS.tsv` で `released`(DMG同梱)なのに、
+     `release.sh` は **各フォルダの `build/` にある成果物をそのまま集める**。
+     ベータ機に古い `LLMMLX/build/LLMMLXDAT.plugin` が残っていると**黙って古い版が入る**
+     (実例: この27機に 8/5 ビルドの成果物が残っていた)。
+     **リリースは §2.6 のとおり安定版機で切る**。ベータ機で作業したときは
+     `rm -rf LLMMLX/build` して取り違えを物理的に防ぐのが安全
 3. **macOS 27 の API を使うプラグインは `PLUGINS.tsv` の `minos` を `27.0` にする。**
    26 機ではビルド対象から外れる（除外時は必ずログに出す。黙って飛ばさない）。
 4. **27 専用フレームワークは `-weak_framework` でリンクし、`@available` で分岐する。**

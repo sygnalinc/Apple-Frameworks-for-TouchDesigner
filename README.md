@@ -148,7 +148,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 
 | Plugin | Family | What it does |
 |---|---|---|
-| [LLM AFM](LLMAFM/) | DAT | **Apple Intelligence on-device LLM** (macOS 26+). **Structured output (JSON schema)** + **Tool Calling** (the LLM calls a tool, TouchDesigner executes it and returns the result) straight into show control |
+| [LLM AFM](LLMAFM/) | DAT | **Apple Intelligence LLM** (macOS 26+). **Structured output (JSON schema)** + **Tool Calling** (the LLM calls a tool, TouchDesigner executes it and returns the result) straight into show control. *(Experimental, unverified: macOS 27 model select / image input / reasoning levels)* |
 | [LLM MLX](LLMMLX/) | DAT | **Local LLM via Apple MLX** (mlx-swift-lm). Runs any mlx-community model (Gemma 4 / Qwen / Llama) fully on-device with token streaming. No API key; model auto-downloads from Hugging Face on first use |
 | [Translate](Translate/) | DAT | **On-device translation.** Wire to Speech Transcribe for real-time subtitle translation |
 | [Text Analyze](TextAnalyze/) | DAT | Sentiment / language ID / named entities / semantic similarity (JA supported) + **tokens (token / POS / lemma)** and **embedding vectors** (numeric). "Drive visuals from speech mood/topic" |
@@ -157,7 +157,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 
 | Plugin | Family | What it does |
 |---|---|---|
-| [RealityKit Capture](RealityKitCapture/) | SOP | **Photo folder → 3D mesh** (RealityKit Object Capture). Textured OBJ output |
+| [RealityKit Capture](RealityKitCapture/) | SOP | **Photo folder → 3D mesh** (RealityKit Object Capture). Textured OBJ output. *(Experimental: exports the sparse point cloud as a 3DGS-**format** PLY — this is **not** Gaussian-splat generation — for the experimental RealityKit Splat TOP)* |
 | [ImageIO PointCloud](ImageIOPointCloud/) | SOP | **Photo depth → 3D point cloud** (unproject via camera calibration / FOV). Colors sampled from RGB |
 | [Cinematic Video](Cinematic/) | TOP | **iPhone Cinematic video** (macOS 26+): depth (disparity) map or **re-render with adjustable focus / aperture**. **Plays automatically like a Movie File In** (Play Mode: Sequential / Locked to Timeline / Specify Index, plus Speed / Loop / Cue). `Mode = All` emits **colour, depth and rendered as three colour buffers** (`Color + Depth` is the lighter two-buffer variant with the same indices); `Info DAT` lists the file's own metadata; metadata (focus depth, subjects) on its **Info CHOP** |
 | [Spatial Video](SpatialVideo/) | TOP | **MV-HEVC spatial video** from iPhone / Vision Pro: pull out the **left or right eye**, side-by-side, or **both as two colour buffers** (buffer 1 read with a Render Select TOP — one decode, and the eyes are guaranteed to be the same frame). **Plays like a Movie File In** (Play Mode / Speed / Loop / Cue). Baseline, field of view and hero eye on the **Info CHOP / Info DAT** |
@@ -190,6 +190,7 @@ and are unsupported. The source is here so you can build and try them yourself
 | [AVF Camera](AVFoundationCamera/) | TOP | experimental |
 | [AVAudio Mixer CHOP](AVAudioMixer/) | CHOP | experimental |
 | [AVAudio Spatial CHOP](AVAudioSpatial/) | CHOP | experimental |
+| [AVF Camera TOP](AVFoundationCamera/) | TOP | experimental |
 | [AudioToolbox Mix CHOP](AudioToolboxMix/) | CHOP | experimental |
 | [Caption Author DAT](CaptionAuthor/) | DAT | experimental |
 | [ColorSync TOP](ColorSync/) | TOP | experimental |
@@ -202,13 +203,16 @@ and are unsupported. The source is here so you can build and try them yourself
 | [Image Capture DAT](ImageCapture/) | DAT | experimental |
 | [Metal FrameInterp TOP](MetalFrameInterp/) | TOP | experimental |
 | [MPS Analyze CHOP](MetalMPSAnalyze/) | CHOP | experimental |
+| [Music Understanding DAT](MusicUnderstanding/) | DAT | experimental — macOS 27+ |
 | [PHASE CHOP](Phase/) | CHOP | experimental |
+| [RealityKit Splat TOP](RealityKitSplat/) | TOP | experimental — macOS 27+ |
 | [Shazam DAT](Shazam/) | DAT | experimental |
 | [Speech Activity CHOP](SpeechActivity/) | CHOP | **blocked** — measured not to work with the current API |
 | [SwiftUI TOP](SwiftUI/) | TOP | experimental |
 | [SwiftUI Panel CHOP](SwiftUIPanel/) | CHOP | experimental |
 | [UI Widget DAT](UIWidget/) | DAT | experimental |
 | [VisionAesthetics CHOP](VisionAesthetics/) | CHOP | experimental |
+| [Vision IterSeg TOP](VisionIterSeg/) | TOP | experimental — macOS 27+ |
 | [Vision Segment TOP — 人物セグメンテーション（macOS）](VisionSegment/) | TOP | experimental |
 | [Vision Similarity CHOP](VisionSimilarity/) | CHOP | experimental |
 | [VisionTrack CHOP](VisionTrack/) | CHOP | experimental |

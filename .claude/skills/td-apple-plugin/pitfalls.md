@@ -84,6 +84,17 @@
 - FoundationModels は **Apple Intelligence有効**でないと unavailable。
   `SystemLanguageModel.default.availability` で理由分岐して status に出す
 - FoundationModels構造化出力は DynamicGenerationSchema で "name:type" スキーマ → スキーマ保証JSON
+- **FoundationModels の macOS 27(AFM3世代)拡張**(全て `#available(macOS 27.0, *)` ガードで
+  26互換を保てる):
+  - モデル選択: `LanguageModelSession(model: some LanguageModel, ...)`。
+    `PrivateCloudComputeLanguageModel()`(Appleサーバ側・quota付き)も渡せる
+  - `capabilities`(vision/reasoning/toolCalling/guidedGeneration)は `LanguageModel` プロトコル
+    要件。**`contextSize` は PCC モデル専用**(async throws)— LanguageModelSession には無い
+  - 画像入力: `Attachment(cgImage)` を `@PromptBuilder` クロージャに置く
+    (`streamResponse(options:contextOptions:) { attachment; prompt }`)。vision capability 必須
+  - Reasoning: `ContextOptions(reasoningLevel: .light/.moderate/.deep)` を
+    streamResponse/respond の `contextOptions:` へ
+  - トークン数: `session.usage.input/output.totalTokenCount`(27)
 - **Whisper(WhisperKit)は無音バッファに「[音楽]」等を幻覚する**。① RMS<0.004 のバッファは捨てる
   ② 括弧タグだけの確定行は破棄、の2段ガード必須。ストリーミング非対応なので
   「溜めて0.7秒毎に再認識 → 無音or30秒で確定行に落とす」チャンク方式
@@ -105,9 +116,22 @@
 - **オフスクリーン描画はヘッドレス(ウィンドウ無し)で動く**。`RealityRenderer.CameraOutput`
   の `.singleProjection(colorTexture:)` に自前の MTLTexture(`.bgra8Unorm` / `.shared` /
   usage=[.renderTarget,.shaderRead])を渡し、`getBytes` で読み戻す
-- **Gaussian Splat 専用のロードAPIは存在しない**(SDKに "splat"/"gaussian" シンボル無し)。
-  splat は USD/USDZ に含めて `Entity(contentsOf:)` で読み込み、RealityKit が内部描画する。
-  つまり「splat専用TOP」ではなく「RealityKitが読めるUSDシーンを描くTOP」になる(macOS 26+ で splat 対応)
+- **Gaussian Splat は macOS 27 の公開API `GaussianSplatComponent` / `GaussianSplatResource` で描く**
+  (26以前はオフスクリーンでは点群もsplatも描画不可だった。**27 では RealityRenderer の
+  オフスクリーン描画でsplatが出る**・実測)。ファイルローダは無いので **3DGS .ply は自前パース**して
+  `LowLevelBuffer` へ投入する。実測で踏んだ罠:
+  - **opacity 等に NaN/Inf が1つでも混ざるとシーン全体が描画されない**
+    (Consoleに `GSAsset: NaN/Inf detected in alphas buffer`)。パース時に必ず除去/置換する
+  - **`LowLevelBuffer` の capacity にはアライメント要件がある**。count×12(float3ぴったり)だと
+    `BufferResource` init が `invalid(bufferCapacity:)` を投げる → **256B境界へ切り上げ**、
+    `bytesUsed` に実サイズを入れる
+  - scale(log値)/opacity(logit)は生値のまま渡し、`scaleActivation = .exponential` /
+    `opacityActivation = .sigmoid` に評価させる(自前で exp/sigmoid すると activation と二重になる)
+  - ply の `rot_0..3` は **w,x,y,z** 順。RealityKit へは **x,y,z,w** で渡す(正規化も自前で)
+  - SH は degree 0(f_dc_0..2 を float3)で十分きれい。degree 1〜3 の f_rest_* の
+    バッファレイアウトは公開ドキュメントに無い(未検証)
+  - 3DGS は Y下向き規約 → エンティティを X軸π回転で正立。フレーミングは bbox でなく
+    **各軸中央値+距離70パーセンタイル**(遠方の背景splatで bbox が数百単位に巨大化するため)
 - **`Entity.visualBounds` はシーンへ追加した後に取得する**。ロード直後は不定。さらに
   **`entity.scale = ...` でロード物を正規化しようとすると内部トランスフォームと複合して破綻**
   (16単位のモデルが 0.09 掛けで 150単位に肥大した実例)。**エンティティは変形せず、カメラ側で

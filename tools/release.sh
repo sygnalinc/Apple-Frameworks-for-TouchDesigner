@@ -76,13 +76,26 @@ cmd_sign() {
     echo "== sign: repo builds → $DIST (identity: $SIGN_ID)"
     rm -rf "$DIST"; mkdir -p "$DIST"
     local n=0
+    local missing=()
     while read -r d; do
+        local found=0
         for b in "$REPO/$d"/build/*.plugin; do
             [ -d "$b" ] || continue
             cp -R "$b" "$DIST/"
             n=$((n+1))
+            found=1
         done
+        [ "$found" -eq 1 ] || missing+=("$d")
     done < <(td_released_plugins)
+    # released なのにビルド成果物が無いものを**黙って落とさない**。
+    # 黙って落とすと「全部入っている」と誤解したまま欠けたDMGを配ってしまう
+    # (実例: LLM MLX を別マシンでビルドする運用にしたとき、この機の build/ が空だった)
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo "ERROR: released なのに build/ 成果物が無いプラグインがあります:" >&2
+        printf '  - %s\n' "${missing[@]}" >&2
+        echo "  → 各フォルダで ./build.sh を実行してから、または該当マシンでリリースを切ってください" >&2
+        exit 1
+    fi
     echo "copied $n bundles (from repo builds)"
     # 各プラグインのビルド時点の版が残らないよう、配布物へ現在の VERSION を焼き直す。
     # **署名より前**に行う(Info.plist を後から書き換えると署名が壊れるため)

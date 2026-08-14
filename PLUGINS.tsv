@@ -10,11 +10,11 @@
 #
 # 追加・昇格したらこの表を直すこと。tools/release.sh が追跡フォルダとの一致を検査する。
 name	status	minos
+AppleScript	released	26.0
+AudioToolboxMix	experimental	26.0
 AVAudioMixer	experimental	26.0
 AVAudioSpatial	experimental	26.0
 AVFoundationCamera	experimental	26.0
-AppleScript	released	26.0
-AudioToolboxMix	experimental	26.0
 CaptionAuthor	experimental	26.0
 Cinematic	released	26.0
 ColorSync	experimental	26.0
@@ -55,10 +55,12 @@ MetalMPSAnalyze	experimental	26.0
 MetalUpscale	released	26.0
 MultipeerCHOP	released	26.0
 MultipeerDAT	released	26.0
+MusicUnderstanding	experimental	27.0
 NetworkDiscovery	released	26.0
 PDFKit	released	26.0
 Phase	experimental	26.0
 RealityKitCapture	released	26.0
+RealityKitSplat	experimental	27.0
 ScreenCapture	released	26.0
 Shazam	experimental	26.0
 Shortcuts	released	26.0
@@ -84,6 +86,7 @@ VisionFace	released	26.0
 VisionFlow	released	26.0
 VisionHand	released	26.0
 VisionHorizon	released	26.0
+VisionIterSeg	experimental	27.0
 VisionPose	released	26.0
 VisionPose3D	released	26.0
 VisionRect	released	26.0

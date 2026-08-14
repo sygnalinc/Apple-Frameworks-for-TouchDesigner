@@ -5914,6 +5914,156 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   - これで明るさ・コントラスト・彩度・シャープネス・ゲイン・色温度・フォーカス・ズーム・
     パン/チルトも同じ方法で触れる見込み(Processing Unit / Camera Terminal のコントロール)
 
+### 2026-08-05 RealityKit Splat TOP 再実装(macOS 27 GaussianSplatComponent・真のsplat描画)
+
+- 環境が **macOS 27.0 実機+SDK 27.0** になり、待っていた公開API
+  `GaussianSplatComponent` / `GaussianSplatResource` / `LowLevelBuffer` がSDKに入ったことを確認
+  (RealityFoundation.swiftmodule の swiftinterface で実確認)。記録済み方針どおり
+  **RealityKit Splat TOP を真のGaussian Splat描画で再実装**(ブランチ `macos27/realitykit-splat`)
+- **ヘッドレスharnessで先に実証**: 3DGS .ply 自前パース → LowLevelBuffer 投入 →
+  `RealityRenderer` オフスクリーン描画 → PNG。**macOS 26で不可能だったオフスクリーンsplat描画が
+  27では動く**(山岳ジオラマの実3DGSシーンを精細に視認)
+- プラグインは旧実装(削除済み・git履歴 89d1b41^ から回収)の RealityRenderer +MainActor +
+  オービットカメラ構成を土台に、.ply ロード経路を追加。USD/USDZ メッシュ描画は従来どおり共存
+  (temple_scan.usdz でリグレッション確認済み)
+- **実測(M2・TD実機・MCP HTTP直送)**: gs_sample.ply(369,085 splats・91MB)を丸ごとロード、
+  1280×720 で **splatレンダ約44fps・TD本体60fps維持・cook約0.8ms**。Yaw/Pitch/Distance オービット、
+  Info CHOP(executes/frames/render_rc/loaded/splats)、警告なし
+- **踏んだ地雷(pitfalls.md反映)**: ①**opacityにNaN/Infが1つでも混ざると全体が描画されない**
+  (`GSAsset: NaN/Inf detected`)→パースで除去必須 ②**LowLevelBufferのcapacityはアライメント要件
+  あり**(count×12素のままだと invalid(bufferCapacity:)→256B切り上げ)③plyの rot_0..3 は wxyz →
+  RealityKitへは xyzw ④scale/opacityは生値+.exponential/.sigmoid activation ⑤SHはdegree 0
+  (f_dc)で投入(f_rest_* の高次レイアウトは非公開・未対応)⑥3DGSはY下向き→X軸π回転で正立、
+  フレーミングは中央値+70パーセンタイル(bboxは背景splatで数百単位に暴れる)
+- **重要(環境)**: macOS 27 移行でホームが新規になり、**常設Plugins(約80個)と各 build/ 成果物が
+  消失**。今回 RealityKitSplatTOP のみ再ビルド・再インストール済み。**sample.toe は現在
+  大量の "Unknown operator type" 状態なので絶対に保存しないこと**(全プラグイン再ビルド・
+  再インストール後に開き直す)。TouchDesigner.app は /Applications に存在(SDKヘッダも従来パス)
+- **sample.toe がTDにより自動保存され(17:30・プラグイン欠損状態のまま)壊れた** → 規約どおり
+  git HEAD から復旧済み(壊れた版と sample.3.toe はscratchpadに退避)。検証でTDを開く際は
+  自動保存に注意(既知: 終了時以外にも保存が走ることがある)
+- 次にやること: 全プラグインの一括再ビルド+再インストール(xargs -P 6 並列で約20分)、
+  sample.toe への RealityKitSplat 利用例追加、SH degree 1〜3 レイアウトの調査(視覚差分で推定可能)
+
+### 2026-08-05 全84プラグインを macOS 27 環境で一括再ビルド・常設再インストール
+
+- ユーザー指示「開発しているpluginはすべてbuildしてpluginsフォルダに入れて」。macOS 27移行で
+  消えた常設Pluginsを全量復旧: **84バンドル全てビルド成功・署名検証OK・インストール完了**。
+  TD再起動後に全型の登録と sample.toe の全ノード0エラーを確認(68例コンテナ)
+- **踏んだ罠(環境系)**:
+  1. **common/build_plugin.sh の zsh専用構文(`${(%):-%N}`・`${=VAR}`)が #!/bin/bash の
+     build.sh から source されると bad substitution で全滅**。自己位置解決は BASH_SOURCE
+     フォールバック付きに修正済み。**一括ビルドは `zsh ./build.sh` で起動するのが安全**
+  2. **macOS の `xargs -I{}` は置換後コマンドが長いと "command line cannot be assembled"**
+     で静かに死ぬ(scratchpadの長いパス×複数置換で発生)→ 引数1個のヘルパースクリプト+
+     `xargs -P 6 -n 1` 方式に変更
+  3. **LLMMLX は Xcode 27 beta の Metal Toolchain が別コンポーネント**。
+     `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer xcodebuild
+     -downloadComponent MetalToolchain`(839MB)を先に実行しないと
+     "cannot execute tool 'metal'" で失敗する。xcode-select は CLT のままでよい
+     (DEVELOPER_DIR 環境変数だけで xcodebuild が使える・sudo不要)
+  4. **84バンドル一括入れ替え後の初回TD起動は一部プラグインの登録を取りこぼすことがある**
+     (今回 CoreWLAN 2件が未登録・バイナリは cplusplusCHOP 経由で正常動作)→ **TD再起動で解消**
+     (既知の「初回はプラグイン再検証」挙動の亜種)
+- ユーザーが `Assets/oowaku.ply` / `oowaku.spz` を追加(oowaku.ply は gs_sample.ply と同一
+  内容の山岳ジオラマ・gitignore済み)。登録済み RealityKit Splat TOP で oowaku.ply の
+  369,085 splats 描画を視認確認。**.spz(Niantic圧縮形式)は現行パーサ非対応**(将来課題:
+  gzip+固定小数の独自形式なのでデコーダ追加は可能)
+- 次にやること: .spz 対応の検討、sample.toe への RealityKitSplat 例追加、SH degree 1〜3
+
+### 2026-08-05 LLM AFM を macOS 27(AFM3)対応に拡張(26互換維持)
+
+- ユーザー「LLM AFMをMacOS27のAFM3対応にしたい」「MacOS26でも使えるように互換性は残したい」。
+  SDK実確認の結論: **AFM3という型は無く、macOS 27では FoundationModels が新世代モデルを自動使用**。
+  「AFM3対応」の実質は macOS 27 の新API採用 = 以下を実装:
+  - **Model メニュー**(ondevice/pcc): `LanguageModelSession(model:)` に
+    `PrivateCloudComputeLanguageModel()`(Appleサーバ側大型モデル)を渡せる
+  - **画像入力(Vision ページ: Image TOP + Use Image)**: Submit時に TOP を BGRA8/top-down で
+    ダウンロード → helper が CGImage 化 → `Attachment(cgImage)` を PromptBuilder に置いて生成。
+    LLM MLX と同じ「DATはTOPをパラメータ参照」パターン
+  - **Reasoning メニュー**(off/light/moderate/deep): `ContextOptions.ReasoningLevel`
+  - **診断**: Info DAT に model/capabilities 行、Info CHOP に context_size/input_tokens/
+    output_tokens、poll JSON に capabilities 配列
+- **26互換**: 27専用APIは全て `#available(macOS 27.0, *)` ガード。26では従来動作
+  (テキスト/構造化/Tool Calling)のまま、27専用機能を選ぶと status にエラーが出るだけ
+- **SDK実確認の要点(pitfalls反映)**: `capabilities` は LanguageModel プロトコル要件
+  (vision/reasoning/toolCalling/guidedGeneration)、**`contextSize` は PCCモデル専用**
+  (LanguageModelSession には無い・ビルドエラーで発見)、usage は session.usage(27)
+- **検証(M2・TD実機)**: 新パラメータ生成(Model/Reasoning/Imagetop/Useimage・メニュー項目とも
+  正しい)、Info DAT 3行(status/model/capabilities)。**この新macOS 27環境は Apple Intelligence
+  未有効のため生成テストは未実施**(status="unavailable: Apple Intelligence not enabled" が正しく
+  出ることを確認。PCC は "device not eligible (PCC)")。**ユーザーがシステム設定で
+  Apple Intelligence を有効化したら、テキスト生成・画像入力・Reasoning・PCC の実データ検証が必要**
+- ビルド・署名・常設インストール済み。README(LLMAFM+ルート英日)更新
+- 注意: TD検証セッション中に sample.toe がまた自動保存された(全プラグイン登録済み状態)。
+  規約どおり git HEAD へ復旧済み
+
+### 2026-08-05 macOS 27 新機能の横断調査(op候補)
+
+- SDK 27.0 実機走査。新フレームワーク: **MediaIntelligence**(FaceGroupAnalyzer=顔クラスタリング/
+  VideoAnalyzer+HighlightAnalysisRequest=ハイライト区間+盛り上がりlevel曲線/KeyFrameAnalysisRequest)、
+  **VisualIntelligence**(SemanticContentDescriptor)、**SpatialPreview**(DocumentPreviewSession=
+  接続中Vision Proへ文書/USDをライブプッシュ)、**CoreAI**(調査済み・別記)、
+  **_Vision_FoundationModels**(OCRTool/BarcodeReaderTool=FoundationModels用の純正Visionツール)、
+  **_CoreSpotlight_FoundationModels**(SpotlightSearchTool)
+- 既存フレームワークの27追加: **Vision: GenerateIterativeSegmentationRequest**(seed point/box/
+  **scribble** の3プロンプト・fast/balanced/accurate・DL資産=SAM相当の純正API)、
+  **ImagePlayground: ImagePlaygroundOptions**(sizeSpecification=任意解像度・creationStrategy/variety/
+  personalization)、**MetalFX**(distortionTexture/contentWidth動的解像度/requiresPrevColorTexture)、
+  **RealityFoundation**(BloomComponent・NavigationMesh・BehaviorTree・AnimationGraph・Lightmap・
+  SkeletonResource+Retargeting 等27で大量追加)。SoundAnalysis/Speech/Translation/NL/SCK/VTは27追加なし
+- 提案の優先順位(ユーザーへ提示): ①Vision IterativeSegment TOP(SAM2の外部モデル不要版・
+  scribble入力が新規性)②MediaIntelligence Highlight DAT/CHOP ③MediaIntelligence FaceGroup DAT
+  ④ImagePlayground/Metal Upscale/LLM AFM(純正ツール)/RealityKit Splat(Bloom)の27アップグレード
+  ⑤SpatialPreview Out(Vision Pro実機待ち)⑥CoreAI(ツールチェーン待ち)
+
+### 2026-08-06 Vision IterSeg TOP + Music Understanding DAT 実装(macOS 27新機能・実データ検証済み)
+
+- **Vision IterSeg TOP**(`Visioniterseg`・icon VIS・CPUMem TOP+Swiftヘルパ vi_):
+  macOS 27 の `GenerateIterativeSegmentationRequest` = Apple純正の対話的セグメンテーション
+  (SAM相当・外部モデル不要)。プロンプト3種(seed point / seed box / **scribble**=入力1のTOPを
+  なぞり書きとして使用・Rチャンネル)。**モデルはOS管理のダウンロード資産**
+  (`DownloadableAssetsRequest`・Download Assetsパルス+asset_readyチャンネル)。
+  ユーザー指定の短名「VisionSegment」は**既存の人物セグメンテーションTOPと衝突**するため
+  「Vision IterSeg」に。実測(M2・640×426): 点2箇所・box・scribble全て正しい人物を個別マスク
+  (座標=TD uvと無変換一致)、解析1〜2秒、submits=results=5でフレーム落ちなし
+- **Music Understanding DAT**(`Musicunderstanding`・icon MUN・DAT+Swiftヘルパ mu_):
+  macOS 27 新フレームワーク MusicUnderstanding で音楽ファイルをオンデバイス楽曲解析。
+  Modeメニューで Summary/Rhythm(ビート・小節)/Key(調)/Structure(セクション)/Pace/
+  Loudness/Instruments(vocal・drum・bass・otherの区間+レベル曲線)のテーブル切替。
+  実測(M2・TD同梱テクノ曲70秒): **BPM123・144ビート・36小節・5セクション・G minor を正検出**
+  (ビート間隔0.488s=123BPMと整合)、loudness -11.4 LUFS、bass区間検出。解析は数十秒・非同期
+- **踏んだ罠**: ①MusicUnderstanding framework自体が27新規なので **-weak_framework でリンク**
+  (26でもdylibロード可能に。@availableガードと併用)②Vision新Swift APIの
+  `DownloadableAssetsRequestStatus` は notReady/downloading/ready/error(availableではない)
+  ③86バンドル入れ替え後のTD初回起動は10分超固まることがある→強制終了→再起動(既知の亜種)
+- 2件ともビルド・署名・常設インストール・TD実機検証済み。README(各+ルート英日)更新
+- 検証中に scratchpad が一度クリアされ tdmcp.py を再作成した(セッション横断の一時ファイルは消える前提で)
+
+### 2026-08-06 RealityKit Capture に Splat PLY 書き出しを追加(写真→splatパイプライン)
+
+- ユーザー「RealityKitCaptureをアップデートしてsplat対応にしたい」。**macOS 27 でも
+  PhotogrammetrySession に Gaussian Splat 学習出力は無い**(SDK実確認: Request は
+  modelFile/modelEntity/bounds/pointCloud/poses のみ・splat学習は CorePhotogrammetry 内部の非公開のまま)
+  → **pointCloud リクエスト(macOS 14+)で点群を取得し、3DGS形式(INRIA互換)の .ply に変換して
+  書き出す**方式で実装。RealityKit Splat TOP がそのまま真のsplatとして描画できる
+  =完全オンデバイスの「写真→splat」パイプライン
+- 実装: ph_start に splatPath/splatScale を追加。modelFile と pointCloud を同時リクエスト
+  (pendingRequests カウントで完了判定)。writeSplatPLY は f_dc=(c/255-0.5)/C0 の SH DC逆変換、
+  opacity=logit(0.95)、scale=log(最近傍距離中央値×係数・2000点サンプル総当り)、rot=恒等。
+  パラメータ Export Splat PLY / Splat PLY File / Splat Scale。Info DAT に splat / splat_points
+- **踏んだ罠**: ①Object Capture は Y上向き・3DGS ply 慣例は Y下向き → **書き出し時に y,z を反転**
+  (しないと Splat TOP のX軸180°自動正立で上下逆になる・実測)②pointCloud の点群密度は
+  Detail 非依存(SfM疎点群・templeRing 47枚で約1650点)③自前パッチスクリプトのガード条件ミスで
+  パラメータ定義だけ未挿入→「バイナリに文字列はあるのにTDにパラメータが出ない」状態を踏んだ
+  (lsofでロード確認→ソース確認で発見)
+- **実測(M2・templeRing 47枚)**: 再構成+点群→ 1656 splat の .ply、RealityKit Splat TOP で
+  **正立の神殿がsplat描画**されることを視認(等方ガウシアン・疎点群なのでぼかし気味=READMEに簡易版と明記)
+- あわせて **Music Understanding をユーザー追加の実サンプルで追検証**(gitignore済み):
+  music_sample_01.m4a=BPM135/E♭minor/14sections、music_sample_02.wav=BPM130/Gminor/9sections
+  (曲ごとに異なる正しい解析)。検証ループの「前回結果を読むレース」に注意(fresh nodeで再確認した)
+- README(RealityKitCapture+ルート英日)更新。ビルド・署名・常設インストール済み
+
 ### 2026-08-13 AVF Camera に UVC コントロールとビデオ通話機能を追加(途中・カメラを壊しかけた)
 
 - ユーザー「uvc control 追加したい。さらに mac に標準でついている webcam のビデオ通話用機能を
@@ -6023,6 +6173,358 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **教訓**: 「他アプリでは見えるのに TD で見えない」ときは、まず **TD本体の `/local/midi/*`** を
   見る。そこも空ならプラグインではなく TDプロセス側の問題と切り分けられる
 
+### 2026-08-14 macos27ブランチを main へ統合(以後 main 一本で開発)
+
+- ユーザー「このosはbeta版のmacos27で、その新機能の開発用の環境だが、基本mainブランチのみで
+  開発していく事になった」→ `macos27/realitykit-splat` を **main へ --no-ff マージ**して以後 main で作業
+- **mainは別マシン側で大幅に進んでいた**(AVF Camera / CoreMIDI / demo.toe改称 / PLUGINS.tsv /
+  release.sh 公証パイプライン / READMEの英日併記化 等)ため ff 不可。6ファイルで競合し手動解決:
+  - `common/build_plugin.sh`: **mainの「zsh専用」方針を採用**(自分のbash互換パッチは捨てた)。
+    main側の結論は「各 build.sh も必ず `#!/bin/zsh`」で、実際に全87件が zsh shebang であることを
+    確認済み。一括ビルドも `zsh ./build.sh` で起動する運用に統一
+  - `CLAUDE.md`: 両者の作業ログを時系列で結合(union)
+  - `README.md` / `README.ja.md`: mainが英日併記+op絞り込み済みだったので、**main側の構成に
+    新規2行(Vision IterSeg / Music Understanding)だけ差し込む**形に。branch側が持っていた
+    「mainから外された op 行」(CoreImageBokeh/SpeechActivity/Shazam/AVAudio*/PHASE等)は復活させない
+  - `LLMAFM/README.md`: mainの英日併記構成を採用し、AFM3節を英語・日本語の両方へ追加
+  - `.gitignore`: 双方の追記を結合(macOS 27検証素材の除外を追加)
+- **mainの新ルールに追従**: 「新規プラグインは指示があるまで experimental」(a668882)に従い、
+  `PLUGINS.tsv` へ MusicUnderstanding / RealityKitSplat / VisionIterSeg を **experimental・minos 27.0**
+  で登録(minos 27 は release.sh がSDK不足時にビルド除外するため必須)。
+  `tools/release.sh` の整合検査(追跡フォルダ=表)を手動で回して **87件一致**を確認
+- マージ後のソースで新規3件+改修2件(RealityKitCapture / LLMAFM)を**再ビルドして全OK**
+- 注意: マージで main 側の `demo.toe`(旧 sample.toe)運用に変わったので、macOS 27 op の
+  利用例は今後 demo.toe 側へ追加する。RealityKitSplat の未検証項目(SH degree 1〜3)は据え置き
+
+### 2026-08-14 新規3opを README でも experimental 扱いに統一
+
+- ユーザー「こちらで作ったopをREADMEでもexperimental扱いして欲しい」。**PLUGINS.tsv だけでなく
+  README の見え方も揃える**:
+  - **mainのREADME慣習を確認**: experimental op は本表(Plugin catalog)には載せず、
+    末尾の「Experimental plugins / 実験中のプラグイン」表にだけ載せる(status列に experimental /
+    **blocked** を書く)。今回はこの慣習に合わせ、新規3op(Vision IterSeg / Music Understanding /
+    RealityKit Splat)を**本表から削除し実験中表へ移動**(英日とも・status に "macOS 27+" を付記)
+  - **個別READMEにも状態注記**: 最新の慣習(AVF Camera の `> **Status: experimental.**` ブロック)に
+    倣い3件の冒頭へ「実験中(macOS 27+)・DMG非同梱・PLUGINS.tsvが正」+ 何を検証済みで
+    なぜ released でないかを明記
+  - **released op に足した macOS 27 機能も個別に実験中と明記**: RealityKit Capture の Splat出力節
+    (描画先の Splat TOP が実験中)、LLM AFM の AFM3節(実装とパラメータは確認済みだが
+    **Apple Intelligence 未有効で生成そのものは未検証**)。op自体は released のまま据え置き
+- **副産物の発見と修正**: `AVFoundationCamera` は PLUGINS.tsv では experimental なのに
+  **README の実験中表から漏れていた**(main側で追加した際の抜け)。英日とも1行追加して補った
+- 検算: PLUGINS.tsv の experimental 集合と README 実験中表が一致(blocked の SpeechActivity は
+  同表に別ラベルで載る仕様なので差分に出るのが正)、英日の表が同件数・同集合(30行)、
+  本表に非released opの混入なし — をスクリプトで確認
+
+### 2026-08-14 OS beta 更新後のSDK差分を確認(旧SDKとの実差分が取れた)
+
+- ユーザー「os beta をアップデートしたSDKに違いがあるか確認して」
+- **環境の変化**: OS `26A5388g` → **`26A5406e`**、CLT SDK build `26A5406c`、
+  Swift `swiftlang-6.4.0.27.1/clang-2100.3.27.1` → **`6.4.0.30.4/clang-2100.3.30.1`**。
+  **Xcode-beta は 27A5228h のまま更新されず、旧SDKを保持していた**
+- **これが強力**: `/Applications/Xcode-beta.app/.../MacOSX27.0.sdk`(旧)と
+  `/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk`(新)の swiftinterface を
+  **直接diffできる**。指紋でも確認(FoundationModels の user-module-version
+  2.0.62.1.402→2.0.68.1.401、CoreAI 3600.79.1→3600.83.2.14.1)。
+  **今後もOS更新のたびにこの2つを diff すれば「何が変わったか」が確定する**
+- **差分の実態(swiftinterface diff行数)**: FoundationModels 341 / RealityFoundation 165 /
+  Vision 30 / **MusicUnderstanding 0 / CoreAI 0 / ImagePlayground 0**
+  - **Vision**: `RecognizeAnimalsRequest` に **revision3** と **`Identifier` enum
+    (dog/cat/dogHead/catHead)** + `supportedIdentifiers` が追加(= VisionAnimalPose を
+    犬猫/頭部で絞れる)。`GenerateIterativeSegmentationRequest` に
+    `supportedComputeStageDevices` 追加。**我々が使う seedPoint/seedBox/seedScribbleBuffer・
+    QualityLevel・DownloadableAssetsRequestStatus は無変更**
+  - **FoundationModels**: **`SystemLanguageModel.variant` が新規**で、値は
+    **`.core3` / `.coreAdvanced3`(= AFM3世代のバリアント識別)**。ただし **getter のみで
+    variant を指定する init は無い**(選択不可・識別だけ)。ほかに `supportedLanguages` /
+    `supportsLocale(_:)`、`Transcript.HistoryView`。**破壊的変更は `metadata:` 引数の型が
+    `[String: any Codable&Sendable&Equatable]` → `[String: any ConvertibleToGeneratedContent]`**
+    (既定値なので渡していない我々は無影響)。`CustomSegment` プロトコルは削除
+  - **RealityFoundation**: `PortalComponent.BoundaryMode` の **`.disabled` → `.none` に改名**、
+    `Entity.write(_ scenes:)` → `(_ entities:)` のラベル変更(いずれも未使用)。
+    **GaussianSplat* / LowLevelBuffer は差分ゼロ** = splat経路は無変更
+- **検証**: 影響する5件(RealityKitCapture / VisionIterSeg / MusicUnderstanding /
+  RealityKitSplat / LLMAFM)を新SDKで**全てビルド成功**。minos も全件 26.0 のまま
+  (`TD_MIN_MACOS` ガードが効いている)。= **SDK更新による破壊的影響なし**
+- **前回の記述を訂正**: FMHelper のコメントに「contextSize は PCC モデル専用」と書いたが、
+  **`SystemLanguageModel.contextSize` も公開されている**(旧SDKにも存在。@backDeployed で
+  26.4以前は 4096 を返す)。`LanguageModelSession` に無いだけ。オンデバイス側の
+  context_size も出せる = 改善の余地
+
+### 2026-08-14 開発環境のPluginsがmain時点へ巻き戻っていた(splatが消えていた原因)
+
+- ユーザー「RealityKit Captureにsplatの作成はついてない?」→ **実装済みだがインストール済み
+  バイナリに入っていなかった**。調査結果:
+  - ソースには splat 機能あり(`Exportsplat`/`Splatfile`/`Splatscale`・`writeSplatPLY`)
+  - **インストール済みバンドルは 8/13 00:23 ビルドで splat 文字列ゼロ**。
+    同時刻に LLMAFM も入れ替わっており(AFM3機能なし)、
+    **VisionIterSeg / MusicUnderstanding / RealityKitSplat は未インストール**
+  - = **8/13 に Plugins フォルダ全体が「main時点(macos27ブランチ統合前)」の状態で
+    入れ直されていた**。ブランチで作った機能は当然入っていない
+- 5件を新SDKでリビルドして再インストール。`Exportsplat/Splatfile/Splatscale` が
+  バイナリに入り、署名検証も通ることを確認
+- **教訓**: 「ソースにあるか」と「インストール済みバイナリにあるか」は別問題。
+  TDで機能が見えないときは `strings <installed>/Contents/MacOS/<exe> | grep <ParName>` で
+  まずインストール済みを疑う(ブランチ作業と一括再ビルドが交差すると起きる)
+- **未着手の申し送り**: `GenerateIterativeSegmentationRequest` には
+  **`addIncludedPoint` / `addExcludedPoint`(新旧SDK両方に存在)** があり、これが
+  op名の "Iterative" の本体(マスクを対話的に足し引きして詰める)。現実装は単発プロンプトのみで
+  未使用。TD側は点リストのDAT/CHOP入力を足せば実装できる
+
+### 2026-08-14 【訂正】RealityKit Capture の splat 書き出しは「3DGSの生成」ではない
+
+- ユーザー指摘「実装したSplatの書き出しは本当の3DGSではなかったはず」→ **その通り。過去の記述が
+  誇張だった**。8/6 のログとREADMEで「完全オンデバイスの写真→splatパイプライン」「真のsplatとして
+  描画」と書いたが、実装が実際にやっているのは:
+  - `PhotogrammetrySession` の **pointCloud(SfMの疎点群)をそのまま座標に**(学習・最適化なし)
+  - 共分散は**等方の固定値**(半径=最近傍距離の中央値×係数)。異方性なし
+  - 不透明度は**全点固定 0.95**、回転は**恒等**、色は**SH DC項のみ**(視点依存なし)
+  - 点数も疎(templeRing 47枚で約1650点)
+  = **中身は点群で、3DGSを名乗れるのはファイルレイアウトだけ**。「3DGSの生成」ではない
+- **修正内容**: ①パラメータ**ラベル**を正直に(`Export Splat PLY`→`Export Point Cloud (3DGS PLY)`、
+  `Splat PLY File`→`Point Cloud PLY File`、`Splat Scale`→`Point Size`)。**par名は不変**なので
+  既存 .toe は無傷 ②README(該当+ルート英日)に「**3DGSの生成ではない**」と明記し、
+  本物との差分を項目別の比較表に(生成手順/共分散/不透明度/回転/色/点数)
+  ③本物が欲しい場合は外部ツール(INRIA実装・Postshot等)で学習した .ply を
+  **RealityKit Splat TOP に直接読ませる**のが正解、と誘導を追加
+- **教訓**: ファイル形式を満たすことと、その形式が表す**手法を実装したこと**は別。
+  形式変換に手法の名前を付けると誇張になる。「何をしていないか」を表で書くのが誠実
+
+### 2026-08-14 LLM MLX は macOS 26 機でビルドする方針 + release.sh の「黙って落とす」バグ修正
+
+- ユーザー「LLMMLXのビルドはmacos26環境でやる予定」。**なぜLLMMLXだけ特別なのか**を実物で確認:
+  1. mlx-swift の Metal(`default.metallib`)は **SwiftPM の `swift build` では作れない**
+     (公式README明記)。生成されないと実行時 `Failed to load the default metallib`。
+     → **`xcodebuild` 必須**。他のSPMプラグイン(CoreMLImageGen / SpeechTranscribe)は
+     Metalシェーダを持たないので `swift build` で足る = **LLMMLXだけ**の理由
+  2. `xcodebuild` は**フルXcode専用**。この機の `xcode-select` は CommandLineTools を
+     指しているので素で叩くと失敗。`xcode-select --switch` は sudo が要るグローバル変更なので
+     **`DEVELOPER_DIR` でそのビルドの間だけフルXcodeを指す**
+- **見つけた穴①(修正済み)**: `LLMMLX/build.sh` は **自分で `DEVELOPER_DIR` を設定していなかった**。
+  呼び出し側で export して初めて通る状態で、素の `./build.sh` は失敗する(他マシンで再現できない罠)。
+  → **build.sh がフルXcodeを自動検出して設定**するようにした(既設定は尊重・不在なら理由を出して終了)。
+  **Metal Toolchain 不在の事前チェック**も追加(`xcrun metal --version`)。SETUP.md §2.2 に明文化
+- **Metal Toolchain は OS/Xcode 更新で無効化される**(実測): OS 26A5388g→26A5406e で
+  要求版が 27A5228f→**27A5237l** に変わり `xcodebuild -showComponent MetalToolchain` が
+  `Status: uninstalled` に。アセットはディスクに残るが使えない。再ダウンロード(約840MB):
+  `DEVELOPER_DIR=<Xcode.app>/Contents/Developer xcodebuild -downloadComponent MetalToolchain`
+  (この27機はユーザー要望で再導入済み・`Status: installed` / metalfe-32023.921.3 を確認)
+- **見つけた穴②(修正済み・こちらが重大)**: `release.sh cmd_sign` は
+  **`released` なのに `build/` 成果物が無いプラグインを無言でスキップ**していた
+  (`[ -d "$b" ] || continue` だけで、欠けを報告しない)。
+  リポジトリの方針「黙って落とすと『全部入っている』と誤解される」に反する。
+  → **欠けているものを列挙して exit 1** にした。**入れた直後に実害が判明**:
+  この機では **CoreImageGlass / LLMMLX / SpeechTranscribe の3件が欠けていた**
+  (前2件は別マシンで追加されmergeで入ったのでこの機で一度もビルドされていない)。
+  修正前にこの機でリリースを切っていたら**released 3件が欠けたDMGを黙って配っていた**
+- ベータ機の古い `LLMMLX/build`(8/5ビルド)は取り違え防止のため退避。
+  SETUP.md §3 に「LLM MLX はベータ機でビルドしない・リリースは安定版機で切る・
+  ベータ機で作業したら `rm -rf LLMMLX/build`」を追記
+
+### 2026-08-14 3DGSの「生成」は可能か調査 — Appleは非公開SPIに完成品を持っている
+
+- ユーザー「3dgsを作成する事はできるようになりそう?」→ 実機で3方向から確認
+- **① 公開API: macOS 27 でも生成はできない。** `GaussianSplatResource` の生成経路は
+  **`BufferResource(count:position:scale:...)` のバッファ投入だけ**。URLからのロードも
+  画像からの生成も無い(= 描画専用)
+- **② 非公開SPI(CorePhotogrammetry): 完全な3DGS生成APIが存在する。**
+  `dyld_info -exports` で **Gaussian関連118シンボル**を確認(バイナリは共有キャッシュ内なので
+  ディスク上はシンボリックリンク切れ。`dyld_info -exports <framework path>` なら読める)。
+  **ObjCクラスは0件で純C API**。全体像:
+  - **物体のsplat生成**: `CPGGaussianSplattingSessionCreate` /
+    `CPGGaussianSplattingOptionsCreate` + **`SetAppearanceModelingEnabled`(視点依存の外観)** /
+    **`SetEnableSparsification`** / `CPGGaussianSplattingCallbackBundleCreate` /
+    `CPGGaussianSplattingOutputGetGaussian3D(+Metadata)` / **`CPGGaussian3DSaveToURLWithMetadata`**
+  - **シーン全体のsplat生成(Environment GS)**: `CPGEnvironmentGSRequestDescriptionCreate` /
+    `CPGEnvironmentGSSessionOptionsCreate(+SetWorkingDirectory)` /
+    `CPGSessionCreateWithEnvironmentGSOptions` / `CPGSessionProcessGSRequestWithCallbacks` /
+    `CPGGSOutputGetGaussianSplattingPointCloudURL` / `CPGGSOutputGetFailure` /
+    **`CPGCheckDeviceCompatibilityForEnvironmentGS`**
+  - **データ表現は本物**: coordinates / scales / quaternions / opacities / colorDiffuse /
+    **colorRest(=高次SH)** / `GetSphericalHarmonicsDimension` / storageMode。
+    = 我々の等方・SH DCのみの簡易版とは別物で、視点依存の本物の3DGS
+  - `CPGAddSampleStreamProcessingOutputGetGaussian3D` もあり、**撮影ストリームから
+    直接Gaussianを出す経路**まで用意されている
+- **`CPGCheckDeviceCompatibilityForEnvironmentGS()` を実測すると 0 を返した**
+  (引数なしのbool想定で呼び出し・M2/macOS 27.0 26A5406e)。0=非対応の可能性が高いが、
+  **引数の正しいシグネチャが不明なので断定はできない**(要検証)
+- **結論(現時点の判断材料)**:
+  - **今すぐ本物の3DGSを作る手段は公開APIには無い**。非公開SPIは shipping プラグインには
+    使えない(無記載・OS更新で壊れる・引数仕様も不明)
+  - ただし **API表面の完成度が高い**(session/options/callback/output/save/デバイス判定が揃い、
+    物体用とシーン用の2系統、appearance modeling と sparsification のオプションまである)。
+    **macOS 27 で描画側(`GaussianSplatComponent`)が先に公開された流れ**を踏まえると、
+    生成側が後続で公開される見込みは高い。**次のbeta以降で
+    `dyld_info -exports` の GS 系が公開SDKへ出てくるかを毎回確認する**のが監視方法
+  - **今できる実用解は変わらず「外部ツール(INRIA実装 / Postshot 等)で学習した .ply を
+    RealityKit Splat TOP に直接読ませる」**。RealityKit Splat TOP は本物の3DGS .ply を
+    そのまま描画できる(36.9万splatで約44fps実測)ので、**描画側は既に用意できている**
+
+### 2026-08-14 非公開3DGS学習API(CorePhotogrammetry)を実際に駆動できることを確認
+
+- ユーザー「非公開APIで試しに実装してみることはできる?」→ **プローブ専用プロセスに隔離**して
+  段階的に検証(引数仕様が不明なのでTDには絶対載せない)。**結論: 駆動できる。実物の3DGS学習器**
+- **調査の型**: バイナリは共有キャッシュ内でディスク上はリンク切れ → **`dyld_info -exports`**で
+  シンボル列挙、**lldb で `disassemble -n <symbol>`** して引数の数と型を確定
+  (host に `marker()` を置き **dlopen 後**にブレークするのがコツ。main で止めると未ロードで
+  シンボルが見つからない)
+- **判明した事実**:
+  - **`Photogrammetry_GaussianSplatting_Kernels.metallib` が同梱**されている(+ `Gess_Kernels.metallib`)。
+    カーネル名に **`Adam` / `AdamW` / `IdentifyTileRanges`(タイルラスタライザ) / `PruneGaussianPairings`**
+    = 本物の3DGS学習実装
+  - **`CPGGaussianSplattingSessionCreate(void** out)` → rc=0 で成功**(480バイトのセッション生成)。
+    **物体側のGSパスは macOS で生きている**
+  - **`CPGCheckDeviceCompatibilityForEnvironmentGS` は `mov w0,#0; ret` の完全なスタブ**
+    = **シーン全体(Environment GS)はこのプラットフォームで無効化**されている。呼んでも常に0
+  - **`CPGGaussianSplattingOptionsCreate()` は引数なし・戻り値がハンドル**(432バイト)。
+    最初 `int(void**)` で呼んで**ポインタを32bitに切り捨てて** opts=NULL と誤診した(戻り値型に注意)
+  - **Optionsの読み書きが完全に往復した**。Appleの既定値は **INRIA 3DGS論文の値そのまま**:
+    `iterations=10000 / shDegree=3 / lambdaSSIM=0.8 / appearanceModeling=1(既定ON) /
+    densifyFromIter=500 / densifyUntilIter=15000 / positionLR 0.00016→0.0000016`
+    (setterで7000/3/0.25/1に変更→getterで一致を確認)
+  - **`CallbackBundleSetDataLoaderCallback(bundle, fn, context)`** = `stp x1,x2,[x0,#0x38]` の
+    素直な (関数ポインタ, ユーザデータ) 形
+  - **`CPGGaussianSplattingSessionRunWithInitialPointCloud` は6引数**(x0..x5)。内部で
+    構造体を組んで実装本体へ委譲するサンク。**引数の並びと型は未確定**
+- **残る関門(ここが作業の本体)**: ①Run の6引数の正体 ②**DataLoaderCallback 自体のシグネチャと
+  学習ビュー(画像+カメラ内部/外部パラメータ)の構造体レイアウト** ③初期点群の型
+  (`RunWithInitialPointCloud` なので、公開APIの `PhotogrammetrySession` の `.pointCloud` と
+  `.poses` を材料にできる見込み)
+- **呼び出し元は見つからなかった**(Vista / RealityFoundation / CorePhotogrammetry 自身の
+  imports に無し)。=呼び出し側から引数構築を学ぶ手は使えない。**Object Capture の実アプリや
+  visionOS 側バイナリを当たるのが次の手**
+- **絶対の前提**: これは**配布物には載せられない**(無記載SPI・OS更新で壊れる・
+  引数仕様が推定)。**実験は scratchpad のプローブに限る**。実用は引き続き
+  「外部ツールで学習した .ply を RealityKit Splat TOP に読ませる」
+
+### 2026-08-14 Stage 1 完了: 非公開3DGS学習APIの引数配置を実験で確定
+
+- 前項の続き。**プローブを fork 隔離**して総当りし(クラッシュしても次の試行へ進む設計)、
+  `CPGGaussianSplattingSessionRunWithInitialPointCloud` の引数を実験で絞り込んだ
+- **確定した呼び出し規約**(6引数。lldb逆アセンブル + 実呼び出しの併用で確定):
+
+  | reg | 引数 | 生成元 | 確度 |
+  |---|---|---|---|
+  | x0 | session | `CPGGaussianSplattingSessionCreate(&out)` → rc=0 | **確定** |
+  | x1 | **SfmMap**(必須・非NULL) | `CPGSfmMapCreate()` | 高(null検査+奥まで進行) |
+  | x2 | 初期点群 | `CPGDepthPointCloudCreate` + `AddPoint` | 中(NULLでも進む) |
+  | x3 | **options**(必須・非NULL) | `CPGGaussianSplattingOptionsCreate()` | **確定** |
+  | x4 | callbackBundle | `CPGGaussianSplattingCallbackBundleCreate()` | 中 |
+  | x5 | 未特定(NULL可) | — | 低 |
+
+- **x3=options の確定の仕方**: 最初 `Run(s, opts, 0,0,0,0)` は impl+272 で
+  `x3+8` を std::string として無条件参照して落ちた(公開x3がNULLだったため `0+8=0x8` を参照)。
+  `OptionsCreate` の逆アセンブルで **options+8 が初期化されている**ことを確認し、
+  x3にoptionsを入れたら**クラッシュ位置が impl+272 → impl+1864(4段ネストの奥)へ移動** =
+  metallibパスのコピーを通過して実処理に入った、と判定できた
+- **残る関門は「データを詰めること」だけで、入力は全て公開APIから作れる**見通しが立った:
+  - `CPGSfmMapSetCameraBySampleID` / `SetSampleIsRegistered` / `SetBoundingBox` で SfmMap を構築
+  - `CPGCameraCreateWithIntrinsicsExtrinsicsResolution` ← **公開 `PhotogrammetrySession` の
+    `.poses` リクエストがカメラ姿勢を返す**ので材料が揃う
+  - `CPGDepthPointCloudCreate`/`AddPoint` ← 公開 `.pointCloud` の点をそのまま入れられる
+  - `CPGSfmMapLoadFromURL` もあるので、保存済みSfMを読む手も残っている
+  - 出力は `CPGGaussianSplattingOutputGetGaussian3D` → coordinates/scales/quaternions/
+    opacities/colorDiffuse/**colorRest(高次SH)** を読んで INRIA .ply に書けば
+    **既存の RealityKit Splat TOP でそのまま描画できる**
+- **今の未確定**: ①x5 の正体 ②**DataLoaderCallback のコールバック自身のシグネチャ**
+  (sampleID→画像を返す契約と思われる)③intrinsics/extrinsics の構造体レイアウト
+  (simd float3x3 / float4x4 の見込み)④sampleID の型
+- **プローブ手法の再現メモ**(次セッション用):
+  - `dyld_info -exports <framework>` でシンボル列挙(ディスク上のバイナリはリンク切れ・
+    共有キャッシュ内なので nm は不可)
+  - lldb は host に `marker()` を置き **dlopen 後**にブレーク → `disassemble -n <sym>`
+  - **戻り値でハンドルを返す関数を `int` で受けるとポインタが32bitに切り捨てられる**(実際に誤診)
+  - 引数当ては **fork 隔離 + 戻り値/シグナル判定**。`rc=-2` が内部のnull検査、
+    SIGSEGV の**発生位置の深さ**が「どこまで通ったか」の指標になる
+- **前提は不変**: SPIなので**配布物には載せない**。実験は scratchpad のプローブに限る
+
+### 2026-08-14 Stage 2: 非公開3DGS学習APIの呼び出しシーケンスが rc=0 で通った
+
+- **到達点**: 一連の呼び出しが**成功(rc=0)し、`CPGGaussianSplattingOutput` と
+  `CPGGaussian3D` を取得できた**。Metalシェーダのコンパイルも走り、進捗コールバックも発火する。
+  **ただし splat数=0**(入力の点群が空・実画像を与えていないため)。
+  = 「APIは完全に駆動できる」ことの証明であって、**まだsplatを生成できたわけではない**
+- **確定した完全なシグネチャ**:
+  ```c
+  int CPGGaussianSplattingSessionRunWithInitialPointCloud(
+      void*  session,        // x0  CPGGaussianSplattingSessionCreate(&out) → rc=0
+      void*  sfmMap,         // x1  CPGSfmMapCreate() + SetCameraBySampleID + SetSampleIsRegistered
+      void*  pointCloud,     // x2  CPGDepthPointCloudCreate()(+AddPoint)。**NULLだと落ちる**
+      void*  options,        // x3  CPGGaussianSplattingOptionsCreate()
+      void*  callbackBundle, // x4  CPGGaussianSplattingCallbackBundleCreate()
+      void** outOutput);     // x5  出力(CPGGaussianSplattingOutput)を受け取る
+  ```
+- **各生成関数の作法(ここが罠だった)**:
+  - `CPGGaussianSplattingSessionCreate(void** out)` → **出力引数**、戻り値はrc
+  - `CPGGaussianSplattingOptionsCreate(void)` → **戻り値でハンドル**(引数なし)
+  - `CPGGaussianSplattingCallbackBundleCreate(void)` → 戻り値でハンドル
+  - `CPGSfmMapCreate(void)` / `CPGDepthPointCloudCreate(void)` → 戻り値でハンドル
+  - **`CPGCameraCreateWithIntrinsicsExtrinsicsResolution(const simd_double3x3* K,
+    const simd_double4x4* E, void** outCamera, simd_double2 resolution)`**
+    ← **第3引数が出力**。NULLを渡すと `str x21,[x19]` で即クラッシュ(これで一度落とした)。
+    intrinsics=96B(double3x3)/extrinsics=128B(double4x4)は逆アセンブルのロード幅から確定
+  - `CPGSfmMapSetCameraBySampleID(map, int sampleID, camera)` /
+    `CPGSfmMapSetSampleIsRegistered(map, int sampleID, bool)` ← **sampleIDは32bit整数**
+    (`mov w9, w1` から判明)
+- **CallbackBundle のレイアウト**(80バイト。各スロットに (fn, ctx) を格納):
+  `+0x08 MemoryWillChange / +0x18 MemoryDidChange / +0x28 Iteration / +0x38 DataLoader`
+- **DataLoaderCallback は「データ要求」ではなく進捗通知だった**(重要な誤解の訂正)。
+  実際の引数は `(loaderObj, progressObj, context, x3, …)` で **contextは第3引数**。
+  第2引数が `CPGGaussianSplattingDataLoaderProgress` で、
+  `GetPercentage`=`[obj+0x8]`(float)、メッセージは `obj+0x10` に **"Loaded image 0"** と入っていた。
+  = **画像の供給はパイプライン側が自前で行っている**
+- `IterationResult` のレイアウト: `+0x08 step(int32) / +0x0c loss(float) / +0x14 numGaussians(int32)`
+- **残る唯一の関門は「実データの投入経路」**:
+  ①`CPGDepthPointCloudAddPoint` の引数(float regs s3/v4 を使う。位置+法線+色と推定)
+  ②**画像をどこから読ませるか**。進捗が "Loaded image 0" と言うので sampleID 0 に対応する
+  画像を探しているはず。候補は options 内の作業ディレクトリ(options+8 が std::string)、
+  `CPGSampleCreateWithCVPixelBuffer`+`CPGSessionAddSample` 経由の別セッション、
+  `CPGSfmMapLoadFromURL` で読む保存済みSfM
+- **プローブ実装の教訓**: **stdout をリダイレクトするとクラッシュで出力が全て失われる**
+  → `setvbuf(stdout,NULL,_IONBF,0)` を先頭に入れる(これで「無出力」の謎が解けた)。
+  クラッシュ位置の**深さの変化**が「引数が正しくなったか」の最良の指標
+- **前提は不変**: SPI なので**配布物には載せない**。実験は scratchpad のプローブ限定
+
+### 2026-08-14 Stage 3: 画像を渡す経路が無く、外部から本物のsplatは生成できないと判明(調査終了)
+
+- **結論: 非公開APIで学習器は駆動できるが、画像を供給する経路が公開されていないため、
+  外部から本物の3DGSを生成することはできない。** ここで調査を打ち切る
+- **画像がどう探されているか(実測)**: カメラを3台登録して Run すると、DataLoader が
+  **33% / 67% / 100% で sampleID 0,1,2 の "Loaded image N"** を報告した
+  = **SfmMap の登録サンプルを列挙して、sampleIDごとに画像を引きに行っている**
+- **引きに行く先を逆アセンブルで特定**: 画像ロード関数(ワーカースレッドから呼ばれる)は
+  `[x0+0x8]` の内部オブジェクトを見て、`+0x50`(バケット配列)/`+0x58`(バケット数)/
+  `+0x78`(配列)を使い **`udiv`/`msub` によるハッシュ探索で sampleID → 画像**を引いている。
+  つまり**内部に per-sample の画像ハッシュマップがある**
+- **ここが構造的な壁**:
+  - **この画像マップに挿入する公開(export)関数が存在しない**。`CPGGaussianSplatting*` の
+    エクスポート79個を全数確認したが、画像/ピクセルバッファを渡す口は無い
+  - `Run` の**6引数は全て用途が確定済み**(session / sfmMap / pointCloud / options /
+    callbackBundle / outOutput)で、**画素を運ぶ引数が無い**
+  - `SfmMap` 側にも画像URLのsetterは無い(cameras と tracks だけ)
+  - 画像を持つのは `CPGSample`(`CPGSampleCreateWithCVPixelBuffer`)+ `CPGSessionAddSample` で、
+    これは**別系統の本体セッション(`CPGSessionCreate`)**に属する。本体セッションから
+    オブジェクトGSへ繋ぐ関数は `CPGSessionProcessGSRequestWithCallbacks`(= Environment GS 系)
+    しかなく、**そちらは `CPGCheckDeviceCompatibilityForEnvironmentGS` が
+    `mov w0,#0; ret` のスタブで macOS では無効**
+  - = **Appleの上位内部コードだけが画像プロバイダを構築できる**設計。外部からは
+    内部C++オブジェクトを手で捏造するしかなく、それは現実的でない(OS更新で即壊れる)
+- **今回の調査で得られた確定情報(将来Appleが公開したら即使える)**:
+  - `Run` の完全なシグネチャと各生成関数の作法(出力引数方式か戻り値方式か)
+  - Options = INRIA 3DGS のハイパーパラメータそのまま(既定 iterations=10000 / SH=3 /
+    λSSIM=0.8 / positionLR 0.00016→0.0000016 / densify 500〜15000)。読み書き可能
+  - CallbackBundle レイアウト(+0x08/+0x18/+0x28/+0x38)、
+    IterationResult(+0x08 step / +0x0c loss / +0x14 numGaussians)、
+    DataLoaderProgress(+0x08 割合 / +0x10 メッセージ)
+  - Camera 生成: `(const simd_double3x3* K, const simd_double4x4* E, void** out, simd_double2 res)`
+  - 出力は `colorRest`(高次SH)まで読める → INRIA .ply に書けば **RealityKit Splat TOP で描画可能**
+- **監視方法(次にやること)**: OS/SDK 更新のたびに
+  `dyld_info -exports` の `CPGGaussianSplatting*` と、公開SDK側に splat **生成**APIが
+  出てきたかを確認する(描画側 `GaussianSplatComponent` が macOS 27 で先に公開された流れ)。
+  **画像を渡す口が公開された瞬間に、上記の確定情報でそのまま実装できる**
+- **実用解は変わらず**: 外部ツール(INRIA実装 / Postshot 等)で学習した .ply を
+  **RealityKit Splat TOP に直接読ませる**(36.9万splatで約44fps実測済み)
+
 ### 2026-08-14 CoreMIDI In をノート/CC 対応に(届いた分を自動でチャンネル化)
 
 - ユーザー「midiコンのキーボードとかpadとかノブの入力も全て扱いたい」→ 同期専用だった In を拡張
@@ -6041,3 +6543,4 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   **MIDIチャンネル番号は機材が送ってきたそのまま**(この個体は鍵盤が ch14)
 - README(英日)の「何のためにあるか」を書き換え、「鍵盤・パッド・ノブ」節と実測を追加
 - 次にやること: demo.toe への利用例追加(未着手)。MIDI 2.0(UMP)対応は将来
+

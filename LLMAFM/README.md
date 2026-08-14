@@ -1,4 +1,4 @@
-# LLM AFM DAT — Apple Intelligence on-device LLM (macOS 26+)
+# LLM AFM DAT — Apple Intelligence LLM (macOS 26+ / AFM3: macOS 27+)
 
 **English** | [日本語](#日本語)
 
@@ -85,6 +85,26 @@ is enough to produce `status: error: Exceeded model context window size` (measur
 - For structured results, either use Output Schema above or instruct "reply in JSON only" and
   parse the DAT
 
+### macOS 27 (AFM3-generation) additions — experimental
+
+> **Unverified.** These are implemented and the parameters/diagnostics were checked in TD,
+> but generation itself is untested because Apple Intelligence is not enabled on the test
+> machine yet. macOS 26 behaviour is unchanged.
+
+On macOS 27 FoundationModels moves to the new-generation model (AFM3) with an extended API.
+This OP adds:
+
+| Feature | Details |
+|---|---|
+| **Model menu** | `On-Device (AFM)` / `Private Cloud Compute` (Apple's server-side larger model) |
+| **Image input (Vision)** | `Image TOP` + `Use Image` on the Vision page — attach a TOP image to the prompt |
+| **Reasoning** | `Off / Light / Moderate / Deep` (`ContextOptions.ReasoningLevel`) |
+| **Diagnostics** | Info DAT: `model` / `capabilities`; Info CHOP: `context_size / input_tokens / output_tokens` |
+
+**macOS 26 compatibility is kept**: every 27-only API sits behind `#available(macOS 27.0, *)`.
+On 26 the classic text / structured output / tool calling keep working; selecting a 27-only
+feature just reports an error in `status` (no crash).
+
 ### Build
 
 ```
@@ -93,13 +113,33 @@ is enough to produce `status: error: Exceeded model context window size` (measur
 
 ## 日本語
 
-Apple の **FoundationModels framework**（Apple Intelligence の ~3B オンデバイスLLM）で
-テキスト生成する TD カスタム DAT。**完全オンデバイス・API課金なし・ネットワーク不要**。
+Apple の **FoundationModels framework**（Apple Intelligence のオンデバイスLLM）で
+テキスト生成する TD カスタム DAT。**完全オンデバイス・API課金なし・ネットワーク不要**
+（Private Cloud Compute 選択時のみネットワーク使用）。
 
 名前をフレームワーク名に合わせているのは、将来ほかのLLM統合（外部API等）を
 別OPとして足すときに衝突しないようにするため。
 
 実測（M2）: 日本語の実況テキスト生成が数秒・ストリーミングで出力。
+
+### macOS 27(AFM3世代)の新機能 — 実験中
+
+> **未検証。** 実装とパラメータ/診断の表示はTD実機で確認済みですが、検証機で
+> Apple Intelligence が未有効のため**生成そのものは未テスト**です。macOS 26 の挙動は不変。
+
+macOS 27 では FoundationModels が新世代モデル(AFM3)と拡張APIになり、本OPは以下に対応:
+
+| 機能 | 内容 |
+|---|---|
+| **Model メニュー** | `On-Device (AFM)` / `Private Cloud Compute`(Appleサーバ側の大型モデル・`PrivateCloudComputeLanguageModel`) |
+| **画像入力(Vision)** | Vision ページの `Image TOP` + `Use Image`。TOPの画像をプロンプトに添付(AFM3 は `capabilities.vision` 対応) |
+| **Reasoning** | `Off / Light / Moderate / Deep`(`ContextOptions.ReasoningLevel`)。推論を深くする |
+| **診断** | Info DAT に `model` / `capabilities`(vision reasoning toolCalling guidedGeneration)、Info CHOP に `context_size / input_tokens / output_tokens` |
+
+**macOS 26 互換は維持**: 27専用APIは全て `#available(macOS 27.0, *)` ガード付きで、
+26 では従来どおりのテキスト生成・構造化出力・Tool Calling が動く。27専用機能
+(PCC / 画像 / Reasoning)を26で選ぶと status にエラーメッセージが出るだけでクラッシュしない。
+画像は Submit 時に BGRA8(top-down)でダウンロードして `Attachment(CGImage)` として添付する。
 
 ### 出力テーブル（会話履歴）
 
@@ -121,13 +161,19 @@ index | role      | text
 | Temperature | 0.7 | ランダム性 |
 | Max Tokens | 512 | 最大生成トークン |
 | Keep Context (Multi-turn) | On | 会話の文脈を保持。オフなら毎回独立した1問1答 |
+| Model | ondevice | 生成モデル(macOS 27): On-Device (AFM) / Private Cloud Compute |
+| Reasoning | off | 推論レベル(macOS 27): Off / Light / Moderate / Deep |
+| Image TOP (Visionページ) | — | プロンプトに添付する画像TOP(macOS 27・vision対応モデル) |
+| Use Image (Visionページ) | Off | Onで Submit 時に Image TOP を添付(Tool Calling とは併用不可) |
 | Max Rows | 50 | 保持する履歴行数 |
 | Submit | — | 生成実行（busy 中は無視） |
 | Clear Conversation | — | 履歴とセッションをリセット |
 
-Info CHOP: `executes / busy / turns`。Info DAT: `status`
+Info CHOP: `executes / busy / turns / tool_pending / context_size / input_tokens /
+output_tokens`。Info DAT: `status / model / capabilities`
 （ready / generating / unavailable: Apple Intelligence not enabled 等 — 端末側で
-Apple Intelligence を有効にしておく必要がある）。
+Apple Intelligence を有効にしておく必要がある。PCC は加えてネットワークと
+対象デバイスであることが必要で、不可なら `device not eligible (PCC)` 等が出る）。
 
 ### 構造化出力
 

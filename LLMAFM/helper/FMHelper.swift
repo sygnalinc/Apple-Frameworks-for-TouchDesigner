@@ -4,15 +4,26 @@
 // C ABI（fm_*）で ObjC++ プラグインへ提供する。完全オンデバイス・ネットワーク不要。
 // 端末で Apple Intelligence が有効になっている必要がある（無効時は status に理由が出る）。
 //
+// macOS 27(AFM3世代)対応:
+//   - Model 選択: On-Device(SystemLanguageModel=AFM3) / Private Cloud Compute
+//     (PrivateCloudComputeLanguageModel・Appleのサーバ側大型モデル)
+//   - 画像入力: Attachment(CGImage) → Prompt(AFM3 は capabilities.vision 対応)
+//   - Reasoning: ContextOptions.ReasoningLevel(light/moderate/deep)
+//   - 診断: capabilities / contextSize / usage(トークン数)を poll JSON に出す
+//   26以前では #available ガードで従来動作にフォールバックする。
+//
 // C API:
 //   fm_create(instructions)                    セッション生成（システム指示つき）
+//   fm_set_config(h, model, reasoning)         モデル(0=on-device/1=PCC)とreasoning(0..3)
 //   fm_submit(h, prompt, temp, maxTok, keep)   生成を非同期実行（busy 中は false）。
 //                                              keep=false なら毎回新しいセッション（文脈を持たない）
+//   fm_submit_image(h, prompt, rgba, w, h, ...) 画像つき生成(BGRA8・top-down)
 //   fm_poll(h, buf, cap)                       状態 JSON {status, busy, history:[{role,text}]}
 //   fm_clear(h)                                会話履歴とセッションをリセット
 //   fm_destroy(h)
 
 import Foundation
+import CoreGraphics
 import FoundationModels
 
 // 動的ツール: パラメータスキーマを実行時に構築し、呼び出しをホスト(TD)へ委譲する。
@@ -54,16 +65,70 @@ final class FMSession: @unchecked Sendable {
     private var pendingToolName = ""
     private var pendingToolArgs = ""
     private var toolCont: CheckedContinuation<String, Never>?
+    // AFM3(macOS 27)向け設定と診断
+    private var modelKind = 0        // 0=on-device(AFM3) / 1=Private Cloud Compute
+    private var reasoningLevel = 0   // 0=off / 1=light / 2=moderate / 3=deep
+    private var capabilitiesList: [String] = []
+    private var contextSize = 0
+    private var inputTokens = 0
+    private var outputTokens = 0
 
     init(instructions: String) {
         self.instructions = instructions
         checkAvailability()
     }
 
+    // モデル/レベル設定(cook毎に呼ばれる)。モデル変更時はセッションを作り直す
+    func setConfig(model: Int, reasoning: Int) {
+        lock.lock()
+        let modelChanged = (model != modelKind)
+        modelKind = model
+        reasoningLevel = reasoning
+        if modelChanged {
+            session = nil
+            capabilitiesList = []
+            contextSize = 0
+        }
+        lock.unlock()
+        if modelChanged { checkAvailability() }
+    }
+
     private func checkAvailability() {
+        lock.lock(); let kind = modelKind; lock.unlock()
+        if kind == 1 {
+            // Private Cloud Compute(Appleサーバ側モデル・macOS 27+)
+            guard #available(macOS 27.0, *) else {
+                setStatus("unavailable: Private Cloud Compute requires macOS 27+")
+                return
+            }
+            let pcc = PrivateCloudComputeLanguageModel()
+            switch pcc.availability {
+            case .available:
+                updateCapabilities(pcc.capabilities)
+                setStatus("ready (Private Cloud Compute)")
+                Task { [weak self] in   // contextSize は PCC 専用・async
+                    if let cs = try? await pcc.contextSize {
+                        self?.lock.lock()
+                        self?.contextSize = cs
+                        self?.lock.unlock()
+                    }
+                }
+            case .unavailable(let reason):
+                switch reason {
+                case .deviceNotEligible:
+                    setStatus("unavailable: device not eligible (PCC)")
+                case .systemNotReady:
+                    setStatus("unavailable: PCC system not ready (ネットワーク/サインイン確認)")
+                @unknown default:
+                    setStatus("unavailable (PCC)")
+                }
+            }
+            return
+        }
         let model = SystemLanguageModel.default
         switch model.availability {
         case .available:
+            if #available(macOS 27.0, *) { updateCapabilities(model.capabilities) }
             setStatus("ready")
         case .unavailable(let reason):
             switch reason {
@@ -77,6 +142,50 @@ final class FMSession: @unchecked Sendable {
                 setStatus("unavailable")
             }
         }
+    }
+
+    @available(macOS 27.0, *)
+    private func updateCapabilities(_ caps: LanguageModelCapabilities) {
+        var list: [String] = []
+        if caps.contains(.vision) { list.append("vision") }
+        if caps.contains(.reasoning) { list.append("reasoning") }
+        if caps.contains(.toolCalling) { list.append("toolCalling") }
+        if caps.contains(.guidedGeneration) { list.append("guidedGeneration") }
+        lock.lock(); capabilitiesList = list; lock.unlock()
+    }
+
+    // 選択中モデルでセッションを生成(macOS 27はmodel指定・26以前は従来の既定モデル)
+    private func makeSession(tools: [any Tool] = []) -> LanguageModelSession {
+        if #available(macOS 27.0, *), modelKind == 1 {
+            return LanguageModelSession(model: PrivateCloudComputeLanguageModel(),
+                                        tools: tools, instructions: instructions)
+        }
+        return LanguageModelSession(tools: tools, instructions: instructions)
+    }
+
+    // ContextOptions(reasoningLevel)。off または macOS 26以前では nil
+    @available(macOS 27.0, *)
+    private func makeContextOptions() -> ContextOptions? {
+        lock.lock(); let lv = reasoningLevel; lock.unlock()
+        switch lv {
+        case 1: return ContextOptions(reasoningLevel: .light)
+        case 2: return ContextOptions(reasoningLevel: .moderate)
+        case 3: return ContextOptions(reasoningLevel: .deep)
+        default: return nil
+        }
+    }
+
+    // 生成完了後に usage を取り込む(macOS 27)。
+    // contextSize は PCC モデル専用のプロパティで、checkAvailability 時に取得する
+    private func captureUsage(_ sess: LanguageModelSession) async {
+        guard #available(macOS 27.0, *) else { return }
+        let usage = sess.usage
+        let inTok = usage.input.totalTokenCount
+        let outTok = usage.output.totalTokenCount
+        lock.lock()
+        inputTokens = inTok
+        outputTokens = outTok
+        lock.unlock()
     }
 
     private func setStatus(_ s: String) {
@@ -114,7 +223,10 @@ final class FMSession: @unchecked Sendable {
         do {
             lock.lock()
             if !keepContext || session == nil {
-                session = LanguageModelSession(instructions: instructions)
+                lock.unlock()
+                let s = makeSession()
+                lock.lock()
+                session = s
             }
             let sess = session!
             lock.unlock()
@@ -123,9 +235,121 @@ final class FMSession: @unchecked Sendable {
             options.temperature = temperature
             options.maximumResponseTokens = maxTokens
 
-            let stream = sess.streamResponse(to: prompt, options: options)
+            if #available(macOS 27.0, *), let co = makeContextOptions() {
+                let stream = sess.streamResponse(to: prompt, options: options,
+                                                 contextOptions: co)
+                for try await partial in stream {
+                    lock.lock()
+                    if generation == gen, var last = history.last, last["role"] == "assistant" {
+                        last["text"] = partial.content
+                        history[history.count - 1] = last
+                    }
+                    lock.unlock()
+                }
+            } else {
+                let stream = sess.streamResponse(to: prompt, options: options)
+                for try await partial in stream {
+                    // partial は累積スナップショット
+                    lock.lock()
+                    if generation == gen, var last = history.last, last["role"] == "assistant" {
+                        last["text"] = partial.content
+                        history[history.count - 1] = last
+                    }
+                    lock.unlock()
+                }
+            }
+            await captureUsage(sess)
+            lock.lock()
+            busy = false
+            status = "ready"
+            lock.unlock()
+        } catch {
+            lock.lock()
+            busy = false
+            status = "error: \(error.localizedDescription)"
+            if var last = history.last, last["role"] == "assistant", last["text"]!.isEmpty {
+                last["text"] = "(エラー)"
+                history[history.count - 1] = last
+            }
+            lock.unlock()
+        }
+    }
+
+    // ------------------------------------------------- 画像つき生成(AFM3 vision・macOS 27+)
+    // bgra: BGRA8・top-down(TDのdownloadTexture verticalFlip=true の出力)
+    func submitImage(prompt: String, bgra: Data, width: Int, height: Int,
+                     temperature: Double, maxTokens: Int, keepContext: Bool) -> Bool
+    {
+        guard #available(macOS 27.0, *) else {
+            setStatus("error: image input requires macOS 27+")
+            return false
+        }
+        lock.lock()
+        if busy {
+            lock.unlock()
+            return false
+        }
+        if !capabilitiesList.contains("vision") {
+            status = "error: selected model does not support vision"
+            lock.unlock()
+            return false
+        }
+        busy = true
+        status = "generating"
+        history.append(["role": "user", "text": "[image] " + prompt])
+        history.append(["role": "assistant", "text": ""])
+        let gen = generation + 1
+        generation = gen
+        lock.unlock()
+
+        Task { [weak self] in
+            await self?.runImage(prompt: prompt, bgra: bgra, width: width, height: height,
+                                 temperature: temperature, maxTokens: maxTokens,
+                                 keepContext: keepContext, gen: gen)
+        }
+        return true
+    }
+
+    @available(macOS 27.0, *)
+    private func runImage(prompt: String, bgra: Data, width: Int, height: Int,
+                          temperature: Double, maxTokens: Int, keepContext: Bool,
+                          gen: Int) async
+    {
+        do {
+            // BGRA8(little-endian)→ CGImage。アルファは無視(noneSkipFirst)
+            guard let provider = CGDataProvider(data: bgra as CFData),
+                  let image = CGImage(
+                      width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+                      bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                      bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipFirst.rawValue
+                                               | CGBitmapInfo.byteOrder32Little.rawValue),
+                      provider: provider, decode: nil, shouldInterpolate: true,
+                      intent: .defaultIntent)
+            else {
+                lock.lock(); busy = false; status = "error: cannot build CGImage"; lock.unlock()
+                return
+            }
+            lock.lock()
+            if !keepContext || session == nil {
+                lock.unlock()
+                let s = makeSession()
+                lock.lock()
+                session = s
+            }
+            let sess = session!
+            lock.unlock()
+
+            var options = GenerationOptions()
+            options.temperature = temperature
+            options.maximumResponseTokens = maxTokens
+            let co = makeContextOptions() ?? ContextOptions()
+
+            let attachment = Attachment(image)
+            let stream = sess.streamResponse(options: options, contextOptions: co) {
+                attachment
+                prompt
+            }
             for try await partial in stream {
-                // partial は累積スナップショット
                 lock.lock()
                 if generation == gen, var last = history.last, last["role"] == "assistant" {
                     last["text"] = partial.content
@@ -133,6 +357,7 @@ final class FMSession: @unchecked Sendable {
                 }
                 lock.unlock()
             }
+            await captureUsage(sess)
             lock.lock()
             busy = false
             status = "ready"
@@ -209,7 +434,10 @@ final class FMSession: @unchecked Sendable {
 
             lock.lock()
             if !keepContext || session == nil {
-                session = LanguageModelSession(instructions: instructions)
+                lock.unlock()
+                let s = makeSession()
+                lock.lock()
+                session = s
             }
             let sess = session!
             lock.unlock()
@@ -239,6 +467,7 @@ final class FMSession: @unchecked Sendable {
                let s = String(data: d, encoding: .utf8) { jsonText = s }
             else { jsonText = "{}" }
 
+            await captureUsage(sess)
             lock.lock()
             structured = dict
             if generation == gen, var last = history.last, last["role"] == "assistant" {
@@ -337,7 +566,7 @@ final class FMSession: @unchecked Sendable {
                     await self?.hostToolCall(name: n, argsJSON: a) ?? "{}"
                 })
             // tools はセッション生成時に固定。ツール利用は毎回新規セッション
-            let sess = LanguageModelSession(tools: [tool], instructions: instructions)
+            let sess = makeSession(tools: [tool])
             lock.lock(); session = sess; lock.unlock()
 
             var options = GenerationOptions()
@@ -345,6 +574,7 @@ final class FMSession: @unchecked Sendable {
             options.maximumResponseTokens = maxTokens
 
             let resp = try await sess.respond(to: prompt, options: options)
+            await captureUsage(sess)
             lock.lock()
             if generation == gen, var last = history.last, last["role"] == "assistant" {
                 last["text"] = resp.content
@@ -392,6 +622,11 @@ final class FMSession: @unchecked Sendable {
             "structured": structured,
             "pending_tool": pendingToolName,
             "pending_tool_args": pendingToolArgs,
+            "model": modelKind == 1 ? "pcc" : "ondevice",
+            "capabilities": capabilitiesList,
+            "context_size": contextSize,
+            "input_tokens": inputTokens,
+            "output_tokens": outputTokens,
         ]
         lock.unlock()
         guard let data = try? JSONSerialization.data(withJSONObject: dict),
@@ -437,6 +672,33 @@ public func fm_poll(_ handle: UnsafeMutableRawPointer?,
     memcpy(buffer, utf8, utf8.count)
     buffer[utf8.count] = 0
     return Int32(utf8.count)
+}
+
+@_cdecl("fm_set_config")
+public func fm_set_config(_ handle: UnsafeMutableRawPointer?, _ model: Int32,
+                          _ reasoning: Int32)
+{
+    guard #available(macOS 26.0, *), let handle else { return }
+    let session = Unmanaged<FMSession>.fromOpaque(handle).takeUnretainedValue()
+    session.setConfig(model: Int(model), reasoning: Int(reasoning))
+}
+
+@_cdecl("fm_submit_image")
+public func fm_submit_image(_ handle: UnsafeMutableRawPointer?,
+                            _ prompt: UnsafePointer<CChar>?,
+                            _ bgra: UnsafePointer<UInt8>?,
+                            _ width: Int32, _ height: Int32,
+                            _ temperature: Double, _ maxTokens: Int32,
+                            _ keepContext: Bool) -> Bool
+{
+    guard #available(macOS 26.0, *), let handle, let prompt, let bgra,
+          width > 0, height > 0 else { return false }
+    let session = Unmanaged<FMSession>.fromOpaque(handle).takeUnretainedValue()
+    let data = Data(bytes: bgra, count: Int(width) * Int(height) * 4)   // コピーして所有
+    return session.submitImage(prompt: String(cString: prompt), bgra: data,
+                               width: Int(width), height: Int(height),
+                               temperature: temperature, maxTokens: Int(maxTokens),
+                               keepContext: keepContext)
 }
 
 @_cdecl("fm_submit_structured")
