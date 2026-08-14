@@ -122,6 +122,7 @@ CoreML trio), provides the data side. Four modes, all measured working:
 | **Geocode** | Place name or address → coordinates. "Tokyo Station" → 35.68107, 139.76743. Implemented with `MKLocalSearch`, because `CLGeocoder` returns *no result* (kCLErrorDomain 8) for place names |
 | **Reverse Geocode** | lat/lon → `country / admin_area / locality / thoroughfare / postal_code` |
 | **Route** | Source → destination, walking/driving/transit. `Steps` gives instructions with distances (Shibuya→Tokyo Station walking: 7532 m / 124 min, Japanese instructions); `Points` gives the **full route polyline** (190 rows for that route) |
+| **Look Around Coverage** | Where does Look Around imagery exist? There is no coverage-query API, so this probes scene requests point by point (a miss costs ~0.16 s). No input: scans a `Coverage Grid` × Grid over `Span` around the centre — Tokyo Station 600 m, 5×5: **23/25 points covered** in ~20 s (the station building itself is one of the two holes, which explains the TOP's earlier "no coverage" there). With a DAT wired into the input (search results, route points — any table with lat/lon in columns 1–2): checks each row instead — all 6 Shibuya cafés from a search came back available. If the result stays empty right after wiring an input, press **Refresh** (the input may still have been loading when first read) |
 
 `Points` exists to feed the TOP: DAT to CHOP the lat/lon columns and drive the MapKit TOP's camera
 along the route — a turn-by-turn flythrough.
@@ -259,6 +260,7 @@ Info CHOP: `executes / frames / running / window_ready / available / width / hei
 | **Geocode** | 地名・住所 → 座標。「東京駅」→ 35.68107, 139.76743。実装は `MKLocalSearch`(`CLGeocoder` は地名で kCLErrorDomain 8 = 結果なしを返すため) |
 | **Reverse Geocode** | 緯度経度 → `country / admin_area / locality / thoroughfare / postal_code` |
 | **Route** | 出発地 → 目的地。徒歩/車/公共交通。`Steps` は距離つきの案内(渋谷→東京駅 徒歩 7532m / 124分・日本語の案内)、`Points` は**経路のポリライン全点**(この経路で190行) |
+| **Look Around Coverage** | Look Around がどこにあるか。カバー範囲の問い合わせ API は無いので、シーン要求を点ごとに投げて当たり外れを見る(外れは約0.16秒)。入力なし: 中心 + `Span` を `Coverage Grid` × Grid で走査 — 東京駅600mの5×5で**23/25点にあり**(約20秒。駅舎そのものが穴の1つで、TOP で「範囲外」だった理由もこれで分かる)。**入力 DAT を繋ぐ**と(検索結果・経路の点列など、1〜2列目が lat/lon の表)各行を判定 — 渋谷のカフェ検索6件は全てあり。入力を繋いだ直後に空のままなら **Refresh**(初回読み取り時に入力がまだロード中のことがある) |
 
 `Points` は TOP へ流すためにある: lat/lon 列を DAT to CHOP して MapKit TOP のカメラを
 経路に沿って動かせば、道なりの飛行になる。

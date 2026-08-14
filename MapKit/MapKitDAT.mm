@@ -10,6 +10,7 @@
 #import <Foundation/Foundation.h>
 #import <MapKit/MapKit.h>
 #import <CoreLocation/CoreLocation.h>
+#include <array>
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -58,17 +59,59 @@ public:
         const std::string transport = str(in, "Transport", "walking");
         const std::string routeOut = str(in, "Routeoutput", "steps");
         const int maxResults = std::max(1, std::min(100, (int)in->getParInt("Maxresults")));
+        const int grid = std::max(2, std::min(10, (int)in->getParInt("Grid")));
+
+        // Look Around Coverage の対象点:
+        // 入力 DAT があればその各点(検索結果・経路の点列をそのまま繋げる)、
+        // 無ければ中心 + Span のグリッド走査
+        std::vector<std::array<std::string, 3>> pts;   // name, lat, lon
+        if (mode == "lookaround") {
+            const OP_DATInput* src = in->getInputDAT(0);
+            if (src && src->numRows > 0) {
+                for (int r = 0; r < src->numRows && (int)pts.size() < 100; r++) {
+                    if (src->numCols < 3) continue;
+                    const char* c0 = src->getCell(r, 0);
+                    const char* c1 = src->getCell(r, 1);
+                    const char* c2 = src->getCell(r, 2);
+                    char* e1 = nullptr; char* e2 = nullptr;
+                    if (c1) strtod(c1, &e1);
+                    if (c2) strtod(c2, &e2);
+                    if (e1 == c1 || e2 == c2) continue;   // ヘッダ行
+                    pts.push_back({c0 ? c0 : "", c1, c2});
+                }
+            } else {
+                for (int gy = 0; gy < grid; gy++)
+                    for (int gx = 0; gx < grid; gx++) {
+                        const double fy = grid > 1 ? (double)gy / (grid - 1) - 0.5 : 0;
+                        const double fx = grid > 1 ? (double)gx / (grid - 1) - 0.5 : 0;
+                        const double la = lat + fy * span / 111320.0;
+                        const double lo = lon + fx * span /
+                                          (111320.0 * cos(lat * M_PI / 180.0));
+                        char nm[24]; snprintf(nm, sizeof nm, "g%d_%d", gy, gx);
+                        pts.push_back({nm, fmt(la), fmt(lo)});
+                    }
+            }
+        }
 
         char sig[512];
-        snprintf(sig, sizeof sig, "%s|%s|%.7f|%.7f|%.1f|%.7f|%.7f|%s|%s|%d",
+        snprintf(sig, sizeof sig, "%s|%s|%.7f|%.7f|%.1f|%.7f|%.7f|%s|%s|%d|%d|%zu",
                  mode.c_str(), query.c_str(), lat, lon, span, dlat, dlon,
-                 transport.c_str(), routeOut.c_str(), maxResults);
+                 transport.c_str(), routeOut.c_str(), maxResults, grid, pts.size());
+        if (mode == "lookaround")   // 入力の中身が変わったら取り直す
+            for (const auto& pt : pts) {
+                const size_t len = strlen(sig);
+                snprintf(sig + len, sizeof sig - len, "|%.6s%.6s",
+                         pt[1].c_str() + std::max<int>(0, (int)pt[1].size() - 6),
+                         pt[2].c_str() + std::max<int>(0, (int)pt[2].size() - 6));
+                if (len > sizeof sig - 32) break;
+            }
         const bool force = myRefresh.exchange(false);
         if ((mySig != sig || force) && !myBusy.exchange(true)) {
             mySig = sig;
             myRequests++;
             myStart = CFAbsoluteTimeGetCurrent();
-            request(mode, query, lat, lon, span, dlat, dlon, transport, routeOut, maxResults);
+            if (mode == "lookaround") startCoverage(std::move(pts));
+            else request(mode, query, lat, lon, span, dlat, dlon, transport, routeOut, maxResults);
         }
 
         Table t;
@@ -91,10 +134,11 @@ public:
         {
             OP_StringParameter p("Mode");
             p.label = "Mode"; p.page = P; p.defaultValue = "search";
-            const char* n[] = {"search", "geocode", "reverse", "route"};
+            const char* n[] = {"search", "geocode", "reverse", "route", "lookaround"};
             const char* l[] = {"Search Nearby", "Geocode (address to lat/lon)",
-                               "Reverse Geocode (lat/lon to address)", "Route"};
-            m->appendMenu(p, 4, n, l);
+                               "Reverse Geocode (lat/lon to address)", "Route",
+                               "Look Around Coverage"};
+            m->appendMenu(p, 5, n, l);
         }
         { OP_StringParameter p("Query"); p.label = "Query"; p.page = P;
           p.defaultValue = "coffee"; m->appendString(p); }
@@ -117,6 +161,10 @@ public:
             const char* l[] = {"Steps", "Points (polyline)"};
             m->appendMenu(p, 2, n, l);
         }
+        { OP_NumericParameter p("Grid"); p.label = "Coverage Grid"; p.page = P;
+          p.defaultValues[0] = 5; p.minSliders[0] = 2; p.maxSliders[0] = 10;
+          p.minValues[0] = 2; p.maxValues[0] = 10; p.clampMins[0] = p.clampMaxes[0] = true;
+          m->appendInt(p); }
         { OP_NumericParameter p("Maxresults"); p.label = "Max Results"; p.page = P;
           p.defaultValues[0] = 25; p.minSliders[0] = 1; p.maxSliders[0] = 100;
           p.minValues[0] = 1; p.maxValues[0] = 100; p.clampMins[0] = p.clampMaxes[0] = true;
@@ -308,6 +356,46 @@ private:
         }];
     }
 
+    // カバー範囲の問い合わせ API は無いので、点ごとにシーン要求を投げて当たり外れを見る
+    // (外れは約0.16秒・当たりは約0.5秒の実測)。MapKit が内部で直列化するので1点ずつ
+    void startCoverage(std::vector<std::array<std::string, 3>> pts)
+    {
+        auto results = std::make_shared<Table>();
+        results->push_back({"name", "lat", "lon", "available"});
+        auto queue = std::make_shared<std::vector<std::array<std::string, 3>>>(std::move(pts));
+        coverageStep(queue, results, 0);
+    }
+
+    void coverageStep(std::shared_ptr<std::vector<std::array<std::string, 3>>> queue,
+                      std::shared_ptr<Table> results, size_t i)
+    {
+        if (i >= queue->size()) {
+            finish(std::move(*results), results->size() > 1, "");
+            return;
+        }
+        auto alive = myAlive;
+        auto* self = this;
+        const auto& pt = (*queue)[i];
+        const double la = atof(pt[1].c_str());
+        const double lo = atof(pt[2].c_str());
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!alive->load()) return;
+            MKLookAroundSceneRequest* rq = [[MKLookAroundSceneRequest alloc]
+                initWithCoordinate:CLLocationCoordinate2DMake(la, lo)];
+            [rq getSceneWithCompletionHandler:^(MKLookAroundScene* sc, NSError* e) {
+                if (!alive->load()) return;
+                results->push_back({(*queue)[i][0], (*queue)[i][1], (*queue)[i][2],
+                                    sc ? "1" : "0"});
+                {
+                    // 途中経過も見えるようにテーブルへ随時反映
+                    std::lock_guard<std::mutex> l(self->myMutex);
+                    self->myTable = *results;
+                }
+                self->coverageStep(queue, results, i + 1);
+            }];
+        });
+    }
+
     void startRoute(double lat, double lon, double dlat, double dlon,
                     std::string transport, std::string routeOut)
     {
@@ -387,7 +475,7 @@ DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* i)
     i->customOPInfo.majorVersion = 0;
     i->customOPInfo.minorVersion = 9;
     i->customOPInfo.minInputs = 0;
-    i->customOPInfo.maxInputs = 0;
+    i->customOPInfo.maxInputs = 1;   // Look Around Coverage の対象点(任意)
 }
 
 DLLEXPORT DAT_CPlusPlusBase* CreateDATInstance(const OP_NodeInfo* i)
