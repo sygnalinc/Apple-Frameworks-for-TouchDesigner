@@ -35,7 +35,5 @@ PLIST
 }
 
 build_one MapKitTOP MapKitTOP.mm mapkit-top \
-  MapKit AppKit CoreLocation CoreGraphics CoreText
-build_one MapKitLiveTOP MapKitLiveTOP.mm mapkitlive-top \
   MapKit AppKit CoreLocation CoreGraphics ScreenCaptureKit CoreMedia CoreVideo
 td_stamp_all
