@@ -25,6 +25,15 @@ mkdir -p "$OUT"
 W=480   # 書き出し幅（全て共通）
 H=270   # 16:9
 
+# **なめらかなグラデーションが全画面で動く clip は、クリップ共通のパレットでは救えない。**
+# 実測(VisionSubject の背景): 元動画は 68,442色 / 共通パレットでは実際に使えたのは 102色で
+# 帯状のムラだらけになる。**フレームごとのパレット(stats_mode=single + paletteuse=new=1)**で
+# 毎フレーム255色を使い、さらに**誤差拡散ディザ**(floyd_steinberg)にすると帯が消える。
+# そのぶん重いので fps と尺で調整する(bayer では足りない)
+filterPerFrame() {   # 幅 fps ディザ
+    print -r -- "fps=${2},scale=${1}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=256:stats_mode=single[p];[b][p]paletteuse=new=1:dither=${3}"
+}
+
 filter() {   # 幅 fps hqdn3d 色数 [ディザ]
     # 既定はディザ無し(そのぶん軽い)。**滑らかなグラデーション**(海・空・地形)が
     # 主役の clip は 64色/ディザ無しだと**帯状のムラ(バンディング)が出て汚くなる**ので、
@@ -43,9 +52,9 @@ CLIPS=(
     # 人混みの街路はほぼ全画素が毎フレーム変わる。fps と尺を落として強めに除去する
     "coreml-yolo|CoreMLDAT(yolo).mp4|0|3.2|480|10|16:16:28:28|64"
     "coreml-depth|CoreMLTOP(depthanything).mp4|0|4.0|480|12|8:8:14:14|64"
-    # 切り抜きの背景が**なめらかなグラデ**になったので、64色/ディザ無しだと帯状のムラが出る。
-    # 128色 + bayer にする(被写体は動くが背景の差分は小さいので全尺でも軽い)
-    "visionsubject|VisionSubject.mp4|0|6.3|480|12|6:6:12:12|128|bayer:bayer_scale=5"
+    # 切り抜きの背景が**全画面のなめらかなグラデ**になったので、共通パレットでは帯が出る。
+    # フレームごとのパレット + 誤差拡散(上の filterPerFrame 参照)。PERFRAME を目印にする
+    "visionsubject|VisionSubject.mp4|0|5.0|480|8|PERFRAME|256|floyd_steinberg"
     "coretext|CoreText.mp4|1.5|10.0|480|10|8:8:14:14|96"   # 冒頭は真っ白なので少し後ろから
     # 英日2画面のチャット。文字が主役なので色数を上げる。背景が動かないので長尺でも軽い
     "llmafm-chat|LLMAFM_chat.mp4|0|16.0|480|12|8:8:14:14|128"
@@ -64,8 +73,13 @@ CLIPS=(
 for c in "${CLIPS[@]}"; do
     parts=("${(@s:|:)c}")
     name="$parts[1]"; file="$parts[2]"; ss="$parts[3]"; dur="$parts[4]"
-    ffmpeg -v error -y -ss "$ss" -t "$dur" -i "$SRC/$file" \
-        -vf "$(filter "$parts[5]" "$parts[6]" "$parts[7]" "$parts[8]" "${parts[9]:-none}")" -loop 0 "$OUT/$name.gif"
+    local vf
+    if [[ "$parts[7]" == "PERFRAME" ]]; then
+        vf="$(filterPerFrame "$parts[5]" "$parts[6]" "${parts[9]:-floyd_steinberg}")"
+    else
+        vf="$(filter "$parts[5]" "$parts[6]" "$parts[7]" "$parts[8]" "${parts[9]:-none}")"
+    fi
+    ffmpeg -v error -y -ss "$ss" -t "$dur" -i "$SRC/$file" -vf "$vf" -loop 0 "$OUT/$name.gif"
     printf "%-20s %5s KB  (%ss from %ss of %s)\n" \
         "$name.gif" "$(( $(stat -f%z "$OUT/$name.gif") / 1024 ))" "$dur" "$ss" "$file"
 done
