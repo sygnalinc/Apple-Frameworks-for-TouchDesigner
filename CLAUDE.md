@@ -6707,3 +6707,16 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - README(英日)に MapKit DAT 節、ルート README の実験中の表に行を追加。
   PLUGINS.tsv はフォルダ単位なので変更なし
 - 次にやること: demo.toe への利用例(TOP + DAT 連携: 経路に沿った飛行)
+
+### 2026-08-14 demo.toe に MapKit の利用例(TOP + DAT 連携・経路に沿った飛行)
+
+- `/project1/MapKit`(System/Devices/Network の行・x=1800): `route`(MapKit DAT・渋谷→東京駅
+  徒歩の Points)→ `driver`(Execute DAT・onFrameEnd)→ `Mapkit1`(MapKit TOP・3D・pitch62・
+  高度280m)→ out1 + note
+- **driver の型**: ポリライン点列を `t = absTime.seconds * SPEED` で補間しながら lat/lon を進め、
+  **Heading は「少し先の点(LOOKAHEAD=5)への方位」に毎フレーム 6% ずつ追従**させる。
+  スナップさせると交差点でカメラが跳ねるので、この緩い追従が道なりに曲がって見えるコツ
+- **実測**: 渋谷を出発して 246 沿いに進行(検証時は平河町を通過中)。10秒で lat 35.67746→35.67893、
+  heading 53→77 と滑らかに旋回。エラーなし
+- 他の利用例と同じく **allowCooking=False で保存**(開いただけでネットワーク+SCK が走らないように)。
+  note に SPEED / Show Window の書き戻し(その間 driver はオフ)/ Look Around 切替を記載
