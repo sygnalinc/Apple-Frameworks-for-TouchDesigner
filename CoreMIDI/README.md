@@ -143,6 +143,13 @@ Channels are mapped by name, and **only changes are sent** — nothing is stream
 
 ### Notes
 
+- **The MIDI client lives on a dedicated thread with a run loop** (CoreMIDI delivers setup-change
+  notifications to the run loop of the thread that created the client, and the cook thread has
+  none). `CFRunLoopGetCurrent()` returns an **unowned** reference: if that thread exits first, the
+  run loop is deallocated and the destructor's `CFRunLoopStop` trips
+  `__CFCheckCFInfoPACSignature` (SIGTRAP) — this crashed TouchDesigner on every quit until the
+  reference was retained and released after `join()`
+
 - This op **cooks every frame whether or not its output is used**, and keeps cooking when the
   timeline is stopped. A MIDI sink that only runs when someone looks at it is useless — pulses,
   automatic Note Offs and the sync stream all need cook.
@@ -419,6 +426,13 @@ Info DAT: 送り先1件=1行で `uniqueid / name / manufacturer / model / online
 | Send Song Position | 開始時と位置が飛んだときに再生位置を伝える(既定On) |
 
 ### 注意
+
+- **MIDI クライアントはランループ常駐の専用スレッドで作る**(CoreMIDI の setup 変更通知は
+  クライアントを作ったスレッドのランループへ届き、cook スレッドにはランループが無いため)。
+  `CFRunLoopGetCurrent()` は**所有権を持たない参照**で、スレッドが先に抜けるとランループごと
+  解放される。デストラクタで `CFRunLoopStop` するとその解放済みオブジェクトを触り
+  `__CFCheckCFInfoPACSignature`(SIGTRAP)で落ちる — **TD 終了のたびにクラッシュしていた**。
+  CFRetain して `join()` の後に解放すること
 
 - このOPは**出力が使われていなくても毎フレーム cook する**。タイムラインを止めていても動く。
   パルスも自動 Note Off も同期ストリームも cook が要るので、見られていないと動かない

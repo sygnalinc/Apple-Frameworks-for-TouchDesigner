@@ -444,3 +444,35 @@
   `createArgumentsTuple` も par 代入も全部NG。**コールバックでは C++ グローバルに値を保存するだけ**にし、
   cook(TDコンテキスト)内で PyRun によるパラメータ書き戻しを行う(CoreText TOP のフォントパネルで実証)。
   なお cook 内からの直接 par 代入は問題ない
+
+## 専用スレッド + ランループ(CoreMIDI / Bonjour 系)
+
+- **`CFRunLoopGetCurrent()` は所有権を持たない参照**。専用スレッドで取って持ち回り、
+  デストラクタで `CFRunLoopStop()` する設計は**スレッドが先に抜けると use-after-free**になり、
+  `__CFCheckCFInfoPACSignature`(EXC_BREAKPOINT / SIGTRAP)でプロセスごと落ちる。
+  **CoreMIDI In/Out で実際に TD 終了のたびにクラッシュしていた**(macOS 26 実測)。
+  正しくは `CFRetain` して保持し、`join()` した後に `CFRelease` する:
+  ```objc
+  // スレッド側
+  myLoop = (CFRunLoopRef)CFRetain(CFRunLoopGetCurrent());
+  // デストラクタ
+  CFRunLoopRef loop = myLoop.exchange(nullptr);
+  if (loop) CFRunLoopStop(loop);
+  if (myThread.joinable()) myThread.join();
+  if (loop) CFRelease(loop);
+  ```
+- **終了時クラッシュは「次回起動時に『予期しない理由で終了しました』と出る」形で報告される**。
+  推測せず `~/Library/Logs/DiagnosticReports/*.ips` を読む(1行目がヘッダJSON・残りが本体JSON。
+  `triggered` のスレッドのフレームに落ちた op 名がそのまま出る)。
+  修正の検証は**レポート数が増えないこと**で判定できる(画面操作不要)
+
+## ウインドウを持つ TOP(MapKit 系)
+
+- **cook が止まったことは cook 側からは検出できない**(execute が呼ばれない = そこから投げる
+  `dispatch_async` も動かない)。コンテナの allowCooking オフやバイパスでウインドウだけ
+  画面に残るのを防ぐには、**cook と独立した dispatch タイマー**で最終 cook 時刻を見張る
+- **「表示した」と「画面に載っている」は別**。`orderBack:` でも on-screen になるので、
+  可視状態のフラグは**ウインドウ生成時にも**立てる(reconfigure だけだと畳み損ねる)
+- **ウインドウの検証は `CGWindowListCopyWindowInfo` で外部プロセスから列挙する**のが速くて確実。
+  名前と位置(x,y,w,h)が取れるので、表示中 / 退避中(端に1pt)/ 完全に下ろした、を数値で区別できる。
+  スクリーンショットや computer-use は要らない

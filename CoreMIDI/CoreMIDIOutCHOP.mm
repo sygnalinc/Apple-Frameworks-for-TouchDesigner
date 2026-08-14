@@ -55,8 +55,14 @@ public:
     ~CoreMIDIOutCHOP() override
     {
         myQuit = true;
-        if (myLoop) CFRunLoopStop(myLoop);
+        // **CFRunLoopGetCurrent() は所有権を持たない参照**。スレッドが先に抜けると
+        // ランループごと解放され、ここで CFRunLoopStop すると解放済みオブジェクトを
+        // 触って SIGTRAP(__CFCheckCFInfoPACSignature)になる。実際に TD 終了のたびに
+        // 落ちていた。→ スレッド側で CFRetain し、join した後に解放する
+        CFRunLoopRef loop = myLoop.exchange(nullptr);
+        if (loop) CFRunLoopStop(loop);
         if (myThread.joinable()) myThread.join();
+        if (loop) CFRelease(loop);
         if (myPort) MIDIPortDispose(myPort);
         if (myClient) MIDIClientDispose(myClient);
     }
@@ -357,7 +363,8 @@ private:
     void midiThread()
     {
         @autoreleasepool {
-            myLoop = CFRunLoopGetCurrent();
+            // デストラクタが join するまで生かしておくため retain する(上記参照)
+            myLoop = (CFRunLoopRef)CFRetain(CFRunLoopGetCurrent());
             MIDIClientRef c = 0;
             OSStatus st = MIDIClientCreateWithBlock(CFSTR("TDAppleOps CoreMIDI Out"), &c,
                 ^(const MIDINotification* n) {
@@ -750,7 +757,7 @@ private:
     struct PendingOff { int note; double at; };
 
     std::thread myThread;
-    CFRunLoopRef myLoop = nullptr;
+    std::atomic<CFRunLoopRef> myLoop{nullptr};   // スレッドが書き、デストラクタが読む
     MIDIClientRef myClient = 0;
     MIDIPortRef myPort = 0;
     MIDIEndpointRef myDest = 0;

@@ -6893,3 +6893,30 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   Look Around の回転は **Heading を一定間隔で置き直す方式**に変更 —
   毎フレーム動かすと op 側の追従アニメ(setPresentationYaw:animated:)が
   そのたびに作り直されてカクつくため。5秒ごとに +70度 を置くと滑らかに回る
+
+### 2026-08-14 TD 終了時クラッシュの真犯人は CoreMIDI(MapKit ではなかった)+ demo 起動時の破綻を修正
+
+- ユーザー報告「起動時に『終了時に予期しない理由で終了』と出る / MapKit demo が正しく動かない」
+- **クラッシュレポートを読んで即断できた**(推測しなくてよかった):
+  `~/Library/Logs/DiagnosticReports/TouchDesigner-*.ips` の triggered スレッドが
+  `CoreMIDIOutCHOP::~CoreMIDIOutCHOP()` → `CFRunLoopWakeUp` → `__CFCheckCFInfoPACSignature`
+  (EXC_BREAKPOINT)。**MapKit ではなく CoreMIDI In/Out のデストラクタ**だった
+- **原因**: `CFRunLoopGetCurrent()` は**所有権を持たない参照**。専用スレッドが先に抜けると
+  ランループごと解放され、デストラクタの `CFRunLoopStop` が解放済みオブジェクトを触る。
+  スレッドは 0.25秒のポーリングなので、`myQuit=true` を見て先に抜けるとこの窓が開く。
+  → スレッド側で **CFRetain**、`join()` の後に **CFRelease**。member も atomic に
+- **検証は画面操作なしで完結**: クラッシュレポートの**件数が増えないこと**で判定
+  (旧バイナリのプロセスでは 14→15 と増え、新バイナリでは 15→15 のまま)
+- **demo 起動時の破綻(こちらが「正しく動かない」の実体)**: driver の走行状態を
+  `storage` に置いていたが、**storage は .toe に保存されるのに absTime は起動でリセットされる**。
+  前回セッションの `t0=1450` が残ったまま `now=89` で再開すると `t` が大きな負になり、
+  補間が範囲外へ外挿されて **lat 90 / lon 180(北極点)へ飛んでいた**(実測で再現)。
+  → ①`0 <= now - t0 < 3600` を満たさない状態は捨てる ②`u` を 0..1 にクランプ
+  ③`onStart()` でも unstore、の三重で防止
+- **衛星タイルとウインドウの両立**: op は「起動時は必ず閉じた状態」を守るが、衛星タイルは
+  ウインドウが見えていないと読み込まれない。**デモを実際に走らせたときだけ** driver が
+  Show Window を開くようにした(`OPENWINDOW` 定数で無効化可)。
+  **1回だけ立てると op 側の「ロード後の閉じ直し」に後勝ちされて開かない**ことがあったので、
+  走り始めの 1〜5秒だけ開くまで粘り、その後は二度と触らない(手で閉じたら閉じたまま)
+- 罠を skill(pitfalls.md)に「専用スレッド+ランループ」「ウインドウを持つ TOP」として追記。
+  CoreMIDI README にもクラッシュの経緯を残した
