@@ -290,11 +290,12 @@ ln -s "$PWD/.claude/skills/td-apple-ops" ~/.claude/skills/td-apple-ops
 
 ## バージョン
 
-現在のリリース: **0.9.6**([`VERSION`](VERSION))
+現在のリリース: **0.9.7**([`VERSION`](VERSION))
 
 | バージョン | 日付 | OP数 | 主な内容 |
 |---|---|---|---|
-| **[0.9.6](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.6)** | 2026-08-13 | 60 | **オペレータを2つ追加。** **CI Glass** — macOSのすりガラスと macOS 26 の Liquid Glass を Core Image で組み直したもの。プリセットは実物を画面に出して実測。縁の屈折は入力1の任意のマスクに追従する。**Spatial Video** — iPhone / Vision Pro の空間ビデオ(MV-HEVC)から左眼 / 右眼 / 左右連結、または**1回のデコードで両眼を2つのカラーバッファへ**(バッファ1は Render Select TOP で取る)。再生は Movie File In 相当。GameController の利用例をドローン飛行 + VJ デモに作り替え、実機パッドで検証 |
+| **[0.9.7](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.7)** | 2026-08-14 | 65 | **5つのオペレータをリリース対象に昇格。** **MapKit MapView / LookAround / Search** — Apple マップを TOP でライブに: 3D地図を 57fps で飛び、Look Around の街並み実写は視線が双方向、検索 / ジオコーディング / 経路 / カバレッジは DAT。**CoreMIDI Out / In** — ホットプラグと機材識別に対応した MIDI、DAW のトランスポート(MMC)と同期(MIDI Clock / MTC)、届いた鍵盤・パッド・ノブから自動でチャンネルを作る入力。**TD 終了のたびに落ちていたクラッシュ**(CoreMIDI が解放済みのランループを止めていた)と、**保存された状態が残って次回起動時に MapKit の利用例が北極点へ飛ぶ**問題を修正。MapKit のウインドウは cook が止まると自動で閉じ、起動時は必ず閉じた状態から始まる |
+| [0.9.6](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.6) | 2026-08-13 | 60 | **オペレータを2つ追加。** **CI Glass** — macOSのすりガラスと macOS 26 の Liquid Glass を Core Image で組み直したもの。プリセットは実物を画面に出して実測。縁の屈折は入力1の任意のマスクに追従する。**Spatial Video** — iPhone / Vision Pro の空間ビデオ(MV-HEVC)から左眼 / 右眼 / 左右連結、または**1回のデコードで両眼を2つのカラーバッファへ**(バッファ1は Render Select TOP で取る)。再生は Movie File In 相当。GameController の利用例をドローン飛行 + VJ デモに作り替え、実機パッドで検証 |
 | [0.9.5](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.5) | 2026-08-12 | 58 | **Cinematic Video を刷新** — 自動再生(Play Mode / Speed / Loop / Cue)、`Color` モード、`All` / `Color + Depth` の複数カラーバッファ出力、`Info DAT` でファイル自身のメタデータ、再生中のメモリ暴走を修正。**CI RAW のピクセル形式不一致を修正**(実RAWで NaN になっていた)。CI RAW / CI HDR に `Apply EXIF Orientation`。CoreWLAN Scan は SSID 一覧が空の理由を警告で出すように。Speech Activity は `SpeechDetector` が結果を返さないため取り下げ |
 | [0.9.4](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.4) | 2026-08-10 | 59 | **Vision Pose 3D を全面的に見直し。** 連続フレームとして処理するようにして検出率 56〜59/60 → 60/60、体の向きの反転 16〜18% → 0〜8%。解析は約2倍速。`Coordinate Space`(root/camera)・`Camera FOV`・`body:facing/pitch/roll`・`cam:distance/fov` を追加し、`bodyheight` / `heightestimation` と旧 `camera:*` 6chを削除(**このopに関して後方非互換**)。Metal Denoise は非対応ハードでエラーではなく警告+素通しに。07-23 から黙ってビルドされていなかった6プラグインを修復 |
 | [0.9.3](https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/releases/tag/v0.9.3)** | 2026-08-09 | 59 | Non-Commercial の解像度上限で絵が崩れる不具合を修正(10 TOP)。**Vision Face のランドマークを 76 → 85 点に**(旧レイアウトは各領域を切り捨てていた。`p` インデックスがずれる**後方非互換**)。Vision Contours に `Aspect Correct UVs`。CoreText の行送り修正 |

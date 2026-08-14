@@ -13,8 +13,20 @@ rm -rf build
 mkdir -p "$OUT/MacOS" "$OUT/Frameworks"
 
 # ① Swift ヘルパ（FoundationModels は macOS 26 API・@available ガード付きで min 14）
+# macOS 27 SDK でだけ AFM3 の新 API(PrivateCloudComputeLanguageModel / Attachment /
+# ContextOptions / capabilities / usage)をコンパイルする。**これらは型ごと 26 SDK に無い**ので、
+# `if #available` では解決できない(26 機でビルドが通らなくなり実際にリリースが止まった)
+SDKVER="$(xcrun --show-sdk-version 2>/dev/null || echo 0)"
+AFM3=()
+if [ "${SDKVER%%.*}" -ge 27 ] 2>/dev/null; then
+  AFM3=(-D TD_AFM3)
+  echo "SDK $SDKVER: AFM3(macOS 27 API)を有効にしてビルド"
+else
+  echo "SDK $SDKVER: AFM3(macOS 27 API)は無効(26 SDK には型が無いため)"
+fi
+
 swiftc -O -emit-library -module-name FMHelper \
-  -target arm64-apple-macos14.0 \
+  -target arm64-apple-macos14.0 "${AFM3[@]}" \
   helper/FMHelper.swift \
   -framework FoundationModels \
   -Xlinker -install_name -Xlinker "@rpath/$DYLIB" \

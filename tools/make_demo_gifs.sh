@@ -25,11 +25,15 @@ mkdir -p "$OUT"
 W=480   # 書き出し幅（全て共通）
 H=270   # 16:9
 
-filter() {   # 幅 fps hqdn3d 色数
-    print -r -- "fps=${2},scale=${1}:-1:flags=lanczos,hqdn3d=${3},split[a][b];[a]palettegen=max_colors=${4}:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle"
+filter() {   # 幅 fps hqdn3d 色数 [ディザ]
+    # 既定はディザ無し(そのぶん軽い)。**滑らかなグラデーション**(海・空・地形)が
+    # 主役の clip は 64色/ディザ無しだと**帯状のムラ(バンディング)が出て汚くなる**ので、
+    # bayer ディザ + 色数増しにする(実測: 衛星写真の広域ショットで顕著)
+    local dith="${5:-none}"
+    print -r -- "fps=${2},scale=${1}:-1:flags=lanczos,hqdn3d=${3},split[a][b];[a]palettegen=max_colors=${4}:stats_mode=diff[p];[b][p]paletteuse=dither=${dith}:diff_mode=rectangle"
 }
 
-# name | source | start(s) | duration(s) | 幅 | fps | hqdn3d | 色数
+# name | source | start(s) | duration(s) | 幅 | fps | hqdn3d | 色数 | [ディザ]
 CLIPS=(
     "visionpose|VisionPose.mp4|0|4.0|480|12|8:8:14:14|64"
     "visionhand|VisionHand.mp4|0|4.0|480|12|8:8:14:14|64"
@@ -48,16 +52,18 @@ CLIPS=(
     "gamecontroller|GameController.mov|22|6.0|480|12|8:8:14:14|96"
     # 実写全画面はGIFの最悪ケース。2秒に切って、そのぶん fps と色数に回す
     "ciglass|CIGlass.mp4|0|2.0|480|12|12:12:20:20|96"
-    # 衛星写真も全画素が動く最悪ケース。**駅名ラベルが一番よく見えるワイドの区間**を
-    # 4秒だけ切り、fps を落として色数に回す(ラベルが潰れると意味が無いため)
-    "mapkit|MapKit.mp4|77|4.0|480|8|24:24:40:40|64"
+    # 衛星写真は全画素が動くうえ、海と地形の**グラデーションが広い**。64色/ディザ無しでは
+    # バンディングで汚くなるので bayer ディザ + 112色にする。そのぶん重いので、
+    # **README が表示する幅(400)でそのまま書き出す**(他は480で書き出して400表示。
+    # この clip だけ実寸で出しても見た目は変わらず、サイズだけ3割減る)
+    "mapkit|MapKit.mp4|84.5|9.0|400|7|6:6:12:12|112|bayer:bayer_scale=5"
 )
 
 for c in "${CLIPS[@]}"; do
     parts=("${(@s:|:)c}")
     name="$parts[1]"; file="$parts[2]"; ss="$parts[3]"; dur="$parts[4]"
     ffmpeg -v error -y -ss "$ss" -t "$dur" -i "$SRC/$file" \
-        -vf "$(filter "$parts[5]" "$parts[6]" "$parts[7]" "$parts[8]")" -loop 0 "$OUT/$name.gif"
+        -vf "$(filter "$parts[5]" "$parts[6]" "$parts[7]" "$parts[8]" "${parts[9]:-none}")" -loop 0 "$OUT/$name.gif"
     printf "%-20s %5s KB  (%ss from %ss of %s)\n" \
         "$name.gif" "$(( $(stat -f%z "$OUT/$name.gif") / 1024 ))" "$dur" "$ss" "$file"
 done

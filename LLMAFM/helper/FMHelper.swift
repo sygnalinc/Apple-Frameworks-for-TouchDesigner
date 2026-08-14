@@ -96,6 +96,7 @@ final class FMSession: @unchecked Sendable {
     private func checkAvailability() {
         lock.lock(); let kind = modelKind; lock.unlock()
         if kind == 1 {
+#if TD_AFM3
             // Private Cloud Compute(Appleサーバ側モデル・macOS 27+)
             guard #available(macOS 27.0, *) else {
                 setStatus("unavailable: Private Cloud Compute requires macOS 27+")
@@ -123,12 +124,19 @@ final class FMSession: @unchecked Sendable {
                     setStatus("unavailable (PCC)")
                 }
             }
+#else
+            // macOS 26 SDK には PrivateCloudComputeLanguageModel が無い(型ごと不在なので
+            // #available では解決できない)。27 SDK でビルドしたときだけ有効になる
+            setStatus("unavailable: Private Cloud Compute requires building on the macOS 27 SDK")
+#endif
             return
         }
         let model = SystemLanguageModel.default
         switch model.availability {
         case .available:
+#if TD_AFM3
             if #available(macOS 27.0, *) { updateCapabilities(model.capabilities) }
+#endif
             setStatus("ready")
         case .unavailable(let reason):
             switch reason {
@@ -144,6 +152,7 @@ final class FMSession: @unchecked Sendable {
         }
     }
 
+#if TD_AFM3
     @available(macOS 27.0, *)
     private func updateCapabilities(_ caps: LanguageModelCapabilities) {
         var list: [String] = []
@@ -153,17 +162,21 @@ final class FMSession: @unchecked Sendable {
         if caps.contains(.guidedGeneration) { list.append("guidedGeneration") }
         lock.lock(); capabilitiesList = list; lock.unlock()
     }
+#endif
 
     // 選択中モデルでセッションを生成(macOS 27はmodel指定・26以前は従来の既定モデル)
     private func makeSession(tools: [any Tool] = []) -> LanguageModelSession {
+#if TD_AFM3
         if #available(macOS 27.0, *), modelKind == 1 {
             return LanguageModelSession(model: PrivateCloudComputeLanguageModel(),
                                         tools: tools, instructions: instructions)
         }
+#endif
         return LanguageModelSession(tools: tools, instructions: instructions)
     }
 
     // ContextOptions(reasoningLevel)。off または macOS 26以前では nil
+#if TD_AFM3
     @available(macOS 27.0, *)
     private func makeContextOptions() -> ContextOptions? {
         lock.lock(); let lv = reasoningLevel; lock.unlock()
@@ -174,10 +187,12 @@ final class FMSession: @unchecked Sendable {
         default: return nil
         }
     }
+#endif
 
     // 生成完了後に usage を取り込む(macOS 27)。
     // contextSize は PCC モデル専用のプロパティで、checkAvailability 時に取得する
     private func captureUsage(_ sess: LanguageModelSession) async {
+#if TD_AFM3
         guard #available(macOS 27.0, *) else { return }
         let usage = sess.usage
         let inTok = usage.input.totalTokenCount
@@ -186,6 +201,7 @@ final class FMSession: @unchecked Sendable {
         inputTokens = inTok
         outputTokens = outTok
         lock.unlock()
+#endif
     }
 
     private func setStatus(_ s: String) {
@@ -235,29 +251,33 @@ final class FMSession: @unchecked Sendable {
             options.temperature = temperature
             options.maximumResponseTokens = maxTokens
 
+            // partial は累積スナップショット。**Swift の #if は波括弧が閉じた単位でしか
+            // 使えない**(C のテキスト置換と違い、if の途中で切ると構文エラーになる)ため、
+            // 受け取り側をクロージャに切り出して分岐ごと丸ごと書く
+            let consume: (String) -> Void = { [self] text in
+                lock.lock()
+                if generation == gen, var last = history.last, last["role"] == "assistant" {
+                    last["text"] = text
+                    history[history.count - 1] = last
+                }
+                lock.unlock()
+            }
+#if TD_AFM3
             if #available(macOS 27.0, *), let co = makeContextOptions() {
-                let stream = sess.streamResponse(to: prompt, options: options,
-                                                 contextOptions: co)
-                for try await partial in stream {
-                    lock.lock()
-                    if generation == gen, var last = history.last, last["role"] == "assistant" {
-                        last["text"] = partial.content
-                        history[history.count - 1] = last
-                    }
-                    lock.unlock()
+                for try await partial in sess.streamResponse(to: prompt, options: options,
+                                                             contextOptions: co) {
+                    consume(partial.content)
                 }
             } else {
-                let stream = sess.streamResponse(to: prompt, options: options)
-                for try await partial in stream {
-                    // partial は累積スナップショット
-                    lock.lock()
-                    if generation == gen, var last = history.last, last["role"] == "assistant" {
-                        last["text"] = partial.content
-                        history[history.count - 1] = last
-                    }
-                    lock.unlock()
+                for try await partial in sess.streamResponse(to: prompt, options: options) {
+                    consume(partial.content)
                 }
             }
+#else
+            for try await partial in sess.streamResponse(to: prompt, options: options) {
+                consume(partial.content)
+            }
+#endif
             await captureUsage(sess)
             lock.lock()
             busy = false
@@ -280,6 +300,11 @@ final class FMSession: @unchecked Sendable {
     func submitImage(prompt: String, bgra: Data, width: Int, height: Int,
                      temperature: Double, maxTokens: Int, keepContext: Bool) -> Bool
     {
+#if !TD_AFM3
+        // 26 SDK には Attachment が無い。27 SDK でビルドしたときだけ使える
+        setStatus("error: image input requires building on the macOS 27 SDK")
+        return false
+#else
         guard #available(macOS 27.0, *) else {
             setStatus("error: image input requires macOS 27+")
             return false
@@ -308,8 +333,10 @@ final class FMSession: @unchecked Sendable {
                                  keepContext: keepContext, gen: gen)
         }
         return true
+#endif
     }
 
+#if TD_AFM3
     @available(macOS 27.0, *)
     private func runImage(prompt: String, bgra: Data, width: Int, height: Int,
                           temperature: Double, maxTokens: Int, keepContext: Bool,
@@ -373,6 +400,7 @@ final class FMSession: @unchecked Sendable {
             lock.unlock()
         }
     }
+#endif
 
     // ------------------------------------------------- 構造化出力
     // schemaSpec: "color:string" 改行区切り(type ∈ string|number|int|bool)

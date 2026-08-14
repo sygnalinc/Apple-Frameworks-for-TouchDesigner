@@ -6937,3 +6937,27 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   他候補は 2.1〜3.0MB になった。README(英日)のデモ表の空きセルへ
 - **踏んだ罠(再発)**: zsh で `"max_colors=$4:stats_mode=..."` と書くと **`$4:s` が履歴修飾子**と
   解釈されて `64teuse=dither=none` のような文字列になる。`${4}` と波括弧で囲む(CLAUDE.md 既出)
+
+### 2026-08-14 v0.9.7 リリース(MapKit 3op + CoreMIDI 2op を同梱・65バンドル)
+
+- 全88プラグインを再ビルド → sign → verify(65バンドル全数)→ DMG 18MB → 公証 **Accepted** →
+  staple → `spctl` accepted。**このマシンの常設 Plugins にもリリースビルドを入れ直した**
+  (ユーザーが実機確認するため。65バンドル・署名検証も全数OK)
+- **リリースが一度止まった: LLM AFM(released)が macOS 26 SDK でビルドできなかった**。
+  macOS 27 機で入れた AFM3 対応(`PrivateCloudComputeLanguageModel` / `Attachment` /
+  `ContextOptions` / `capabilities` / `usage`)が**型ごと 26 SDK に存在しない**ため。
+  **`if #available` は型の不在を解決しない**(実行時チェックであって、コンパイルには型が要る)
+  - 対策: build.sh が `xcrun --show-sdk-version` を見て 27 以上なら `-D TD_AFM3` を渡し、
+    27専用コードを `#if TD_AFM3` で囲う。26 では該当機能が status に理由を返す
+  - **Swift の `#if` は波括弧が閉じた単位でしか使えない**(C のテキスト置換と違い、
+    `if {...} else {` の途中で切ると構文エラー)。ストリーミングの分岐は受け取り側を
+    クロージャに切り出して、分岐ごと丸ごと書く形に直した
+  - 横断監査: released で macOS 27 API に触れているのは LLMAFM だけと確認
+- **27専用の3件(MusicUnderstanding / RealityKitSplat / VisionIterSeg)は 26 機でビルド失敗するが想定内**
+  (`PLUGINS.tsv` の minos 27.0・experimental なので配布対象外)
+- MapKit のデモGIFを作り直し: ユーザー指摘「汚い / もっと長く / 東京駅に寄って」を受けて
+  **84.5秒から9秒**(全国ワイド→東京駅へ降下→駅の3Dビル)に。**64色/ディザ無しではグラデーション
+  (海・地形)にバンディングが出て汚くなる**ので、**bayer ディザ + 112色**へ。そのぶん重いので
+  **README が表示する幅(400)でそのまま書き出す**(他は480で書き出して400表示。この clip だけ
+  実寸にしても見た目は変わらずサイズだけ3割減る)。2.4MB。make_demo_gifs.sh にディザ列を追加
+- 罠(再発): zsh で `"max_colors=$4:stats_mode=..."` は **`$4:s` が履歴修飾子**と解釈される。`${4}` にする
