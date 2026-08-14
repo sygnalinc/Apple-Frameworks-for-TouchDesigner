@@ -7007,3 +7007,15 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 **検証時の注意(再発)**: このopは非同期なので**パラメータ変更直後の save は1つ前の絵**。
 さらに `cookEveryFrameIfAsked` なので**出力が使われていないノードは cook されない** —
 検証では force cook を数回挟んでから保存する
+
+### 2026-08-14 demo.toe の CoreText に手書きアニメーションの例を追加
+
+- `/project1/Coretext` に `write_en`(筆記体 "Writing"・Character by character)と
+  `write_ja`(`手書き風`・Contour, top to bottom)を追加。既存の rich / ruby / shape_sop と同じく
+  独立ノードの並び(out1 は従来どおり typewriter のまま)
+- 進行は式で周回させた: 欧文 `min(1, (absTime.seconds % 6) / 4)` / 和文は8秒周期で6秒。
+  note には「実際は CHOP や Timer CHOP から駆動するのが扱いやすい」ことと、
+  **なぞっているのは輪郭であって書き順ではない**限界を明記
+- 検証の注意(このopで毎回踏む): **`cookEveryFrameIfAsked` なので出力が使われないノードは
+  cook されず**、さらに**非同期なので保存は1つ前の絵**。force cook を数回挟んでから save する
+- コンテナの allowCooking はユーザーが True にしていたのでそのまま残した([[toe-changes-are-users]])
