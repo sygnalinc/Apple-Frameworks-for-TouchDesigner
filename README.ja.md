@@ -187,6 +187,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [CoreMIDI Out](CoreMIDI/) | CHOP | 実験中 |
 | [CoreMIDI In](CoreMIDI/) | CHOP | 実験中 |
 | [AVF Camera](AVFoundationCamera/) | TOP | 実験中 |
+| [MapKit](MapKit/) | TOP | 実験中 |
 | [AVAudio Mixer CHOP](AVAudioMixer/) | CHOP | 実験中 |
 | [AVAudio Spatial CHOP](AVAudioSpatial/) | CHOP | 実験中 |
 | [AVF Camera TOP](AVFoundationCamera/) | TOP | 実験中 |

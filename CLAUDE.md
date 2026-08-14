@@ -6544,3 +6544,31 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - README(英日)の「何のためにあるか」を書き換え、「鍵盤・パッド・ノブ」節と実測を追加
 - 次にやること: demo.toe への利用例追加(未着手)。MIDI 2.0(UMP)対応は将来
 
+### 2026-08-14 MapKit TOP 実装(地図 + Look Around・experimental)
+
+- ユーザー「MapKit 関連の op を作りたい」→ **実装前に何ができるか単体で実測**してから設計した
+- **調査でわかったこと**: MapKit は **API キー不要**。地図スナップショット / 周辺検索 / 経路 /
+  Look Around の4つとも macOS でコンパイルが通り、**ヘッドレスで動く**
+  (検索25件・徒歩経路 3806m/58分/頂点180/手順26 を実測)
+- **設計に効いた発見**: **スナップショット以外は完了ハンドラがメインキューに来る**。
+  単体CLIでメインスレッドをセマフォで塞いだら検索・経路・Look Around が全部タイムアウトし、
+  ランループを回す形にしたら通った。TD はメインランループを回すので、**要求もメインキューから出す**
+- **MapKit TOP**(opType `Mapkit` / icon MPK / TOP): Mode(map / lookaround)・緯度経度・Span・
+  Style(標準/ミュート/衛星/ハイブリッド)・Elevation(flat / realistic 3D)・Pitch/Heading・
+  交通情報・POI・ダーク・Reload。解像度は Common ページから(入力なしなので useinput は 1280x720)
+- **実測(M2)**: 渋谷 2560x1440 が 約0.9秒 / 衛星+3D+pitch60 で**実際の建物ジオメトリ**が 約0.86秒 /
+  **Look Around 渋谷スクランブルの街並み** 約0.57秒。東京駅は Look Around 範囲外で
+  `available`=0 + 警告(約0.16秒)
+- **踏んだ実バグ2つ**:
+  1. **参照をブロックに捕まえて TD ごと落とした**。`request(const Settings& s)` の参照を
+     `dispatch_async` のブロックで捕まえたため、ブロックがメインキューで走る頃には呼び出し元の
+     ローカルが消えてゴミになり、**サイズ0で `MKMapSnapshotOptions.size` が ObjC 例外を投げ**、
+     C++ 側で `std::terminate` → SIGABRT。**値で受ける**+**全 MapKit 呼び出しを @try で受け止める**
+     +**サイズを上下ともクランプ**して解決(クラッシュレポートのスタックで一発特定)
+  2. 素直に CGBitmapContext へ描くと**TD 表示で上下が逆**。CTM を反転してから描くよう修正
+- **教訓**: 「Apple のフレームワークは NSError ではなく ObjC 例外を投げる」は AVF Camera で
+  自分で README に書いた直後にまた踏んだ。**新しい Apple API を叩くコードは最初から @try で囲む**
+- 帰属表示(Apple ロゴ・法的通知)が規約上必要な点を README に明記
+- PLUGINS.tsv に **experimental** で登録(新規は指示があるまで experimental の規約どおり)
+- 次にやること: MapKit Search DAT(周辺検索 / ジオコーディング / 経路。緯度経度→uv も出す)、
+  demo.toe への利用例追加
