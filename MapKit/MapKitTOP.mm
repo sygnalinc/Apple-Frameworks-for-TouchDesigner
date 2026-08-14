@@ -63,6 +63,16 @@ struct Marker {
 // MKMapView の帰属表示(Legal リンク)をビュー階層から探して隠す。
 // 公開 API には表示/非表示の口が無い。Apple のガイドライン上、人に見せる地図には
 // 帰属表示が求められる点は README に明記(消す判断は利用者のもの)
+// Look Around の埋め込み表示は、MapKit が Pan / ズームのレコグナイザを**無効化して
+// プレビュー専用にしている**(実測: enabled=0。navigationEnabled=YES でも変わらない)。
+// 強制的に有効化すると実際に見回し・ズームが効く(実機で確認)。
+// MapKit が無効化し直すことがあるので毎 cook 掛け直す
+static void enableAllGestures(NSView* v)
+{
+    for (NSGestureRecognizer* g in v.gestureRecognizers) g.enabled = YES;
+    for (NSView* sub in v.subviews) enableAllGestures(sub);
+}
+
 static void setLegalHidden(NSView* v, bool hidden)
 {
     for (NSView* sub in v.subviews) {
@@ -235,13 +245,17 @@ public:
                 myCfgSig = cfgSig;
                 applyConfig(style, elev, traffic, poi, dark);
             }
-            // 内蔵の Legal はタイル読込後に再出現することがあるので毎 cook 抑え込む
-            // (TOP 上ではリンクとして機能しないため常に隠し、焼き込みの帰属表示に置き換える)
+            // 毎 cook の抑え込み2件:
+            // ・内蔵 Legal はタイル読込後に再出現する → 常に隠す(焼き込みの帰属表示に置き換え)
+            // ・Look Around の操作レコグナイザは MapKit に無効化される → 常に有効化
             {
                 NSWindow* win2 = myWindow;
+                const bool la2 = lookaround;
                 auto alive2 = myAlive;
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    if (alive2->load() && win2.contentView) setLegalHidden(win2.contentView, true);
+                    if (!alive2->load() || !win2.contentView) return;
+                    setLegalHidden(win2.contentView, true);
+                    if (la2) enableAllGestures(win2.contentView);
                 });
             }
 
@@ -694,18 +708,25 @@ private:
         dispatch_async(dispatch_get_main_queue(), ^{
             if (!alive->load() || !win) return;
             @try {
+                const NSRect keep = win.frame;   // contentViewController がサイズを変えることがある
                 if (lookaround) {
                     if (!self->myLookVC) {
                         // macOS では NSViewController(実測)。地図と同じウインドウで取り込む
                         self->myLookVC = [[MKLookAroundViewController alloc] init];
+                        self->myLookVC.navigationEnabled = YES;
                     }
-                    NSView* v = self->myLookVC.view;
-                    v.frame = ((NSView*)win.contentView).bounds;
-                    v.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-                    win.contentView = v;
+                    // view だけ抜き取るとレスポンダチェーンが繋がらず操作が全滅する。
+                    // **contentViewController として正しく載せ、ファーストレスポンダにする**
+                    self->myLookVC.view.frame = ((NSView*)win.contentView).bounds;
+                    win.contentViewController = self->myLookVC;
+                    [win setFrame:keep display:YES];
+                    [win makeFirstResponder:self->myLookVC.view];
                 } else if (self->myMapView) {
-                    self->myMapView.frame = ((NSView*)win.contentView).bounds;
+                    win.contentViewController = nil;
+                    self->myMapView.frame = NSMakeRect(0, 0, keep.size.width, keep.size.height);
                     win.contentView = self->myMapView;
+                    [win setFrame:keep display:YES];
+                    [win makeFirstResponder:self->myMapView];
                 }
             } @catch (NSException*) {}
         });
@@ -795,8 +816,17 @@ private:
                 // 地図ウインドウは**常にボーダーレス**(角が四角のまま取り込まれる)。
                 // ドラッグはバー(親ウインドウ)が担う
                 [win setFrame:r display:NO];
-                if (myShownOrigin.x != 0 || myShownOrigin.y != 0)
+                if (myShownOrigin.x != 0 || myShownOrigin.y != 0) {
                     [win setFrameOrigin:myShownOrigin];   // 前回表示していた場所へ戻す
+                } else {
+                    // 初回は退避位置(右下ほぼ画面外)のままにせず、
+                    // TD のメインウインドウ(無ければ画面)の中央に出す
+                    NSWindow* host = NSApp.mainWindow ?: NSApp.keyWindow;
+                    const NSRect hf = host ? host.frame
+                        : (win.screen ?: NSScreen.mainScreen).visibleFrame;
+                    [win setFrameOrigin:NSMakePoint(NSMidX(hf) - r.size.width / 2,
+                                                    NSMidY(hf) - r.size.height / 2)];
+                }
                 win.alphaValue = 1.0;
                 win.ignoresMouseEvents = NO;
                 // TD のウインドウをクリックしても隠れないように浮かせる

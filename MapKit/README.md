@@ -75,8 +75,18 @@ Python used elsewhere in this repo). Turn it off and the parameters are the mast
 because the last pulled values seed the push side. The initial camera is seeded from the parameters
 so the default world view never leaks back into them.
 
-In Look Around mode there is no public API to read or set the view direction, so the camera
-parameters only choose the scene coordinate; look and move by hand in the window.
+In Look Around mode the camera parameters only choose the scene coordinate. **Looking around is
+done by hand in the window** — and that took two discoveries: the embedded view controller ships
+with its pan/zoom recognizers **disabled** (`navigationEnabled = YES` does not flip them; measured
+`enabled = 0`), so this op force-enables them every cook, which makes drag-to-look and pinch-zoom
+work for real input.
+
+**The view direction cannot be driven from parameters.** The whole chain was measured: the scene
+and view controller expose no orientation API; and synthesizing drag gestures is impossible —
+application-constructed `NSEvent`s do not feed AppKit's gesture-recognizer machinery at all (a
+plain self-owned `NSPanGestureRecognizer` fired **zero** times from posted synthetic events).
+System-level event injection would need the Accessibility permission and would move the user's
+real cursor. So: coordinates from parameters, view direction by hand.
 
 ### Parameters
 
@@ -205,8 +215,16 @@ Show Window オンのあいだは**ウインドウがマスター**: 手で決�
 マスターに戻る — 書き戻した値を push 側の基準にしているので切り替えで飛ばない。
 初期カメラはパラメータから入れるので、地図既定の全景が逆流することもない。
 
-Look Around モードは視線の向きを読む/決める公開 API が無いので、パラメータはシーンの座標
-選びだけ。見回し・移動はウインドウ内で手で行う。
+Look Around モードでパラメータが決めるのはシーンの座標だけ。**見回しはウインドウ内で手で行う**
+— これも2つの発見が要った: 埋め込みのビューコントローラは Pan / ズームのレコグナイザが
+**無効化された状態**で来る(`navigationEnabled = YES` でも変わらない。実測 `enabled = 0`)。
+このopは毎 cook 強制的に有効化しており、実際のドラッグ見回しとピンチズームが効く。
+
+**視線の向きはパラメータからは動かせない。** 経路を全部実測した: シーンにもビューコントローラにも
+向きの API が無い。ジェスチャの合成も不可能 — アプリが組み立てた `NSEvent` は AppKit の
+ジェスチャ機構に一切届かない(自前の `NSPanGestureRecognizer` すら合成イベントでは**発火 0 回**)。
+システムレベルのイベント注入はアクセシビリティ許可が要る上に実際のカーソルが動いてしまう。
+結論: 座標はパラメータ、視線は手で。
 
 ### パラメータ
 
