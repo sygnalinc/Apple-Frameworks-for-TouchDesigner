@@ -52,6 +52,21 @@ needs the Screen Recording permission.
 - The map's own compass/zoom/pitch controls are never shown: they would be captured. All gestures
   work without them
 
+### Overlaying your own geometry (Markers DAT)
+
+Point **Markers DAT** at a table of `name / lat / lon` rows (or just `lat / lon`) and the TOP's
+**Info DAT** reports each point's screen position as `u / v / visible`. The projection comes from
+`MKMapView`'s own `convertCoordinate:toPointToView:`, so it matches the 3D perspective, pitch and
+heading **exactly** — measured: with pitch 0 and heading 0, the camera target lands on (0.5, 0.5)
+and a point 500 m north on (0.5, 0.966).
+
+Instance SOP geometry at `(u−0.5, (v−0.5)/aspect)` through an Ortho Width = 1 camera and composite
+over the map (the same overlay pattern as the Vision examples) and your objects sit on the map and
+track every camera move. Off-screen points report `visible` = 0 — use it as an instance scale.
+The demo `/project1/MapKitFly` overlays pins on five Tokyo landmarks this way while flying with a
+game controller. Note the projected points are **ground positions**; the API carries no building
+height.
+
 ### Two-way camera
 
 With Show Window on, **the window is the master**: the camera you frame by hand is pulled every
@@ -75,6 +90,7 @@ parameters only choose the scene coordinate; look and move by hand in the window
 | Show Attribution | Burns "&#63743; Apple Maps" into the output (same presentation as everywhere else in this repo). **On by default.** The map's built-in "Legal" label is always hidden instead — in a TOP it is just pixels, not a working link. Apple's guidelines expect visible attribution on maps shown to an audience; switching this off is your call |
 | Attribution Position | Which corner |
 | Capture FPS | ScreenCaptureKit frame-rate ceiling. Idle maps deliver frames only on change |
+| Markers DAT | Table of lat/lon points to project into screen space (see above) |
 | Show Window | Interactive mode (see above) |
 | Restart | Rebuild the stream and re-request the scene |
 
@@ -169,6 +185,19 @@ Apple マップを**ライブ**で TOP に出す1つのオペレータ。3D地�
 - 地図のコンパス/ズーム/チルトコントロールは出さない(取り込みに写るため)。
   ジェスチャはコントロール無しでも全部効く
 
+### 自前のジオメトリを重ねる(Markers DAT)
+
+**Markers DAT** に `name / lat / lon`(または `lat / lon` だけ)の表を指すと、TOP の **Info DAT** に
+各点の画面位置が `u / v / visible` で出る。射影は `MKMapView` 自身の
+`convertCoordinate:toPointToView:` なので、3Dのパース・ピッチ・ヘディングに**正確に**一致する —
+実測: pitch 0 / heading 0 でカメラの注視点が (0.5, 0.5)、その500m北の点が (0.5, 0.966)。
+
+`(u−0.5, (v−0.5)/アスペクト比)` で SOP をインスタンシングし、Ortho Width = 1 のカメラで地図に
+合成すれば(Vision 系の利用例と同じ重ね合わせの型)、オブジェクトは地図に張り付いてカメラの
+動きに追従する。画面外の点は `visible` = 0 — インスタンスのスケールに使うと自動で消える。
+demo の `/project1/MapKitFly` はこの方法で東京のランドマーク5箇所にピンを立てながら
+ゲームパッドで飛ぶ。射影される点は**地表の位置**で、ビルの高さ方向は API に無い点に注意。
+
 ### 双方向カメラ
 
 Show Window オンのあいだは**ウインドウがマスター**: 手で決めたカメラを毎 cook 読み取り、
@@ -191,6 +220,7 @@ Look Around モードは視線の向きを読む/決める公開 API が無い�
 | Show Attribution | 「&#63743; Apple Maps」を出力へ焼き込む。**既定オン**。地図内蔵の「Legal」ラベルは常に隠す — TOP 上ではただのピクセルで、リンクとして機能しないため。Apple のガイドライン上、人に見せる地図には帰属表示が求められる — 消す判断は利用者のもの |
 | Attribution Position | どの隅に出すか |
 | Capture FPS | ScreenCaptureKit のフレームレート上限。静止中は変化時しかフレームが来ない |
+| Markers DAT | 画面座標へ射影する緯度経度の表(上記) |
 | Show Window | 対話モード(上記) |
 | Restart | ストリームを張り直し、シーンも取り直す |
 

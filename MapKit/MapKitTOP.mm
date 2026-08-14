@@ -51,6 +51,15 @@ struct Frame {
     uint64_t serial = 0;
 };
 
+// Markers DAT の1行。u/v は MKMapView 自身の射影(convertCoordinate:toPointToView:)なので
+// 3D のパース・ピッチ・ヘディングに完全一致する
+struct Marker {
+    std::string name;
+    double lat = 0, lon = 0;
+    float u = 0, v = 0;
+    bool visible = false;
+};
+
 // MKMapView の帰属表示(Legal リンク)をビュー階層から探して隠す。
 // 公開 API には表示/非表示の口が無い。Apple のガイドライン上、人に見せる地図には
 // 帰属表示が求められる点は README に明記(消す判断は利用者のもの)
@@ -236,6 +245,9 @@ public:
                 });
             }
 
+            // --- マーカーの射影(地図モードのみ・毎 cook) ---
+            if (!lookaround) projectMarkers(in);
+
             // --- ウインドウの見せ方 / サイズ / ストリーム ---
             char ss[64];
             snprintf(ss, sizeof ss, "%d|%d|%d|%d", w, h, fps, show ? 1 : 0);
@@ -335,6 +347,13 @@ public:
           p.minValues[0] = 1; p.maxValues[0] = 120; p.clampMins[0] = p.clampMaxes[0] = true;
           m->appendInt(p); }
         // 既定は最背面(デスクトップレベル)に隠す。確認したいときだけ前へ出す
+        {
+            // 緯度経度の表(列: name,lat,lon または lat,lon)。各点の画面位置 u/v を
+            // Info DAT に出す = SOP や TOP を地図のパースに正確に重ねられる
+            OP_StringParameter p("Markers");
+            p.label = "Markers DAT"; p.page = P;
+            m->appendDAT(p);
+        }
         { OP_NumericParameter p("Showwindow"); p.label = "Show Window"; p.page = P; m->appendToggle(p); }
         { OP_NumericParameter p("Restart"); p.label = "Restart"; p.page = P; m->appendPulse(p); }
     }
@@ -471,6 +490,106 @@ public:
                 dp[3] = 255;
             }
         }
+    }
+
+    // Markers DAT を読み、メインスレッドで MKMapView に射影させる。
+    // cook は前回の結果(myMarkers)を Info DAT に出すだけ
+    void projectMarkers(const OP_Inputs* in)
+    {
+        const OP_DATInput* d = in->getParDAT("Markers");
+        std::vector<Marker> req;
+        if (d && d->numRows > 0) {
+            for (int r = 0; r < d->numRows; r++) {
+                const int nc = d->numCols;
+                const char* c0 = d->getCell(r, 0);
+                Marker mk;
+                if (nc >= 3) {
+                    const char* c1 = d->getCell(r, 1);
+                    const char* c2 = d->getCell(r, 2);
+                    char* e1 = nullptr; char* e2 = nullptr;
+                    const double la = c1 ? strtod(c1, &e1) : 0;
+                    const double lo = c2 ? strtod(c2, &e2) : 0;
+                    if (e1 == c1 || e2 == c2) continue;   // ヘッダ行(数値でない)は読み飛ばす
+                    mk.name = c0 ? c0 : "";
+                    mk.lat = la; mk.lon = lo;
+                } else if (nc == 2) {
+                    const char* c1 = d->getCell(r, 1);
+                    char* e0 = nullptr; char* e1 = nullptr;
+                    const double la = c0 ? strtod(c0, &e0) : 0;
+                    const double lo = c1 ? strtod(c1, &e1) : 0;
+                    if (e0 == c0 || e1 == c1) continue;
+                    mk.name = std::to_string(r);
+                    mk.lat = la; mk.lon = lo;
+                } else {
+                    continue;
+                }
+                req.push_back(mk);
+            }
+        }
+        {
+            std::lock_guard<std::mutex> l(myMutex);
+            myMarkerReq = req;
+        }
+        if (req.empty()) {
+            std::lock_guard<std::mutex> l(myMutex);
+            myMarkers.clear();
+            return;
+        }
+        MKMapView* mv = myMapView;
+        auto alive = myAlive;
+        auto* self = this;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!alive->load() || !mv) return;
+            std::vector<Marker> ms;
+            {
+                std::lock_guard<std::mutex> l(self->myMutex);
+                ms = self->myMarkerReq;
+            }
+            const CGFloat vw = mv.bounds.size.width, vh = mv.bounds.size.height;
+            if (vw < 1 || vh < 1) return;
+            for (Marker& mk : ms) {
+                const CGPoint pt = [mv convertCoordinate:CLLocationCoordinate2DMake(mk.lat, mk.lon)
+                                           toPointToView:mv];
+                if (isfinite(pt.x) && isfinite(pt.y)) {
+                    mk.u = (float)(pt.x / vw);
+                    // NSView は下原点なので v はそのまま TD の uv と揃う…かは実測で決める
+                    mk.v = 1.0f - (float)(pt.y / vh);
+                    mk.visible = mk.u >= 0.f && mk.u <= 1.f && mk.v >= 0.f && mk.v <= 1.f;
+                }
+            }
+            std::lock_guard<std::mutex> l(self->myMutex);
+            self->myMarkers = std::move(ms);
+        });
+    }
+
+    bool getInfoDATSize(OP_InfoDATSize* sz, void*) override
+    {
+        std::lock_guard<std::mutex> l(myMutex);
+        sz->rows = (int32_t)myMarkers.size() + 1;
+        sz->cols = 6;
+        sz->byColumn = false;
+        return true;
+    }
+
+    void getInfoDATEntries(int32_t row, int32_t nCols, OP_InfoDATEntries* e, void*) override
+    {
+        static const char* hdr[6] = {"name", "lat", "lon", "u", "v", "visible"};
+        if (row == 0) {
+            for (int i = 0; i < nCols && i < 6; i++) e->values[i]->setString(hdr[i]);
+            return;
+        }
+        std::lock_guard<std::mutex> l(myMutex);
+        const int i = row - 1;
+        if (i < 0 || i >= (int)myMarkers.size()) return;
+        const Marker& mk = myMarkers[i];
+        char b[5][32];
+        snprintf(b[0], 32, "%.7f", mk.lat);
+        snprintf(b[1], 32, "%.7f", mk.lon);
+        snprintf(b[2], 32, "%.5f", mk.u);
+        snprintf(b[3], 32, "%.5f", mk.v);
+        snprintf(b[4], 32, "%d", mk.visible ? 1 : 0);
+        const char* v[6] = {mk.name.c_str(), b[0], b[1], b[2], b[3], b[4]};
+        for (int c = 0; c < nCols && c < 6; c++) e->values[c]->setString(v[c]);
     }
 
     void streamError(NSError* e)
@@ -785,6 +904,7 @@ private:
     std::atomic<bool> myAttrOn{true};
     std::atomic<int> myAttrPos{0};
     std::atomic<bool> myAvailable{true}, myLaBusy{false};
+    std::vector<Marker> myMarkers, myMarkerReq;
     std::vector<uint8_t> myPatch;
     uint32_t myPatchW = 0, myPatchH = 0, myPatchForH = 0;
     std::atomic<bool> myStarting{false}, myRunning{false};

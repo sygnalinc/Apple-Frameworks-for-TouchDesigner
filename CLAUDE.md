@@ -6720,3 +6720,29 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   heading 53→77 と滑らかに旋回。エラーなし
 - 他の利用例と同じく **allowCooking=False で保存**(開いただけでネットワーク+SCK が走らないように)。
   note に SPEED / Show Window の書き戻し(その間 driver はオフ)/ Look Around 切替を記載
+
+### 2026-08-14 MapKit TOP に Markers DAT(正確なSOP重ね合わせ)+ パッド飛行デモ
+
+- ユーザー「GameController で操作しながら MapKit の3D空間を移動するデモ。SOP の 3D Object を
+  重ねて表示できないか」
+- **重ね合わせの答え = ビュー自身の射影を公開する**。MapKit TOP に **`Markers DAT`**
+  パラメータ(name/lat/lon の表)を追加し、`MKMapView` の `convertCoordinate:toPointToView:` で
+  各点の画面位置を **Info DAT に u/v/visible** で出す。カメラ行列や FOV を推定する必要がなく、
+  **3Dのパース・ピッチ・回転に正確に一致**する
+  - **実測**: pitch0/heading0 で注視点が (0.5000, 0.5000)、500m北の点が (0.5000, 0.9658)。
+    v は `1 - y/高さ` で TD の uv と揃った
+  - 重ねる側は Vision 系と同じ型: `(u-0.5, (v-0.5)/aspect)` でインスタンシング + Ortho Width=1。
+    visible をインスタンスのスケールに入れると画面外で自動的に消える
+  - 制約: 射影されるのは**地表の点**(ビルの高さ方向は API に無い)
+- **demo `/project1/MapKitFly`**: pad(GameController)→ fly(Execute DAT)が
+  緯度経度/向き/ピッチ/高度を積分して MapKit TOP を駆動(左スティック=移動・右X=旋回・
+  右Y=ピッチ・R2/L2=高度。**移動速度は高度に比例**)。landmarks(渋谷/明治神宮/新宿駅/
+  東京タワー/東京駅)にピンをインスタンシングで重ねる
+  - **視認**: 引きの画角で5本のピンが全ランドマークの正しい位置に立ち、パースにも追従
+  - **疑似パッド(constantCHOP)で飛行を検証**: 前進+右旋回 6秒で lat 35.672→35.659 /
+    heading 35→237(実機パッド不要で検証できるよう fly は `_fakepad` を優先して読む)
+- **踏んだ罠**: ①Geometry COMP のインスタンススケールは **`instancesx/sy`**
+  (instancescalex ではない。存在しない par 名への代入は tdAttributeError)
+  ②**Script CHOP は生成時に自前の callbacks DAT を自動生成する**(pins_callbacks1 が湧いた)。
+  自作の DAT を par.callbacks に挿すなら余分を消す
+- allowCooking=False で保存。README(英日)に Markers DAT の節を追加
