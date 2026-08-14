@@ -18,6 +18,7 @@
 #import <AppKit/AppKit.h>
 #import <MapKit/MapKit.h>
 #import <ScreenCaptureKit/ScreenCaptureKit.h>
+#import <CoreText/CoreText.h>
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -213,17 +214,21 @@ public:
             const bool traffic = in->getParInt("Traffic") != 0;
             const bool poi = in->getParInt("Poi") != 0;
             const bool dark = in->getParInt("Dark") != 0;
-            const bool legal = in->getParInt("Legallink") != 0;
-            myLegalHidden = !legal;
+            myAttrOn = in->getParInt("Attribution") != 0;
+            {
+                const std::string ap = str(in, "Attributionpos", "bottomleft");
+                myAttrPos = (ap == "bottomright") ? 1 : (ap == "topleft") ? 2
+                          : (ap == "topright") ? 3 : 0;
+            }
             const std::string cfgSig = style + "|" + elev + (traffic ? "|1" : "|0") +
-                                       (poi ? "|1" : "|0") + (dark ? "|1" : "|0") +
-                                       (legal ? "|1" : "|0");
+                                       (poi ? "|1" : "|0") + (dark ? "|1" : "|0");
             if (myCfgSig != cfgSig) {
                 myCfgSig = cfgSig;
                 applyConfig(style, elev, traffic, poi, dark);
             }
-            // ラベルはタイル読込後に再出現することがあるので、隠す指定のあいだは毎 cook 抑え込む
-            if (myLegalHidden.load()) {
+            // 内蔵の Legal はタイル読込後に再出現することがあるので毎 cook 抑え込む
+            // (TOP 上ではリンクとして機能しないため常に隠し、焼き込みの帰属表示に置き換える)
+            {
                 NSWindow* win2 = myWindow;
                 auto alive2 = myAlive;
                 dispatch_async(dispatch_get_main_queue(), ^{
@@ -253,6 +258,9 @@ public:
             if (myFrame.bgra.empty()) return;
             f = myFrame;
         }
+        // 帰属表示はアップロード直前に焼く。受信時に焼くと、静止中(新フレームが来ない)は
+        // トグルが反映されないため。パッチは小さいので毎 cook でも安い
+        if (myAttrOn.load()) burnAttribution(f);
         if (tdnc::fit(f.bgra, f.w, f.h, OP_PixelFormat::BGRA8Fixed)) {
             std::lock_guard<std::mutex> l(myMutex);
             myWarning = tdnc::kWarning;
@@ -311,9 +319,17 @@ public:
         { OP_NumericParameter p("Poi");  p.label = "Show Points Of Interest"; p.page = P;
           p.defaultValues[0] = 1; m->appendToggle(p); }
         { OP_NumericParameter p("Dark"); p.label = "Dark Appearance"; p.page = P; m->appendToggle(p); }
-        // 帰属表示。Apple の規約上は表示が求められるので既定オン
-        { OP_NumericParameter p("Legallink"); p.label = "Show Legal Link"; p.page = P;
+        // 帰属表示。ビュー内蔵の Legal は TOP 上ではリンクとして機能しないので常に隠し、
+        // 代わりに「(Appleロゴ) Apple Maps」を出力へ焼き込む(Apple の規約上、既定オン)
+        { OP_NumericParameter p("Attribution"); p.label = "Show Attribution"; p.page = P;
           p.defaultValues[0] = 1; m->appendToggle(p); }
+        {
+            OP_StringParameter p("Attributionpos");
+            p.label = "Attribution Position"; p.page = P; p.defaultValue = "bottomleft";
+            const char* n[] = {"bottomleft", "bottomright", "topleft", "topright"};
+            const char* l[] = {"Bottom Left", "Bottom Right", "Top Left", "Top Right"};
+            m->appendMenu(p, 4, n, l);
+        }
         { OP_NumericParameter p("Fps");  p.label = "Capture FPS"; p.page = P;
           p.defaultValues[0] = 60; p.minSliders[0] = 1; p.maxSliders[0] = 120;
           p.minValues[0] = 1; p.maxValues[0] = 120; p.clampMins[0] = p.clampMaxes[0] = true;
@@ -383,6 +399,78 @@ public:
             myFpsN++;
         }
         CVPixelBufferUnlockBaseAddress(px, kCVPixelBufferLock_ReadOnly);
+    }
+
+    // 「(Appleロゴ) Apple Maps」の小さなパッチを一度だけ描き、アップロード前のフレームへ
+    // 合成する。パッチは cook スレッドだけが触るのでロック不要
+    void ensureAttrPatch(uint32_t h)
+    {
+        if (myPatchForH == h && !myPatch.empty()) return;
+        myPatch.clear();
+        myPatchForH = h;
+        NSString* text = @"\uF8FF Apple Maps";   // U+F8FF = システムフォントの Apple ロゴ
+        const CGFloat fontSize = std::max<CGFloat>(11.0, (CGFloat)h * 0.018);
+        CTFontRef font = CTFontCreateUIFontForLanguage(kCTFontUIFontSystem, fontSize, NULL);
+        NSDictionary* attrs = @{(id)kCTFontAttributeName: (__bridge id)font,
+                                (id)kCTForegroundColorAttributeName:
+                                    (id)[NSColor colorWithWhite:1.0 alpha:0.95].CGColor};
+        CTLineRef line = CTLineCreateWithAttributedString(
+            (__bridge CFAttributedStringRef)[[NSAttributedString alloc] initWithString:text
+                                                                            attributes:attrs]);
+        CGFloat asc = 0, desc = 0;
+        const double tw = CTLineGetTypographicBounds(line, &asc, &desc, NULL);
+        const CGFloat pad = fontSize * 0.5;
+        myPatchW = (uint32_t)ceil(tw + pad * 2);
+        myPatchH = (uint32_t)ceil(asc + desc + pad * 1.4);
+        myPatch.assign((size_t)myPatchW * myPatchH * 4, 0);
+        CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+        CGContextRef ctx = CGBitmapContextCreate(myPatch.data(), myPatchW, myPatchH, 8,
+                                                 myPatchW * 4, cs,
+                                                 kCGImageAlphaPremultipliedFirst |
+                                                 kCGBitmapByteOrder32Little);
+        CGColorSpaceRelease(cs);
+        if (ctx) {
+            CGContextSetRGBFillColor(ctx, 0, 0, 0, 0.45);   // 下地(どんな地図でも読めるように)
+            CGPathRef bg = CGPathCreateWithRoundedRect(
+                CGRectMake(0, 0, myPatchW, myPatchH), 4, 4, NULL);
+            CGContextAddPath(ctx, bg); CGContextFillPath(ctx); CGPathRelease(bg);
+            CGContextSetTextPosition(ctx, pad, pad * 0.7 + desc);
+            CTLineDraw(line, ctx);
+            CGContextRelease(ctx);
+        } else {
+            myPatch.clear();
+        }
+        CFRelease(line);
+        CFRelease(font);
+    }
+
+    // f は bottom-up。パッチ(CG = 上から下)を行反転しながらアルファ合成する
+    void burnAttribution(Frame& f)
+    {
+        ensureAttrPatch(f.h);
+        if (myPatch.empty() || myPatchW + 16 > f.w || myPatchH + 16 > f.h) return;
+        const uint32_t m = std::max<uint32_t>(8, (uint32_t)(f.h * 0.012));
+        const int pos = myAttrPos.load();
+        const bool right = (pos == 1 || pos == 3);
+        const bool top = (pos == 2 || pos == 3);
+        const uint32_t baseX = right ? f.w - m - myPatchW : m;
+        const uint32_t baseY = top ? f.h - m - myPatchH : m;   // bottom-up なので下 = 小さい行
+        for (uint32_t py = 0; py < myPatchH; py++) {
+            const uint8_t* src = myPatch.data() + (size_t)py * myPatchW * 4;
+            uint8_t* dst = f.bgra.data() +
+                ((size_t)(baseY + (myPatchH - 1 - py)) * f.w + baseX) * 4;
+            for (uint32_t px = 0; px < myPatchW; px++) {
+                const uint8_t* sp = src + (size_t)px * 4;
+                uint8_t* dp = dst + (size_t)px * 4;
+                const uint32_t a = sp[3];
+                if (!a) continue;
+                const uint32_t ia = 255 - a;
+                dp[0] = (uint8_t)(sp[0] + (dp[0] * ia + 127) / 255);   // 事前乗算済み
+                dp[1] = (uint8_t)(sp[1] + (dp[1] * ia + 127) / 255);
+                dp[2] = (uint8_t)(sp[2] + (dp[2] * ia + 127) / 255);
+                dp[3] = 255;
+            }
+        }
     }
 
     void streamError(NSError* e)
@@ -559,7 +647,7 @@ private:
                 mv.preferredConfiguration = cfg;
                 win.appearance = [NSAppearance appearanceNamed:
                     dark ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
-                if (win.contentView) setLegalHidden(win.contentView, self2->myLegalHidden.load());
+                if (win.contentView) setLegalHidden(win.contentView, true);
             } @catch (NSException*) {}
         });
     }
@@ -694,8 +782,11 @@ private:
     std::atomic<uint32_t> myLastW{0}, myLastH{0};
     std::atomic<float> myFps{0};
     std::atomic<bool> myWindowRequested{false}, myWindowReady{false};
-    std::atomic<bool> myLegalHidden{false};
+    std::atomic<bool> myAttrOn{true};
+    std::atomic<int> myAttrPos{0};
     std::atomic<bool> myAvailable{true}, myLaBusy{false};
+    std::vector<uint8_t> myPatch;
+    uint32_t myPatchW = 0, myPatchH = 0, myPatchForH = 0;
     std::atomic<bool> myStarting{false}, myRunning{false};
     const OP_NodeInfo* myNode;
     double myPulled[5] = {};

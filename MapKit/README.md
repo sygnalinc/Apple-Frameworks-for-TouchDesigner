@@ -72,7 +72,8 @@ parameters only choose the scene coordinate; look and move by hand in the window
 | Distance (m) | Camera distance. No upper clamp — hand-zooming out writes big values back |
 | Pitch / Heading | Camera tilt and rotation (Map mode) |
 | Style / Elevation / Show Traffic / Show Points Of Interest / Dark Appearance | Map styling |
-| Show Legal Link | The map's built-in attribution. **On by default**; off hides it by walking the view hierarchy (no public API exists). Apple's guidelines still expect visible attribution on maps shown to an audience — switching it off is your call |
+| Show Attribution | Burns "&#63743; Apple Maps" into the output (same presentation as everywhere else in this repo). **On by default.** The map's built-in "Legal" label is always hidden instead — in a TOP it is just pixels, not a working link. Apple's guidelines expect visible attribution on maps shown to an audience; switching this off is your call |
+| Attribution Position | Which corner |
 | Capture FPS | ScreenCaptureKit frame-rate ceiling. Idle maps deliver frames only on change |
 | Show Window | Interactive mode (see above) |
 | Restart | Rebuild the stream and re-request the scene |
@@ -168,7 +169,8 @@ Look Around モードは視線の向きを読む/決める公開 API が無い�
 | Distance (m) | カメラ距離。上限クランプなし(手でズームアウトした大きい値も書き戻せる) |
 | Pitch / Heading | カメラの傾きと回転(Map モード) |
 | Style / Elevation / Show Traffic / Show Points Of Interest / Dark Appearance | 地図の見た目 |
-| Show Legal Link | 地図内蔵の帰属表示。**既定オン**。オフはビュー階層を辿って隠す(公開 API 無し)。Apple のガイドライン上、人に見せる地図には帰属表示が求められる — 消す判断は利用者のもの |
+| Show Attribution | 「&#63743; Apple Maps」を出力へ焼き込む。**既定オン**。地図内蔵の「Legal」ラベルは常に隠す — TOP 上ではただのピクセルで、リンクとして機能しないため。Apple のガイドライン上、人に見せる地図には帰属表示が求められる — 消す判断は利用者のもの |
+| Attribution Position | どの隅に出すか |
 | Capture FPS | ScreenCaptureKit のフレームレート上限。静止中は変化時しかフレームが来ない |
 | Show Window | 対話モード(上記) |
 | Restart | ストリームを張り直し、シーンも取り直す |
