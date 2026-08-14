@@ -36,7 +36,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | | |
 |:--:|:--:|
 | <img src="docs/demo/visionpose.gif" width="400" alt="Vision Pose"> | <img src="docs/demo/visionhand.gif" width="400" alt="Vision Hand"> |
-| **[Vision Pose](VisionPose/)** — 1人19関節(Body Track 互換の34枠)・同時5人 | **[Vision Hand](VisionHand/)** — 片手21関節 |
+| **[Vision Pose](VisionPose/)** — 1人19関節・同時5人 | **[Vision Hand](VisionHand/)** — 片手21関節 |
 | <img src="docs/demo/visionface.gif" width="400" alt="Vision Face"> | <img src="docs/demo/coreml-yolo.gif" width="400" alt="CoreML"> |
 | **[Vision Face](VisionFace/)** — 1顔85ランドマーク・同時10顔 | **[CoreML](CoreMLDAT/)** — YOLOv3 で物体検出 |
 | <img src="docs/demo/visiontext.gif" width="400" alt="Vision Text"> | <img src="docs/demo/visionanimalpose.gif" width="400" alt="Vision AnimalPose"> |

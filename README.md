@@ -37,7 +37,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | | |
 |:--:|:--:|
 | <img src="docs/demo/visionpose.gif" width="400" alt="Vision Pose"> | <img src="docs/demo/visionhand.gif" width="400" alt="Vision Hand"> |
-| **[Vision Pose](VisionPose/)** — 19 joints per person (34 Body-Track-compatible slots), 5 people at once | **[Vision Hand](VisionHand/)** — 21 joints per hand |
+| **[Vision Pose](VisionPose/)** — 19 joints per person, 5 people at once | **[Vision Hand](VisionHand/)** — 21 joints per hand |
 | <img src="docs/demo/visionface.gif" width="400" alt="Vision Face"> | <img src="docs/demo/coreml-yolo.gif" width="400" alt="CoreML"> |
 | **[Vision Face](VisionFace/)** — 85 landmarks per face, 10 faces at once | **[CoreML](CoreMLDAT/)** — object detection with YOLOv3 |
 | <img src="docs/demo/visiontext.gif" width="400" alt="Vision Text"> | <img src="docs/demo/visionanimalpose.gif" width="400" alt="Vision AnimalPose"> |
