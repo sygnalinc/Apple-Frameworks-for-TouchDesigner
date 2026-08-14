@@ -38,12 +38,27 @@ Drive `Latitude / Longitude / Distance / Pitch / Heading` from expressions or CH
 camera follows every frame. When nothing moves, ScreenCaptureKit only delivers frames on change, so
 an idle map costs almost nothing.
 
-**The camera is two-way.** With **Show Window** on, the window comes forward (floating, with a real
-title bar you can drag; the bar is cropped out of the capture with `sourceRect`) and **the window
-becomes the master**: pan, pinch-zoom, two-finger rotate and Option-scroll pitch — the same gestures
+**The camera is two-way.** With **Show Window** on, the window comes forward (floating; a separate
+title-bar window sits above it — drag the bar and the map follows) and **the window becomes the
+master**: pan, pinch-zoom, two-finger rotate and Option-scroll pitch — the same gestures
 as Maps.app — and every move is written back into the TOP's parameters. Turn Show Window off and
 the parameters are the master again, holding whatever you framed by hand. The map's on-screen
 controls are never shown because they would end up in the capture.
+
+The drag bar is a **separate window**, not a title bar on the map window itself: titling the map
+window rounds all its corners, and on macOS 26 even a parent–child attachment rounds the corners of
+the whole window group — both of which showed up in the capture (measured, all four corner alphas).
+An independent bar window that the map follows via `NSWindowDidMoveNotification` keeps the captured
+window borderless and perfectly square.
+
+**Show Legal Link** (on by default) controls the map's built-in attribution. Turning it off hides
+the label by walking the view hierarchy — there is no public API for it, and **Apple's guidelines
+still expect visible attribution on maps shown to an audience**; switching it off is your call to
+make, not the op's.
+
+There is **no public API for time of day**: the 3D scene's lighting cannot be changed (no
+`timeOfDay` anywhere in MapKit's headers or binary). The closest control is **Dark Appearance**,
+which renders the standard map style in its night colours.
 
 Two measured traps shaped the hidden mode: parking the window at desktop level makes macOS treat it
 as occluded, and **MapKit stops rendering — the output goes gray after a while**; and lowering the
@@ -177,12 +192,24 @@ ScreenCaptureKit の `initWithDesktopIndependentWindow:` で取り込む。ウ�
 カメラは毎フレーム追従する。動かしていないあいだは ScreenCaptureKit が変化時しかフレームを
 寄越さないので、静止した地図はほぼコストゼロ。
 
-**カメラは双方向。** **Show Window** をオンにするとウインドウが前面に出て(フローティング・
-掴んで動かせる本物のタイトルバー付き。バーは `sourceRect` で取り込みから除外される)、
+**カメラは双方向。** **Show Window** をオンにするとウインドウが前面に出て(フローティング。
+その上に別ウインドウのタイトルバーが乗り、バーを掴むと地図がついてくる)、
 **ウインドウがマスター**になる: パン・ピンチズーム・2本指回転・Option+スクロールのチルト —
 マップ.app と同じ操作 — の結果が全部 TOP のパラメータへ書き戻される。オフに戻すと
 パラメータがマスターに戻り、手で決めた構図がそのまま残る。地図のコントロール類は
 取り込みに写るので常に出さない。
+
+ドラッグ用のバーは地図ウインドウのタイトルバーではなく**別ウインドウ**になっている。地図側に
+タイトルを付けると角が全部丸くなり、macOS 26 では親子接続でもウインドウ群ごと角丸になって、
+どちらも取り込みに写った(四隅アルファで実測)。独立したバーを `NSWindowDidMoveNotification` で
+追従させる方式なら、取り込まれる地図ウインドウはボーダーレスのまま完全に四角。
+
+**Show Legal Link**(既定オン)は地図内蔵の帰属表示。オフにするとビュー階層を辿ってラベルを隠す —
+公開 API は存在せず、**Apple のガイドライン上、人に見せる地図には帰属表示が求められる**。
+消すかどうかの判断は利用者に委ねる。
+
+**時刻を変える公開 API は無い**: 3D シーンの照明は変更できない(MapKit のヘッダにもバイナリにも
+`timeOfDay` は存在しない)。一番近いのは **Dark Appearance** で、標準スタイルを夜の配色で描ける。
 
 隠しモードの設計は実測で踏んだ2つの罠で決まった: デスクトップレベルに置くと遮蔽扱いになり
 **MapKit が描画を止めて一定時間で出力が灰色になる**。かといってアルファを下げると

@@ -50,6 +50,20 @@ struct Frame {
     uint64_t serial = 0;
 };
 
+// MKMapView の帰属表示(Legal リンク)をビュー階層から探して隠す。
+// 公開 API には表示/非表示の口が無い。Apple のガイドライン上、人に見せる地図には
+// 帰属表示が求められる点は README に明記(消す判断は利用者のもの)
+static void setLegalHidden(NSView* v, bool hidden)
+{
+    for (NSView* sub in v.subviews) {
+        NSString* cls = NSStringFromClass(sub.class);
+        if ([cls containsString:@"Attribution"] || [cls containsString:@"Legal"])
+            sub.hidden = hidden;
+        else
+            setLegalHidden(sub, hidden);
+    }
+}
+
 class MapKitLiveTOP final : public TOP_CPlusPlusBase {
 public:
     MapKitLiveTOP(const OP_NodeInfo* ni, TOP_Context* c)
@@ -65,10 +79,13 @@ public:
         myOutput.owner = nullptr;
         SCStream* st = myStream; myStream = nil;
         NSWindow* w = myWindow; myWindow = nil;
+        NSWindow* bw = myBarWindow; myBarWindow = nil;
+        id obs = myMoveObserver; myMoveObserver = nil;
+        if (obs) [[NSNotificationCenter defaultCenter] removeObserver:obs];
         myMapView = nil;
         if (st) [st stopCaptureWithCompletionHandler:^(NSError*) {}];
         // ウインドウは AppKit の所有物なのでメインスレッドで閉じる
-        dispatch_async(dispatch_get_main_queue(), ^{ [w close]; });
+        dispatch_async(dispatch_get_main_queue(), ^{ [bw close]; [w close]; });
     }
 
     void getGeneralInfo(TOP_GeneralInfo* g, const OP_Inputs*, void*) override
@@ -179,10 +196,21 @@ public:
             std::string elev  = str(in, "Elevation", "realistic");
             const bool poi = in->getParInt("Poi") != 0;
             const bool dark = in->getParInt("Dark") != 0;
-            const std::string cfgSig = style + "|" + elev + (poi ? "|1" : "|0") + (dark ? "|1" : "|0");
+            const bool legal = in->getParInt("Legallink") != 0;
+            myLegalHidden = !legal;
+            const std::string cfgSig = style + "|" + elev + (poi ? "|1" : "|0") +
+                                       (dark ? "|1" : "|0") + (legal ? "|1" : "|0");
             if (myCfgSig != cfgSig) {
                 myCfgSig = cfgSig;
                 applyConfig(style, elev, poi, dark);
+            }
+            // ラベルはタイル読込後に再出現することがあるので、隠す指定のあいだは毎 cook 抑え込む
+            if (myLegalHidden.load()) {
+                MKMapView* mv2 = myMapView;
+                auto alive2 = myAlive;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (alive2->load() && mv2) setLegalHidden(mv2, true);
+                });
             }
 
             // --- ウインドウの見せ方 / サイズ / ストリーム ---
@@ -257,6 +285,9 @@ public:
         { OP_NumericParameter p("Poi");  p.label = "Show Points Of Interest"; p.page = P;
           p.defaultValues[0] = 1; m->appendToggle(p); }
         { OP_NumericParameter p("Dark"); p.label = "Dark Appearance"; p.page = P; m->appendToggle(p); }
+        // 帰属表示。Apple の規約上は表示が求められるので既定オン
+        { OP_NumericParameter p("Legallink"); p.label = "Show Legal Link"; p.page = P;
+          p.defaultValues[0] = 1; m->appendToggle(p); }
         { OP_NumericParameter p("Fps");  p.label = "Capture FPS"; p.page = P;
           p.defaultValues[0] = 60; p.minSliders[0] = 1; p.maxSliders[0] = 120;
           p.minValues[0] = 1; p.maxValues[0] = 120; p.clampMins[0] = p.clampMaxes[0] = true;
@@ -365,6 +396,31 @@ private:
                               defer:NO];
             win.releasedWhenClosed = NO;
             win.title = @"MapKit Live";
+            // ドラッグ用のバーは**別ウインドウ**にして親にする。地図ウインドウを
+            // タイトル付きにすると下角まで丸くなり、丸角が TOP に写ってしまう
+            // (実際にユーザーに指摘された)。バーを掴めば子の地図がついてくる
+            NSWindow* bar = [[NSWindow alloc]
+                initWithContentRect:NSMakeRect(0, 0, r.size.width, 0)
+                          styleMask:NSWindowStyleMaskTitled
+                            backing:NSBackingStoreBuffered
+                              defer:NO];
+            bar.releasedWhenClosed = NO;
+            bar.title = @"MapKit Live";
+            [[bar standardWindowButton:NSWindowCloseButton] setHidden:YES];
+            [[bar standardWindowButton:NSWindowMiniaturizeButton] setHidden:YES];
+            [[bar standardWindowButton:NSWindowZoomButton] setHidden:YES];
+            self->myBarWindow = bar;
+            // バーをドラッグしたら地図をその真下へ追従させる
+            NSWindow* mapWin = win;
+            self->myMoveObserver = [[NSNotificationCenter defaultCenter]
+                addObserverForName:NSWindowDidMoveNotification
+                            object:bar
+                             queue:[NSOperationQueue mainQueue]
+                        usingBlock:^(NSNotification*) {
+                const NSRect bf = bar.frame;
+                [mapWin setFrameOrigin:NSMakePoint(bf.origin.x,
+                                                   bf.origin.y - mapWin.frame.size.height)];
+            }];
             // Mission Control やスペース移動に巻き込まれないように
             win.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
                                      NSWindowCollectionBehaviorStationary |
@@ -397,6 +453,7 @@ private:
         MKMapView* mv = myMapView;
         NSWindow* win = myWindow;
         auto alive = myAlive;
+        auto* self2 = this;
         dispatch_async(dispatch_get_main_queue(), ^{
             if (!alive->load() || !mv) return;
             @try {
@@ -421,6 +478,7 @@ private:
                 mv.preferredConfiguration = cfg;
                 win.appearance = [NSAppearance appearanceNamed:
                     dark ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
+                setLegalHidden(mv, self2->myLegalHidden.load());
             } @catch (NSException*) {}
         });
     }
@@ -444,17 +502,11 @@ private:
             r.size = NSMakeSize(w / scale, h / scale);
             [win setFrame:r display:YES];
             mv.frame = NSMakeRect(0, 0, r.size.width, r.size.height);
-            CGRect srcRect = CGRectZero;   // CGRectZero = ウインドウ全体を取り込む
+            NSWindow* bar = myBarWindow;
             if (show) {
-                // **見えるタイトルバー**を付ける(掴んで動かせる)。バーは sourceRect で
-                // 取り込みから除外するので TOP には写らない
-                win.styleMask = NSWindowStyleMaskTitled;
-                win.title = @"MapKit Live";
-                // 閉じる/しまうボタンは無効(閉じられるとストリームが壊れるため)
-                [[win standardWindowButton:NSWindowCloseButton] setHidden:YES];
-                [[win standardWindowButton:NSWindowMiniaturizeButton] setHidden:YES];
-                [[win standardWindowButton:NSWindowZoomButton] setHidden:YES];
-                [win setContentSize:r.size];
+                // 地図ウインドウは**常にボーダーレス**(角が四角のまま取り込まれる)。
+                // ドラッグはバー(親ウインドウ)が担う
+                [win setFrame:r display:NO];
                 if (myShownOrigin.x != 0 || myShownOrigin.y != 0)
                     [win setFrameOrigin:myShownOrigin];   // 前回表示していた場所へ戻す
                 win.alphaValue = 1.0;
@@ -462,10 +514,14 @@ private:
                 // TD のウインドウをクリックしても隠れないように浮かせる
                 win.level = NSFloatingWindowLevel;
                 [win makeKeyAndOrderFront:nil];
-                const NSRect fr = win.frame;
-                const NSRect cr = [win contentRectForFrameRect:fr];
-                const CGFloat barH = fr.size.height - cr.size.height;
-                srcRect = CGRectMake(0, barH, cr.size.width, cr.size.height);
+                [bar setContentSize:NSMakeSize(win.frame.size.width, 0)];
+                [bar setFrameOrigin:NSMakePoint(win.frame.origin.x, NSMaxY(win.frame))];
+                bar.level = NSFloatingWindowLevel;
+                // **親子接続はしない**。macOS 26 は接続したウインドウ群をまとめて
+                // 角丸にするため、地図の角まで丸くなって取り込みに写った(実測)。
+                // バーの移動は通知(NSWindowDidMoveNotification)で追従させる
+                [bar orderFront:nil];
+                myWasShown = true;
             } else {
                 // 隠すときはボーダーレス(角が四角)。**2つの罠を実測で踏んだ**:
                 // ①デスクトップレベルに置くと遮蔽扱いになり MapKit が描画を止めて灰色になる
@@ -473,9 +529,8 @@ private:
                 // → アルファ 1.0 のまま、**大部分を画面外へ出して 8pt だけ画面内に残す**。
                 //   完全に画面外だと描画が止まるので端を残す(Translate の極小ウインドウと同じ発想)。
                 //   取り込みは desktopIndependent なので画面外の部分も丸ごと取れる
-                if (win.styleMask & NSWindowStyleMaskTitled)
-                    myShownOrigin = win.frame.origin;   // 次に表示するとき元の場所へ戻す
-                win.styleMask = NSWindowStyleMaskBorderless;
+                if (myWasShown) { myShownOrigin = win.frame.origin; myWasShown = false; }
+                [bar orderOut:nil];
                 [win setFrame:r display:NO];
                 win.alphaValue = 1.0;
                 win.ignoresMouseEvents = YES;
@@ -516,7 +571,7 @@ private:
                 cfg.showsCursor = NO;
                 cfg.queueDepth = 3;
                 if (@available(macOS 14.0, *)) cfg.ignoreShadowsSingleWindow = YES;
-                if (!CGRectIsEmpty(srcRect)) cfg.sourceRect = srcRect;
+
                 SCStream* st = [[SCStream alloc] initWithFilter:filter configuration:cfg delegate:o];
                 NSError* add = nil;
                 [st addStreamOutput:o type:SCStreamOutputTypeScreen
@@ -552,11 +607,15 @@ private:
     std::atomic<uint32_t> myLastW{0}, myLastH{0};
     std::atomic<float> myFps{0};
     std::atomic<bool> myWindowRequested{false}, myWindowReady{false};
+    std::atomic<bool> myLegalHidden{false};
     std::atomic<bool> myStarting{false}, myRunning{false};
     const OP_NodeInfo* myNode;
     double myPulled[5] = {};
     uint64_t myPulledSerial = 0, myAppliedPull = 0;
     NSPoint myShownOrigin = {0, 0};
+    NSWindow* myBarWindow = nil;
+    id myMoveObserver = nil;
+    bool myWasShown = false;
 };
 
 }  // namespace
