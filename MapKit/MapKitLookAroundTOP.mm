@@ -44,11 +44,15 @@ namespace { class MapKitLookAroundTOP; }
 {
 @public
     std::shared_ptr<std::atomic<bool>> closeReq;
+    void (^onClose)(void);
 }
 @end
 @implementation TDMKLABarDelegate
 - (BOOL)windowShouldClose:(NSWindow*)w
 {
+    // **cook を待たずにその場で畳む**。cook が止まっているとフラグを読む人が
+    // いないので、ボタンが効かないまま固まって見える(実際に踏んだ)
+    if (onClose) onClose();
     if (closeReq) closeReq->store(true);
     return NO;
 }
@@ -72,6 +76,7 @@ public:
     ~MapKitLookAroundTOP() override
     {
         *myAlive = false;
+        if (myWatchdog) { dispatch_source_cancel(myWatchdog); myWatchdog = nil; }
         myOutput.owner = nullptr;
         SCStream* st = myStream; myStream = nil;
         NSWindow* w = myWindow; myWindow = nil;
@@ -81,10 +86,15 @@ public:
         if (obs) [[NSNotificationCenter defaultCenter] removeObserver:obs];
         myLookVC = nil;
         if (st) [st stopCaptureWithCompletionHandler:^(NSError*) {}];
-        dispatch_async(dispatch_get_main_queue(), ^{
+        // TD 終了時はメインスレッドから破棄されるので、非同期にすると
+        // 実行される前にプロセスが畳まれてウインドウが残って見える
+        void (^closeAll)(void) = ^{
             bw.delegate = nil;   // NSWindow.delegate は weak でない(assign)ので明示的に切る
+            [bw orderOut:nil]; [w orderOut:nil];
             [bw close]; [w close];
-        });
+        };
+        if ([NSThread isMainThread]) closeAll();
+        else dispatch_async(dispatch_get_main_queue(), closeAll);
     }
 
     void getGeneralInfo(TOP_GeneralInfo* g, const OP_Inputs*, void*) override
@@ -95,6 +105,7 @@ public:
     void execute(TOP_Output* out, const OP_Inputs* in, void*) override
     {
         myExec++;
+        myLastCook = CFAbsoluteTimeGetCurrent();
         const bool active = in->getParInt("Active") != 0;
         int w = 1280, h = 720;
         {
@@ -107,7 +118,15 @@ public:
             if (h > 8192) h = 8192;
         }
         const int fps = std::max(1, std::min(120, (int)in->getParInt("Fps")));
-        const bool show = in->getParInt("Showwindow") != 0;
+        bool show = in->getParInt("Showwindow") != 0;
+        // ウインドウを畳んだ後(cook 停止・Active オフ・閉じるボタン)と**ロード直後**は、
+        // Show Window を 0 に戻して閉じたままにする。cook が戻っても勝手に開かない /
+        // 次回 TD 起動時も必ず閉じた状態で始まる
+        if (myNeedParamOff.exchange(false)) {
+            if (show) tdpycb::setFloatPars(myNode, {{"Showwindow", 0.0}});
+            show = false;
+            myStreamSig.clear();
+        }
         if (myCloseReq->exchange(false) && show)
             tdpycb::setFloatPars(myNode, {{"Showwindow", 0.0}});
 
@@ -213,6 +232,7 @@ public:
             [st stopCaptureWithCompletionHandler:^(NSError*) {}];
             myRunning = false;
             myStreamSig.clear();
+            parkWindow();   // Active を切ったらウインドウも画面から下ろす
         }
 
         // --- 最新フレームをアップロード(bypass 復帰のため毎回) ---
@@ -336,6 +356,55 @@ public:
     std::string myStreamSig;
 
 private:
+    // cook が止まった / Active が切れたときに、ウインドウを画面から下ろす。
+    // **破棄はしない**(再開時に張り直すため)。ここは cook スレッドからも呼ばれる
+    // **メインスレッド専用**。ウインドウを画面から下ろす(破棄はしない)。
+    // cook が再開しても勝手に開かないよう、Show Window パラメータを 0 に戻す予約もする
+    void parkNow()
+    {
+        if (!myWindow || !myOnScreen) return;
+        if (myWasShown) {   // 表示位置を覚えてから下ろす(次に開いたとき同じ場所へ)
+            myShownOrigin = myWindow.frame.origin;
+            myWasShown = false;
+        }
+        [myBarWindow orderOut:nil];
+        [myWindow orderOut:nil];
+        myOnScreen = false;
+        myNeedParamOff = true;   // 次の cook で Show Window を 0 に戻す
+    }
+
+    void parkWindow()   // cook スレッドなど、どこからでも
+    {
+        auto alive = myAlive;
+        auto* self = this;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (alive->load()) self->parkNow();
+        });
+    }
+
+    // cook が止まったことを見張る。**cook が止まると main queue への dispatch も止まる**ので、
+    // cook から独立したタイマーでしか検出できない(コンテナの allowCooking=False や
+    // バイパスでウインドウだけ画面に残るのを防ぐ)
+    void startWatchdog()
+    {
+        if (myWatchdog) return;
+        auto alive = myAlive;
+        auto* self = this;
+        dispatch_source_t t = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0,
+                                                     dispatch_get_main_queue());
+        dispatch_source_set_timer(t,
+            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+            (uint64_t)(0.25 * NSEC_PER_SEC), (uint64_t)(0.1 * NSEC_PER_SEC));
+        dispatch_source_set_event_handler(t, ^{
+            if (!alive->load()) return;
+            const double last = self->myLastCook.load();
+            if (last > 0 && CFAbsoluteTimeGetCurrent() - last > kCookStallSec)
+                self->parkWindow();
+        });
+        dispatch_resume(t);
+        myWatchdog = t;
+    }
+
     void createWindow(int w, int h)
     {
         auto alive = myAlive;
@@ -365,6 +434,7 @@ private:
             [[bar standardWindowButton:NSWindowZoomButton] setHidden:YES];
             TDMKLABarDelegate* del = [TDMKLABarDelegate new];
             del->closeReq = self->myCloseReq;
+            del->onClose = ^{ self->parkNow(); };   // ボタンで即座に畳む(メインスレッド)
             bar.delegate = del;
             self->myBarDelegate = del;
             self->myBarWindow = bar;
@@ -391,7 +461,9 @@ private:
             [win makeFirstResponder:self->myLookVC.view];
             self->myWindow = win;
             [win orderBack:nil];
+            self->myOnScreen = true;   // orderBack も「画面に載っている」状態
             self->myWindowReady = true;
+            self->startWatchdog();
         });
     }
 
@@ -474,6 +546,7 @@ private:
                                                 NSMinY(sf) - r.size.height + tdmk::kSliver)];
                 [win orderFront:nil];
             }
+            self->myOnScreen = true;
             const CGWindowID wid = (CGWindowID)win.windowNumber;
 
             [SCShareableContent getShareableContentExcludingDesktopWindows:NO
@@ -544,6 +617,13 @@ private:
     std::atomic<bool> myAvailable{true}, myLaBusy{false};
     const OP_NodeInfo* myNode;
     NSPoint myShownOrigin = {0, 0};
+    std::atomic<double> myLastCook{0};
+    // ロード直後も true = **起動時は必ず閉じた状態から**
+    std::atomic<bool> myNeedParamOff{true};
+    dispatch_source_t myWatchdog = nil;
+    bool myOnScreen = false;   // メインスレッドのみが触る
+    // これだけ cook が来なければ「止まった」と見なす(ヒッチで畳まない程度に長く)
+    static constexpr double kCookStallSec = 1.0;
     NSWindow* myBarWindow = nil;
     TDMKLABarDelegate* myBarDelegate = nil;
     std::shared_ptr<std::atomic<bool>> myCloseReq =

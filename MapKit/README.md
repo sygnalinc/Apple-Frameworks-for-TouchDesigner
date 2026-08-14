@@ -57,6 +57,13 @@ needs the Screen Recording permission.
   in the capture (measured by corner alphas). The window position is remembered across hide/show
 - The map's own compass/zoom/pitch controls are never shown: they would be captured. All gestures
   work without them
+- **The window closes itself when the node stops cooking** (container `allowCooking` off, bypass,
+  …) and stays closed when cooking resumes — reopening is always an explicit click on Show Window.
+  It also **always starts closed** after loading a project, whatever the file had saved. A watchdog
+  timer independent of cook is what makes this possible: when cooking stops, blocks dispatched from
+  `execute()` stop too, so nothing cook-driven can notice. The bar's close button hides the window
+  immediately for the same reason — waiting for the next cook would leave it stuck open while
+  cooking is stopped
 
 ### Overlaying your own geometry (Markers DAT)
 
@@ -226,6 +233,12 @@ Apple マップを TouchDesigner へ持ち込む3つのオペレータ。API キ
   表示位置は隠す→再表示で復元される
 - 地図のコンパス/ズーム/チルトコントロールは出さない(取り込みに写るため)。
   ジェスチャはコントロール無しでも全部効く
+- **cook が止まるとウインドウは自動で閉じる**(コンテナの allowCooking オフ、バイパス等)。
+  cook が戻っても閉じたままで、開くのは常に Show Window の明示的な操作。プロジェクトを
+  読み込んだ直後も、ファイルに何が保存されていても**必ず閉じた状態から始まる**。
+  これには cook から独立した watchdog タイマーが要る — cook が止まると `execute()` から
+  投げる dispatch も止まるので、cook 駆動の仕組みでは気づけない。バーの閉じるボタンが
+  その場で畳むのも同じ理由(次の cook を待つ設計だと、cook 停止中は押しても閉じない)
 
 ### 自前のジオメトリを重ねる(Markers DAT)
 
