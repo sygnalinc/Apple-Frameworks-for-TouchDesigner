@@ -85,6 +85,25 @@ Info CHOP: `executes / frames / running / window_ready / available / width / hei
 Crossing yes, Tokyo Station no) and there is no API to query it, so check this before relying on
 the image.
 
+## MapKit DAT
+
+A second op in this folder, **MapKit** (DAT family — the opType repeats across families like the
+CoreML trio), provides the data side. Four modes, all measured working:
+
+| Mode | In → Out |
+|---|---|
+| **Search Nearby** | Natural-language query + centre/span → `name / lat / lon / distance_m / category / address / phone / url`. "coffee" around Shibuya returned real cafés with addresses |
+| **Geocode** | Place name or address → coordinates. "Tokyo Station" → 35.68107, 139.76743. Implemented with `MKLocalSearch`, because `CLGeocoder` returns *no result* (kCLErrorDomain 8) for place names |
+| **Reverse Geocode** | lat/lon → `country / admin_area / locality / thoroughfare / postal_code` |
+| **Route** | Source → destination, walking/driving/transit. `Steps` gives instructions with distances (Shibuya→Tokyo Station walking: 7532 m / 124 min, Japanese instructions); `Points` gives the **full route polyline** (190 rows for that route) |
+
+`Points` exists to feed the TOP: DAT to CHOP the lat/lon columns and drive the MapKit TOP's camera
+along the route — a turn-by-turn flythrough.
+
+Requests fire when a parameter changes (plus **Refresh**); results arrive asynchronously and the
+completion handlers come in on the main queue, same as the TOP. Info CHOP:
+`executes / requests / busy / valid / rows / request_ms`.
+
 ### Notes
 
 - There is **no public API for time of day** — the 3D lighting cannot be changed (`timeOfDay`
@@ -180,6 +199,25 @@ Look Around モードは視線の向きを読む/決める公開 API が無い�
 Info CHOP: `executes / frames / running / window_ready / available / width / height / capture_fps`。
 `available` は Look Around のシーンがその座標にあるとき 1。カバー範囲は飛び飛び
 (渋谷スクランブル=あり / 東京駅=なし)で問い合わせ API も無いので、画に頼る前にこれを見る。
+
+## MapKit DAT
+
+このフォルダのもう1つのop、**MapKit**(DAT ファミリー。opType は CoreML 三兄弟と同じく
+ファミリー間で重複可)がデータ側を担当する。4モード、すべて実測済み:
+
+| モード | 入力 → 出力 |
+|---|---|
+| **Search Nearby** | 自然文クエリ + 中心/範囲 → `name / lat / lon / distance_m / category / address / phone / url`。渋谷で "coffee" → 実在のカフェが住所つきで返る |
+| **Geocode** | 地名・住所 → 座標。「東京駅」→ 35.68107, 139.76743。実装は `MKLocalSearch`(`CLGeocoder` は地名で kCLErrorDomain 8 = 結果なしを返すため) |
+| **Reverse Geocode** | 緯度経度 → `country / admin_area / locality / thoroughfare / postal_code` |
+| **Route** | 出発地 → 目的地。徒歩/車/公共交通。`Steps` は距離つきの案内(渋谷→東京駅 徒歩 7532m / 124分・日本語の案内)、`Points` は**経路のポリライン全点**(この経路で190行) |
+
+`Points` は TOP へ流すためにある: lat/lon 列を DAT to CHOP して MapKit TOP のカメラを
+経路に沿って動かせば、道なりの飛行になる。
+
+要求はパラメータが変わったとき(+ **Refresh**)に飛ぶ。結果は非同期で、完了ハンドラは
+TOP と同じくメインキューに来る。Info CHOP:
+`executes / requests / busy / valid / rows / request_ms`。
 
 ### 注意
 

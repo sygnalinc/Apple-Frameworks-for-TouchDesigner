@@ -6685,3 +6685,25 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   静止中でも即反映(実測: オン 0.34 → オフ 0.62、右上指定で移動も確認)
 - 検証の注意も同根: 「トグル→読み取り」で変化が見えないとき、**新しいフレームが来ていない**
   だけのことがある。SCK 系の検証は「何が新しいフレームを生むか」を意識する
+
+### 2026-08-14 MapKit DAT 実装(検索 / ジオコーディング / 逆ジオ / 経路)+ 空バンドルで TD をクラッシュさせた
+
+- ユーザー「MapKit DAT の作成」。opType は CoreML 三兄弟と同じく **`Mapkit`**(family間重複)
+- **4モード・全て実測**: Search(渋谷 "coffee" → 実在カフェ・住所・距離つき)/
+  Geocode(「東京駅」→ 35.68107, 139.76743)/ Reverse(35.6595,139.7005 → 神南1丁目)/
+  Route(渋谷→東京駅 徒歩 7532m/124分・日本語案内。`Points` は**ポリライン全190点**)
+- **`Points` の狙いは TOP との連携**: lat/lon を DAT to CHOP して MapKit TOP のカメラを
+  経路に沿って動かす = 道なりの飛行
+- **CLGeocoder は地名に弱い(実測)**: 「東京駅」で kCLErrorDomain 8(結果なし)。
+  Geocode は **MKLocalSearch を地域制約なし**で使う実装に変更(地名・住所とも通る)。
+  Reverse は CLGeocoder のままで正常
+- **やらかし: 空バンドルのインストールで TD が起動時にクラッシュ**(SIGTRAP・libC_DAT →
+  CFDataInit)。原因は2段: ①build_one が「バンドル骨格を作ってからコンパイル」だったため、
+  コンパイル失敗で**実行ファイルの無い骨格が build/ に残った** ②私がビルド成否を確認せず
+  rm+cp でインストールした。**修正**: build_one を「一時パスへコンパイル → 成功したら
+  バンドルを組む」順序に変更 + インストール前に実行ファイルの存在チェックを入れた
+- ほか: `DAT_PluginInfo::apiVersion` は private(`setAPIVersion()` を使う・CHOP と同じ罠)、
+  `MKMapItem.placemark` は MKPlacemark(CLPlacemark には coordinate が無い)
+- README(英日)に MapKit DAT 節、ルート README の実験中の表に行を追加。
+  PLUGINS.tsv はフォルダ単位なので変更なし
+- 次にやること: demo.toe への利用例(TOP + DAT 連携: 経路に沿った飛行)

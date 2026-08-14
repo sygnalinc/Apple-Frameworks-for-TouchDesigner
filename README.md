@@ -189,6 +189,7 @@ and are unsupported. The source is here so you can build and try them yourself
 | [CoreMIDI In](CoreMIDI/) | CHOP | experimental |
 | [AVF Camera](AVFoundationCamera/) | TOP | experimental |
 | [MapKit](MapKit/) | TOP | experimental |
+| [MapKit DAT](MapKit/) | DAT | experimental |
 | [AVAudio Mixer CHOP](AVAudioMixer/) | CHOP | experimental |
 | [AVAudio Spatial CHOP](AVAudioSpatial/) | CHOP | experimental |
 | [AVF Camera TOP](AVFoundationCamera/) | TOP | experimental |
