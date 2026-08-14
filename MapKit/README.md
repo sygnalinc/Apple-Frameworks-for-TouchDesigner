@@ -4,18 +4,24 @@
 
 ## English
 
-One TOP that renders Apple Maps **live**: the 3D map you can fly through, or **Look Around**
-street-level photography you can stand in. No API key, no account.
+Three operators that bring Apple Maps into TouchDesigner. No API key, no account.
 
-> **Status: experimental.** Requires **Screen Recording permission** (the same TCC grant as the
-> Screen Capture TOP) — see "How it works" for why.
+| Op | Family | What it is |
+|---|---|---|
+| **MapKit** | TOP | The 3D map, rendered **live** — fly through it |
+| **MapKit Look Around** | TOP | Street-level photography you can stand in and look around |
+| **MapKit** | DAT | Search / geocode / reverse geocode / routes / Look Around coverage |
+
+> **Status: experimental.** The two TOPs require **Screen Recording permission** (the same TCC
+> grant as the Screen Capture TOP) — see "How it works" for why. They can run side by side —
+> each owns its window.
+
+## MapKit TOP (the 3D map)
 
 ### What it does (measured on M2 / macOS 26.6)
 
 - **Fly through the 3D map**: animate `Latitude / Longitude / Distance / Pitch / Heading` from
   expressions or CHOP exports — **57 fps sustained** (measured over 2 minutes, TD itself at 60 fps)
-- **Look Around**: live street-level scene at the coordinate (Shibuya Crossing measured); with the
-  window shown you can look and walk around in it
 - **Hand-frame with trackpad/mouse**: turn **Show Window** on and the map window comes forward with
   a drag bar. Pan / pinch-zoom / two-finger rotate / Option-scroll pitch — the same gestures as
   Maps.app — and every move is **written back into the parameters**
@@ -46,7 +52,7 @@ needs the Screen Recording permission.
   composited appearance** (alpha 0.01 gives 1 % brightness)
 - **Show Window on**: the window comes forward (floating — clicking TD does not hide it) with a
   separate title-bar window above it; drag the bar and the map follows
-  (`NSWindowDidMoveNotification`). The map window itself stays borderless because titling it — or
+  (`NSWindowDidMoveNotification`), and the bar's close button flips **Show Window** back off. The map window itself stays borderless because titling it — or
   even attaching it as a child window on macOS 26 — rounds its corners, and the rounding shows up
   in the capture (measured by corner alphas). The window position is remembered across hide/show
 - The map's own compass/zoom/pitch controls are never shown: they would be captured. All gestures
@@ -75,43 +81,54 @@ Python used elsewhere in this repo). Turn it off and the parameters are the mast
 because the last pulled values seed the push side. The initial camera is seeded from the parameters
 so the default world view never leaks back into them.
 
-In Look Around mode Latitude/Longitude choose the scene, and **Heading / Look Pitch drive the
-view direction** — with `Show Window` off the parameters are the master; with it on, your drag in
-the window writes the direction back into `Heading` (yaw only — pitch has no read-out). Two
-discoveries made this work: the embedded view controller ships with its pan/zoom recognizers
-**disabled** (`navigationEnabled = YES` does not flip them; measured `enabled = 0`), so this op
-force-enables them every cook; and the direction setter is a **private API** —
-`MKLookAroundView setPresentationYaw:pitch:animated:`, the same internal path the drag gesture
-uses (pixel-verified: yaw 20→90→225 rotates and pitch tilts from street to sky while the imagery
-stays intact). There is no public orientation API, and synthetic drag events cannot reach AppKit
-gesture recognizers at all, so the private call is the only route. **An OS update may break it** —
-this plugin is experimental. (Do **not** rebuild the scene via
-`initWithMapItem:cameraFrameOverride:` — the view then reports itself fully drawn while
-compositing pure black, measured everywhere.)
-
 ### Parameters
 
 | Parameter | Meaning |
 |---|---|
-| Mode | `Map` or `Look Around` |
-| Latitude / Longitude | Camera target (Map) or scene coordinate (Look Around) |
+| Latitude / Longitude | Camera target |
 | Distance (m) | Camera distance. No upper clamp — hand-zooming out writes big values back |
-| Pitch / Heading | Camera tilt and rotation (Map mode). Heading also drives the Look Around view direction |
-| Look Pitch (Look Around) | Look up (+) / down (−) in Look Around, −90..90. Separate from the map-mode Pitch. No read-back — window drags do not write it back |
+| Pitch / Heading | Camera tilt and rotation |
 | Style / Elevation / Show Traffic / Show Points Of Interest / Dark Appearance | Map styling |
 | Show Attribution | Burns "&#63743; Apple Maps" into the output (same presentation as everywhere else in this repo). **On by default.** The map's built-in "Legal" label is always hidden instead — in a TOP it is just pixels, not a working link. Apple's guidelines expect visible attribution on maps shown to an audience; switching this off is your call |
 | Attribution Position | Which corner |
 | Capture FPS | ScreenCaptureKit frame-rate ceiling. Idle maps deliver frames only on change |
 | Markers DAT | Table of lat/lon points to project into screen space (see above) |
 | Show Window | Interactive mode (see above) |
-| Restart | Rebuild the stream and re-request the scene |
+| Restart | Rebuild the capture stream |
 
 Resolution comes from the **Common** page (`Use Input` falls back to 1280×720).
 
-Info CHOP: `executes / frames / running / window_ready / available / width / height / capture_fps`.
-`available` is 1 while a Look Around scene exists at the coordinate — coverage is patchy (Shibuya
-Crossing yes, Tokyo Station no) and there is no API to query it, so check this before relying on
-the image.
+Info CHOP: `executes / frames / running / window_ready / width / height / capture_fps`.
+
+## MapKit Look Around TOP (street-level imagery)
+
+Live Look Around scene at the coordinate (Shibuya Crossing measured). Same window + SCK capture
+foundation as the map TOP, including the drag bar, close button and the hidden 1-pt sliver.
+
+**Heading / Look Pitch drive the view direction** — with `Show Window` off the parameters are the
+master; with it on, your drag in the window writes the direction back into `Heading` (yaw only —
+pitch has no read-out). Two discoveries made this work: the embedded view controller ships with its
+pan/zoom recognizers **disabled** (`navigationEnabled = YES` does not flip them; measured
+`enabled = 0`), so this op force-enables them every cook; and the direction setter is a
+**private API** — `MKLookAroundView setPresentationYaw:pitch:animated:`, the same internal path
+the drag gesture uses (pixel-verified: yaw 20→90→225 rotates and pitch tilts from street to sky
+while the imagery stays intact). There is no public orientation API, and synthetic drag events
+cannot reach AppKit gesture recognizers at all, so the private call is the only route.
+**An OS update may break it.** (Do **not** rebuild the scene via
+`initWithMapItem:cameraFrameOverride:` — the view then reports itself fully drawn while
+compositing pure black, measured everywhere.)
+
+| Parameter | Meaning |
+|---|---|
+| Latitude / Longitude | Scene coordinate (a new scene is fetched when it changes) |
+| Heading | View direction, two-way (drag writes back) |
+| Look Pitch | Look up (+) / down (−), −90..90. No read-back — drags do not write it back |
+| Show Attribution / Attribution Position / Capture FPS / Show Window / Restart | Same as the map TOP |
+
+Info CHOP adds `available`: 1 while a Look Around scene exists at the coordinate — coverage is
+patchy (Shibuya Crossing yes, Tokyo Station's station building no) and there is no coverage API,
+so check it before relying on the image, or scan ahead with the DAT's **Look Around Coverage**
+mode.
 
 ## MapKit DAT
 
@@ -152,18 +169,23 @@ cd MapKit && ./build.sh
 
 ## 日本語
 
-Apple マップを**ライブ**で TOP に出す1つのオペレータ。3D地図の中を飛び、**Look Around**
-(街並みの実写)の中に立てる。API キーもアカウントも不要。
+Apple マップを TouchDesigner へ持ち込む3つのオペレータ。API キーもアカウントも不要。
 
-> **状態: experimental(実験中)。** **画面収録の許可**(Screen Capture TOP と同じ TCC)が要る —
-> 理由は「仕組み」を参照。
+| op | Family | 役割 |
+|---|---|---|
+| **MapKit** | TOP | 3D地図を**ライブ**でレンダ — 中を飛べる |
+| **MapKit Look Around** | TOP | 街並みの実写。中に立って見回せる |
+| **MapKit** | DAT | 検索 / ジオコーディング / 逆ジオ / 経路 / Look Around カバレッジ |
+
+> **状態: experimental(実験中)。** 2つの TOP は**画面収録の許可**(Screen Capture TOP と
+> 同じ TCC)が要る — 理由は「仕組み」を参照。それぞれ自分のウインドウを持つので**同時に使える**。
+
+## MapKit TOP(3D地図)
 
 ### できること(M2 / macOS 26.6 で実測)
 
 - **3D地図の中を飛ぶ**: `Latitude / Longitude / Distance / Pitch / Heading` を式や CHOP で
   アニメーション — **57fps を維持**(2分間の実測。TD 本体は 60fps)
-- **Look Around**: 座標の街並みをライブ表示(渋谷スクランブルで実測)。ウインドウを出せば
-  その中で見回し・移動もできる
 - **トラックパッド/マウスで構図を決める**: **Show Window** をオンにするとドラッグバー付きで
   前面に出る。パン / ピンチズーム / 2本指回転 / Option+スクロールのチルト — マップ.app と
   同じ操作 — の結果が**パラメータへ書き戻される**
@@ -192,6 +214,7 @@ Apple マップを**ライブ**で TOP に出す1つのオペレータ。3D地�
   **取り込みまで暗くなる**(ScreenCaptureKit は合成後の見た目を返す。アルファ 0.01 = 輝度1%)
 - **Show Window オン**: フローティングで前面に出る(TD をクリックしても隠れない)。上に別
   ウインドウのバーが乗り、バーを掴むと地図がついてくる(`NSWindowDidMoveNotification`)。
+  バーの閉じるボタンは **Show Window** をオフに戻す。
   地図ウインドウ自体をタイトル付きにする — macOS 26 では親子接続でも — と角が丸くなり、
   丸角が取り込みに写る(四隅アルファで実測)ため、地図側は常にボーダーレス。
   表示位置は隠す→再表示で復元される
@@ -218,42 +241,52 @@ Show Window オンのあいだは**ウインドウがマスター**: 手で決�
 マスターに戻る — 書き戻した値を push 側の基準にしているので切り替えで飛ばない。
 初期カメラはパラメータから入れるので、地図既定の全景が逆流することもない。
 
-Look Around モードでは Latitude/Longitude がシーンを決め、**視線の向きは Heading / Look Pitch
-で動かせる** — Show Window オフではパラメータがマスター、オンではウインドウ内のドラッグが
-`Heading` へ書き戻される(書き戻しは yaw のみ。pitch には読み出し口が無い)。
-これには2つの発見が要った: ①埋め込みのビューコントローラは Pan / ズームのレコグナイザが
-**無効化された状態**で来る(`navigationEnabled = YES` でも変わらない。実測 `enabled = 0`)ので
-毎 cook 強制的に有効化する ②向きのセッターは**私有 API**
-`MKLookAroundView setPresentationYaw:pitch:animated:`(ドラッグと同じ内部経路。画素検証で
-yaw 20→90→225 と回り、pitch で路面から空まで振れ、画像は保たれる)。公開の向き API は無く、
-合成ドラッグイベントは AppKit のジェスチャ機構に一切届かない(自前の
-`NSPanGestureRecognizer` すら**発火 0 回**)ので、この私有呼び出しが唯一の経路。
-**OS 更新で壊れうる** — このプラグインは experimental。
-(シーンを `initWithMapItem:cameraFrameOverride:` で作り直す方式は**使わないこと** —
-ビューは「描画済み」と申告しながら合成は真っ黒になる。どの環境でも実測で再現)
-
 ### パラメータ
 
 | パラメータ | 意味 |
 |---|---|
-| Mode | `Map` か `Look Around` |
-| Latitude / Longitude | カメラの注視点(Map)/ シーンの座標(Look Around) |
+| Latitude / Longitude | カメラの注視点 |
 | Distance (m) | カメラ距離。上限クランプなし(手でズームアウトした大きい値も書き戻せる) |
-| Pitch / Heading | カメラの傾きと回転(Map モード)。Heading は Look Around の視線方位も駆動 |
-| Look Pitch (Look Around) | Look Around の見上げ(+)/見下ろし(−)。−90..90。Map モードの Pitch とは別。読み出し口が無いためドラッグの書き戻しは無し |
+| Pitch / Heading | カメラの傾きと回転 |
 | Style / Elevation / Show Traffic / Show Points Of Interest / Dark Appearance | 地図の見た目 |
 | Show Attribution | 「&#63743; Apple Maps」を出力へ焼き込む。**既定オン**。地図内蔵の「Legal」ラベルは常に隠す — TOP 上ではただのピクセルで、リンクとして機能しないため。Apple のガイドライン上、人に見せる地図には帰属表示が求められる — 消す判断は利用者のもの |
 | Attribution Position | どの隅に出すか |
 | Capture FPS | ScreenCaptureKit のフレームレート上限。静止中は変化時しかフレームが来ない |
 | Markers DAT | 画面座標へ射影する緯度経度の表(上記) |
 | Show Window | 対話モード(上記) |
-| Restart | ストリームを張り直し、シーンも取り直す |
+| Restart | 取り込みストリームを張り直す |
 
 解像度は **Common** ページから(`Use Input` は 1280×720 にフォールバック)。
 
-Info CHOP: `executes / frames / running / window_ready / available / width / height / capture_fps`。
-`available` は Look Around のシーンがその座標にあるとき 1。カバー範囲は飛び飛び
-(渋谷スクランブル=あり / 東京駅=なし)で問い合わせ API も無いので、画に頼る前にこれを見る。
+Info CHOP: `executes / frames / running / window_ready / width / height / capture_fps`。
+
+## MapKit Look Around TOP(街並みの実写)
+
+座標の Look Around シーンをライブ表示する(渋谷スクランブルで実測)。ウインドウ + SCK 取り込みの
+土台は地図 TOP と同じ(バー・閉じるボタン・右下 1pt の退避も同じ)。
+
+**視線の向きは Heading / Look Pitch で動かせる** — Show Window オフではパラメータがマスター、
+オンではウインドウ内のドラッグが `Heading` へ書き戻される(書き戻しは yaw のみ。pitch には
+読み出し口が無い)。これには2つの発見が要った: ①埋め込みのビューコントローラは Pan / ズームの
+レコグナイザが**無効化された状態**で来る(`navigationEnabled = YES` でも変わらない。実測
+`enabled = 0`)ので毎 cook 強制的に有効化する ②向きのセッターは**私有 API**
+`MKLookAroundView setPresentationYaw:pitch:animated:`(ドラッグと同じ内部経路。画素検証で
+yaw 20→90→225 と回り、pitch で路面から空まで振れ、画像は保たれる)。公開の向き API は無く、
+合成ドラッグイベントは AppKit のジェスチャ機構に一切届かない(自前の
+`NSPanGestureRecognizer` すら**発火 0 回**)ので、この私有呼び出しが唯一の経路。
+**OS 更新で壊れうる。**(シーンを `initWithMapItem:cameraFrameOverride:` で作り直す方式は
+**使わないこと** — ビューは「描画済み」と申告しながら合成は真っ黒になる。どの環境でも実測で再現)
+
+| パラメータ | 意味 |
+|---|---|
+| Latitude / Longitude | シーンの座標(変えると新しいシーンを取得) |
+| Heading | 視線の方位。双方向(ドラッグが書き戻る) |
+| Look Pitch | 見上げ(+)/見下ろし(−)。−90..90。読み出し口が無いため書き戻し無し |
+| Show Attribution / Attribution Position / Capture FPS / Show Window / Restart | 地図 TOP と同じ |
+
+Info CHOP には `available` が加わる: シーンがその座標にあるとき 1。カバー範囲は飛び飛び
+(渋谷スクランブル=あり / 東京駅の駅舎=なし)で問い合わせ API も無いので、画に頼る前に
+これを見るか、DAT の **Look Around Coverage** モードで先に走査する。
 
 ## MapKit DAT
 

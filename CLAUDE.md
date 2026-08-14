@@ -6815,3 +6815,26 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - デバッグ用 Info CHOP チャンネル(la_drawn 等3ch)を撤去して 8ch に復帰。README(英日)更新
 - 未決(ユーザーへ意見出し中): op を MapKit Map TOP / MapKit LookAround TOP / MapKit Search DAT
   の3つに分割する案
+
+### 2026-08-14 MapKit を3opへ分割(MapKit TOP / MapKit Look Around TOP / MapKit DAT)
+
+- ユーザー提案の3分割に賛成して実施。分けた理由: パラメータの大半がモード依存で死んでいた /
+  実装がほぼ別物(共有は「ウインドウ+SCK取り込み+バー」の土台だけ)/ モード切替
+  (contentViewController 差し替え)が不具合の温床 / 別opなら**地図と Look Around を同時に出せる**
+- **命名**: 地図側が opType `Mapkit` を引き継ぐ(既存 .toe の Mapkit ノードは生き残る。
+  Mode パラメータの消滅は無害)。Look Around は新 opType **`Mapkitlookaround`**
+  (label "MapKit Look Around" / icon MLA)。DAT は据え置き。地図TOPだけ majorVersion 0→1
+  (Mode/Lookpitch 削除の破壊的変更)
+- **共有は `MapKit/MapKitShared.h`**(namespace tdmk): Frame / 帰属焼き込み(Attribution)/
+  setLegalHidden / enableAllGestures / findLookAroundView / kSliver / str / addF。
+  **ObjC クラスは共有しない** — 同名クラスを複数バンドルで定義すると ObjC ランタイムが
+  1実装を使い回し、`owner` の C++ キャスト先が食い違って UB になる(Multipeer は実装が
+  完全同一だから成立していた)。各 .mm でバンドル固有名(TDMap* / TDMKLA*)にした
+- 1フォルダ3バンドル(build_one×3)。PLUGINS.tsv はフォルダ単位なので変更なし
+- **実測(M2・TD実機)**: 地図=Mode無しの17パラメータで従来どおり描画・エラーなし。
+  Look Around=渋谷の実写、Heading 200 + Look Pitch -30 で路面を見下ろし(画素差55.7で回転を確認)。
+  DAT=geocode「東京駅」→ 35.68107, 139.76743。**両TOPのウインドウが同時に存在**することも視認
+- demo.toe: `/project1/MapKitLookAround` 利用例を新設(渋谷・note付き・allowCooking=False)、
+  MapKit の note から Look Around モードの記述を除去。ルートREADME(英日)の実験中の表へ
+  Look Around 行を追加(ついでに **AVF Camera の行が重複していたのを削除**)。
+  MapKit/README.md は3op構成に全面再編(英日)

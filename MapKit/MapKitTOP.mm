@@ -1,5 +1,5 @@
-// MapKit Live TOP — 常駐 MKMapView を ScreenCaptureKit で取り込み、3D地図の中を
-// リアルタイムに飛び回れるようにする。
+// MapKit TOP — 常駐 MKMapView を ScreenCaptureKit で取り込み、3D地図の中を
+// リアルタイムに飛び回れるようにする。街並みの実写は MapKit Look Around TOP(別op)。
 //
 // **なぜこの構成か(実測の結論)**:
 // - MKMapSnapshotter は1回あたり約0.9秒の固定費(32x32でも885ms)。並列にしても
@@ -10,9 +10,8 @@
 //   取り込みは全滅(cacheDisplayInRect / renderInContext / CARenderer とも真っ白を実測)。
 //   完成した絵の所有者はウインドウサーバーなので、**ScreenCaptureKit の
 //   initWithDesktopIndependentWindow: で自分のウインドウを取り込む**のが唯一の公式ルート
-// - 帰属表示は MKMapView 自身が描く(Apple ロゴ + Legal)ので焼き込み不要
 //
-// 制約: 実ウインドウが1枚必要(既定では最背面・デスクトップレベルに隠す)。
+// 制約: 実ウインドウが1枚必要(既定では画面右下に 1pt だけ残して隠す)。
 // 画面収録の TCC 許可が要る(Screen Capture TOP と同じ)。
 #import <Foundation/Foundation.h>
 #import <AppKit/AppKit.h>
@@ -30,11 +29,13 @@
 #include "CPlusPlus_Common.h"
 #include "../common/NonCommercialLimit.h"
 #include "../common/PyCallbacksBootstrap.h"
+#include "MapKitShared.h"
 using namespace TD;
 
 namespace { class MapKitTOP; }
 
-// ボーダーレスウインドウは既定で key になれず、マウスドラッグ系の操作が届かない
+// ボーダーレスウインドウは既定で key になれず、マウスドラッグ系の操作が届かない。
+// クラス名はバンドル固有(MapKitShared.h 冒頭の注意を参照)
 @interface TDMapWindow : NSWindow
 @end
 @implementation TDMapWindow
@@ -64,12 +65,6 @@ namespace { class MapKitTOP; }
 
 namespace {
 
-struct Frame {
-    std::vector<uint8_t> bgra;
-    uint32_t w = 0, h = 0;
-    uint64_t serial = 0;
-};
-
 // Markers DAT の1行。u/v は MKMapView 自身の射影(convertCoordinate:toPointToView:)なので
 // 3D のパース・ピッチ・ヘディングに完全一致する
 struct Marker {
@@ -78,48 +73,6 @@ struct Marker {
     float u = 0, v = 0;
     bool visible = false;
 };
-
-// MKMapView の帰属表示(Legal リンク)をビュー階層から探して隠す。
-// 公開 API には表示/非表示の口が無い。Apple のガイドライン上、人に見せる地図には
-// 帰属表示が求められる点は README に明記(消す判断は利用者のもの)
-// Look Around の視線制御は**私有 API**(公開 API には存在しない):
-// MKLookAroundView の setPresentationYaw:pitch:animated: を呼ぶ(ドラッグと同じ内部経路)。
-// 現在の方位は MKLookAroundView.presentationYaw で読める(pitch の読み出し口は無い)。
-// 実測(画素検証): yaw 20.1→90→225 と回り、画像は保たれる(輝度 148→143→141)。
-// pitch は**正=下**(+30 で路面 / -30 でビル上層と空。実測)。
-// ※シーンを initWithMapItem:cameraFrameOverride: で作り直す方式は**常に真っ黒**
-//   (実測: 状態は drawn=1/yaw 適用済みと返るが、実際の合成は黒。使わないこと)
-// **OS 更新で壊れうる**ことは README に明記(このプラグインは experimental)
-static NSView* findLookAroundView(NSView* root)
-{
-    if ([NSStringFromClass(root.class) isEqualToString:@"MKLookAroundView"]) return root;
-    for (NSView* s in root.subviews) {
-        NSView* r = findLookAroundView(s);
-        if (r) return r;
-    }
-    return nil;
-}
-
-// Look Around の埋め込み表示は、MapKit が Pan / ズームのレコグナイザを**無効化して
-// プレビュー専用にしている**(実測: enabled=0。navigationEnabled=YES でも変わらない)。
-// 強制的に有効化すると実際に見回し・ズームが効く(実機で確認)。
-// MapKit が無効化し直すことがあるので毎 cook 掛け直す
-static void enableAllGestures(NSView* v)
-{
-    for (NSGestureRecognizer* g in v.gestureRecognizers) g.enabled = YES;
-    for (NSView* sub in v.subviews) enableAllGestures(sub);
-}
-
-static void setLegalHidden(NSView* v, bool hidden)
-{
-    for (NSView* sub in v.subviews) {
-        NSString* cls = NSStringFromClass(sub.class);
-        if ([cls containsString:@"Attribution"] || [cls containsString:@"Legal"])
-            sub.hidden = hidden;
-        else
-            setLegalHidden(sub, hidden);
-    }
-}
 
 class MapKitTOP final : public TOP_CPlusPlusBase {
 public:
@@ -141,7 +94,6 @@ public:
         id obs = myMoveObserver; myMoveObserver = nil;
         if (obs) [[NSNotificationCenter defaultCenter] removeObserver:obs];
         myMapView = nil;
-        myLookVC = nil;
         if (st) [st stopCaptureWithCompletionHandler:^(NSError*) {}];
         // ウインドウは AppKit の所有物なのでメインスレッドで閉じる
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -176,8 +128,6 @@ public:
         // バーの閉じるボタン → Show Window をオフ(ウインドウは次 cook で隠れる)
         if (myCloseReq->exchange(false) && show)
             tdpycb::setFloatPars(myNode, {{"Showwindow", 0.0}});
-        const std::string mode = str(in, "Mode", "map");
-        const bool lookaround = (mode == "lookaround");
 
         // --- ウインドウ+MKMapView(メインスレッドで一度だけ作る) ---
         // 初期カメラをパラメータから入れる。入れないと地図既定の全景で開き、
@@ -188,86 +138,9 @@ public:
                          std::max(50.0, in->getParDouble("Distance")),
                          in->getParDouble("Pitch"), in->getParDouble("Heading"));
 
-        // --- カメラは双方向(地図モード) / Look Around はシーン取得 ---
+        // --- カメラは双方向 ---
         if (active && myWindowReady.load()) {
-            if (myModeSig != mode) {
-                myModeSig = mode;
-                applyMode(lookaround);
-                if (lookaround) myLaSig.clear();   // シーンを取り直す
-            }
-            if (lookaround) {
-                // 座標が変わったらシーンを取り直す。視線の向きは Heading パラメータ
-                // (setPresentationYaw 経由)とウインドウ内ドラッグの双方向
-                const double lat = in->getParDouble("Latitude");
-                const double lon = in->getParDouble("Longitude");
-                char sig[64];
-                snprintf(sig, sizeof sig, "%.7f|%.7f", lat, lon);
-                if (myLaSig != sig && !myLaBusy.exchange(true)) {
-                    myLaSig = sig;
-                    requestScene(lat, lon);
-                }
-                // --- 視線(Heading/Pitch)。私有 API 経由(冒頭コメント参照) ---
-                if (show) {
-                    // ウインドウがマスター: ドラッグした視線を Heading へ書き戻す
-                    NSWindow* win2 = myWindow;
-                    auto alive2 = myAlive;
-                    auto* self2 = this;
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        if (!alive2->load() || !win2.contentView) return;
-                        NSView* lav = findLookAroundView(win2.contentView);
-                        if (!lav) return;
-                        @try {
-                            const double y =
-                                [[lav valueForKey:@"presentationYaw"] doubleValue];
-                            std::lock_guard<std::mutex> l(self2->myMutex);
-                            self2->myLaYaw = y;
-                            self2->myLaYawSerial++;
-                        } @catch (NSException*) {}
-                    });
-                    double y; uint64_t serial;
-                    {
-                        std::lock_guard<std::mutex> l(myMutex);
-                        y = myLaYaw; serial = myLaYawSerial;
-                    }
-                    if (serial && serial != myLaYawApplied) {
-                        double norm = fmod(y, 360.0); if (norm < 0) norm += 360.0;
-                        if (fabs(norm - in->getParDouble("Heading")) > 0.05)
-                            tdpycb::setFloatPars(myNode, {{"Heading", norm}});
-                        myLaYawApplied = serial;
-                        char c2[64]; snprintf(c2, sizeof c2, "%.2f|%.2f",
-                                              norm, in->getParDouble("Lookpitch"));
-                        myLaCamSig = c2;
-                    }
-                } else {
-                    // パラメータがマスター: Heading / Look Pitch の変更を
-                    // setPresentationYaw:pitch:animated: でビューへ適用(冒頭コメント参照)。
-                    // API の pitch は**正=下**(実測)なので、パラメータは正=上に反転して渡す。
-                    // pitch の読み戻し口は無い(presentationPitch は存在しない)ため
-                    // 書き戻しは yaw のみ
-                    if (myLaRetry.exchange(false)) myLaCamSig.clear();
-                    const double hd = in->getParDouble("Heading");
-                    const double lp = in->getParDouble("Lookpitch");
-                    char c2[64]; snprintf(c2, sizeof c2, "%.2f|%.2f", hd, lp);
-                    if (myLaSyncSig.exchange(false)) {
-                        myLaCamSig = c2;   // シーン本来の向きを尊重(勝手に適用しない)
-                    } else if (myLaCamSig != c2) {
-                        myLaCamSig = c2;
-                        NSWindow* win3 = myWindow;
-                        auto alive2 = myAlive;
-                        auto* self2 = this;
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            if (!alive2->load() || !win3.contentView) return;
-                            NSView* lav = findLookAroundView(win3.contentView);
-                            if (!lav) { self2->myLaRetry = true; return; }  // 読込前 → 再適用
-                            @try {
-                                ((void (*)(id, SEL, double, double, BOOL))objc_msgSend)(lav,
-                                    sel_registerName("setPresentationYaw:pitch:animated:"),
-                                    hd, -lp, YES);
-                            } @catch (NSException*) {}
-                        });
-                    }
-                }
-            } else if (show) {
+            if (show) {
                 // メインスレッドにカメラを読ませ、cook はその写しを見る
                 MKMapView* mv = myMapView;
                 auto alive = myAlive;
@@ -333,14 +206,14 @@ public:
             }
 
             // --- 地図のスタイル(変わったときだけ) ---
-            std::string style = str(in, "Style", "standard");
-            std::string elev  = str(in, "Elevation", "realistic");
+            std::string style = tdmk::str(in, "Style", "standard");
+            std::string elev  = tdmk::str(in, "Elevation", "realistic");
             const bool traffic = in->getParInt("Traffic") != 0;
             const bool poi = in->getParInt("Poi") != 0;
             const bool dark = in->getParInt("Dark") != 0;
             myAttrOn = in->getParInt("Attribution") != 0;
             {
-                const std::string ap = str(in, "Attributionpos", "bottomleft");
+                const std::string ap = tdmk::str(in, "Attributionpos", "bottomleft");
                 myAttrPos = (ap == "bottomright") ? 1 : (ap == "topleft") ? 2
                           : (ap == "topright") ? 3 : 0;
             }
@@ -350,22 +223,18 @@ public:
                 myCfgSig = cfgSig;
                 applyConfig(style, elev, traffic, poi, dark);
             }
-            // 毎 cook の抑え込み2件:
-            // ・内蔵 Legal はタイル読込後に再出現する → 常に隠す(焼き込みの帰属表示に置き換え)
-            // ・Look Around の操作レコグナイザは MapKit に無効化される → 常に有効化
+            // 内蔵 Legal はタイル読込後に再出現する → 常に隠す(焼き込みの帰属表示に置き換え)
             {
                 NSWindow* win2 = myWindow;
-                const bool la2 = lookaround;
                 auto alive2 = myAlive;
                 dispatch_async(dispatch_get_main_queue(), ^{
                     if (!alive2->load() || !win2.contentView) return;
-                    setLegalHidden(win2.contentView, true);
-                    if (la2) enableAllGestures(win2.contentView);
+                    tdmk::setLegalHidden(win2.contentView, true);
                 });
             }
 
-            // --- マーカーの射影(地図モードのみ・毎 cook) ---
-            if (!lookaround) projectMarkers(in);
+            // --- マーカーの射影(毎 cook) ---
+            projectMarkers(in);
 
             // --- ウインドウの見せ方 / サイズ / ストリーム ---
             char ss[64];
@@ -383,15 +252,14 @@ public:
         }
 
         // --- 最新フレームをアップロード(bypass 復帰のため毎回) ---
-        Frame f;
+        tdmk::Frame f;
         {
             std::lock_guard<std::mutex> l(myMutex);
             if (myFrame.bgra.empty()) return;
             f = myFrame;
         }
-        // 帰属表示はアップロード直前に焼く。受信時に焼くと、静止中(新フレームが来ない)は
-        // トグルが反映されないため。パッチは小さいので毎 cook でも安い
-        if (myAttrOn.load()) burnAttribution(f);
+        // 帰属表示はアップロード直前に焼く(理由は MapKitShared.h)
+        if (myAttrOn.load()) myAttr.burn(f, myAttrPos.load());
         if (tdnc::fit(f.bgra, f.w, f.h, OP_PixelFormat::BGRA8Fixed)) {
             std::lock_guard<std::mutex> l(myMutex);
             myWarning = tdnc::kWarning;
@@ -412,15 +280,8 @@ public:
         const char* P = "MapKit";
         { OP_NumericParameter p("Active"); p.label = "Active"; p.page = P;
           p.defaultValues[0] = 1; m->appendToggle(p); }
-        {
-            OP_StringParameter p("Mode");
-            p.label = "Mode"; p.page = P; p.defaultValue = "map";
-            const char* n[] = {"map", "lookaround"};
-            const char* l[] = {"Map", "Look Around"};
-            m->appendMenu(p, 2, n, l);
-        }
-        addF(m, P, "Latitude",  "Latitude",  35.6595, -90, 90);
-        addF(m, P, "Longitude", "Longitude", 139.7005, -180, 180);
+        tdmk::addF(m, P, "Latitude",  "Latitude",  35.6595, -90, 90);
+        tdmk::addF(m, P, "Longitude", "Longitude", 139.7005, -180, 180);
         {
             // ウインドウ側で大きくズームアウトした値も受けるため、上限はクランプしない
             OP_NumericParameter p("Distance");
@@ -430,10 +291,8 @@ public:
             p.minValues[0] = 1; p.clampMins[0] = true; p.clampMaxes[0] = false;
             m->appendFloat(p);
         }
-        addF(m, P, "Pitch",     "Pitch",     60, 0, 80);
-        addF(m, P, "Heading",   "Heading",   0, 0, 360);
-        // Look Around 専用の見上げ/見下ろし(正=上)。地図モードの Pitch とは別物
-        addF(m, P, "Lookpitch", "Look Pitch (Look Around)", 0, -90, 90);
+        tdmk::addF(m, P, "Pitch",     "Pitch",     60, 0, 80);
+        tdmk::addF(m, P, "Heading",   "Heading",   0, 0, 360);
         {
             OP_StringParameter p("Style");
             p.label = "Style"; p.page = P; p.defaultValue = "standard";
@@ -467,7 +326,6 @@ public:
           p.defaultValues[0] = 60; p.minSliders[0] = 1; p.maxSliders[0] = 120;
           p.minValues[0] = 1; p.maxValues[0] = 120; p.clampMins[0] = p.clampMaxes[0] = true;
           m->appendInt(p); }
-        // 既定は最背面(デスクトップレベル)に隠す。確認したいときだけ前へ出す
         {
             // 緯度経度の表(列: name,lat,lon または lat,lon)。各点の画面位置 u/v を
             // Info DAT に出す = SOP や TOP を地図のパースに正確に重ねられる
@@ -483,19 +341,17 @@ public:
     {
         if (!strcmp(name, "Restart")) {
             myStreamSig.clear(); myCamSig.clear(); myCfgSig.clear();
-            myModeSig.clear(); myLaSig.clear();
         }
     }
 
-    int32_t getNumInfoCHOPChans(void*) override { return 8; }
+    int32_t getNumInfoCHOPChans(void*) override { return 7; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override
     {
-        static const char* n[8] = {"executes", "frames", "running", "window_ready",
-                                   "available", "width", "height", "capture_fps"};
-        // capture_fps: 直近1秒に受け取ったフレーム数 / available: Look Around のカバー内か
-        const float v[8] = {(float)myExec.load(), (float)myFrames.load(),
+        static const char* n[7] = {"executes", "frames", "running", "window_ready",
+                                   "width", "height", "capture_fps"};
+        // capture_fps: 直近1秒に受け取ったフレーム数
+        const float v[7] = {(float)myExec.load(), (float)myFrames.load(),
                             myRunning.load() ? 1.f : 0.f, myWindowReady.load() ? 1.f : 0.f,
-                            myAvailable.load() ? 1.f : 0.f,
                             (float)myLastW.load(), (float)myLastH.load(), myFps.load()};
         c->name->setString(n[i]);
         c->value = v[i];
@@ -518,7 +374,7 @@ public:
         const size_t stride = CVPixelBufferGetBytesPerRow(px);
         const uint8_t* src = (const uint8_t*)CVPixelBufferGetBaseAddress(px);
         if (src && w && h) {
-            Frame f;
+            tdmk::Frame f;
             f.w = w; f.h = h;
             f.bgra.resize((size_t)w * h * 4);
             for (uint32_t y = 0; y < h; y++)   // TD は bottom-up
@@ -539,78 +395,6 @@ public:
             myFpsN++;
         }
         CVPixelBufferUnlockBaseAddress(px, kCVPixelBufferLock_ReadOnly);
-    }
-
-    // 「(Appleロゴ) Apple Maps」の小さなパッチを一度だけ描き、アップロード前のフレームへ
-    // 合成する。パッチは cook スレッドだけが触るのでロック不要
-    void ensureAttrPatch(uint32_t h)
-    {
-        if (myPatchForH == h && !myPatch.empty()) return;
-        myPatch.clear();
-        myPatchForH = h;
-        NSString* text = @"\uF8FF Apple Maps";   // U+F8FF = システムフォントの Apple ロゴ
-        const CGFloat fontSize = std::max<CGFloat>(11.0, (CGFloat)h * 0.018);
-        CTFontRef font = CTFontCreateUIFontForLanguage(kCTFontUIFontSystem, fontSize, NULL);
-        NSDictionary* attrs = @{(id)kCTFontAttributeName: (__bridge id)font,
-                                (id)kCTForegroundColorAttributeName:
-                                    (id)[NSColor colorWithWhite:1.0 alpha:0.95].CGColor};
-        CTLineRef line = CTLineCreateWithAttributedString(
-            (__bridge CFAttributedStringRef)[[NSAttributedString alloc] initWithString:text
-                                                                            attributes:attrs]);
-        CGFloat asc = 0, desc = 0;
-        const double tw = CTLineGetTypographicBounds(line, &asc, &desc, NULL);
-        const CGFloat pad = fontSize * 0.5;
-        myPatchW = (uint32_t)ceil(tw + pad * 2);
-        myPatchH = (uint32_t)ceil(asc + desc + pad * 1.4);
-        myPatch.assign((size_t)myPatchW * myPatchH * 4, 0);
-        CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
-        CGContextRef ctx = CGBitmapContextCreate(myPatch.data(), myPatchW, myPatchH, 8,
-                                                 myPatchW * 4, cs,
-                                                 kCGImageAlphaPremultipliedFirst |
-                                                 kCGBitmapByteOrder32Little);
-        CGColorSpaceRelease(cs);
-        if (ctx) {
-            CGContextSetRGBFillColor(ctx, 0, 0, 0, 0.45);   // 下地(どんな地図でも読めるように)
-            CGPathRef bg = CGPathCreateWithRoundedRect(
-                CGRectMake(0, 0, myPatchW, myPatchH), 4, 4, NULL);
-            CGContextAddPath(ctx, bg); CGContextFillPath(ctx); CGPathRelease(bg);
-            CGContextSetTextPosition(ctx, pad, pad * 0.7 + desc);
-            CTLineDraw(line, ctx);
-            CGContextRelease(ctx);
-        } else {
-            myPatch.clear();
-        }
-        CFRelease(line);
-        CFRelease(font);
-    }
-
-    // f は bottom-up。パッチ(CG = 上から下)を行反転しながらアルファ合成する
-    void burnAttribution(Frame& f)
-    {
-        ensureAttrPatch(f.h);
-        if (myPatch.empty() || myPatchW + 16 > f.w || myPatchH + 16 > f.h) return;
-        const uint32_t m = std::max<uint32_t>(8, (uint32_t)(f.h * 0.012));
-        const int pos = myAttrPos.load();
-        const bool right = (pos == 1 || pos == 3);
-        const bool top = (pos == 2 || pos == 3);
-        const uint32_t baseX = right ? f.w - m - myPatchW : m;
-        const uint32_t baseY = top ? f.h - m - myPatchH : m;   // bottom-up なので下 = 小さい行
-        for (uint32_t py = 0; py < myPatchH; py++) {
-            const uint8_t* src = myPatch.data() + (size_t)py * myPatchW * 4;
-            uint8_t* dst = f.bgra.data() +
-                ((size_t)(baseY + (myPatchH - 1 - py)) * f.w + baseX) * 4;
-            for (uint32_t px = 0; px < myPatchW; px++) {
-                const uint8_t* sp = src + (size_t)px * 4;
-                uint8_t* dp = dst + (size_t)px * 4;
-                const uint32_t a = sp[3];
-                if (!a) continue;
-                const uint32_t ia = 255 - a;
-                dp[0] = (uint8_t)(sp[0] + (dp[0] * ia + 127) / 255);   // 事前乗算済み
-                dp[1] = (uint8_t)(sp[1] + (dp[1] * ia + 127) / 255);
-                dp[2] = (uint8_t)(sp[2] + (dp[2] * ia + 127) / 255);
-                dp[3] = 255;
-            }
-        }
     }
 
     // Markers DAT を読み、メインスレッドで MKMapView に射影させる。
@@ -673,7 +457,6 @@ public:
                                            toPointToView:mv];
                 if (isfinite(pt.x) && isfinite(pt.y)) {
                     mk.u = (float)(pt.x / vw);
-                    // NSView は下原点なので v はそのまま TD の uv と揃う…かは実測で決める
                     mk.v = 1.0f - (float)(pt.y / vh);
                     mk.visible = mk.u >= 0.f && mk.u <= 1.f && mk.v >= 0.f && mk.v <= 1.f;
                 }
@@ -720,24 +503,12 @@ public:
         myWarning = e ? (e.localizedDescription.UTF8String ?: "stream error") : "stream stopped";
     }
 
-private:
-    static std::string str(const OP_Inputs* in, const char* k, const char* d)
-    {
-        const char* v = in->getParString(k);
-        return v && *v ? v : d;
-    }
-    static void addF(OP_ParameterManager* m, const char* pg, const char* n, const char* l,
-                     double def, double lo, double hi)
-    {
-        OP_NumericParameter p(n);
-        p.label = l; p.page = pg;
-        p.defaultValues[0] = def;
-        p.minSliders[0] = lo; p.maxSliders[0] = hi;
-        p.minValues[0] = lo;  p.maxValues[0] = hi;
-        p.clampMins[0] = p.clampMaxes[0] = true;
-        m->appendFloat(p);
-    }
+    std::atomic<bool> myStarting{false};
+    SCStream* myStream = nil;
+    std::atomic<bool> myRunning{false};
+    std::string myStreamSig;
 
+private:
     void createWindow(int w, int h, double lat, double lon, double dist,
                       double pitch, double heading)
     {
@@ -754,13 +525,12 @@ private:
                               defer:NO];
             win.releasedWhenClosed = NO;
             win.title = @"MapKit";
-            // ドラッグ用のバーは**別ウインドウ**にして親にする。地図ウインドウを
-            // タイトル付きにすると下角まで丸くなり、丸角が TOP に写ってしまう
-            // (実際にユーザーに指摘された)。バーを掴めば子の地図がついてくる
+            // ドラッグ用のバーは**別ウインドウ**(親子接続もしない)。タイトル付き・
+            // 親子接続のウインドウは macOS 26 が角を丸め、丸角が取り込みに写る(実測)
             NSWindow* bar = [[NSWindow alloc]
                 initWithContentRect:NSMakeRect(0, 0, r.size.width, 0)
                           styleMask:(NSWindowStyleMaskTitled |
-                                     NSWindowStyleMaskClosable)  // Closable が無いと閉じるボタンが生成されない
+                                     NSWindowStyleMaskClosable)  // Closable が無いと閉じるボタンが出ない
                             backing:NSBackingStoreBuffered
                               defer:NO];
             bar.releasedWhenClosed = NO;
@@ -796,7 +566,7 @@ private:
                              fromDistance:dist pitch:pitch heading:heading];
             } @catch (NSException*) {}
             // 標準のマップと同じ操作(スクロール=パン / ピンチ=ズーム / 2本指回転 /
-            // Option+スクロール=チルト)。コントロール類は Show Window 時だけ出す
+            // Option+スクロール=チルト)。コントロール類は取り込みに写るので常に出さない
             mv.zoomEnabled = YES;
             mv.scrollEnabled = YES;
             mv.rotateEnabled = YES;
@@ -811,69 +581,11 @@ private:
         });
     }
 
-    // map / lookaround で contentView を入れ替える
-    void applyMode(bool lookaround)
-    {
-        NSWindow* win = myWindow;
-        auto alive = myAlive;
-        auto* self = this;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (!alive->load() || !win) return;
-            @try {
-                const NSRect keep = win.frame;   // contentViewController がサイズを変えることがある
-                if (lookaround) {
-                    if (!self->myLookVC) {
-                        // macOS では NSViewController(実測)。地図と同じウインドウで取り込む
-                        self->myLookVC = [[MKLookAroundViewController alloc] init];
-                        self->myLookVC.navigationEnabled = YES;
-                    }
-                    // view だけ抜き取るとレスポンダチェーンが繋がらず操作が全滅する。
-                    // **contentViewController として正しく載せ、ファーストレスポンダにする**
-                    self->myLookVC.view.frame = ((NSView*)win.contentView).bounds;
-                    win.contentViewController = self->myLookVC;
-                    [win setFrame:keep display:YES];
-                    [win makeFirstResponder:self->myLookVC.view];
-                } else if (self->myMapView) {
-                    win.contentViewController = nil;
-                    self->myMapView.frame = NSMakeRect(0, 0, keep.size.width, keep.size.height);
-                    win.contentView = self->myMapView;
-                    [win setFrame:keep display:YES];
-                    [win makeFirstResponder:self->myMapView];
-                }
-            } @catch (NSException*) {}
-        });
-    }
-
-    void requestScene(double lat, double lon)
-    {
-        auto alive = myAlive;
-        auto* self = this;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (!alive->load()) { self->myLaBusy = false; return; }
-            MKLookAroundSceneRequest* req = [[MKLookAroundSceneRequest alloc]
-                initWithCoordinate:CLLocationCoordinate2DMake(lat, lon)];
-            [req getSceneWithCompletionHandler:^(MKLookAroundScene* scene, NSError* e) {
-                if (!alive->load()) return;
-                self->myAvailable = (scene != nil);
-                self->myLaSyncSig = true;   // 読込直後は適用せず、シグネチャの基準だけ合わせる
-                if (self->myLookVC) self->myLookVC.scene = scene;
-                {
-                    std::lock_guard<std::mutex> l(self->myMutex);
-                    self->myWarning = scene ? "" :
-                        (e ? (e.localizedDescription.UTF8String ?: "no Look Around scene")
-                           : "No Look Around imagery at this coordinate. Coverage is patchy.");
-                }
-                self->myLaBusy = false;
-            }];
-        });
-    }
-
     void applyConfig(std::string style, std::string elev, bool traffic, bool poi, bool dark)
     {
         MKMapView* mv = myMapView;
         NSWindow* win = myWindow;
         auto alive = myAlive;
-        auto* self2 = this;
         dispatch_async(dispatch_get_main_queue(), ^{
             if (!alive->load() || !mv) return;
             @try {
@@ -900,7 +612,7 @@ private:
                 mv.preferredConfiguration = cfg;
                 win.appearance = [NSAppearance appearanceNamed:
                     dark ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
-                if (win.contentView) setLegalHidden(win.contentView, true);
+                if (win.contentView) tdmk::setLegalHidden(win.contentView, true);
             } @catch (NSException*) {}
         });
     }
@@ -924,13 +636,13 @@ private:
             r.size = NSMakeSize(w / scale, h / scale);
             [win setFrame:r display:YES];
             mv.frame = NSMakeRect(0, 0, r.size.width, r.size.height);
-            NSWindow* bar = myBarWindow;
+            NSWindow* bar = self->myBarWindow;
             if (show) {
                 // 地図ウインドウは**常にボーダーレス**(角が四角のまま取り込まれる)。
-                // ドラッグはバー(親ウインドウ)が担う
+                // ドラッグはバー(独立ウインドウ)が担う
                 [win setFrame:r display:NO];
-                if (myShownOrigin.x != 0 || myShownOrigin.y != 0) {
-                    [win setFrameOrigin:myShownOrigin];   // 前回表示していた場所へ戻す
+                if (self->myShownOrigin.x != 0 || self->myShownOrigin.y != 0) {
+                    [win setFrameOrigin:self->myShownOrigin];   // 前回表示していた場所へ戻す
                 } else {
                     // 初回は退避位置(右下ほぼ画面外)のままにせず、
                     // TD のメインウインドウ(無ければ画面)の中央に出す
@@ -952,15 +664,18 @@ private:
                 // 角丸にするため、地図の角まで丸くなって取り込みに写った(実測)。
                 // バーの移動は通知(NSWindowDidMoveNotification)で追従させる
                 [bar orderFront:nil];
-                myWasShown = true;
+                self->myWasShown = true;
             } else {
                 // 隠すときはボーダーレス(角が四角)。**2つの罠を実測で踏んだ**:
                 // ①デスクトップレベルに置くと遮蔽扱いになり MapKit が描画を止めて灰色になる
                 // ②アルファを下げると SCK の取り込みまで暗くなる(合成後の見た目が返る)
-                // → アルファ 1.0 のまま、**大部分を画面外へ出して 8pt だけ画面内に残す**。
+                // → アルファ 1.0 のまま、**大部分を画面外へ出して 1pt だけ画面内に残す**。
                 //   完全に画面外だと描画が止まるので端を残す(Translate の極小ウインドウと同じ発想)。
                 //   取り込みは desktopIndependent なので画面外の部分も丸ごと取れる
-                if (myWasShown) { myShownOrigin = win.frame.origin; myWasShown = false; }
+                if (self->myWasShown) {
+                    self->myShownOrigin = win.frame.origin;
+                    self->myWasShown = false;
+                }
                 [bar orderOut:nil];
                 [win setFrame:r display:NO];
                 win.alphaValue = 1.0;
@@ -968,8 +683,8 @@ private:
                 win.level = NSFloatingWindowLevel;
                 NSScreen* scr = win.screen ?: NSScreen.mainScreen;
                 const NSRect sf = scr.frame;
-                [win setFrameOrigin:NSMakePoint(NSMaxX(sf) - kSliver,
-                                                NSMinY(sf) - r.size.height + kSliver)];
+                [win setFrameOrigin:NSMakePoint(NSMaxX(sf) - tdmk::kSliver,
+                                                NSMinY(sf) - r.size.height + tdmk::kSliver)];
                 [win orderFront:nil];
             }
             mv.showsCompass = NO;   // コントロール類は TOP に写るので常に出さない
@@ -1026,21 +741,12 @@ private:
     TOP_Context* myContext;
     std::shared_ptr<std::atomic<bool>> myAlive;
     TDMapStreamOutput* myOutput = nil;
-    SCStream* myStream = nil;
     NSWindow* myWindow = nil;
     MKMapView* myMapView = nil;
-    MKLookAroundViewController* myLookVC = nil;
-    std::string myLaCamSig;
-    double myLaYaw = 0;
-    uint64_t myLaYawSerial = 0, myLaYawApplied = 0;
-    std::atomic<bool> myLaSyncSig{false}, myLaRetry{false};
     std::mutex myMutex;
-    Frame myFrame;
-    // 隠すとき画面内に残す量(pt)。**実測**: 0(完全に画面外)だと描画が止まり
-    // フレームが凍結する(輝度は保つが更新されない)。1pt 残せば動き続ける。
-    // 右下の最端 1pt はノッチ付き Mac の丸角ベゼルにほぼ隠れる
-    static constexpr CGFloat kSliver = 1;
-    std::string myWarning, myCamSig, myCfgSig, myStreamSig, myModeSig, myLaSig;
+    tdmk::Frame myFrame;
+    tdmk::Attribution myAttr;
+    std::string myWarning, myCamSig, myCfgSig;
     uint64_t mySerial = 0;
     double myFpsT0 = 0;
     int myFpsN = 0;
@@ -1050,11 +756,7 @@ private:
     std::atomic<bool> myWindowRequested{false}, myWindowReady{false};
     std::atomic<bool> myAttrOn{true};
     std::atomic<int> myAttrPos{0};
-    std::atomic<bool> myAvailable{true}, myLaBusy{false};
     std::vector<Marker> myMarkers, myMarkerReq;
-    std::vector<uint8_t> myPatch;
-    uint32_t myPatchW = 0, myPatchH = 0, myPatchForH = 0;
-    std::atomic<bool> myStarting{false}, myRunning{false};
     const OP_NodeInfo* myNode;
     double myPulled[5] = {};
     uint64_t myPulledSerial = 0, myAppliedPull = 0;
@@ -1094,8 +796,8 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i)
         i->customOPInfo.opHelpURL->setString(
             "https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/MapKit/README.md");
     i->customOPInfo.authorName->setString("SYGNAL Inc.");
-    i->customOPInfo.majorVersion = 0;
-    i->customOPInfo.minorVersion = 9;
+    i->customOPInfo.majorVersion = 1;   // Mode/Look Around を別opへ分離(破壊的変更)
+    i->customOPInfo.minorVersion = 0;
     i->customOPInfo.minInputs = 0;
     i->customOPInfo.maxInputs = 0;
     i->customOPInfo.cookOnStart = true;   // 出力を見られていなくてもストリームを維持する
