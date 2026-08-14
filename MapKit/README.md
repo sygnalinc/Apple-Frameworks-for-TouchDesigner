@@ -75,18 +75,19 @@ Python used elsewhere in this repo). Turn it off and the parameters are the mast
 because the last pulled values seed the push side. The initial camera is seeded from the parameters
 so the default world view never leaks back into them.
 
-In Look Around mode the camera parameters only choose the scene coordinate. **Looking around is
-done by hand in the window** — and that took two discoveries: the embedded view controller ships
-with its pan/zoom recognizers **disabled** (`navigationEnabled = YES` does not flip them; measured
-`enabled = 0`), so this op force-enables them every cook, which makes drag-to-look and pinch-zoom
-work for real input.
-
-**The view direction cannot be driven from parameters.** The whole chain was measured: the scene
-and view controller expose no orientation API; and synthesizing drag gestures is impossible —
-application-constructed `NSEvent`s do not feed AppKit's gesture-recognizer machinery at all (a
-plain self-owned `NSPanGestureRecognizer` fired **zero** times from posted synthetic events).
-System-level event injection would need the Accessibility permission and would move the user's
-real cursor. So: coordinates from parameters, view direction by hand.
+In Look Around mode Latitude/Longitude choose the scene, and **Heading / Look Pitch drive the
+view direction** — with `Show Window` off the parameters are the master; with it on, your drag in
+the window writes the direction back into `Heading` (yaw only — pitch has no read-out). Two
+discoveries made this work: the embedded view controller ships with its pan/zoom recognizers
+**disabled** (`navigationEnabled = YES` does not flip them; measured `enabled = 0`), so this op
+force-enables them every cook; and the direction setter is a **private API** —
+`MKLookAroundView setPresentationYaw:pitch:animated:`, the same internal path the drag gesture
+uses (pixel-verified: yaw 20→90→225 rotates and pitch tilts from street to sky while the imagery
+stays intact). There is no public orientation API, and synthetic drag events cannot reach AppKit
+gesture recognizers at all, so the private call is the only route. **An OS update may break it** —
+this plugin is experimental. (Do **not** rebuild the scene via
+`initWithMapItem:cameraFrameOverride:` — the view then reports itself fully drawn while
+compositing pure black, measured everywhere.)
 
 ### Parameters
 
@@ -95,7 +96,8 @@ real cursor. So: coordinates from parameters, view direction by hand.
 | Mode | `Map` or `Look Around` |
 | Latitude / Longitude | Camera target (Map) or scene coordinate (Look Around) |
 | Distance (m) | Camera distance. No upper clamp — hand-zooming out writes big values back |
-| Pitch / Heading | Camera tilt and rotation (Map mode) |
+| Pitch / Heading | Camera tilt and rotation (Map mode). Heading also drives the Look Around view direction |
+| Look Pitch (Look Around) | Look up (+) / down (−) in Look Around, −90..90. Separate from the map-mode Pitch. No read-back — window drags do not write it back |
 | Style / Elevation / Show Traffic / Show Points Of Interest / Dark Appearance | Map styling |
 | Show Attribution | Burns "&#63743; Apple Maps" into the output (same presentation as everywhere else in this repo). **On by default.** The map's built-in "Legal" label is always hidden instead — in a TOP it is just pixels, not a working link. Apple's guidelines expect visible attribution on maps shown to an audience; switching this off is your call |
 | Attribution Position | Which corner |
@@ -216,16 +218,19 @@ Show Window オンのあいだは**ウインドウがマスター**: 手で決�
 マスターに戻る — 書き戻した値を push 側の基準にしているので切り替えで飛ばない。
 初期カメラはパラメータから入れるので、地図既定の全景が逆流することもない。
 
-Look Around モードでパラメータが決めるのはシーンの座標だけ。**見回しはウインドウ内で手で行う**
-— これも2つの発見が要った: 埋め込みのビューコントローラは Pan / ズームのレコグナイザが
-**無効化された状態**で来る(`navigationEnabled = YES` でも変わらない。実測 `enabled = 0`)。
-このopは毎 cook 強制的に有効化しており、実際のドラッグ見回しとピンチズームが効く。
-
-**視線の向きはパラメータからは動かせない。** 経路を全部実測した: シーンにもビューコントローラにも
-向きの API が無い。ジェスチャの合成も不可能 — アプリが組み立てた `NSEvent` は AppKit の
-ジェスチャ機構に一切届かない(自前の `NSPanGestureRecognizer` すら合成イベントでは**発火 0 回**)。
-システムレベルのイベント注入はアクセシビリティ許可が要る上に実際のカーソルが動いてしまう。
-結論: 座標はパラメータ、視線は手で。
+Look Around モードでは Latitude/Longitude がシーンを決め、**視線の向きは Heading / Look Pitch
+で動かせる** — Show Window オフではパラメータがマスター、オンではウインドウ内のドラッグが
+`Heading` へ書き戻される(書き戻しは yaw のみ。pitch には読み出し口が無い)。
+これには2つの発見が要った: ①埋め込みのビューコントローラは Pan / ズームのレコグナイザが
+**無効化された状態**で来る(`navigationEnabled = YES` でも変わらない。実測 `enabled = 0`)ので
+毎 cook 強制的に有効化する ②向きのセッターは**私有 API**
+`MKLookAroundView setPresentationYaw:pitch:animated:`(ドラッグと同じ内部経路。画素検証で
+yaw 20→90→225 と回り、pitch で路面から空まで振れ、画像は保たれる)。公開の向き API は無く、
+合成ドラッグイベントは AppKit のジェスチャ機構に一切届かない(自前の
+`NSPanGestureRecognizer` すら**発火 0 回**)ので、この私有呼び出しが唯一の経路。
+**OS 更新で壊れうる** — このプラグインは experimental。
+(シーンを `initWithMapItem:cameraFrameOverride:` で作り直す方式は**使わないこと** —
+ビューは「描画済み」と申告しながら合成は真っ黒になる。どの環境でも実測で再現)
 
 ### パラメータ
 
@@ -234,7 +239,8 @@ Look Around モードでパラメータが決めるのはシーンの座標だ�
 | Mode | `Map` か `Look Around` |
 | Latitude / Longitude | カメラの注視点(Map)/ シーンの座標(Look Around) |
 | Distance (m) | カメラ距離。上限クランプなし(手でズームアウトした大きい値も書き戻せる) |
-| Pitch / Heading | カメラの傾きと回転(Map モード) |
+| Pitch / Heading | カメラの傾きと回転(Map モード)。Heading は Look Around の視線方位も駆動 |
+| Look Pitch (Look Around) | Look Around の見上げ(+)/見下ろし(−)。−90..90。Map モードの Pitch とは別。読み出し口が無いためドラッグの書き戻しは無し |
 | Style / Elevation / Show Traffic / Show Points Of Interest / Dark Appearance | 地図の見た目 |
 | Show Attribution | 「&#63743; Apple Maps」を出力へ焼き込む。**既定オン**。地図内蔵の「Legal」ラベルは常に隠す — TOP 上ではただのピクセルで、リンクとして機能しないため。Apple のガイドライン上、人に見せる地図には帰属表示が求められる — 消す判断は利用者のもの |
 | Attribution Position | どの隅に出すか |

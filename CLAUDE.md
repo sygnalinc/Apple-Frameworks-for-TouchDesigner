@@ -6788,3 +6788,30 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **既知の癖**: 入力を繋いだ直後、入力側がまだロード中(1x1 の status 表)だと空振りし、
   シグネチャの都合で自動再試行されないことがある → Refresh で解決(README に明記)
 - これで Look Around の演出フロー(検索 → カバー判定 → あり地点へ TOP を切替)が DAT だけで組める
+
+### 2026-08-14 MapKit TOP: Look Around の視線をパラメータ制御に(真っ黒問題の決着)+ バーに閉じるボタン
+
+- 前日からの「パラメータで視線を変えると真っ黒」問題を**画素検証で決着**:
+  - **単体プローブも黒だったと判明**。以前「単体では動く」とした根拠は `presentationYaw` /
+    `adequatelyDrawn` の読み戻しだったが、**これらの状態フラグは実際の合成を反映しない**
+    (drawn=1/yaw適用済みと申告しながらウインドウは真っ黒)。**状態読み戻しだけの検証は無効。
+    必ず画素で確認する**(screencapture で領域を撮り輝度を測る)
+  - `initWithMapItem:cameraFrameOverride:` で作ったシーンは**どの環境でも描画されない**
+    (yaw のみ / 本物のシーンへ KVC で override を差し込む / muninViewState 移植、全て黒)。
+    TD 固有ではなかった。ユーザーの「map⇄lookaround 切替で復旧」は新しい実シーンの取り直しによるもの
+- **正解は `MKLookAroundView setPresentationYaw:pitch:animated:`**(クラスの camera/yaw 系
+  メソッドを総当たりで発見)。ドラッグと同じ内部経路なので画像を保ったまま回る。
+  画素検証: yaw 20.1→90→225(輝度 148→143→141)。シーン差し替え・SCK 再ストリーム等の
+  ワークアラウンドは全て撤去
+- **pitch は正=下**(+30 で路面 / -30 でビルと空。実測)。読み出し口は無い
+  (`presentationPitch` は存在しない)ので**書き戻しは yaw のみ**
+- 実装: Heading(yaw・双方向)+ **`Look Pitch (Look Around)` パラメータ新設**(-90..90・正=上に
+  反転して渡す)。TD 実機で Heading 90/225 の回転と Lookpitch ±40 の見上げ/見下ろしを視認
+- **バーウインドウに閉じるボタン**(ユーザー要望): `windowShouldClose:` で **NO を返しつつ
+  フラグを立て、cook が `Show Window` パラメータをオフにする**(AppKit コールバックから TD に
+  触らない・CoreText フォントパネルの THREAD CONFLICT と同じ型)。
+  **罠: styleMask に `NSWindowStyleMaskClosable` が無いと閉じるボタン自体が生成されない**
+  (Titled だけでは出ない。実機で気づいた)。クリック→Showwindow=0→再オンで復帰まで実機確認
+- デバッグ用 Info CHOP チャンネル(la_drawn 等3ch)を撤去して 8ch に復帰。README(英日)更新
+- 未決(ユーザーへ意見出し中): op を MapKit Map TOP / MapKit LookAround TOP / MapKit Search DAT
+  の3つに分割する案

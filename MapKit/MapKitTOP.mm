@@ -19,6 +19,8 @@
 #import <MapKit/MapKit.h>
 #import <ScreenCaptureKit/ScreenCaptureKit.h>
 #import <CoreText/CoreText.h>
+#import <objc/message.h>
+#import <objc/runtime.h>
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -37,6 +39,23 @@ namespace { class MapKitTOP; }
 @end
 @implementation TDMapWindow
 - (BOOL)canBecomeKeyWindow { return YES; }
+@end
+
+// バーの閉じるボタン: 実際には閉じず、フラグを立てて cook 側が Show Window をオフにする
+// (ウインドウは使い回すので破棄しない。AppKit コールバックから TD には触らない —
+//  CoreText のフォントパネルで踏んだ THREAD CONFLICT と同じ理由でフラグ渡し)
+@interface TDMapBarDelegate : NSObject <NSWindowDelegate>
+{
+@public
+    std::shared_ptr<std::atomic<bool>> closeReq;
+}
+@end
+@implementation TDMapBarDelegate
+- (BOOL)windowShouldClose:(NSWindow*)w
+{
+    if (closeReq) closeReq->store(true);
+    return NO;
+}
 @end
 
 @interface TDMapStreamOutput : NSObject <SCStreamOutput, SCStreamDelegate>
@@ -63,6 +82,24 @@ struct Marker {
 // MKMapView の帰属表示(Legal リンク)をビュー階層から探して隠す。
 // 公開 API には表示/非表示の口が無い。Apple のガイドライン上、人に見せる地図には
 // 帰属表示が求められる点は README に明記(消す判断は利用者のもの)
+// Look Around の視線制御は**私有 API**(公開 API には存在しない):
+// MKLookAroundView の setPresentationYaw:pitch:animated: を呼ぶ(ドラッグと同じ内部経路)。
+// 現在の方位は MKLookAroundView.presentationYaw で読める(pitch の読み出し口は無い)。
+// 実測(画素検証): yaw 20.1→90→225 と回り、画像は保たれる(輝度 148→143→141)。
+// pitch は**正=下**(+30 で路面 / -30 でビル上層と空。実測)。
+// ※シーンを initWithMapItem:cameraFrameOverride: で作り直す方式は**常に真っ黒**
+//   (実測: 状態は drawn=1/yaw 適用済みと返るが、実際の合成は黒。使わないこと)
+// **OS 更新で壊れうる**ことは README に明記(このプラグインは experimental)
+static NSView* findLookAroundView(NSView* root)
+{
+    if ([NSStringFromClass(root.class) isEqualToString:@"MKLookAroundView"]) return root;
+    for (NSView* s in root.subviews) {
+        NSView* r = findLookAroundView(s);
+        if (r) return r;
+    }
+    return nil;
+}
+
 // Look Around の埋め込み表示は、MapKit が Pan / ズームのレコグナイザを**無効化して
 // プレビュー専用にしている**(実測: enabled=0。navigationEnabled=YES でも変わらない)。
 // 強制的に有効化すると実際に見回し・ズームが効く(実機で確認)。
@@ -100,13 +137,17 @@ public:
         SCStream* st = myStream; myStream = nil;
         NSWindow* w = myWindow; myWindow = nil;
         NSWindow* bw = myBarWindow; myBarWindow = nil;
+        myBarDelegate = nil;
         id obs = myMoveObserver; myMoveObserver = nil;
         if (obs) [[NSNotificationCenter defaultCenter] removeObserver:obs];
         myMapView = nil;
         myLookVC = nil;
         if (st) [st stopCaptureWithCompletionHandler:^(NSError*) {}];
         // ウインドウは AppKit の所有物なのでメインスレッドで閉じる
-        dispatch_async(dispatch_get_main_queue(), ^{ [bw close]; [w close]; });
+        dispatch_async(dispatch_get_main_queue(), ^{
+            bw.delegate = nil;   // NSWindow.delegate は weak でない(assign)ので明示的に切る
+            [bw close]; [w close];
+        });
     }
 
     void getGeneralInfo(TOP_GeneralInfo* g, const OP_Inputs*, void*) override
@@ -132,6 +173,9 @@ public:
         }
         const int fps = std::max(1, std::min(120, (int)in->getParInt("Fps")));
         const bool show = in->getParInt("Showwindow") != 0;
+        // バーの閉じるボタン → Show Window をオフ(ウインドウは次 cook で隠れる)
+        if (myCloseReq->exchange(false) && show)
+            tdpycb::setFloatPars(myNode, {{"Showwindow", 0.0}});
         const std::string mode = str(in, "Mode", "map");
         const bool lookaround = (mode == "lookaround");
 
@@ -152,8 +196,8 @@ public:
                 if (lookaround) myLaSig.clear();   // シーンを取り直す
             }
             if (lookaround) {
-                // 座標が変わったらシーンを取り直す。視線の向きは公開APIに無いので
-                // ウインドウ内で見回す(読み出しも不可 = 書き戻しは無し)
+                // 座標が変わったらシーンを取り直す。視線の向きは Heading パラメータ
+                // (setPresentationYaw 経由)とウインドウ内ドラッグの双方向
                 const double lat = in->getParDouble("Latitude");
                 const double lon = in->getParDouble("Longitude");
                 char sig[64];
@@ -161,6 +205,67 @@ public:
                 if (myLaSig != sig && !myLaBusy.exchange(true)) {
                     myLaSig = sig;
                     requestScene(lat, lon);
+                }
+                // --- 視線(Heading/Pitch)。私有 API 経由(冒頭コメント参照) ---
+                if (show) {
+                    // ウインドウがマスター: ドラッグした視線を Heading へ書き戻す
+                    NSWindow* win2 = myWindow;
+                    auto alive2 = myAlive;
+                    auto* self2 = this;
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (!alive2->load() || !win2.contentView) return;
+                        NSView* lav = findLookAroundView(win2.contentView);
+                        if (!lav) return;
+                        @try {
+                            const double y =
+                                [[lav valueForKey:@"presentationYaw"] doubleValue];
+                            std::lock_guard<std::mutex> l(self2->myMutex);
+                            self2->myLaYaw = y;
+                            self2->myLaYawSerial++;
+                        } @catch (NSException*) {}
+                    });
+                    double y; uint64_t serial;
+                    {
+                        std::lock_guard<std::mutex> l(myMutex);
+                        y = myLaYaw; serial = myLaYawSerial;
+                    }
+                    if (serial && serial != myLaYawApplied) {
+                        double norm = fmod(y, 360.0); if (norm < 0) norm += 360.0;
+                        if (fabs(norm - in->getParDouble("Heading")) > 0.05)
+                            tdpycb::setFloatPars(myNode, {{"Heading", norm}});
+                        myLaYawApplied = serial;
+                        char c2[64]; snprintf(c2, sizeof c2, "%.2f|%.2f",
+                                              norm, in->getParDouble("Lookpitch"));
+                        myLaCamSig = c2;
+                    }
+                } else {
+                    // パラメータがマスター: Heading / Look Pitch の変更を
+                    // setPresentationYaw:pitch:animated: でビューへ適用(冒頭コメント参照)。
+                    // API の pitch は**正=下**(実測)なので、パラメータは正=上に反転して渡す。
+                    // pitch の読み戻し口は無い(presentationPitch は存在しない)ため
+                    // 書き戻しは yaw のみ
+                    if (myLaRetry.exchange(false)) myLaCamSig.clear();
+                    const double hd = in->getParDouble("Heading");
+                    const double lp = in->getParDouble("Lookpitch");
+                    char c2[64]; snprintf(c2, sizeof c2, "%.2f|%.2f", hd, lp);
+                    if (myLaSyncSig.exchange(false)) {
+                        myLaCamSig = c2;   // シーン本来の向きを尊重(勝手に適用しない)
+                    } else if (myLaCamSig != c2) {
+                        myLaCamSig = c2;
+                        NSWindow* win3 = myWindow;
+                        auto alive2 = myAlive;
+                        auto* self2 = this;
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            if (!alive2->load() || !win3.contentView) return;
+                            NSView* lav = findLookAroundView(win3.contentView);
+                            if (!lav) { self2->myLaRetry = true; return; }  // 読込前 → 再適用
+                            @try {
+                                ((void (*)(id, SEL, double, double, BOOL))objc_msgSend)(lav,
+                                    sel_registerName("setPresentationYaw:pitch:animated:"),
+                                    hd, -lp, YES);
+                            } @catch (NSException*) {}
+                        });
+                    }
                 }
             } else if (show) {
                 // メインスレッドにカメラを読ませ、cook はその写しを見る
@@ -327,6 +432,8 @@ public:
         }
         addF(m, P, "Pitch",     "Pitch",     60, 0, 80);
         addF(m, P, "Heading",   "Heading",   0, 0, 360);
+        // Look Around 専用の見上げ/見下ろし(正=上)。地図モードの Pitch とは別物
+        addF(m, P, "Lookpitch", "Look Pitch (Look Around)", 0, -90, 90);
         {
             OP_StringParameter p("Style");
             p.label = "Style"; p.page = P; p.defaultValue = "standard";
@@ -652,14 +759,19 @@ private:
             // (実際にユーザーに指摘された)。バーを掴めば子の地図がついてくる
             NSWindow* bar = [[NSWindow alloc]
                 initWithContentRect:NSMakeRect(0, 0, r.size.width, 0)
-                          styleMask:NSWindowStyleMaskTitled
+                          styleMask:(NSWindowStyleMaskTitled |
+                                     NSWindowStyleMaskClosable)  // Closable が無いと閉じるボタンが生成されない
                             backing:NSBackingStoreBuffered
                               defer:NO];
             bar.releasedWhenClosed = NO;
             bar.title = @"MapKit";
-            [[bar standardWindowButton:NSWindowCloseButton] setHidden:YES];
+            // 閉じるボタンは出す(押すと Show Window がオフになる。delegate 参照)
             [[bar standardWindowButton:NSWindowMiniaturizeButton] setHidden:YES];
             [[bar standardWindowButton:NSWindowZoomButton] setHidden:YES];
+            TDMapBarDelegate* del = [TDMapBarDelegate new];
+            del->closeReq = self->myCloseReq;
+            bar.delegate = del;
+            self->myBarDelegate = del;
             self->myBarWindow = bar;
             // バーをドラッグしたら地図をその真下へ追従させる
             NSWindow* mapWin = win;
@@ -743,6 +855,7 @@ private:
             [req getSceneWithCompletionHandler:^(MKLookAroundScene* scene, NSError* e) {
                 if (!alive->load()) return;
                 self->myAvailable = (scene != nil);
+                self->myLaSyncSig = true;   // 読込直後は適用せず、シグネチャの基準だけ合わせる
                 if (self->myLookVC) self->myLookVC.scene = scene;
                 {
                     std::lock_guard<std::mutex> l(self->myMutex);
@@ -917,6 +1030,10 @@ private:
     NSWindow* myWindow = nil;
     MKMapView* myMapView = nil;
     MKLookAroundViewController* myLookVC = nil;
+    std::string myLaCamSig;
+    double myLaYaw = 0;
+    uint64_t myLaYawSerial = 0, myLaYawApplied = 0;
+    std::atomic<bool> myLaSyncSig{false}, myLaRetry{false};
     std::mutex myMutex;
     Frame myFrame;
     // 隠すとき画面内に残す量(pt)。**実測**: 0(完全に画面外)だと描画が止まり
@@ -943,6 +1060,9 @@ private:
     uint64_t myPulledSerial = 0, myAppliedPull = 0;
     NSPoint myShownOrigin = {0, 0};
     NSWindow* myBarWindow = nil;
+    TDMapBarDelegate* myBarDelegate = nil;
+    std::shared_ptr<std::atomic<bool>> myCloseReq =
+        std::make_shared<std::atomic<bool>>(false);
     id myMoveObserver = nil;
     bool myWasShown = false;
 };
