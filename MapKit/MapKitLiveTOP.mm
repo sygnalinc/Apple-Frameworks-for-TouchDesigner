@@ -26,9 +26,17 @@
 #include "TOP_CPlusPlusBase.h"
 #include "CPlusPlus_Common.h"
 #include "../common/NonCommercialLimit.h"
+#include "../common/PyCallbacksBootstrap.h"
 using namespace TD;
 
 namespace { class MapKitLiveTOP; }
+
+// ボーダーレスウインドウは既定で key になれず、マウスドラッグ系の操作が届かない
+@interface TDMapLiveWindow : NSWindow
+@end
+@implementation TDMapLiveWindow
+- (BOOL)canBecomeKeyWindow { return YES; }
+@end
 
 @interface TDMapLiveOutput : NSObject <SCStreamOutput, SCStreamDelegate>
 @property (nonatomic, assign) void* owner;
@@ -44,8 +52,8 @@ struct Frame {
 
 class MapKitLiveTOP final : public TOP_CPlusPlusBase {
 public:
-    MapKitLiveTOP(const OP_NodeInfo*, TOP_Context* c)
-        : myContext(c), myAlive(std::make_shared<std::atomic<bool>>(true))
+    MapKitLiveTOP(const OP_NodeInfo* ni, TOP_Context* c)
+        : myNode(ni), myContext(c), myAlive(std::make_shared<std::atomic<bool>>(true))
     {
         myOutput = [TDMapLiveOutput new];
         myOutput.owner = this;
@@ -88,29 +96,82 @@ public:
         const bool show = in->getParInt("Showwindow") != 0;
 
         // --- ウインドウ+MKMapView(メインスレッドで一度だけ作る) ---
-        if (active && !myWindowRequested.exchange(true)) createWindow(w, h);
+        // 初期カメラをパラメータから入れる。入れないと地図既定の全景で開き、
+        // Show Window オン(=ウインドウがマスター)だとその値がパラメータへ逆流する
+        if (active && !myWindowRequested.exchange(true))
+            createWindow(w, h,
+                         in->getParDouble("Latitude"), in->getParDouble("Longitude"),
+                         std::max(50.0, in->getParDouble("Distance")),
+                         in->getParDouble("Pitch"), in->getParDouble("Heading"));
 
-        // --- カメラ。毎 cook 送る(TD 側で lat/heading をアニメーションさせる前提) ---
+        // --- カメラは双方向 ---
+        // Show Window オン = **ウインドウがマスター**。トラックパッド/マウスで動かした
+        // カメラを読み取り、パラメータへ書き戻す(結果が TOP のプロパティに残る)。
+        // オフ = 従来どおりパラメータがマスターで、式や CHOP から飛ばせる
         if (active && myWindowReady.load()) {
-            const double lat = in->getParDouble("Latitude");
-            const double lon = in->getParDouble("Longitude");
-            const double dist = std::max(50.0, in->getParDouble("Distance"));
-            const double pitch = in->getParDouble("Pitch");
-            const double heading = in->getParDouble("Heading");
-            char cam[160];
-            snprintf(cam, sizeof cam, "%.7f|%.7f|%.2f|%.2f|%.2f", lat, lon, dist, pitch, heading);
-            if (myCamSig != cam) {
-                myCamSig = cam;
+            if (show) {
+                // メインスレッドにカメラを読ませ、cook はその写しを見る
                 MKMapView* mv = myMapView;
                 auto alive = myAlive;
+                auto* self = this;
                 dispatch_async(dispatch_get_main_queue(), ^{
                     if (!alive->load() || !mv) return;
-                    @try {
-                        mv.camera = [MKMapCamera cameraLookingAtCenterCoordinate:
-                                        CLLocationCoordinate2DMake(lat, lon)
-                                     fromDistance:dist pitch:pitch heading:heading];
-                    } @catch (NSException*) {}
+                    MKMapCamera* c = mv.camera;
+                    std::lock_guard<std::mutex> l(self->myMutex);
+                    self->myPulled[0] = c.centerCoordinate.latitude;
+                    self->myPulled[1] = c.centerCoordinate.longitude;
+                    self->myPulled[2] = c.centerCoordinateDistance;
+                    self->myPulled[3] = c.pitch;
+                    self->myPulled[4] = c.heading;
+                    self->myPulledSerial++;
                 });
+                double v[5]; uint64_t serial;
+                {
+                    std::lock_guard<std::mutex> l(myMutex);
+                    memcpy(v, myPulled, sizeof v);
+                    serial = myPulledSerial;
+                }
+                if (serial && serial != myAppliedPull) {
+                    const bool moved =
+                        fabs(v[0] - in->getParDouble("Latitude"))  > 1e-7 ||
+                        fabs(v[1] - in->getParDouble("Longitude")) > 1e-7 ||
+                        fabs(v[2] - in->getParDouble("Distance"))  > 0.01 ||
+                        fabs(v[3] - in->getParDouble("Pitch"))     > 0.01 ||
+                        fabs(v[4] - in->getParDouble("Heading"))   > 0.01;
+                    if (moved) {
+                        tdpycb::setFloatPars(myNode, {{"Latitude", v[0]}, {"Longitude", v[1]},
+                                                      {"Distance", v[2]}, {"Pitch", v[3]},
+                                                      {"Heading", v[4]}});
+                    }
+                    myAppliedPull = serial;
+                    // 書き戻した値を push 側の基準にもして、オフに戻した瞬間に飛ばないようにする
+                    char cam[160];
+                    snprintf(cam, sizeof cam, "%.7f|%.7f|%.2f|%.2f|%.2f",
+                             v[0], v[1], v[2], v[3], v[4]);
+                    myCamSig = cam;
+                }
+            } else {
+                const double lat = in->getParDouble("Latitude");
+                const double lon = in->getParDouble("Longitude");
+                const double dist = std::max(50.0, in->getParDouble("Distance"));
+                const double pitch = in->getParDouble("Pitch");
+                const double heading = in->getParDouble("Heading");
+                char cam[160];
+                snprintf(cam, sizeof cam, "%.7f|%.7f|%.2f|%.2f|%.2f",
+                         lat, lon, dist, pitch, heading);
+                if (myCamSig != cam) {
+                    myCamSig = cam;
+                    MKMapView* mv = myMapView;
+                    auto alive = myAlive;
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (!alive->load() || !mv) return;
+                        @try {
+                            mv.camera = [MKMapCamera cameraLookingAtCenterCoordinate:
+                                            CLLocationCoordinate2DMake(lat, lon)
+                                         fromDistance:dist pitch:pitch heading:heading];
+                        } @catch (NSException*) {}
+                    });
+                }
             }
 
             // --- 地図のスタイル(変わったときだけ) ---
@@ -168,7 +229,15 @@ public:
           p.defaultValues[0] = 1; m->appendToggle(p); }
         addF(m, P, "Latitude",  "Latitude",  35.6595, -90, 90);
         addF(m, P, "Longitude", "Longitude", 139.7005, -180, 180);
-        addF(m, P, "Distance",  "Distance (m)", 800, 50, 200000);
+        {
+            // ウインドウ側で大きくズームアウトした値も受けるため、上限はクランプしない
+            OP_NumericParameter p("Distance");
+            p.label = "Distance (m)"; p.page = P;
+            p.defaultValues[0] = 800;
+            p.minSliders[0] = 50; p.maxSliders[0] = 2000000;
+            p.minValues[0] = 1; p.clampMins[0] = true; p.clampMaxes[0] = false;
+            m->appendFloat(p);
+        }
         addF(m, P, "Pitch",     "Pitch",     60, 0, 80);
         addF(m, P, "Heading",   "Heading",   0, 0, 360);
         {
@@ -280,7 +349,8 @@ private:
         m->appendFloat(p);
     }
 
-    void createWindow(int w, int h)
+    void createWindow(int w, int h, double lat, double lon, double dist,
+                      double pitch, double heading)
     {
         auto alive = myAlive;
         auto* self = this;
@@ -288,16 +358,30 @@ private:
             if (!alive->load()) return;
             const CGFloat scale = NSScreen.mainScreen.backingScaleFactor ?: 2.0;
             NSRect r = NSMakeRect(0, 0, w / scale, h / scale);
-            NSWindow* win = [[NSWindow alloc] initWithContentRect:r
-                                                        styleMask:NSWindowStyleMaskBorderless
-                                                          backing:NSBackingStoreBuffered
-                                                            defer:NO];
+            NSWindow* win = [[TDMapLiveWindow alloc]
+                initWithContentRect:r
+                          styleMask:NSWindowStyleMaskBorderless
+                            backing:NSBackingStoreBuffered
+                              defer:NO];
             win.releasedWhenClosed = NO;
+            win.title = @"MapKit Live";
             // Mission Control やスペース移動に巻き込まれないように
             win.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
                                      NSWindowCollectionBehaviorStationary |
                                      NSWindowCollectionBehaviorIgnoresCycle;
-            MKMapView* mv = [[MKMapView alloc] initWithFrame:r];
+            MKMapView* mv = [[MKMapView alloc] initWithFrame:win.contentView.bounds];
+            mv.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+            @try {
+                mv.camera = [MKMapCamera cameraLookingAtCenterCoordinate:
+                                CLLocationCoordinate2DMake(lat, lon)
+                             fromDistance:dist pitch:pitch heading:heading];
+            } @catch (NSException*) {}
+            // 標準のマップと同じ操作(スクロール=パン / ピンチ=ズーム / 2本指回転 /
+            // Option+スクロール=チルト)。コントロール類は Show Window 時だけ出す
+            mv.zoomEnabled = YES;
+            mv.scrollEnabled = YES;
+            mv.rotateEnabled = YES;
+            mv.pitchEnabled = YES;
             mv.showsCompass = NO;
             mv.showsZoomControls = NO;
             win.contentView = mv;
@@ -360,14 +444,50 @@ private:
             r.size = NSMakeSize(w / scale, h / scale);
             [win setFrame:r display:YES];
             mv.frame = NSMakeRect(0, 0, r.size.width, r.size.height);
+            CGRect srcRect = CGRectZero;   // CGRectZero = ウインドウ全体を取り込む
             if (show) {
-                win.level = NSNormalWindowLevel;
-                [win orderFront:nil];
+                // **見えるタイトルバー**を付ける(掴んで動かせる)。バーは sourceRect で
+                // 取り込みから除外するので TOP には写らない
+                win.styleMask = NSWindowStyleMaskTitled;
+                win.title = @"MapKit Live";
+                // 閉じる/しまうボタンは無効(閉じられるとストリームが壊れるため)
+                [[win standardWindowButton:NSWindowCloseButton] setHidden:YES];
+                [[win standardWindowButton:NSWindowMiniaturizeButton] setHidden:YES];
+                [[win standardWindowButton:NSWindowZoomButton] setHidden:YES];
+                [win setContentSize:r.size];
+                if (myShownOrigin.x != 0 || myShownOrigin.y != 0)
+                    [win setFrameOrigin:myShownOrigin];   // 前回表示していた場所へ戻す
+                win.alphaValue = 1.0;
+                win.ignoresMouseEvents = NO;
+                // TD のウインドウをクリックしても隠れないように浮かせる
+                win.level = NSFloatingWindowLevel;
+                [win makeKeyAndOrderFront:nil];
+                const NSRect fr = win.frame;
+                const NSRect cr = [win contentRectForFrameRect:fr];
+                const CGFloat barH = fr.size.height - cr.size.height;
+                srcRect = CGRectMake(0, barH, cr.size.width, cr.size.height);
             } else {
-                // デスクトップレベル = 壁紙の上・アイコンの下。ユーザーの操作に一切割り込まない
-                win.level = CGWindowLevelForKey(kCGDesktopWindowLevelKey);
-                [win orderBack:nil];
+                // 隠すときはボーダーレス(角が四角)。**2つの罠を実測で踏んだ**:
+                // ①デスクトップレベルに置くと遮蔽扱いになり MapKit が描画を止めて灰色になる
+                // ②アルファを下げると SCK の取り込みまで暗くなる(合成後の見た目が返る)
+                // → アルファ 1.0 のまま、**大部分を画面外へ出して 8pt だけ画面内に残す**。
+                //   完全に画面外だと描画が止まるので端を残す(Translate の極小ウインドウと同じ発想)。
+                //   取り込みは desktopIndependent なので画面外の部分も丸ごと取れる
+                if (win.styleMask & NSWindowStyleMaskTitled)
+                    myShownOrigin = win.frame.origin;   // 次に表示するとき元の場所へ戻す
+                win.styleMask = NSWindowStyleMaskBorderless;
+                [win setFrame:r display:NO];
+                win.alphaValue = 1.0;
+                win.ignoresMouseEvents = YES;
+                win.level = NSFloatingWindowLevel;
+                NSScreen* scr = win.screen ?: NSScreen.mainScreen;
+                const NSRect sf = scr.frame;
+                [win setFrameOrigin:NSMakePoint(NSMaxX(sf) - 8, NSMinY(sf) - r.size.height + 8)];
+                [win orderFront:nil];
             }
+            mv.showsCompass = NO;   // コントロール類は TOP に写るので常に出さない
+            mv.showsZoomControls = NO;
+            if (@available(macOS 11.0, *)) mv.showsPitchControl = NO;
             const CGWindowID wid = (CGWindowID)win.windowNumber;
 
             // ウインドウサーバーに載った自分のウインドウを SCK で探して取り込む
@@ -395,6 +515,8 @@ private:
                 cfg.pixelFormat = kCVPixelFormatType_32BGRA;
                 cfg.showsCursor = NO;
                 cfg.queueDepth = 3;
+                if (@available(macOS 14.0, *)) cfg.ignoreShadowsSingleWindow = YES;
+                if (!CGRectIsEmpty(srcRect)) cfg.sourceRect = srcRect;
                 SCStream* st = [[SCStream alloc] initWithFilter:filter configuration:cfg delegate:o];
                 NSError* add = nil;
                 [st addStreamOutput:o type:SCStreamOutputTypeScreen
@@ -431,6 +553,10 @@ private:
     std::atomic<float> myFps{0};
     std::atomic<bool> myWindowRequested{false}, myWindowReady{false};
     std::atomic<bool> myStarting{false}, myRunning{false};
+    const OP_NodeInfo* myNode;
+    double myPulled[5] = {};
+    uint64_t myPulledSerial = 0, myAppliedPull = 0;
+    NSPoint myShownOrigin = {0, 0};
 };
 
 }  // namespace

@@ -38,6 +38,21 @@ Drive `Latitude / Longitude / Distance / Pitch / Heading` from expressions or CH
 camera follows every frame. When nothing moves, ScreenCaptureKit only delivers frames on change, so
 an idle map costs almost nothing.
 
+**The camera is two-way.** With **Show Window** on, the window comes forward (floating, with a real
+title bar you can drag; the bar is cropped out of the capture with `sourceRect`) and **the window
+becomes the master**: pan, pinch-zoom, two-finger rotate and Option-scroll pitch — the same gestures
+as Maps.app — and every move is written back into the TOP's parameters. Turn Show Window off and
+the parameters are the master again, holding whatever you framed by hand. The map's on-screen
+controls are never shown because they would end up in the capture.
+
+Two measured traps shaped the hidden mode: parking the window at desktop level makes macOS treat it
+as occluded, and **MapKit stops rendering — the output goes gray after a while**; and lowering the
+window's alpha darkens the *capture* too (ScreenCaptureKit returns the composited appearance, so
+alpha 0.01 gives you 1% brightness). The window therefore stays at full alpha and is instead pushed
+almost entirely off-screen, keeping an **8 pt sliver on the bottom-right edge** — enough for AppKit
+to keep it "visible" and rendering. Verified: 90 s of hidden-mode camera animation held full
+brightness.
+
 What this costs, compared to the snapshot op:
 
 - **Screen Recording permission** (same TCC grant as the Screen Capture TOP)
@@ -161,6 +176,20 @@ ScreenCaptureKit の `initWithDesktopIndependentWindow:` で取り込む。ウ�
 `Latitude / Longitude / Distance / Pitch / Heading` を式や CHOP エクスポートで駆動すれば、
 カメラは毎フレーム追従する。動かしていないあいだは ScreenCaptureKit が変化時しかフレームを
 寄越さないので、静止した地図はほぼコストゼロ。
+
+**カメラは双方向。** **Show Window** をオンにするとウインドウが前面に出て(フローティング・
+掴んで動かせる本物のタイトルバー付き。バーは `sourceRect` で取り込みから除外される)、
+**ウインドウがマスター**になる: パン・ピンチズーム・2本指回転・Option+スクロールのチルト —
+マップ.app と同じ操作 — の結果が全部 TOP のパラメータへ書き戻される。オフに戻すと
+パラメータがマスターに戻り、手で決めた構図がそのまま残る。地図のコントロール類は
+取り込みに写るので常に出さない。
+
+隠しモードの設計は実測で踏んだ2つの罠で決まった: デスクトップレベルに置くと遮蔽扱いになり
+**MapKit が描画を止めて一定時間で出力が灰色になる**。かといってアルファを下げると
+**取り込みまで暗くなる**(ScreenCaptureKit は合成後の見た目を返すので、アルファ 0.01 だと
+輝度1%になる)。そこでアルファは 1.0 のまま、ウインドウをほぼ画面外へ出して**右下の端に
+8pt だけ残す**(AppKit が「可視」とみなして描画を続けるのに十分)。隠しモードで90秒
+カメラをアニメーションさせても輝度が落ちないことを確認済み。
 
 スナップショット版と比べた代償:
 
