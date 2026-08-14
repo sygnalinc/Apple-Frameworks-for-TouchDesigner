@@ -47,8 +47,8 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | **[CoreText](CoreText/)** — 日本語の縦組みを一文字ずつ表示 | **[ImagePlayground](ImagePlayground/)** — 顔写真(左)からイラスト(右)を生成 |
 | <img src="docs/demo/llmafm-chat.gif" width="400" alt="LLM AFM"> | <img src="docs/demo/gamecontroller.gif" width="400" alt="GameController"> |
 | **[LLM AFM](LLMAFM/)** — Apple Intelligence のオンデバイスモデル(~3B)が英語と日本語で同時に応答。日本語側の「赤と青を混ぜると青」は**誤答**(正しくは紫。英語側は purple と正答) | **[GameController](GameController/)** — ゲームパッドでカメラを街に飛ばす。ボタンでシーンを切り替える(ワイヤーフレーム / カラーパレット / ビルの高さが音に連動) |
-| <img src="docs/demo/ciglass.gif" width="400" alt="CI Glass"> | |
-| **[CI Glass](CoreImageGlass/)** — macOS の Liquid Glass を Core Image で組み直したもの。縁で背後の街が歪み、文字の輪郭に沿ってリムが光る | |
+| <img src="docs/demo/ciglass.gif" width="400" alt="CI Glass"> | <img src="docs/demo/mapkit.gif" width="400" alt="MapKit"> |
+| **[CI Glass](CoreImageGlass/)** — macOS の Liquid Glass を Core Image で組み直したもの。縁で背後の街が歪み、文字の輪郭に沿ってリムが光る | **[MapKit](MapKit/)** — 東海道新幹線を東京から新大阪へ、ライブの衛星3Dで飛ぶ。駅名は Text SOP のジオメトリを地図自身のカメラで射影したもの。右下は直前に着いた駅の Look Around |
 
 ## 目次
 
@@ -174,6 +174,11 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [CoreWLAN](CoreWLAN/) | CHOP | **Wi-Fiの実測値**(CoreWLAN)— RSSI/ノイズ/SNR/送信レート/チャンネル |
 | [CoreWLAN Scan](CoreWLANScan/) | CHOP | **周辺Wi-Fiをスキャン→チャンネル別の混雑度/AP数/最大RSSI**と最も空いてるch(2.4/5GHz)。**SSID名は同梱の位置情報許可ヘルパーappで取得可**(Info DAT) |
 | [Network Discovery](NetworkDiscovery/) | DAT | **LAN上の全デバイスを発見**: Bonjour + **アクティブIPv4スキャン**(ARPスイープでBonjour非対応機器もMAC/ホスト名付き) → IP/MAC/**ベンダー(OUI)**/DNS名/mDNS名/**SMB名・ドメイン(NetBIOS)**/ポート/TXT(LanScan Pro相当) |
+| [MapKit MapView](MapKit/) | TOP | **Apple マップをライブでレンダ** — 3D地図(衛星/ハイブリッド・Realistic 3D)の中を 57fps で飛べる。画面に出したウインドウとカメラは双方向。**Markers DAT** で緯度経度を画面 u/v へ射影できるので、自前のジオメトリを地図にぴったり重ねられる |
+| [MapKit LookAround](MapKit/) | TOP | **Look Around(街並みの実写)をライブ表示**。視線の向きは Heading / Look Pitch で操作(ドラッグと双方向) |
+| [MapKit Search](MapKit/) | DAT | **検索 / ジオコーディング / 逆ジオ / 経路**(徒歩・車・公共交通。ポリライン全点も)と **Look Around カバレッジ**の走査 |
+| [CoreMIDI Out](CoreMIDI/) | CHOP | **ホットプラグと機材識別に対応した MIDI 出力**(UniqueID で挿し直しても同じ機材。製造元/モデル/オンライン状態は Info DAT)。パラメータからも CHOP チャンネルからも送れ、**DAW のトランスポート(MMC)と同期(MIDI Clock / MTC)** をパケット単位のタイムスタンプ付きで送出 |
+| [CoreMIDI In](CoreMIDI/) | CHOP | **届いた分だけチャンネルを自動生成する MIDI 入力**: 鍵盤・パッド・ノブが `ch1n60` / `ch1c74` として現れる(事前の列挙が要らない)。**MIDI Clock を BPM / 拍**に変換し、**MTC** も受信 |
 
 
 ## 実験中のプラグイン(リリースには含まれません)
@@ -184,12 +189,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 
 | プラグイン | Family | 状態 |
 |---|---|---|
-| [CoreMIDI Out](CoreMIDI/) | CHOP | 実験中 |
-| [CoreMIDI In](CoreMIDI/) | CHOP | 実験中 |
 | [AVF Camera](AVFoundationCamera/) | TOP | 実験中 |
-| [MapKit MapView](MapKit/) | TOP | 実験中 |
-| [MapKit LookAround](MapKit/) | TOP | 実験中 |
-| [MapKit Search](MapKit/) | DAT | 実験中 |
 | [AVAudio Mixer CHOP](AVAudioMixer/) | CHOP | 実験中 |
 | [AVAudio Spatial CHOP](AVAudioSpatial/) | CHOP | 実験中 |
 | [AudioToolbox Mix CHOP](AudioToolboxMix/) | CHOP | 実験中 |

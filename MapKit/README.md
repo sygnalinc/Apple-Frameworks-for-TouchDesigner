@@ -12,9 +12,10 @@ Three operators that bring Apple Maps into TouchDesigner. No API key, no account
 | **MapKit LookAround** | TOP | Street-level photography you can stand in and look around |
 | **MapKit Search** | DAT | Search / geocode / reverse geocode / routes / Look Around coverage |
 
-> **Status: experimental.** The two TOPs require **Screen Recording permission** (the same TCC
-> grant as the Screen Capture TOP) — see "How it works" for why. They can run side by side —
-> each owns its window.
+> The two TOPs require **Screen Recording permission** (the same TCC grant as the Screen Capture
+> TOP) — see "How it works" for why. They can run side by side — each owns its window.
+> The Look Around view direction relies on a **private API**; that one part may break on an OS
+> update (everything else is public API).
 
 ## MapKit MapView TOP (the 3D map)
 
@@ -190,8 +191,9 @@ Apple マップを TouchDesigner へ持ち込む3つのオペレータ。API キ
 | **MapKit LookAround** | TOP | 街並みの実写。中に立って見回せる |
 | **MapKit Search** | DAT | 検索 / ジオコーディング / 逆ジオ / 経路 / Look Around カバレッジ |
 
-> **状態: experimental(実験中)。** 2つの TOP は**画面収録の許可**(Screen Capture TOP と
-> 同じ TCC)が要る — 理由は「仕組み」を参照。それぞれ自分のウインドウを持つので**同時に使える**。
+> 2つの TOP は**画面収録の許可**(Screen Capture TOP と同じ TCC)が要る — 理由は「仕組み」を参照。
+> それぞれ自分のウインドウを持つので**同時に使える**。
+> Look Around の視線制御だけは**私有 API** に依存しており、OS 更新で壊れうる(他は全て公開 API)。
 
 ## MapKit MapView TOP(3D地図)
 

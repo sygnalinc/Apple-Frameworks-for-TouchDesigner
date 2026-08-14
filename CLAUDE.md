@@ -6920,3 +6920,20 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   走り始めの 1〜5秒だけ開くまで粘り、その後は二度と触らない(手で閉じたら閉じたまま)
 - 罠を skill(pitfalls.md)に「専用スレッド+ランループ」「ウインドウを持つ TOP」として追記。
   CoreMIDI README にもクラッシュの経緯を残した
+
+### 2026-08-14 MapKit 3op と CoreMIDI 2op を released へ + MapKit のデモGIF追加
+
+- ユーザー指示で **MapKit MapView / MapKit LookAround / MapKit Search / CoreMIDI Out / CoreMIDI In**
+  を `PLUGINS.tsv` で released に。ルート README(英日)の「実験中」表から本表(System /
+  Devices / Network の並び)へ5行を移動し、MapKit README の状態ブロックも released 向けに書き換え
+  (画面収録の許可が要ることと、**Look Around の視線制御だけ私有 API 依存**である点は残した)
+- **昇格前に機械チェック**: released 60フォルダすべてに build 成果物があること(=「released なのに
+  ビルドされていない」で配布から黙って落ちる事故の予防)、英日の実験中表が完全一致すること、
+  5op が実験中表から消えたことを assert で確認。バンドル合計 65
+- **デモGIF追加**(`docs/demo/mapkit.gif`・1.28MB): ユーザーが `demo_capture/MapKit.mp4`
+  (98秒)を追加。コンタクトシート(`fps=1,tile=`)で中身を俯瞰して**駅名ラベルが一番よく見える
+  ワイドの区間(77秒から4秒)**を選んだ。衛星写真は全画素が毎フレーム変わる GIF の最悪ケースなので、
+  8fps + 強めの hqdn3d で 64色を維持(ラベルが潰れると意味が無いため色数は削らない)。
+  他候補は 2.1〜3.0MB になった。README(英日)のデモ表の空きセルへ
+- **踏んだ罠(再発)**: zsh で `"max_colors=$4:stats_mode=..."` と書くと **`$4:s` が履歴修飾子**と
+  解釈されて `64teuse=dither=none` のような文字列になる。`${4}` と波括弧で囲む(CLAUDE.md 既出)

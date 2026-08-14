@@ -48,8 +48,8 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | **[CoreText](CoreText/)** — vertical Japanese typesetting, revealed a character at a time | **[ImagePlayground](ImagePlayground/)** — a face photo (left) turned into an illustration (right) |
 | <img src="docs/demo/llmafm-chat.gif" width="400" alt="LLM AFM"> | <img src="docs/demo/gamecontroller.gif" width="400" alt="GameController"> |
 | **[LLM AFM](LLMAFM/)** — Apple Intelligence's on-device model (~3B) answering in English and Japanese at once. Note the wrong answer: mixing red and blue gives *purple*, but the Japanese side says *blue* | **[GameController](GameController/)** — flying a camera through a city with a gamepad. The face buttons switch the scene: wireframe, colour palette, and building heights driven by audio |
-| <img src="docs/demo/ciglass.gif" width="400" alt="CI Glass"> | |
-| **[CI Glass](CoreImageGlass/)** — macOS's Liquid Glass rebuilt in Core Image. The border refracts the street behind it and the rim lights up along the letterforms | |
+| <img src="docs/demo/ciglass.gif" width="400" alt="CI Glass"> | <img src="docs/demo/mapkit.gif" width="400" alt="MapKit"> |
+| **[CI Glass](CoreImageGlass/)** — macOS's Liquid Glass rebuilt in Core Image. The border refracts the street behind it and the rim lights up along the letterforms | **[MapKit](MapKit/)** — flying the Shinkansen route from Tokyo to Shin-Osaka over live satellite 3D. Station names are Text SOP geometry projected by the map's own camera, and the inset is Look Around at the station just visited |
 
 ## Table of contents
 
@@ -175,6 +175,11 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | [CoreWLAN](CoreWLAN/) | CHOP | **Live Wi-Fi metrics** (CoreWLAN) — RSSI / noise / SNR / TX rate / channel |
 | [CoreWLAN Scan](CoreWLANScan/) | CHOP | **Scan nearby Wi-Fi → per-channel congestion / AP count / max RSSI** and the least-congested channel (2.4/5GHz). Optional **SSID names via a bundled Location-authorized helper app** (Info DAT) |
 | [Network Discovery](NetworkDiscovery/) | DAT | **Discover all LAN devices**: Bonjour services + **active IPv4 scan** (ARP sweep → MAC / hostname of every host, even non-Bonjour); merged IP / MAC / **vendor (OUI)** / DNS name / mDNS name / **SMB name & domain (NetBIOS)** / port / TXT (LanScan Pro-like) |
+| [MapKit MapView](MapKit/) | TOP | **Apple Maps rendered live** — fly through the 3D map (satellite / hybrid, realistic 3D) at 57fps. Camera is two-way with the on-screen window; **Markers DAT** projects lat/lon to screen u/v so you can overlay your own geometry exactly on the map |
+| [MapKit LookAround](MapKit/) | TOP | **Look Around street-level imagery**, live. Heading / Look Pitch drive the view direction (two-way with drag) |
+| [MapKit Search](MapKit/) | DAT | **Search / geocode / reverse geocode / routes** (walking, driving, transit — with the full polyline) and **Look Around coverage** scanning |
+| [CoreMIDI Out](CoreMIDI/) | CHOP | **MIDI out with hot-plug and device identity** (UniqueID survives re-plugging; manufacturer / model / online on its Info DAT). Send notes / CC from the parameters or from CHOP channels, plus **DAW transport (MMC) and sync — MIDI Clock or MTC** with per-packet timestamps |
+| [CoreMIDI In](CoreMIDI/) | CHOP | **MIDI in that builds its own channels**: keys / pads / knobs appear as `ch1n60` / `ch1c74` as they arrive (no need to list them first). Also turns **MIDI Clock into BPM / beat** and receives **MTC** |
 
 
 ## Experimental plugins (not in the release)
@@ -185,12 +190,7 @@ and are unsupported. The source is here so you can build and try them yourself
 
 | Plugin | Family | Status |
 |---|---|---|
-| [CoreMIDI Out](CoreMIDI/) | CHOP | experimental |
-| [CoreMIDI In](CoreMIDI/) | CHOP | experimental |
 | [AVF Camera](AVFoundationCamera/) | TOP | experimental |
-| [MapKit MapView](MapKit/) | TOP | experimental |
-| [MapKit LookAround](MapKit/) | TOP | experimental |
-| [MapKit Search](MapKit/) | DAT | experimental |
 | [AVAudio Mixer CHOP](AVAudioMixer/) | CHOP | experimental |
 | [AVAudio Spatial CHOP](AVAudioSpatial/) | CHOP | experimental |
 | [AudioToolbox Mix CHOP](AudioToolboxMix/) | CHOP | experimental |
