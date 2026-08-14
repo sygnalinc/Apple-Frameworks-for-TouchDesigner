@@ -1,5 +1,5 @@
-// MapKit TOP — 常駐 MKMapView を ScreenCaptureKit で取り込み、3D地図の中を
-// リアルタイムに飛び回れるようにする。街並みの実写は MapKit Look Around TOP(別op)。
+// MapKit MapView TOP — 常駐 MKMapView を ScreenCaptureKit で取り込み、3D地図の中を
+// リアルタイムに飛び回れるようにする。街並みの実写は MapKit LookAround TOP(別op)。
 //
 // **なぜこの構成か(実測の結論)**:
 // - MKMapSnapshotter は1回あたり約0.9秒の固定費(32x32でも885ms)。並列にしても
@@ -32,7 +32,7 @@
 #include "MapKitShared.h"
 using namespace TD;
 
-namespace { class MapKitTOP; }
+namespace { class MapKitMapViewTOP; }
 
 // ボーダーレスウインドウは既定で key になれず、マウスドラッグ系の操作が届かない。
 // クラス名はバンドル固有(MapKitShared.h 冒頭の注意を参照)
@@ -74,16 +74,16 @@ struct Marker {
     bool visible = false;
 };
 
-class MapKitTOP final : public TOP_CPlusPlusBase {
+class MapKitMapViewTOP final : public TOP_CPlusPlusBase {
 public:
-    MapKitTOP(const OP_NodeInfo* ni, TOP_Context* c)
+    MapKitMapViewTOP(const OP_NodeInfo* ni, TOP_Context* c)
         : myNode(ni), myContext(c), myAlive(std::make_shared<std::atomic<bool>>(true))
     {
         myOutput = [TDMapStreamOutput new];
         myOutput.owner = this;
     }
 
-    ~MapKitTOP() override
+    ~MapKitMapViewTOP() override
     {
         *myAlive = false;
         myOutput.owner = nullptr;
@@ -139,8 +139,13 @@ public:
                          in->getParDouble("Pitch"), in->getParDouble("Heading"));
 
         // --- カメラは双方向 ---
+        // Window Drives Camera をオフにすると、ウインドウを表示したまま
+        // パラメータがマスターのままになる(スクリプト駆動の飛行を見せながら
+        // 衛星タイルを読み込ませる用途。imagery はウインドウが見えていないと
+        // ロードされない — 実測)
         if (active && myWindowReady.load()) {
-            if (show) {
+            const bool winMaster = show && in->getParInt("Windowcamera") != 0;
+            if (winMaster) {
                 // メインスレッドにカメラを読ませ、cook はその写しを見る
                 MKMapView* mv = myMapView;
                 auto alive = myAlive;
@@ -334,6 +339,10 @@ public:
             m->appendDAT(p);
         }
         { OP_NumericParameter p("Showwindow"); p.label = "Show Window"; p.page = P; m->appendToggle(p); }
+        // オン(既定): Show Window 中は手で決めたカメラがパラメータへ書き戻る。
+        // オフ: ウインドウは表示するがカメラはパラメータが決める(式/CHOP駆動の飛行用)
+        { OP_NumericParameter p("Windowcamera"); p.label = "Window Drives Camera"; p.page = P;
+          p.defaultValues[0] = 1; m->appendToggle(p); }
         { OP_NumericParameter p("Restart"); p.label = "Restart"; p.page = P; m->appendPulse(p); }
     }
 
@@ -524,7 +533,7 @@ private:
                             backing:NSBackingStoreBuffered
                               defer:NO];
             win.releasedWhenClosed = NO;
-            win.title = @"MapKit";
+            win.title = @"MapKit MapView";
             // ドラッグ用のバーは**別ウインドウ**(親子接続もしない)。タイトル付き・
             // 親子接続のウインドウは macOS 26 が角を丸め、丸角が取り込みに写る(実測)
             NSWindow* bar = [[NSWindow alloc]
@@ -534,7 +543,7 @@ private:
                             backing:NSBackingStoreBuffered
                               defer:NO];
             bar.releasedWhenClosed = NO;
-            bar.title = @"MapKit";
+            bar.title = @"MapKit MapView";
             // 閉じるボタンは出す(押すと Show Window がオフになる。delegate 参照)
             [[bar standardWindowButton:NSWindowMiniaturizeButton] setHidden:YES];
             [[bar standardWindowButton:NSWindowZoomButton] setHidden:YES];
@@ -698,7 +707,7 @@ private:
                 completionHandler:^(SCShareableContent* c, NSError* e) {
                 TDMapStreamOutput* o = weakOut;
                 if (!o || !o.owner || !alive->load()) return;
-                auto* owner = static_cast<MapKitTOP*>(o.owner);
+                auto* owner = static_cast<MapKitMapViewTOP*>(o.owner);
                 if (e || !c) { owner->streamError(e); owner->myStarting = false; return; }
                 SCWindow* target = nil;
                 for (SCWindow* x in c.windows)
@@ -729,7 +738,7 @@ private:
                 [st startCaptureWithCompletionHandler:^(NSError* se) {
                     TDMapStreamOutput* o2 = weakOut;
                     if (!o2 || !o2.owner) return;
-                    auto* ow = static_cast<MapKitTOP*>(o2.owner);
+                    auto* ow = static_cast<MapKitMapViewTOP*>(o2.owner);
                     ow->myStarting = false;
                     if (se) ow->streamError(se);
                     else ow->myRunning = true;
@@ -775,11 +784,11 @@ private:
 - (void)stream:(SCStream*)s didOutputSampleBuffer:(CMSampleBufferRef)b ofType:(SCStreamOutputType)t
 {
     if (t == SCStreamOutputTypeScreen && self.owner)
-        static_cast<MapKitTOP*>(self.owner)->receive(b);
+        static_cast<MapKitMapViewTOP*>(self.owner)->receive(b);
 }
 - (void)stream:(SCStream*)s didStopWithError:(NSError*)e
 {
-    if (self.owner) static_cast<MapKitTOP*>(self.owner)->streamError(e);
+    if (self.owner) static_cast<MapKitMapViewTOP*>(self.owner)->streamError(e);
 }
 @end
 
@@ -789,8 +798,8 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i)
 {
     if (!i->setAPIVersion(TOPCPlusPlusAPIVersion)) return;
     i->executeMode = TOP_ExecuteMode::CPUMem;
-    i->customOPInfo.opType->setString("Mapkit");
-    i->customOPInfo.opLabel->setString("MapKit");
+    i->customOPInfo.opType->setString("Mapkitmapview");
+    i->customOPInfo.opLabel->setString("MapKit MapView");
     i->customOPInfo.opIcon->setString("MPK");
     if (i->customOPInfo.opHelpURL)
         i->customOPInfo.opHelpURL->setString(
@@ -805,12 +814,12 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i)
 
 DLLEXPORT TOP_CPlusPlusBase* CreateTOPInstance(const OP_NodeInfo* i, TOP_Context* c)
 {
-    return new MapKitTOP(i, c);
+    return new MapKitMapViewTOP(i, c);
 }
 
 DLLEXPORT void DestroyTOPInstance(TOP_CPlusPlusBase* i, TOP_Context*)
 {
-    delete static_cast<MapKitTOP*>(i);
+    delete static_cast<MapKitMapViewTOP*>(i);
 }
 
 }

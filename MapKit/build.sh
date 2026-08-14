@@ -1,5 +1,5 @@
 #!/bin/zsh
-# 1フォルダ3バンドル(MapKitTOP=地図 / MapKitLookAroundTOP=街並み実写 / MapKitDAT=検索系)。
+# 1フォルダ3バンドル(MapKitMapViewTOP=地図 / MapKitLookAroundTOP=街並み実写 / MapKitSearchDAT=検索系)。
 # 共通ヘルパは rm -rf build を毎回行うため複数回呼べない → build_one を手組み(Cinematic と同型)
 set -e
 cd "$(dirname "$0")"
@@ -40,10 +40,10 @@ PLIST
   echo "built: $(pwd)/build/$NAME.plugin"
 }
 
-build_one MapKitTOP MapKitTOP.mm mapkit-top "$SDK_TOP" \
+build_one MapKitMapViewTOP MapKitMapViewTOP.mm mapkit-mapview-top "$SDK_TOP" \
   MapKit AppKit CoreLocation CoreGraphics ScreenCaptureKit CoreMedia CoreVideo CoreText
 build_one MapKitLookAroundTOP MapKitLookAroundTOP.mm mapkit-lookaround-top "$SDK_TOP" \
   MapKit AppKit CoreLocation CoreGraphics ScreenCaptureKit CoreMedia CoreVideo CoreText
-build_one MapKitDAT MapKitDAT.mm mapkit-dat "$SDK_DAT" \
+build_one MapKitSearchDAT MapKitSearchDAT.mm mapkit-search-dat "$SDK_DAT" \
   MapKit AppKit CoreLocation
 td_stamp_all

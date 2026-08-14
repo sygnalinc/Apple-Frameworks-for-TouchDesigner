@@ -188,9 +188,9 @@ and are unsupported. The source is here so you can build and try them yourself
 | [CoreMIDI Out](CoreMIDI/) | CHOP | experimental |
 | [CoreMIDI In](CoreMIDI/) | CHOP | experimental |
 | [AVF Camera](AVFoundationCamera/) | TOP | experimental |
-| [MapKit](MapKit/) | TOP | experimental |
-| [MapKit Look Around](MapKit/) | TOP | experimental |
-| [MapKit DAT](MapKit/) | DAT | experimental |
+| [MapKit MapView](MapKit/) | TOP | experimental |
+| [MapKit LookAround](MapKit/) | TOP | experimental |
+| [MapKit Search](MapKit/) | DAT | experimental |
 | [AVAudio Mixer CHOP](AVAudioMixer/) | CHOP | experimental |
 | [AVAudio Spatial CHOP](AVAudioSpatial/) | CHOP | experimental |
 | [AudioToolbox Mix CHOP](AudioToolboxMix/) | CHOP | experimental |

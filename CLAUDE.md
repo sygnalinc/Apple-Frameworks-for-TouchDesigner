@@ -6838,3 +6838,32 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   MapKit の note から Look Around モードの記述を除去。ルートREADME(英日)の実験中の表へ
   Look Around 行を追加(ついでに **AVF Camera の行が重複していたのを削除**)。
   MapKit/README.md は3op構成に全面再編(英日)
+
+### 2026-08-14 MapKit を MapView / LookAround / Search に改称 + 新幹線デモを作成
+
+- ユーザー指示で3op を改称: **MapKit MapView**(TOP・opType `Mapkitmapview`)/
+  **MapKit LookAround**(TOP・`Mapkitlookaround` 据え置き)/ **MapKit Search**(DAT・
+  `Mapkitsearch`・icon MKS)。ファイルも MapKitMapViewTOP.mm / MapKitSearchDAT.mm へ git mv
+- **貼り替え手順**: 新旧バンドルを一時併存させて TD 再起動 → 既存ノードを新 opType へ
+  `copyParameters` + 配線復元で置換 → 旧バンドル撤去。opType が変わる改称ではこれが安全
+- **demo を全面的に作り直し**(ユーザー要望): `/project1/MapKit` = 東海道新幹線(のぞみ停車駅)を
+  東京→新大阪へ飛ぶ。衛星3D、駅ごとに3秒停車(停車中はゆっくり旋回)、移動は smoothstep +
+  高度アーク、Text SOP の英語駅名が空中に浮き(Markers DAT の u/v/visible を式で読み
+  Ortho Width=1 で重ねる)、右下 PIP に**到着駅の最寄り Look Around**(Heading の式で回転)
+- **Look Around カバレッジは事前に実測**して表に焼いた(`la_lat/la_lon`)。単体プローブで
+  中心→100/200/300/450m のリング×8方位を探索。東京駅だけ 100m 北で当たり、他5駅は中心で当たる
+
+**踏んだ罠(いずれも実測で切り分け)**
+- **衛星/ハイブリッドのタイルはウインドウが見えていないとロードされない**(標準タイルは
+  隠したままロードされる)。輝度で確認: standard 236 / satellite 50 → ウインドウ表示で 123。
+  → **`Window Drives Camera` トグルを新設**(既定オン=従来動作。オフにすると
+  ウインドウを表示したままパラメータがマスター)。デモは Show Window=On + これ=Off で動かす
+- **Geo の式で `../info` は1つ上に行き過ぎる**。Geometry COMP の中からではなく
+  COMP 自身のパラメータに書く式なので、兄弟は `op('info')`。`../` だと None を購読して
+  `TypeError: 'NoneType' object is not subscriptable` になり、**パラメータは valid=True のまま
+  ラベルだけ出ない**(エラー表示が出ないので気づきにくい)。material も同様に `lblmat`
+- **MapKit Search の非同期応答は1つ前のクエリの結果のことがある**。停車中に次の駅を
+  ジオコードして表を更新する設計で、緩い妥当性判定(0.7度)だと**隣の駅や別都市の座標を
+  書き込む**(新横浜に名古屋市、新大阪に京都市役所が入った)。0.05度(約5km)に絞って解決
+- MCP の `run` は exec スコープ分離があるので、**入れ子関数も go() の中に定義する**
+  (トップレベルに置くと `NameError`)

@@ -31,15 +31,15 @@ static std::string fmt(double v, int prec = 7)
     return b;
 }
 
-class MapKitDAT final : public DAT_CPlusPlusBase {
+class MapKitSearchDAT final : public DAT_CPlusPlusBase {
 public:
-    MapKitDAT(const OP_NodeInfo*)
+    MapKitSearchDAT(const OP_NodeInfo*)
         : myAlive(std::make_shared<std::atomic<bool>>(true))
     {
         myGeocoder = [[CLGeocoder alloc] init];
     }
 
-    ~MapKitDAT() override { *myAlive = false; }
+    ~MapKitSearchDAT() override { *myAlive = false; }
 
     void getGeneralInfo(DAT_GeneralInfo* g, const OP_Inputs*, void*) override
     {
@@ -465,9 +465,9 @@ extern "C" {
 DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* i)
 {
     if (!i->setAPIVersion(DATCPlusPlusAPIVersion)) return;
-    i->customOPInfo.opType->setString("Mapkit");
-    i->customOPInfo.opLabel->setString("MapKit");
-    i->customOPInfo.opIcon->setString("MPK");
+    i->customOPInfo.opType->setString("Mapkitsearch");
+    i->customOPInfo.opLabel->setString("MapKit Search");
+    i->customOPInfo.opIcon->setString("MKS");
     if (i->customOPInfo.opHelpURL)
         i->customOPInfo.opHelpURL->setString(
             "https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/MapKit/README.md");
@@ -480,12 +480,12 @@ DLLEXPORT void FillDATPluginInfo(DAT_PluginInfo* i)
 
 DLLEXPORT DAT_CPlusPlusBase* CreateDATInstance(const OP_NodeInfo* i)
 {
-    return new MapKitDAT(i);
+    return new MapKitSearchDAT(i);
 }
 
 DLLEXPORT void DestroyDATInstance(DAT_CPlusPlusBase* i)
 {
-    delete static_cast<MapKitDAT*>(i);
+    delete static_cast<MapKitSearchDAT*>(i);
 }
 
 }

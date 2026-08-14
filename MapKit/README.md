@@ -8,15 +8,15 @@ Three operators that bring Apple Maps into TouchDesigner. No API key, no account
 
 | Op | Family | What it is |
 |---|---|---|
-| **MapKit** | TOP | The 3D map, rendered **live** — fly through it |
-| **MapKit Look Around** | TOP | Street-level photography you can stand in and look around |
-| **MapKit** | DAT | Search / geocode / reverse geocode / routes / Look Around coverage |
+| **MapKit MapView** | TOP | The 3D map, rendered **live** — fly through it |
+| **MapKit LookAround** | TOP | Street-level photography you can stand in and look around |
+| **MapKit Search** | DAT | Search / geocode / reverse geocode / routes / Look Around coverage |
 
 > **Status: experimental.** The two TOPs require **Screen Recording permission** (the same TCC
 > grant as the Screen Capture TOP) — see "How it works" for why. They can run side by side —
 > each owns its window.
 
-## MapKit TOP (the 3D map)
+## MapKit MapView TOP (the 3D map)
 
 ### What it does (measured on M2 / macOS 26.6)
 
@@ -94,13 +94,19 @@ so the default world view never leaks back into them.
 | Capture FPS | ScreenCaptureKit frame-rate ceiling. Idle maps deliver frames only on change |
 | Markers DAT | Table of lat/lon points to project into screen space (see above) |
 | Show Window | Interactive mode (see above) |
+| Window Drives Camera | On (default): hand-framing writes back to the parameters. Off: the window is visible but the parameters stay master — for script-driven flights that need imagery tiles (see below) |
 | Restart | Rebuild the capture stream |
+
+**Imagery (Satellite / Hybrid) tiles only load while the window is actually visible** — the
+hidden 1-pt sliver is enough for Standard/Muted tiles but not for imagery (measured: standard
+loads hidden, satellite stays on the dark placeholder). For satellite flights, turn
+**Show Window** on and **Window Drives Camera** off.
 
 Resolution comes from the **Common** page (`Use Input` falls back to 1280×720).
 
 Info CHOP: `executes / frames / running / window_ready / width / height / capture_fps`.
 
-## MapKit Look Around TOP (street-level imagery)
+## MapKit LookAround TOP (street-level imagery)
 
 Live Look Around scene at the coordinate (Shibuya Crossing measured). Same window + SCK capture
 foundation as the map TOP, including the drag bar, close button and the hidden 1-pt sliver.
@@ -130,10 +136,10 @@ patchy (Shibuya Crossing yes, Tokyo Station's station building no) and there is 
 so check it before relying on the image, or scan ahead with the DAT's **Look Around Coverage**
 mode.
 
-## MapKit DAT
+## MapKit Search DAT
 
-A second op in this folder, **MapKit** (DAT family — the opType repeats across families like the
-CoreML trio), provides the data side. Four modes, all measured working:
+A second op in this folder, **MapKit Search** (DAT, opType `Mapkitsearch`), provides the data
+side. Four modes, all measured working:
 
 | Mode | In → Out |
 |---|---|
@@ -173,14 +179,14 @@ Apple マップを TouchDesigner へ持ち込む3つのオペレータ。API キ
 
 | op | Family | 役割 |
 |---|---|---|
-| **MapKit** | TOP | 3D地図を**ライブ**でレンダ — 中を飛べる |
-| **MapKit Look Around** | TOP | 街並みの実写。中に立って見回せる |
-| **MapKit** | DAT | 検索 / ジオコーディング / 逆ジオ / 経路 / Look Around カバレッジ |
+| **MapKit MapView** | TOP | 3D地図を**ライブ**でレンダ — 中を飛べる |
+| **MapKit LookAround** | TOP | 街並みの実写。中に立って見回せる |
+| **MapKit Search** | DAT | 検索 / ジオコーディング / 逆ジオ / 経路 / Look Around カバレッジ |
 
 > **状態: experimental(実験中)。** 2つの TOP は**画面収録の許可**(Screen Capture TOP と
 > 同じ TCC)が要る — 理由は「仕組み」を参照。それぞれ自分のウインドウを持つので**同時に使える**。
 
-## MapKit TOP(3D地図)
+## MapKit MapView TOP(3D地図)
 
 ### できること(M2 / macOS 26.6 で実測)
 
@@ -254,13 +260,18 @@ Show Window オンのあいだは**ウインドウがマスター**: 手で決�
 | Capture FPS | ScreenCaptureKit のフレームレート上限。静止中は変化時しかフレームが来ない |
 | Markers DAT | 画面座標へ射影する緯度経度の表(上記) |
 | Show Window | 対話モード(上記) |
+| Window Drives Camera | オン(既定): 手で決めたカメラがパラメータへ書き戻る。オフ: ウインドウは表示したままパラメータがマスター — 衛星タイルが要るスクリプト駆動の飛行用(下記) |
 | Restart | 取り込みストリームを張り直す |
+
+**衛星/ハイブリッドのタイルはウインドウが実際に見えていないとロードされない**(実測: 隠しの
+1pt スライバーで標準タイルはロードされるが、衛星は暗いプレースホルダのまま)。衛星で飛ぶときは
+**Show Window** をオンにし **Window Drives Camera** をオフにする。
 
 解像度は **Common** ページから(`Use Input` は 1280×720 にフォールバック)。
 
 Info CHOP: `executes / frames / running / window_ready / width / height / capture_fps`。
 
-## MapKit Look Around TOP(街並みの実写)
+## MapKit LookAround TOP(街並みの実写)
 
 座標の Look Around シーンをライブ表示する(渋谷スクランブルで実測)。ウインドウ + SCK 取り込みの
 土台は地図 TOP と同じ(バー・閉じるボタン・右下 1pt の退避も同じ)。
@@ -288,10 +299,10 @@ Info CHOP には `available` が加わる: シーンがその座標にあると�
 (渋谷スクランブル=あり / 東京駅の駅舎=なし)で問い合わせ API も無いので、画に頼る前に
 これを見るか、DAT の **Look Around Coverage** モードで先に走査する。
 
-## MapKit DAT
+## MapKit Search DAT
 
-このフォルダのもう1つのop、**MapKit**(DAT ファミリー。opType は CoreML 三兄弟と同じく
-ファミリー間で重複可)がデータ側を担当する。4モード、すべて実測済み:
+このフォルダのもう1つのop、**MapKit Search**(DAT・opType `Mapkitsearch`)がデータ側を
+担当する。4モード、すべて実測済み:
 
 | モード | 入力 → 出力 |
 |---|---|

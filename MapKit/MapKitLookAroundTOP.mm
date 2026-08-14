@@ -1,4 +1,4 @@
-// MapKit Look Around TOP — Apple マップの Look Around(街並みの実写)をライブで TOP に出す。
+// MapKit LookAround TOP — Apple マップの Look Around(街並みの実写)をライブで TOP に出す。
 // MapKit TOP(地図)と同じ土台: 常駐ビューをプラグイン所有のウインドウに置き、
 // ScreenCaptureKit の initWithDesktopIndependentWindow: で取り込む(理由は MapKitTOP.mm 冒頭)。
 //
@@ -350,7 +350,7 @@ private:
                             backing:NSBackingStoreBuffered
                               defer:NO];
             win.releasedWhenClosed = NO;
-            win.title = @"MapKit Look Around";
+            win.title = @"MapKit LookAround";
             // ドラッグ用のバーは**別ウインドウ**(親子接続もしない)。タイトル付き・
             // 親子接続のウインドウは macOS 26 が角を丸め、丸角が取り込みに写る(実測)
             NSWindow* bar = [[NSWindow alloc]
@@ -360,7 +360,7 @@ private:
                             backing:NSBackingStoreBuffered
                               defer:NO];
             bar.releasedWhenClosed = NO;
-            bar.title = @"MapKit Look Around";
+            bar.title = @"MapKit LookAround";
             [[bar standardWindowButton:NSWindowMiniaturizeButton] setHidden:YES];
             [[bar standardWindowButton:NSWindowZoomButton] setHidden:YES];
             TDMKLABarDelegate* del = [TDMKLABarDelegate new];
@@ -573,7 +573,7 @@ DLLEXPORT void FillTOPPluginInfo(TOP_PluginInfo* i)
     if (!i->setAPIVersion(TOPCPlusPlusAPIVersion)) return;
     i->executeMode = TOP_ExecuteMode::CPUMem;
     i->customOPInfo.opType->setString("Mapkitlookaround");
-    i->customOPInfo.opLabel->setString("MapKit Look Around");
+    i->customOPInfo.opLabel->setString("MapKit LookAround");
     i->customOPInfo.opIcon->setString("MLA");
     if (i->customOPInfo.opHelpURL)
         i->customOPInfo.opHelpURL->setString(
