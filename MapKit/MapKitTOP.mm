@@ -11,6 +11,7 @@
 #import <Foundation/Foundation.h>
 #import <AppKit/AppKit.h>
 #import <MapKit/MapKit.h>
+#import <CoreText/CoreText.h>
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -28,6 +29,8 @@ struct Settings {
     double lat = 35.6595, lon = 139.7005;   // 既定は渋谷スクランブル(Look Around のカバー内)
     double span = 1200.0, pitch = 0.0, heading = 0.0;
     bool traffic = false, poi = true, dark = false;
+    bool attribution = true;                 // Apple の規約上、表示するなら帰属表示が要る
+    std::string attrPos = "bottomleft";
     int w = 1280, h = 720;
 
     std::string signature() const
@@ -36,7 +39,7 @@ struct Settings {
         snprintf(b, sizeof b, "%s|%s|%s|%.7f|%.7f|%.1f|%.1f|%.1f|%d%d%d|%d|%d",
                  mode.c_str(), style.c_str(), elevation.c_str(), lat, lon, span, pitch, heading,
                  traffic, poi, dark, w, h);
-        return b;
+        return std::string(b) + "|" + (attribution ? attrPos : "off");
     }
 };
 
@@ -49,7 +52,41 @@ struct Result {
 
 // NSImage → BGRA。**素直に描くと TD の表示で上下が逆になる**(実機で確認)ので、
 // CTM を反転させてから描き、バッファを TD が期待する並びで作る
-static bool imageToBGRA(NSImage* img, Result& r)
+// 「 Apple Maps」を隅に焼き込む。**画像用に掛けた反転と合わさって、この文脈では
+// y は下から上へ増える**(実機で確認。反転を打ち消すと逆に鏡像になった)
+static void drawAttribution(CGContextRef ctx, size_t w, size_t h, const std::string& pos)
+{
+    NSString* text = @"\uF8FF Apple Maps";     // U+F8FF = システムフォントの Apple ロゴ
+    const CGFloat fontSize = std::max<CGFloat>(11.0, (CGFloat)h * 0.018);
+    CTFontRef font = CTFontCreateUIFontForLanguage(kCTFontUIFontSystem, fontSize, NULL);
+    NSDictionary* attrs = @{(id)kCTFontAttributeName: (__bridge id)font,
+                            (id)kCTForegroundColorAttributeName:
+                                (id)[NSColor colorWithWhite:1.0 alpha:0.95].CGColor};
+    CTLineRef line = CTLineCreateWithAttributedString(
+        (__bridge CFAttributedStringRef)[[NSAttributedString alloc] initWithString:text
+                                                                       attributes:attrs]);
+    CGFloat asc = 0, desc = 0;
+    const double tw = CTLineGetTypographicBounds(line, &asc, &desc, NULL);
+    const CGFloat pad = fontSize * 0.5, m = fontSize * 0.7;
+    const CGFloat bw = (CGFloat)tw + pad * 2, bh = asc + desc + pad * 1.4;
+
+    const bool right = pos.find("right") != std::string::npos;
+    const bool top   = pos.find("top") != std::string::npos;
+    const CGFloat bx = right ? (CGFloat)w - m - bw : m;
+    const CGFloat by = top ? (CGFloat)h - m - bh : m;   // y は下から上へ
+
+    CGContextSaveGState(ctx);
+    CGContextSetRGBFillColor(ctx, 0, 0, 0, 0.45);          // 下地(どんな地図でも読めるように)
+    CGPathRef bg = CGPathCreateWithRoundedRect(CGRectMake(bx, by, bw, bh), 4, 4, NULL);
+    CGContextAddPath(ctx, bg); CGContextFillPath(ctx); CGPathRelease(bg);
+    CGContextSetTextPosition(ctx, bx + pad, by + pad * 0.7 + desc);
+    CTLineDraw(line, ctx);
+    CGContextRestoreGState(ctx);
+    CFRelease(line);
+    CFRelease(font);
+}
+
+static bool imageToBGRA(NSImage* img, Result& r, bool attribution, const std::string& attrPos)
 {
     if (!img) return false;
     CGImageRef cg = [img CGImageForProposedRect:NULL context:nil hints:nil];
@@ -67,6 +104,7 @@ static bool imageToBGRA(NSImage* img, Result& r)
     CGContextTranslateCTM(ctx, 0, (CGFloat)h);
     CGContextScaleCTM(ctx, 1, -1);
     CGContextDrawImage(ctx, CGRectMake(0, 0, (CGFloat)w, (CGFloat)h), cg);
+    if (attribution) drawAttribution(ctx, w, h, attrPos);
     CGContextRelease(ctx);
     return true;
 }
@@ -88,6 +126,7 @@ public:
         myExec++;
         Settings s = readSettings(out, in);
 
+        { std::lock_guard<std::mutex> l(myMutex); myAttr = s.attribution; myAttrPos = s.attrPos; }
         const std::string sig = s.signature();
         if (sig != mySig || myReload.exchange(false)) {
             mySig = sig;
@@ -149,6 +188,16 @@ public:
         { OP_NumericParameter p("Traffic"); p.label = "Show Traffic";           p.page = P; m->appendToggle(p); }
         { OP_NumericParameter p("Poi");     p.label = "Show Points Of Interest"; p.page = P; p.defaultValues[0] = 1; m->appendToggle(p); }
         { OP_NumericParameter p("Dark");    p.label = "Dark Appearance";        p.page = P; m->appendToggle(p); }
+        // 既定オン。Apple の規約は、人に見せる地図に帰属表示を添えることを求めている
+        { OP_NumericParameter p("Attribution"); p.label = "Show Attribution"; p.page = P;
+          p.defaultValues[0] = 1; m->appendToggle(p); }
+        {
+            OP_StringParameter p("Attributionpos");
+            p.label = "Attribution Position"; p.page = P; p.defaultValue = "bottomleft";
+            const char* n[] = {"bottomleft", "bottomright", "topleft", "topright"};
+            const char* l[] = {"Bottom Left", "Bottom Right", "Top Left", "Top Right"};
+            m->appendMenu(p, 4, n, l);
+        }
         { OP_NumericParameter p("Reload");  p.label = "Reload";                 p.page = P; m->appendPulse(p); }
     }
 
@@ -205,6 +254,8 @@ private:
         s.traffic = in->getParInt("Traffic") != 0;
         s.poi = in->getParInt("Poi") != 0;
         s.dark = in->getParInt("Dark") != 0;
+        s.attribution = in->getParInt("Attribution") != 0;
+        s.attrPos = str("Attributionpos", "bottomleft");
         // 解像度は他のTOPと同じく Common ページから。入力を持たないので
         // 既定の "Use Input"(127x127)は無意味 → 1280x720 を既定にする
         const char* om = in->getParString("outputresolution");
@@ -250,13 +301,22 @@ private:
     void finish(std::shared_ptr<std::atomic<bool>> alive, NSImage* img,
                 bool available, NSString* err)
     {
+        std::string attrPos;
+        bool attribution;
+        { std::lock_guard<std::mutex> l(myMutex); attribution = myAttr; attrPos = myAttrPos; }
+        finishWith(alive, img, available, err, attribution, attrPos);
+    }
+
+    void finishWith(std::shared_ptr<std::atomic<bool>> alive, NSImage* img, bool available,
+                    NSString* err, bool attribution, std::string attrPos)
+    {
         if (!alive->load()) return;
         auto* self = this;
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
             if (!alive->load()) return;
             Result r;
             r.available = available;
-            const bool ok = imageToBGRA(img, r);
+            const bool ok = imageToBGRA(img, r, attribution, attrPos);
             {
                 std::lock_guard<std::mutex> l(self->myMutex);
                 if (ok) { r.serial = ++self->mySerial; self->myResult = std::move(r); }
@@ -349,7 +409,8 @@ private:
     std::mutex myMutex;
     Result myResult;
     Settings myQueuedSettings;
-    std::string mySig, myWarning;
+    std::string mySig, myWarning, myAttrPos = "bottomleft";
+    bool myAttr = true;
     uint64_t mySerial = 0;
     uint32_t myOutW = 0, myOutH = 0;
     CFAbsoluteTime myStart = 0;

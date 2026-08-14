@@ -23,6 +23,25 @@ Requests only go out when a parameter changes (or you press **Reload**), so a st
 nothing per frame. While a request is in flight the previous image keeps showing; `busy` on the
 Info CHOP tells you one is running.
 
+### Why you cannot fly through the 3D view (yet)
+
+Measured, because it decides what is possible:
+
+| | Measured |
+|---|---|
+| One snapshot, 640×360 | ~1.1 s |
+| One snapshot, 2560×1440 | ~2.0 s |
+| 8 requests in flight at once | **~1.4 frames/sec total** — the same as one at a time |
+
+**Issuing requests in parallel does not help**; MapKit serialises them internally, so ~1.4 fps is a
+hard ceiling no matter the size. And `MKMapView`, which does render continuously in 3D, **cannot be
+captured offscreen** — `cacheDisplayInRect:` and `layer renderInContext:` both come back blank
+because it draws with Metal.
+
+So a live flythrough is not possible through this op today. What does work is **baking**: step the
+camera along a path, keep every frame, then play them back at any speed. A 150-frame move takes
+about two minutes to bake and then plays perfectly smoothly. That is not implemented yet.
+
 ### Look Around coverage is patchy
 
 Shibuya Crossing has imagery; **Tokyo Station does not**. There is no way to ask MapKit for a
@@ -50,6 +69,8 @@ you animate through pitch 0.
 | Show Traffic | Traffic overlay (Standard and Hybrid) |
 | Show Points Of Interest | Shops, stations and so on |
 | Dark Appearance | Renders the map in dark mode |
+| Show Attribution | Burns "&#63743; Apple Maps" into a corner. **On by default** — see below |
+| Attribution Position | Which corner |
 | Reload | Request again without changing anything |
 
 Resolution comes from the **Common** page, like the other generator TOPs. The default `Use Input` is
@@ -59,9 +80,11 @@ Info CHOP: `executes / requests / renders / busy / available / width / height / 
 
 ### Notes
 
-- **Attribution is required.** Apple's guidelines ask that maps shown to an audience carry the Apple
-  logo and the legal notice. The snapshot image does not include them, so add them yourself if the
-  output is going on a screen people see
+- **Attribution is required, and is on by default.** Apple's guidelines ask that maps shown to an
+  audience carry the Apple logo. The snapshot image does not contain one, so this op draws
+  "&#63743; Apple Maps" into a corner itself, using the Apple logo glyph from the system font. Leave
+  **Show Attribution** on unless you are adding your own — turning it off does not remove the
+  obligation
 - The imagery is fetched from Apple's servers — **this op needs a network connection**, and Apple
   rate-limits heavy use. Do not animate the coordinate every frame
 - **MapKit raises Objective-C exceptions rather than returning errors.** A zero-area size makes
@@ -99,6 +122,24 @@ API キーもアカウントも要らない。
 要求はパラメータが変わったとき(と **Reload**)だけ飛ぶので、動かさない地図は毎フレームの負荷が
 ない。要求中は前の画像を出したままで、走っているかは Info CHOP の `busy` で分かる。
 
+### 3D の中を飛び回れない理由(現状)
+
+何ができるかを決める数字なので実測した:
+
+| | 実測 |
+|---|---|
+| 1枚(640×360) | 約1.1秒 |
+| 1枚(2560×1440) | 約2.0秒 |
+| 8枚を同時に要求 | **合計 約1.4枚/秒** — 1枚ずつと変わらない |
+
+**並列に投げても速くならない。** MapKit が内部で直列化するので、サイズに関わらず 約1.4fps が
+上限になる。一方、3Dを連続描画できる `MKMapView` は**オフスクリーンで取り込めない**
+(`cacheDisplayInRect:` も `layer renderInContext:` も真っ白。Metal で描いているため)。
+
+したがって、このopでライブの飛行はできない。成立するのは**焼き込み**で、カメラをパスに沿って
+進めて全フレームを溜め、あとから好きな速度で再生する方式。150フレームで焼くのに約2分かかるが、
+再生は完全に滑らかになる。これはまだ実装していない。
+
 ### Look Around のカバー範囲は飛び飛び
 
 渋谷スクランブルには画像があるが、**東京駅には無い**。カバー範囲を問い合わせる API は無いので、
@@ -123,6 +164,8 @@ map region を使うので厳密)。傾けるか回した瞬間にカメラへ�
 | Show Traffic | 交通情報(標準・ハイブリッド) |
 | Show Points Of Interest | 店舗や駅などの表示 |
 | Dark Appearance | 地図をダークで描く |
+| Show Attribution | 「&#63743; Apple Maps」を隅に焼き込む。**既定でオン**(後述) |
+| Attribution Position | どの隅に出すか |
 | Reload | 設定を変えずにもう一度取得する |
 
 解像度は他の生成系 TOP と同じく **Common** ページから。入力を持たないので既定の `Use Input` は
@@ -132,8 +175,11 @@ Info CHOP: `executes / requests / renders / busy / available / width / height / 
 
 ### 注意
 
-- **帰属表示が必要。** Apple のガイドラインは、人に見せる地図に Apple ロゴと法的通知を添えることを
-  求めている。スナップショット画像には含まれないので、画面に出すなら自分で足すこと
+- **帰属表示は必要で、既定でオン。** Apple のガイドラインは、人に見せる地図に Apple ロゴを
+  添えることを求めている。スナップショット画像には含まれないので、このopが自分で
+  「&#63743; Apple Maps」を隅に描く(システムフォントの Apple ロゴのグリフを使用)。
+  自分で別に付ける場合を除き **Show Attribution** はオンのままにする。
+  オフにしても義務が消えるわけではない
 - 画像は Apple のサーバーから取得する。**ネットワークが要る**し、過剰な利用はレート制限される。
   座標を毎フレーム動かすような使い方はしない
 - **MapKit はエラーを返さず Objective-C 例外を投げる。** 面積 0 のサイズを渡すと
