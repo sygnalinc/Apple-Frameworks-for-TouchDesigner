@@ -6572,3 +6572,31 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - PLUGINS.tsv に **experimental** で登録(新規は指示があるまで experimental の規約どおり)
 - 次にやること: MapKit Search DAT(周辺検索 / ジオコーディング / 経路。緯度経度→uv も出す)、
   demo.toe への利用例追加
+
+### 2026-08-14 MapKit Live TOP 実装(常駐MKMapView+SCK取り込み・3D地図を飛べる)
+
+- ユーザー「3D表示の中をカメラで飛び回りたい」→「pluginでも同様の設計にできない?」
+- **まず「なぜマップ.app は滑らかか」を実測で特定**: MKMapSnapshotter の約0.9秒は
+  1回あたりの固定費(**32x32 でも 885ms**・同じ場所の2回目も同じ・遠隔地はさらに上乗せ)。
+  = データでも描画量でもなく「セッションを作って壊す」コスト。マップ.app は
+  **レンダラーを常駐**させ、手元のタイル/メッシュを GPU で描き直しているだけだから速い
+- **プロセス内の取り込みは3経路とも全滅を実測**: cacheDisplayInRect / layer renderInContext /
+  **CARenderer**(Metal取り込みの正攻法)も真っ白(0.08msで「空」を描く)。
+  CAMetalLayer の中身は present 済み drawable = **ウインドウサーバーの持ち物**で、
+  プロセス内から読む公開APIが無い
+- **成立した設計**: プラグインが MKMapView 入りのボーダーレスウインドウを自分で持ち
+  (**デスクトップレベル**=壁紙の上・アイコンの下、全スペース所属・フォーカス奪わない)、
+  **SCK の `initWithDesktopIndependentWindow:`** で自ウインドウをストリーム取り込み → TOP へ。
+  1つの .plugin に全部入る(ヘルパ不要)。帰属表示は MKMapView 自身が描く(Legal リンク付き)
+- **実測(M2)**: ヘディング+座標を式でアニメーションさせて **毎秒53.4フレーム受信**
+  (スナップショット方式の約40倍)、**TD 本体は 64fps を維持**。静止中は SCK が変化時しか
+  フレームを寄越さないので capture_fps は 2〜3 に落ちる(正常・省エネ)。
+  デスクトップレベルに隠したウインドウも SCK が問題なく取り込めることを確認
+- MapKit/ は1フォルダ2バンドル構成に(MapKitTOP=スナップショット / MapKitLiveTOP=ライブ)。
+  build.sh は Cinematic と同じ build_one×2 の手組み。PLUGINS.tsv はフォルダ単位なので行は1つのまま
+- opType `Mapkitlive` / label "MapKit Live" / icon MKL。パラメータ: Active / Lat / Lon /
+  Distance / Pitch / Heading / Style / Elevation / POI / Dark / Capture FPS / Show Window / Restart
+- 代償(READMEに明記): 画面収録の TCC 許可(Screen Capture TOP と同じ)+実ウインドウ1枚。
+  静止地図はスナップショット版が良い(許可不要・メートル正確な範囲指定)
+- 次にやること: demo.toe への利用例(飛行パスのデモ)、MapKit Search DAT、
+  Look Around 版ライブ(MKLookAroundViewController を同じ仕組みで)の検討

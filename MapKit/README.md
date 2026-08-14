@@ -1,4 +1,4 @@
-# MapKit
+# MapKit / MapKit Live
 
 **English** | [日本語](#日本語)
 
@@ -23,7 +23,31 @@ Requests only go out when a parameter changes (or you press **Reload**), so a st
 nothing per frame. While a request is in flight the previous image keeps showing; `busy` on the
 Info CHOP tells you one is running.
 
-### Why you cannot fly through the 3D view (yet)
+## MapKit Live (flythrough)
+
+A second op in this folder, **MapKit Live** (`Mapkitlive`), does what the snapshot op cannot:
+**fly through the 3D map in real time**. Measured while animating heading and position from
+expressions: **53 frames/sec received**, with TD itself still running at 64 fps.
+
+It works the way Maps.app works — a **persistent `MKMapView`** kept alive in a borderless window,
+captured with ScreenCaptureKit's `initWithDesktopIndependentWindow:`. The window sits at desktop
+level (above the wallpaper, below the icons), joins no Mission Control spaces, and never takes
+input focus. Set **Show Window** on to bring it forward for inspection.
+
+Drive `Latitude / Longitude / Distance / Pitch / Heading` from expressions or CHOP exports and the
+camera follows every frame. When nothing moves, ScreenCaptureKit only delivers frames on change, so
+an idle map costs almost nothing.
+
+What this costs, compared to the snapshot op:
+
+- **Screen Recording permission** (same TCC grant as the Screen Capture TOP)
+- A real window exists on the desktop layer of the screen
+- Attribution comes from `MKMapView` itself (Apple logo and Legal link are part of the view)
+
+The snapshot op stays the better choice for a static map: no permission, no window, and exact
+metre-accurate spans.
+
+### Why you cannot fly through the 3D view (with the snapshot op)
 
 Measured, because it decides what is possible:
 
@@ -38,9 +62,10 @@ hard ceiling no matter the size. And `MKMapView`, which does render continuously
 captured offscreen** — `cacheDisplayInRect:` and `layer renderInContext:` both come back blank
 because it draws with Metal.
 
-So a live flythrough is not possible through this op today. What does work is **baking**: step the
-camera along a path, keep every frame, then play them back at any speed. A 150-frame move takes
-about two minutes to bake and then plays perfectly smoothly. That is not implemented yet.
+So a live flythrough is not possible through the snapshot op — which is why **MapKit Live** above
+exists. The third capture path that also failed, for the record: `CARenderer` renders a layer tree
+into your own Metal texture, but a `CAMetalLayer`'s content lives in its presented drawables, which
+belong to the window server — it "rendered" an empty layer in 0.08 ms.
 
 ### Look Around coverage is patchy
 
@@ -122,7 +147,31 @@ API キーもアカウントも要らない。
 要求はパラメータが変わったとき(と **Reload**)だけ飛ぶので、動かさない地図は毎フレームの負荷が
 ない。要求中は前の画像を出したままで、走っているかは Info CHOP の `busy` で分かる。
 
-### 3D の中を飛び回れない理由(現状)
+## MapKit Live(飛行)
+
+このフォルダのもう1つのop、**MapKit Live**(`Mapkitlive`)がスナップショット版にできないことを
+やる — **3D地図の中をリアルタイムに飛ぶ**。ヘディングと座標を式でアニメーションさせながらの実測で
+**毎秒53フレーム受信**、TD 本体も 64 fps を維持した。
+
+仕組みはマップ.app と同じで、**常駐の `MKMapView`** をボーダーレスウインドウに生かしっぱなしにし、
+ScreenCaptureKit の `initWithDesktopIndependentWindow:` で取り込む。ウインドウはデスクトップレベル
+(壁紙の上・アイコンの下)に置かれ、Mission Control にも入らず、フォーカスも奪わない。
+確認したいときは **Show Window** で前面に出せる。
+
+`Latitude / Longitude / Distance / Pitch / Heading` を式や CHOP エクスポートで駆動すれば、
+カメラは毎フレーム追従する。動かしていないあいだは ScreenCaptureKit が変化時しかフレームを
+寄越さないので、静止した地図はほぼコストゼロ。
+
+スナップショット版と比べた代償:
+
+- **画面収録の許可**(Screen Capture TOP と同じ TCC)
+- 実ウインドウが画面のデスクトップ層に1枚存在する
+- 帰属表示は `MKMapView` 自身が描く(Apple ロゴと Legal リンクがビューに含まれる)
+
+静止した地図にはスナップショット版のほうが良い: 許可もウインドウも不要で、
+メートル単位の正確な範囲指定ができる。
+
+### スナップショット版で 3D の中を飛び回れない理由
 
 何ができるかを決める数字なので実測した:
 
@@ -136,9 +185,10 @@ API キーもアカウントも要らない。
 上限になる。一方、3Dを連続描画できる `MKMapView` は**オフスクリーンで取り込めない**
 (`cacheDisplayInRect:` も `layer renderInContext:` も真っ白。Metal で描いているため)。
 
-したがって、このopでライブの飛行はできない。成立するのは**焼き込み**で、カメラをパスに沿って
-進めて全フレームを溜め、あとから好きな速度で再生する方式。150フレームで焼くのに約2分かかるが、
-再生は完全に滑らかになる。これはまだ実装していない。
+したがってスナップショット版でライブの飛行はできない — それが上の **MapKit Live** が存在する
+理由。記録のために、3つ目の失敗した取り込み経路も書いておく: `CARenderer` はレイヤーツリーを
+自前の Metal テクスチャに描くが、`CAMetalLayer` の中身は present 済み drawable にあり、
+それはウインドウサーバーの持ち物 — 空のレイヤーを 0.08ms で「描いた」だけだった。
 
 ### Look Around のカバー範囲は飛び飛び
 
