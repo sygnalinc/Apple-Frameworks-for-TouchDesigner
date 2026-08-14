@@ -9,6 +9,10 @@
 close the loop inside TD: record joints/features → label → train (CreateML) → live inference
 (CoreML Motion).
 
+> **Status: experimental.** Verified against CreateML (a 3-channel take recorded as two labelled
+> recordings trains as-is), but it is **not shipped in the release DMG** and is unsupported.
+> `PLUGINS.tsv` is the source of truth — build it yourself from this folder.
+
 ### What it does
 
 - Writes one row per frame, one column per input CHOP channel
@@ -79,6 +83,10 @@ cd CreateMLTrainingRecorder && ./build.sh   # → build/CreateMLTrainingRecorder
 入力CHOP(VisionPose / VisionHand / SoundFeatures など)の**時系列を、CreateML DAT
 (Activity task)がそのまま学習できるCSVデータセットへ収録**する。TD内で「関節/特徴を
 録る → ラベル付け → 学習(CreateML)→ ライブ推論(CoreML Motion)」を閉じられる。
+
+> **状態: experimental。** CreateML 側と突き合わせて検証済み(3chの収録を2つのラベル付き
+> recording として書き出し、そのまま学習できる)。ただし**リリースDMGには入らず**サポート対象外。
+> 正は `PLUGINS.tsv`。使うにはこのフォルダで自分でビルドする。
 
 ### 何ができる
 

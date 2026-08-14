@@ -10,6 +10,11 @@ The resulting model is read directly by the existing inference operators
 ([CoreML TOP](../CoreML/) / [CoreML Motion CHOP](../CoreMLMotion/) /
 [SoundClass CHOP](../SoundClass/) …), so "collect in TD → label → train → infer" closes the loop.
 
+> **Status: experimental.** Trained end-to-end here (Tabular train/val = 1.0, regression RMSE 0.12,
+> Activity, Image) and the output models are read by the inference operators, but it is **not
+> shipped in the release DMG** and is unsupported. `PLUGINS.tsv` is the source of truth — build it
+> yourself from this folder.
+
 - Training runs **asynchronously** in a Swift helper. Cook only polls progress and never blocks
 - Input is either a **folder** (subfolder per label) or a **CSV** (time series / table). Which
   columns and parameters apply depends on the task
@@ -123,6 +128,10 @@ Apple の **CreateML** による各種学習タスクを**1つのオペレータ
 `Task` メニューでタスクを切り替え、TD内から**オンデバイス学習**して `.mlmodel` を書き出す。
 出力モデルは既存の推論OP([CoreML TOP](../CoreML/) / [CoreML Motion CHOP](../CoreMLMotion/) /
 [SoundClass CHOP](../SoundClass/) 等)がそのまま読む。「TD内で集める→ラベル付け→学習→推論」を閉じられる。
+
+> **状態: experimental。** ここで学習まで通している(Tabular train/val=1.0・回帰 RMSE 0.12・
+> Activity・Image)し、出力モデルは推論opがそのまま読める。ただし**リリースDMGには入らず**
+> サポート対象外。正は `PLUGINS.tsv`。使うにはこのフォルダで自分でビルドする。
 
 - 学習は Swift ヘルパで**非同期**実行。cook は進捗を poll するだけでブロックしない
 - 入力は**フォルダ**(ラベル別サブフォルダ)または **CSV**(時系列/表)。Taskごとに使う列/パラメータが変わる

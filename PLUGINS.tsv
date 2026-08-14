@@ -32,13 +32,13 @@ CoreML	released	26.0
 CoreMLCHOP	released	26.0
 CoreMLDAT	released	26.0
 CoreMLImageGen	released	26.0
-CoreMLMotion	released	26.0
+CoreMLMotion	experimental	26.0
 CoreMLSAM2	released	26.0
 CoreText	released	26.0
 CoreWLAN	released	26.0
 CoreWLANScan	released	26.0
-CreateML	released	26.0
-CreateMLTrainingRecorder	released	26.0
+CreateML	experimental	26.0
+CreateMLTrainingRecorder	experimental	26.0
 GameController	released	26.0
 GameplayKitAgents	experimental	26.0
 GameplayKitPath	experimental	26.0

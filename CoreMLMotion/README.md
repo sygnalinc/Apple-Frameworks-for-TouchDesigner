@@ -10,6 +10,10 @@ input CHOP (Vision Pose channels and the like) over the prediction window. The o
 probability per class plus confidence and predicted (argmax index). Recurrent state is updated
 every frame.
 
+> **Status: experimental.** Verified live (a circular motion gives `prob_circle` = 1.0, a lateral
+> one `prob_wave` = 1.0), but it is **not shipped in the release DMG** and is unsupported.
+> `PLUGINS.tsv` is the source of truth — build it yourself from this folder.
+
 - Inference runs on Core ML (ANE/GPU). Cook only hands over the latest window and never blocks
 - The **feature channel names, prediction window and class labels are read from the model
   description** — no manual setup
@@ -70,6 +74,10 @@ cd CoreMLMotion && ./build.sh   # → build/CoreMLMotionCHOP.plugin
 [CreateML DAT](../CreateML/)(Activity タスク)で学習した**動作分類モデル**(`MLActivityClassifier`)を
 ロードし、入力CHOP(VisionPose 等のチャンネル)を**予測窓ぶんバッファしてライブでジェスチャ分類**する。
 出力はクラスごとの確率 + confidence + predicted(argmax index)。recurrent state を毎フレーム更新する。
+
+> **状態: experimental。** ライブ推論を実測済み(円運動で `prob_circle`=1.0・横振動で
+> `prob_wave`=1.0)。ただし**リリースDMGには入らず**サポート対象外。
+> 正は `PLUGINS.tsv`。使うにはこのフォルダで自分でビルドする。
 
 - 推論は CoreML(ANE/GPU)。cook は最新窓を渡すだけでブロックしない
 - モデルの入力記述から**特徴チャンネル名・予測窓・クラスラベルを自動取得**。手動設定不要
