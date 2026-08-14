@@ -174,6 +174,10 @@ struct Style {
     float strokeWidth = 0; float strokeRGBA[4] = {0,0,0,1};
     float embolden = 0;                // 合成ボールド(px)。フォントの最大ウェイト以上に太らせる
     bool shadow = false; float shadowRGBA[4] = {0,0,0,0.75f}; float shadowX = 0, shadowY = -6, shadowBlur = 8;
+    // 手書き風アニメーション。1.0 = 全部書けた状態(既定なので既存の .toe は不変)
+    float writeProgress = 1.0f;
+    float writePen = 0.14f;    // ペンの太さ(フォントサイズ比)
+    int writeOrder = 0;        // 0=文字ごと(欧文向き) 1=輪郭ごとに上から(和文向き)
     int w = 1280, h = 720;
 
     std::string sig() const {
@@ -193,8 +197,12 @@ struct Style {
         snprintf(sh, sizeof sh, "|s%d|%d|%.3f|%.1f|%zu|sh%.2f,%.2f,%.2f|li%d%d%d%d|%.2f|%.2f|%.2f|%.2f",
                  shape, shapeSides, shapeRound, shapeRotate, shapePath.size(), shearX, shearY, slant,
                  lineImg, lineApply, lineWidthMode, lineFront, lineOffset, lineThick, lineExtend, lineOffsetX);
+        // **新しいパラメータは必ずここに足す**。この文字列が変わらないと再レンダが走らず、
+        // 「パラメータを動かしても何も起きない」になる(手書き用の3つで実際に踏んだ)
+        char wr[64];
+        snprintf(wr, sizeof wr, "|w%.4f,%.3f,%d", writeProgress, writePen, writeOrder);
         return text + "\x1f" + fontFile + "\x1f" + ellipsis + "\x1f" + runsSig + "\x1f" + sh + "\x1f"
-             + (palt ? "P" : "p") + (autofit ? "F" : "f") + std::to_string(truncate) + "\x1f" + b;
+             + (palt ? "P" : "p") + (autofit ? "F" : "f") + std::to_string(truncate) + "\x1f" + b + wr;
     }
 };
 
@@ -881,6 +889,162 @@ static void drawGradientThroughMask(CGContextRef ctx, const Style& st, CTFrameRe
     CGContextRestoreGState(ctx);
 }
 
+// ---- 手書き風アニメーション ----------------------------------------------------
+// フォントが持っているのは**字形の輪郭**であって筆の運び順ではない。そこで
+// アウトライン(CTFontCreatePathForGlyph)を取り出し、**先頭から進行度ぶんだけ
+// 太いペンでなぞった形**をマスクにして、最終画像を切り抜く。
+// 部分描画の専用APIは無いので `CGPathCreateCopyByDashingPath` に
+// [描く長さ, 巨大なギャップ] を渡して先頭だけ残す。
+// **ダッシュはサブパス(輪郭)ごとに独立して効く**ので、漢字のように輪郭が複数ある字は
+// 分割して順に描かないと一瞬で完成して見える(実測)。それが Write Order = contour。
+namespace writeanim {
+
+struct LenCtx { CGPoint cur, start; double len; };
+static void lenApply(void* info, const CGPathElement* e) {
+    LenCtx* c = (LenCtx*)info; CGPoint* pt = e->points;
+    switch (e->type) {
+        case kCGPathElementMoveToPoint: c->cur = c->start = pt[0]; break;
+        case kCGPathElementAddLineToPoint:
+            c->len += hypot(pt[0].x - c->cur.x, pt[0].y - c->cur.y); c->cur = pt[0]; break;
+        case kCGPathElementAddQuadCurveToPoint:   // 制御点までの距離で近似(十分)
+            c->len += hypot(pt[1].x - c->cur.x, pt[1].y - c->cur.y) * 1.2; c->cur = pt[1]; break;
+        case kCGPathElementAddCurveToPoint:
+            c->len += hypot(pt[2].x - c->cur.x, pt[2].y - c->cur.y) * 1.3; c->cur = pt[2]; break;
+        case kCGPathElementCloseSubpath:
+            c->len += hypot(c->start.x - c->cur.x, c->start.y - c->cur.y); c->cur = c->start; break;
+    }
+}
+static double pathLen(CGPathRef p) { LenCtx c{CGPointZero, CGPointZero, 0}; CGPathApply(p, &c, lenApply); return c.len; }
+
+struct SplitCtx { CFMutableArrayRef arr; CGMutablePathRef cur; };
+static void splitApply(void* info, const CGPathElement* e) {
+    SplitCtx* s = (SplitCtx*)info; CGPoint* pt = e->points;
+    if (e->type == kCGPathElementMoveToPoint) {
+        if (s->cur) { CFArrayAppendValue(s->arr, s->cur); CGPathRelease(s->cur); }
+        s->cur = CGPathCreateMutable();
+        CGPathMoveToPoint(s->cur, nullptr, pt[0].x, pt[0].y);
+    } else if (s->cur) {
+        switch (e->type) {
+            case kCGPathElementAddLineToPoint: CGPathAddLineToPoint(s->cur, nullptr, pt[0].x, pt[0].y); break;
+            case kCGPathElementAddQuadCurveToPoint:
+                CGPathAddQuadCurveToPoint(s->cur, nullptr, pt[0].x, pt[0].y, pt[1].x, pt[1].y); break;
+            case kCGPathElementAddCurveToPoint:
+                CGPathAddCurveToPoint(s->cur, nullptr, pt[0].x, pt[0].y, pt[1].x, pt[1].y, pt[2].x, pt[2].y); break;
+            case kCGPathElementCloseSubpath: CGPathCloseSubpath(s->cur); break;
+            default: break;
+        }
+    }
+}
+// **retain/release コールバック付きの配列**で受ける。NULL コールバックだと
+// append 直後の CGPathRelease で中身が解放済みになり落ちる(実際に踏んだ)
+static void splitSubpaths(CGPathRef p, std::vector<CGPathRef>& out) {
+    SplitCtx s{ CFArrayCreateMutable(nullptr, 0, &kCFTypeArrayCallBacks), nullptr };
+    CGPathApply(p, &s, splitApply);
+    if (s.cur) { CFArrayAppendValue(s.arr, s.cur); CGPathRelease(s.cur); }
+    for (CFIndex i = 0; i < CFArrayGetCount(s.arr); i++)
+        out.push_back((CGPathRef)CGPathRetain((CGPathRef)CFArrayGetValueAtIndex(s.arr, i)));
+    CFRelease(s.arr);
+}
+
+// 描画順に並んだ「筆画」(= 文字ごと or 輪郭ごと)
+struct Piece { CGPathRef path; };
+
+static void collectPieces(CTFrameRef frame, const Style& st, std::vector<Piece>& out)
+{
+    CFArrayRef lines = CTFrameGetLines(frame);
+    CFIndex nl = CFArrayGetCount(lines);
+    if (nl <= 0) return;
+    std::vector<CGPoint> origins((size_t)nl);
+    CTFrameGetLineOrigins(frame, CFRangeMake(0, 0), origins.data());
+    CGRect fr = CGPathGetBoundingBox(CTFrameGetPath(frame));
+    for (CFIndex li = 0; li < nl; li++) {
+        CTLineRef line = (CTLineRef)CFArrayGetValueAtIndex(lines, li);
+        CGPoint lo = origins[(size_t)li];
+        CFArrayRef runs = CTLineGetGlyphRuns(line);
+        for (CFIndex ri = 0; ri < CFArrayGetCount(runs); ri++) {
+            CTRunRef run = (CTRunRef)CFArrayGetValueAtIndex(runs, ri);
+            CFIndex ng = CTRunGetGlyphCount(run);
+            if (ng <= 0) continue;
+            std::vector<CGGlyph> gl((size_t)ng);
+            std::vector<CGPoint> pos((size_t)ng);
+            CTRunGetGlyphs(run, CFRangeMake(0, ng), gl.data());
+            CTRunGetPositions(run, CFRangeMake(0, ng), pos.data());
+            CFDictionaryRef at = CTRunGetAttributes(run);
+            CTFontRef rf = at ? (CTFontRef)CFDictionaryGetValue(at, kCTFontAttributeName) : nullptr;
+            if (!rf) continue;
+            for (CFIndex gi = 0; gi < ng; gi++) {
+                CGPathRef gp = CTFontCreatePathForGlyph(rf, gl[(size_t)gi], nullptr);
+                if (!gp) continue;   // 空白など
+                CGAffineTransform t = CGAffineTransformMakeTranslation(
+                    fr.origin.x + lo.x + pos[(size_t)gi].x,
+                    fr.origin.y + lo.y + pos[(size_t)gi].y);
+                CGPathRef moved = CGPathCreateCopyByTransformingPath(gp, &t);
+                CGPathRelease(gp);
+                if (!moved) continue;
+                if (st.writeOrder == 0) {
+                    out.push_back({moved});
+                } else {
+                    // 輪郭ごと。**上から下へ**並べる(和文の筆順の近似。CGは下原点なので Y 降順)
+                    std::vector<CGPathRef> subs;
+                    splitSubpaths(moved, subs);
+                    CGPathRelease(moved);
+                    std::sort(subs.begin(), subs.end(), [](CGPathRef a, CGPathRef b) {
+                        CGRect ra = CGPathGetBoundingBox(a), rb = CGPathGetBoundingBox(b);
+                        if (fabs(CGRectGetMaxY(ra) - CGRectGetMaxY(rb)) > 1.0)
+                            return CGRectGetMaxY(ra) > CGRectGetMaxY(rb);
+                        return CGRectGetMinX(ra) < CGRectGetMinX(rb);
+                    });
+                    for (CGPathRef sp : subs) out.push_back({sp});
+                }
+            }
+        }
+    }
+}
+
+// 「書けたところまで」のカバレッジを 8bit マスクで返す(呼び出し側が解放)
+static CGImageRef makeMask(const Style& st, CTFrameRef frame)
+{
+    std::vector<Piece> pieces;
+    collectPieces(frame, st, pieces);
+    if (pieces.empty()) return nullptr;
+
+    CGColorSpaceRef gray = CGColorSpaceCreateDeviceGray();
+    CGContextRef mc = CGBitmapContextCreate(nullptr, st.w, st.h, 8, (size_t)st.w, gray, kCGImageAlphaNone);
+    CGColorSpaceRelease(gray);
+    if (!mc) { for (auto& p : pieces) CGPathRelease(p.path); return nullptr; }
+    CGContextSetGrayFillColor(mc, 0, 1); CGContextFillRect(mc, CGRectMake(0, 0, st.w, st.h));
+    CGContextSetGrayFillColor(mc, 1, 1);
+    CGContextSetGrayStrokeColor(mc, 1, 1);
+    CGContextSetLineCap(mc, kCGLineCapRound);
+    CGContextSetLineJoin(mc, kCGLineJoinRound);
+    const CGFloat pen = std::max(1.0f, st.fontSize * st.writePen);
+    CGContextSetLineWidth(mc, pen);
+
+    const double head = (double)pieces.size() * std::min(1.0f, std::max(0.0f, st.writeProgress));
+    for (size_t i = 0; i < pieces.size(); i++) {
+        const double local = head - (double)i;
+        if (local <= 0) continue;
+        if (local >= 1) {                       // 書き終わった筆画は塗る
+            CGContextAddPath(mc, pieces[i].path);
+            CGContextFillPath(mc);
+            continue;
+        }
+        // 進行中: 先頭から local ぶんだけペンでなぞる
+        const double L = pathLen(pieces[i].path) * local;
+        if (L > 0.5) {
+            CGFloat dash[2] = { (CGFloat)L, (CGFloat)1.0e7 };
+            CGPathRef d = CGPathCreateCopyByDashingPath(pieces[i].path, nullptr, 0, dash, 2);
+            if (d) { CGContextAddPath(mc, d); CGContextStrokePath(mc); CGPathRelease(d); }
+        }
+    }
+    for (auto& p : pieces) CGPathRelease(p.path);
+    CGImageRef img = CGBitmapContextCreateImage(mc);
+    CGContextRelease(mc);
+    return img;
+}
+
+}  // namespace writeanim
+
 // フレームから行ごとの位置と大きさを取り出す(TDのuv・0〜1・左下原点)。
 // CGは下原点で出力もその向きを保つので、uv へは単純な除算でマップできる。
 // 縦書きでは1行=1段(縦方向に伸びる)になる
@@ -998,6 +1162,19 @@ static bool renderText(const Style& stIn, CGImageRef lineImg, Result& out, std::
     int lines = 0;
     CTFrameRef frame = makeFrame(fillStr, st, &lines);
     collectLineMetrics(frame, st, out.metrics);
+
+    // 手書き風: 「書けたところまで」でこの先の描画をクリップする。
+    // **アルファを持たない DeviceGray 画像をマスクにできるのは CGContextClipToMask だけ**で、
+    // kCGBlendModeDestinationIn は元画像のアルファを見るため、この形のマスクでは効かない(実測)。
+    // 背景はこの前に塗ってあるので残り、文字と装飾だけが書かれていく
+    CGImageRef writeMask = nullptr;
+    if (st.writeProgress < 0.999f) {
+        writeMask = writeanim::makeMask(st, frame);
+        if (writeMask) {
+            CGContextSaveGState(ctx);
+            CGContextClipToMask(ctx, CGRectMake(0, 0, st.w, st.h), writeMask);
+        }
+    }
     // 入力画像を各行の下に敷く(既定は文字の下=先に描く)
     if (st.lineImg && !st.lineFront) drawLineImages(ctx, st, lineImg, out.metrics);
     // 描画順: 縁取り(最外周) → 合成ボールド(太らせた本体) → 本文テキスト
@@ -1008,6 +1185,8 @@ static bool renderText(const Style& stIn, CGImageRef lineImg, Result& out, std::
     if (st.gradient) drawGradientThroughMask(ctx, st, frame);
     else             CTFrameDraw(frame, ctx);
     if (st.lineImg && st.lineFront) drawLineImages(ctx, st, lineImg, out.metrics);
+
+    if (writeMask) { CGContextRestoreGState(ctx); CGImageRelease(writeMask); }
     CFRelease(frame);
 
     if (st.shadow) CGContextEndTransparencyLayer(ctx);
@@ -1221,6 +1400,12 @@ public:
         st.shadowX   = (float)in->getParDouble("Shadowx");
         st.shadowY   = (float)in->getParDouble("Shadowy");
         st.shadowBlur= (float)in->getParDouble("Shadowblur");
+        st.writeProgress = (float)in->getParDouble("Writeprogress");
+        st.writePen      = (float)in->getParDouble("Writepen");
+        {
+            const char* wo = in->getParString("Writeorder");
+            st.writeOrder = (wo && !strcmp(wo, "contour")) ? 1 : 0;
+        }
         // 解像度は他のTOPと同じく Common ページ(Output Resolution)から取得。
         // 本TOPは入力を持たないため既定の "Use Input" は無意味(127x127になる)→ 1280x720 を既定に
         {
@@ -1378,6 +1563,20 @@ public:
         { OP_NumericParameter p("Shadowx"); p.label = "Shadow Offset X"; p.page = S; p.defaultValues[0] = 0; p.minSliders[0] = -50; p.maxSliders[0] = 50; m->appendFloat(p); }
         { OP_NumericParameter p("Shadowy"); p.label = "Shadow Offset Y"; p.page = S; p.defaultValues[0] = -6; p.minSliders[0] = -50; p.maxSliders[0] = 50; m->appendFloat(p); }
         { OP_NumericParameter p("Shadowblur"); p.label = "Shadow Blur"; p.page = S; p.defaultValues[0] = 8; p.minSliders[0] = 0; p.maxSliders[0] = 50; p.minValues[0] = 0; p.clampMins[0] = true; m->appendFloat(p); }
+        // 手書き風アニメーション。既定 1.0 = 全部書けた状態なので、既存の .toe は見た目が変わらない
+        { OP_NumericParameter p("Writeprogress"); p.label = "Write Progress"; p.page = S;
+          p.defaultValues[0] = 1; p.minSliders[0] = 0; p.maxSliders[0] = 1;
+          p.minValues[0] = 0; p.maxValues[0] = 1; p.clampMins[0] = p.clampMaxes[0] = true; m->appendFloat(p); }
+        { OP_NumericParameter p("Writepen"); p.label = "Write Pen (x font size)"; p.page = S;
+          p.defaultValues[0] = 0.14; p.minSliders[0] = 0.02; p.maxSliders[0] = 0.5;
+          p.minValues[0] = 0.01; p.clampMins[0] = true; m->appendFloat(p); }
+        {
+            OP_StringParameter p("Writeorder");
+            p.label = "Write Order"; p.page = S; p.defaultValue = "glyph";
+            const char* n[] = {"glyph", "contour"};
+            const char* l[] = {"Character by character", "Contour, top to bottom"};
+            m->appendMenu(p, 2, n, l);
+        }
 
     }
 

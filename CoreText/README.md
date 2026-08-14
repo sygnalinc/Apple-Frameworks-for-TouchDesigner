@@ -92,6 +92,7 @@ better-looking typography than TD's built-in Text TOP**.
 | | Gradient Fill / Color 2 / Angle | Gradient fill (Font Color → Color 2, angle 0° = top to bottom) |
 | | Stroke Width / Color | Outline (outer, px) |
 | | Drop Shadow / Color / Offset / Blur | Drop shadow |
+| | Write Progress / Pen / Order | **Handwriting-style reveal.** 0 = nothing written, 1 = fully written (**default 1**, so existing projects are unchanged) — drive it from a CHOP or an expression. `Pen` is how thick the tracing pen is (× font size). `Order` is `Character by character` (Latin) or `Contour, top to bottom` (Japanese) |
 | Common | Output Resolution | **Resolution is set on the Common page like any other TOP** (Custom etc.). Use Input falls back to 1280×720 |
 
 Info CHOP: `executes / renders / width / height / lines / fitted_size / truncated` plus
@@ -153,6 +154,14 @@ and the layout follows live.
   cap is **scaled down automatically** with a warning (without it TD renders garbage). Use a
   commercial license if you need full resolution.
 
+- **The writing animation traces the glyph outline, which is not stroke order.** A font stores the
+  *shape* of a character, not how a pen moves through it, so `書` is 6 contours where handwriting is
+  10 strokes. For Latin script faces the outline reads as a pen stroke; for kanji it reads as
+  "parts appearing top to bottom", which is the honest limit. True stroke order needs stroke data
+  (KanjiVG or a stroke-based font) — Apple's APIs do not carry it.
+- **Dashing applies per contour, not per glyph.** `CGPathCreateCopyByDashingPath` restarts on every
+  subpath, so a kanji drawn as one path finishes instantly. `Write Order = Contour` splits the glyph
+  and draws the contours in order, which is what makes Japanese work.
 - **Stroke and Embolden use mask dilation**, not the glyph outline path (extracting outlines from
   the system UI font demonstrably picks up garbage contours inside the TD process). Emoji get an
   outline too. Dilation only reaches **background that is reachable from the image edge**, so
@@ -289,6 +298,7 @@ Apple のテキストレンダリング(Core Text + Core Graphics)で文字を�
 | | Gradient Fill / Color 2 / Angle | グラデーション塗り(Font Color→Color 2・角度0°=上→下) |
 | | Stroke Width / Color | 縁取り(外側アウトライン・px) |
 | | Drop Shadow / Color / Offset / Blur | ドロップシャドウ |
+| | Write Progress / Pen / Order | **手書き風に書かれるアニメーション。** 0=何も書かれていない、1=全部書けた(**既定1**なので既存プロジェクトの見た目は変わらない)。CHOPや式で駆動する。`Pen` はなぞるペンの太さ(フォントサイズ比)、`Order` は `Character by character`(欧文)か `Contour, top to bottom`(和文) |
 | Common | Output Resolution | **他のTOPと同じくCommonページで解像度指定**(Custom等)。Use Input時は1280×720 |
 
 Info CHOP: `executes / renders / width / height / lines / fitted_size / truncated` +
