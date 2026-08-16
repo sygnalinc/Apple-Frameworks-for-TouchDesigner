@@ -15,6 +15,7 @@ AudioToolboxMix	experimental	26.0
 AVAudioMixer	experimental	26.0
 AVAudioSpatial	experimental	26.0
 AVFoundationCamera	experimental	26.0
+AudioUnit	experimental	26.0
 CaptionAuthor	experimental	26.0
 Cinematic	released	26.0
 ColorSync	experimental	26.0

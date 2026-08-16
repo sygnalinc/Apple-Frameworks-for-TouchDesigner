@@ -62,6 +62,40 @@ inline bool setFloatPars(const TD::OP_NodeInfo* node,
     return ok;
 }
 
+// 自ノードの文字列パラメータへ書き戻す。setFloatPars の文字列版。
+//
+// 用途例: プラグインの内部状態を base64 にしてパラメータへ入れ、.toe と一緒に保存する。
+// 値はシングルクォート内に入れるので、`'` と `\` だけエスケープすれば足りる。
+inline bool setStringPars(const TD::OP_NodeInfo* node,
+                          const std::vector<std::pair<std::string, std::string>>& vals)
+{
+    if (!node || !node->context || vals.empty()) return false;
+    PyGILState_STATE g = PyGILState_Ensure();
+    std::string py = "__tdsp_ok = False\ntry:\n\tn = __tdsp_node\n";
+    for (const auto& kv : vals) {
+        std::string esc;
+        for (char c : kv.second) { if (c == '\\' || c == '\'') esc += '\\'; esc += c; }
+        py += "\tn.par." + kv.first + " = '" + esc + "'\n";
+    }
+    py += "\t__tdsp_ok = True\nexcept Exception:\n";
+    py += "\timport traceback as __tdsp_tb\n\t__tdsp_err = __tdsp_tb.format_exc()\n";
+    bool ok = false;
+    PyObject* main = PyImport_AddModule("__main__");
+    PyObject* dict = main ? PyModule_GetDict(main) : nullptr;
+    PyObject* args = node->context->createArgumentsTuple(0, nullptr);
+    if (dict && args) {
+        PyDict_SetItemString(dict, "__tdsp_node", PyTuple_GET_ITEM(args, 0));
+        PyObject* r = PyRun_String(py.c_str(), Py_file_input, dict, dict);
+        if (r) Py_DECREF(r); else PyErr_Clear();
+        PyObject* v = PyDict_GetItemString(dict, "__tdsp_ok");
+        ok = v && PyObject_IsTrue(v) == 1;
+        PyDict_DelItemString(dict, "__tdsp_node");
+    }
+    if (args) Py_DECREF(args);
+    PyGILState_Release(g);
+    return ok;
+}
+
 // Callbacks DAT が未接続なら、雛形入り Text DAT を生成してホストへドック接続(閉じた↓チップ)。
 // 戻り値: callbacks が接続済みなら true(以後呼ばなくてよい)
 inline bool bootstrapCallbacksDAT(const TD::OP_NodeInfo* node, const char* stubs)

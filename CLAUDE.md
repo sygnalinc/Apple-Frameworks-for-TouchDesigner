@@ -7083,3 +7083,59 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - demo.toe: 2026-08-08 の棚卸しで**この3件はいずれも利用例が無い**と記録済み(examples を
   フラット化した際の「利用例が無い14件」に含まれる)。TD 未起動のため直接確認はしていないが、
   この記録どおりなら削除すべきコンテナは無い
+
+### 2026-08-16 AudioUnit CHOP 実装(TD に無い AU ホスト)
+
+- 「MapKit のように見落としていた定番フレームワークは無いか」の調査から着手。SDK の 297 個から
+  使用中 46 を引いた 251 個を棚卸しし、**推測せず実際に叩いて**候補を絞った
+- **TD の TCC の壁を先に測ったのが効いた**: TouchDesigner.app の Info.plist は
+  `NSMicrophone` と `NSCamera` の**2つだけ**。用途文字列が要るフレームワークの挙動は3通りに分かれる:
+  - **CoreBluetooth = プロセスごとクラッシュ**(クラッシュレポートの termination namespace が `TCC`)。
+    **TD を巻き込んで落とす**ので BLE 系は不可
+  - EventKit / Contacts = 落ちないが `granted=false` で黙って拒否(位置情報と同じ)
+  - **iTunesLibrary = 権限もエンタイトルメントも不要で完全に動く**(35,820曲・アートワーク600x600)
+- 本命は **AudioUnit ホスト**と判定。根拠(すべて実測):
+  - **TD の Audio VST CHOP は VST3 専用**。同梱 `libJUCE.dylib` に `VST3PluginFormat` は1件あるが
+    **`AudioUnitPluginFormat` は 0件**で、Audio 系フレームワークもリンクしていない。
+    走査先も `/Library/Audio/Plug-Ins/VST3` のみ
+  - 素の M2 で **VST3 = 0個 / AU = 30個**(Apple 純正エフェクト23・インストゥルメント3・ジェネレータ4)
+  - 途中で「TD に音声プラグインのホストが無い」と誤って断定 → `libJUCE.dylib` を見つけて訂正した。
+    **バイナリを見てから言うこと**
+- **AudioUnit CHOP**(opType `Audiounit` / icon AUN / experimental)を実装。
+  入力0=音声・入力1=パラメータ自動化、出力はステレオ。実装の型は AVAudio Spatial と同じ
+  (source node → AU → mainMixer → manual rendering)
+- **実測**: AU 2段直列で 512サンプル1ブロック **0.009 ms**。TD 上で 44100Hz/60fps・735サンプル/cook。
+  Bypass On で peak 0.500(入力そのもの)/ Off で 0.583、Gain 0.5 で 0.292(=0.583×0.5)、
+  `Delay_Mix` 0/45/100 で AU 側の値と出音が追従、プリセット適用も確認
+- **状態の保存/復元**(VST CHOP の `loadpluginstate` 相当): AU の `fullState` を base64 にして
+  文字列パラメータへ。AUDistortion で **463文字**(Apple 純正は 312〜1144 文字と実測)。
+  別プラグインへ切り替えて戻すと復元され、**`Load Plugin State`=Off なら既定値のまま**という
+  対照実験つきで確認。プラグインIDを前置して別プラグインの状態が流れ込まないようにした
+- **GUI 表示**(VST CHOP の `displaygui` / `alwaysontop` 相当): `requestViewControllerWithCompletionHandler:`
+  (CoreAudioKit)で AU 自身の画面をフローティングウインドウに。AUDistortion 581×518 を実測
+
+**踏んだ罠(いずれも実測で切り分け)**
+
+- **`setupParameters` はインスタンスにつき1回きり**(計測用カウンタを仕込んで確認。プラグインを
+  変えても増えない)。**公開 C++ SDK では実行中にパラメータを増やせない**ので、VST CHOP の
+  「learn parms」(プラグインのパラメータを TD のパラメータとして生やす)は再現不可能。
+  自動化用 CHOP 入力 + Info DAT がその代わりになる
+- **AU のパラメータ識別子は `"0"` `"1"` `"2"` のように数字だけのことがある**(AUDistortion)。
+  それをサニタイズして `p0` `p1` にすると添え字別名 `p<index>` と衝突する →
+  **チャンネル名は表示名から作る**(`Delay_Mix` `Ring_Mod_Freq_1` など。意味も読める)
+- **ウインドウを閉じるときに `contentViewController = nil` すると、同じプラグインで2回目に
+  `requestViewController` しても表示できなくなる**。ウインドウと VC は**作り直さず使い回し**、
+  閉じるのは `orderOut` だけにする(位置も保たれる)。プラグインを差し替えるときだけ破棄する
+- **TD 内 Python を実行している間は main queue の処理が走らない**(自分のスクリプトが
+  メインスレッドを占有するため)。`dispatch_async(main)` の結果を同じスクリプト内で読むと
+  必ず「まだ何も起きていない」状態が返る。**設定 → シェル側で待つ → 別の呼び出しで読む**
+- `CGWindowListOptionAll` は**非表示のウインドウも含む**。表示/非表示を判定するなら
+  `kCGWindowIsOnscreen` を見る(数を数えるだけだと閉じたのに残って見える)
+- `CHOP_PluginInfo::apiVersion` は private → **`setAPIVersion()`**(既出の罠を再度踏んだ)
+- cplusplusCHOP のパラメータは `isCustom` で取れない → `n.pars('*')` で名前を見る(既出)
+- 検証中に `cook(force=True)` だけで測ると**タイムラインが進まず同じブロックを読み続ける**。
+  パラメータの効きを見るときは実時間を進める
+- `common/PyCallbacksBootstrap.h` に **`setStringPars`** を追加(setFloatPars の文字列版)。
+  状態の base64 を自ノードのパラメータへ書き戻すのに使う
+- 次にやること: サードパーティ AU での検証、インストゥルメント(`aumu`)を CoreMIDI In と
+  組み合わせる、demo.toe への利用例追加
