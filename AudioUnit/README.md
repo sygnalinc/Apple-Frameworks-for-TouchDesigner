@@ -112,6 +112,26 @@ aliases. You can also address a parameter positionally as `p0`, `p1`, ….
 A parameter is written **only when the incoming value changes**, so anything you do not automate
 stays under the control of the plugin's GUI and presets.
 
+### How the plugin's GUI and this operator stay in sync
+
+Apple's bundled AUs are **v2** units wrapped in an AUv3 bridge, and the two sides do not sync both
+ways. Measured:
+
+| | Result |
+|---|---|
+| Write `AUParameter.value` → read the v2 unit | **syncs** (so the audio changes) |
+| Move a knob in the GUI (writes the v2 unit) → read `AUParameter.value` | **does not sync** — the value stays stale |
+| Move a knob in the GUI → parameter observer | **never fires** |
+| Write `AUParameter.value` → a GUI-style `AUEventListener` | **0 notifications** — the GUI does not redraw |
+| The same write followed by `AUEventListenerNotify` | **delivered** — the GUI follows |
+
+So this operator **reads the v2 side** (`AudioUnitGetParameter`) and **posts an event after every
+write**. Learn works by polling those v2 values rather than by the parameter observer, which is why
+turning a knob in the plugin's own window is picked up at all.
+
+One more trap: **`AUParameter.address` is not the v2 parameter ID** (measured: v2 id 3 maps to
+address 10). The two lists line up by position, not by value.
+
 ### Plugin state
 
 The GUI is only useful if what you set there survives. `Save Plugin State` serializes the AU's
@@ -265,6 +285,26 @@ Info DAT を繋ぐとパラメータ表が出る(`index` / `channel` / `name` / 
 
 パラメータは**値が変わったときだけ**書き込む。自動化していないパラメータはプラグインの GUI や
 プリセットが持ち主のままになる。
+
+### プラグインの GUI とこの op の同期について
+
+Apple 純正の AU は **v2** のユニットを AUv3 のブリッジで包んだもので、**両者は片方向にしか
+同期しない**。実測:
+
+| | 結果 |
+|---|---|
+| `AUParameter.value` に書く → v2 側を読む | **同期する**(だから音が変わる) |
+| GUI でつまみを動かす(v2 側に書かれる)→ `AUParameter.value` を読む | **同期しない**。古い値のまま |
+| GUI でつまみを動かす → パラメータオブザーバ | **発火しない** |
+| `AUParameter.value` に書く → GUI と同じ `AUEventListener` | **通知0回**。GUI は描き直さない |
+| 同じ書き込み + `AUEventListenerNotify` | **届く**。GUI が追従する |
+
+そのためこの op は **v2 側を読み**(`AudioUnitGetParameter`)、**書いたら必ずイベントを飛ばす**。
+Learn もオブザーバではなく **v2 側の値のポーリング**で検出している。プラグイン自身のウインドウで
+つまみを回したときに拾えるのはこのため。
+
+もう1つの罠: **`AUParameter.address` は v2 のパラメータIDではない**(実測: v2id=3 ↔ addr=10)。
+2つの一覧は値ではなく**並び順**で対応する。
 
 ### プラグインの状態
 

@@ -9,6 +9,7 @@
 // timeslice=true なので入出力のサンプル数は TD が揃えてくれる。
 #import <AVFoundation/AVFoundation.h>
 #import <AudioToolbox/AudioToolbox.h>
+#import <AudioToolbox/AudioUnitUtilities.h>   // AUEventListenerNotify(GUI へ変更を伝える)
 #import <CoreAudioKit/CoreAudioKit.h>
 #import <AppKit/AppKit.h>
 #import <objc/runtime.h>
@@ -89,7 +90,9 @@ struct ParamEntry {
     std::string unit;
     float minV = 0, maxV = 1, cur = 0;
     float lastWritten = NAN;   // 自分が最後に書いた AU 側の値。GUI/プリセットと喧嘩しないための記録
-    uint64_t address = 0;      // AUParameter のアドレス(GUI操作の検出に使う)
+    uint64_t address = 0;      // AUParameter のアドレス。**v2 のパラメータIDとは別物**(実測)
+    AudioUnitParameterID pid = 0;  // v2 側のID。GUI はこちらを読み書きする
+    float learnBase = 0;       // Learn 開始時の値。GUI で動かされたかの判定に使う
     int      learnSlot = -1;   // 割り当てられた Learn 枠(1始まり。-1=未割り当て)
 };
 
@@ -322,7 +325,7 @@ public:
         set(2, p.name);
         snprintf(b, sizeof(b), "%g", p.minV); set(3, b);
         snprintf(b, sizeof(b), "%g", p.maxV); set(4, b);
-        snprintf(b, sizeof(b), "%g", p.p ? p.p.value : p.cur); set(5, b);
+        snprintf(b, sizeof(b), "%g", readParam(p)); set(5, b);
         set(6, p.unit);
         set(7, p.learnSlot > 0 ? ("learn" + std::to_string(p.learnSlot)) : "");
     }
@@ -417,6 +420,18 @@ private:
             myPresets.push_back(pr.name.UTF8String ?: "preset");
         myAddrToIndex.clear();
         for (size_t i = 0; i < myParams.size(); i++) myAddrToIndex[myParams[i].address] = (int)i;
+
+        // v2 側のパラメータID一覧。**AUParameter.address とは一致しない**(実測: v2id=3 ↔ addr=10)。
+        // 並び順は同じなので添え字で対応づける
+        myAU2 = myUnit.audioUnit;
+        UInt32 sz = 0;
+        if (myAU2 && AudioUnitGetPropertyInfo(myAU2, kAudioUnitProperty_ParameterList,
+                                              kAudioUnitScope_Global, 0, &sz, nullptr) == noErr && sz) {
+            std::vector<AudioUnitParameterID> ids(sz / sizeof(AudioUnitParameterID));
+            if (AudioUnitGetProperty(myAU2, kAudioUnitProperty_ParameterList, kAudioUnitScope_Global,
+                                     0, ids.data(), &sz) == noErr)
+                for (size_t i = 0; i < myParams.size() && i < ids.size(); i++) myParams[i].pid = ids[i];
+        }
         installObserver();
     }
 
@@ -526,8 +541,34 @@ private:
         if (target < e.minV) target = e.minV;
         if (target > e.maxV) target = e.maxV;
         if (!std::isnan(e.lastWritten) && fabsf(target - e.lastWritten) < 1e-7f) return;
-        e.p.value = target;
+        e.p.value = target;              // v3→v2 は同期するので、音はこれだけで変わる
+        notifyGUI(e);                    // ただし GUI は通知しないと描き直さない
         e.lastWritten = target;
+        e.learnBase = target;            // 自分の書き込みを「GUI で触られた」と誤検出しないように
+    }
+
+    // v2 のプラグイン GUI は AUEventListener で変更を受け取る。こちらが新 API で書いても
+    // 通知は飛ばないので、明示的に知らせる（実測: これが無いと GUI のつまみが動かない）
+    void notifyGUI(const ParamEntry& e)
+    {
+        if (!myAU2) return;
+        AudioUnitEvent ev = {};
+        ev.mEventType = kAudioUnitEvent_ParameterValueChange;
+        ev.mArgument.mParameter.mAudioUnit   = myAU2;
+        ev.mArgument.mParameter.mParameterID = e.pid;
+        ev.mArgument.mParameter.mScope       = kAudioUnitScope_Global;
+        ev.mArgument.mParameter.mElement     = 0;
+        AUEventListenerNotify(nullptr, nullptr, &ev);
+    }
+
+    // **読むのは v2 側**。GUI の操作は v2 にしか反映されず、AUParameter.value は古いままになる(実測)
+    float readParam(const ParamEntry& e) const
+    {
+        if (myAU2) {
+            AudioUnitParameterValue v = 0;
+            if (AudioUnitGetParameter(myAU2, e.pid, kAudioUnitScope_Global, 0, &v) == noErr) return v;
+        }
+        return e.p ? e.p.value : e.cur;
     }
 
     // 入力1のチャンネル名でパラメータを動かす。
@@ -559,14 +600,39 @@ private:
             for (int i = 0; i < kLearnSlots; i++) myLearnIdx[i] = -1;
             rebuildLearnAliases(); saveLearnMap();
         }
-        myLearning = in->getParInt("Learn") != 0;
-        if (!myLearning) return;
+        const bool learn = in->getParInt("Learn") != 0;
+        if (learn && !myLearning) {                      // Off→On: 今の値を基準として控える
+            for (auto& e : myParams) e.learnBase = readParam(e);
+            myLearning = true;
+            myLearnArmed = true;
+            return;                                      // armした cook では判定しない
+        }                                                // (直前の書き込みが落ち着く前に拾ってしまう)
+        myLearning = learn;
+        if (!learn) return;
+
+        // **v2 側の値を毎cook読んで、動いたものを割り当てる。**
+        // v2 プラグインの GUI は旧 API で書くのでパラメータオブザーバが発火せず、
+        // AUParameter.value も更新されない(実測)。ポーリングだけが確実
+        for (size_t i = 0; i < myParams.size(); i++) {
+            ParamEntry& e = myParams[i];
+            const float now = readParam(e);
+            const float span = e.maxV - e.minV;
+            const float eps = (span > 0 ? span : 1.0f) * 0.002f;   // 範囲の 0.2%
+            if (fabsf(now - e.learnBase) <= eps) continue;
+            e.learnBase = now;
+            if (e.learnSlot > 0) continue;                          // 既に割り当て済み
+            assignLearnSlot((int)i);
+        }
+        // オブザーバ経由(v3 プラグイン用)。こちらは即座に届く
         const uint64_t raw = myTouchedAddr.exchange(0);
-        if (!raw) return;
-        auto it = myAddrToIndex.find(raw - 1);
-        if (it == myAddrToIndex.end()) return;
-        const int idx = it->second;
-        if (myParams[idx].learnSlot > 0) return;              // 既に割り当て済み
+        if (raw) {
+            auto it = myAddrToIndex.find(raw - 1);
+            if (it != myAddrToIndex.end() && myParams[it->second].learnSlot <= 0) assignLearnSlot(it->second);
+        }
+    }
+
+    void assignLearnSlot(int idx)
+    {
         for (int i = 0; i < kLearnSlots; i++) {
             if (myLearnIdx[i] >= 0) continue;
             myLearnIdx[i] = idx;
@@ -580,6 +646,21 @@ private:
     void applyLearnSlots(const OP_Inputs* in)
     {
         if (myLearning) return;
+        if (myLearnArmed) {   // Learn を抜けた直後は、GUI の現在値を枠へ書き戻す
+            myLearnArmed = false;
+            std::vector<std::pair<std::string,double>> vals;
+            for (int i = 0; i < kLearnSlots; i++) {
+                const int idx = myLearnIdx[i];
+                if (idx < 0 || idx >= (int)myParams.size()) continue;
+                ParamEntry& e = myParams[idx];
+                const float span = e.maxV - e.minV;
+                const float nrm = span > 0 ? (readParam(e) - e.minV) / span : 0.f;
+                e.lastWritten = readParam(e);
+                vals.push_back({"Learn" + std::to_string(i + 1), nrm < 0 ? 0 : (nrm > 1 ? 1 : nrm)});
+            }
+            if (!vals.empty()) tdpycb::setFloatPars(myNode, vals);
+            return;                       // この cook は書かない(書き戻しが1フレーム遅れて届くため)
+        }
         for (int i = 0; i < kLearnSlots; i++) {
             const int idx = myLearnIdx[i];
             if (idx < 0 || idx >= (int)myParams.size()) continue;
@@ -816,6 +897,8 @@ private:
     bool myLearning = false;
     int  myLearnIdx[kLearnSlots] = { -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1 };
     std::unordered_map<uint64_t,int> myAddrToIndex;
+    AudioUnit myAU2 = nullptr;
+    bool myLearnArmed = false;
     AUParameterTree* myObserverTree = nil;
     AUParameterObserverToken myObserverToken = nullptr;
     std::atomic<int64_t> myStateSaves{0};
