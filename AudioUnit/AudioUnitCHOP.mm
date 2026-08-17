@@ -74,6 +74,8 @@ std::string sanitize(NSString* s)
     return r;
 }
 
+constexpr int kLearnSlots = 16;
+
 struct PluginEntry {
     std::string id;      // "aufx:dist:appl" を16進にしたもの
     std::string label;   // "AUDistortion — Apple"
@@ -86,7 +88,9 @@ struct ParamEntry {
     std::string name;    // 表示名
     std::string unit;
     float minV = 0, maxV = 1, cur = 0;
-    float lastWritten = NAN;   // 自分が書いた値。GUI/プリセットと喧嘩しないための記録
+    float lastWritten = NAN;   // 自分が最後に書いた AU 側の値。GUI/プリセットと喧嘩しないための記録
+    uint64_t address = 0;      // AUParameter のアドレス(GUI操作の検出に使う)
+    int      learnSlot = -1;   // 割り当てられた Learn 枠(1始まり。-1=未割り当て)
 };
 
 } // namespace
@@ -136,7 +140,7 @@ public:
             if (want != myWantId) { myWantId = want; teardownUnit(); if (!want.empty()) beginLoad(want); }
 
             // 非同期ロードの完了を拾う
-            if (myLoaded.exchange(false)) { adoptLoadedUnit(); restoreState(in); }
+            if (myLoaded.exchange(false)) { adoptLoadedUnit(); restoreState(in); restoreLearnMap(in); }
             if (myLoadFailed.exchange(false)) myErr = myErrPending;
 
             const OP_CHOPInput* ci = in->getInputCHOP(0);
@@ -150,6 +154,8 @@ public:
             if (!ensureEngine(sr, n)) { passThrough(out, ci, n, in); return; }
 
             applyPreset(in);
+            handleLearn(in);
+            applyLearnSlots(in);
             applyParamsFromInput(in);
             myBypassed = in->getParInt("Bypass") != 0;
             myUnit.AUAudioUnit.shouldBypassEffect = myBypassed;
@@ -216,9 +222,36 @@ public:
           p.clampMins[0] = true; p.clampMaxes[0] = true; m->appendFloat(p); }
         { OP_NumericParameter p("Gain"); p.label = "Output Gain"; p.page = P; p.defaultValues[0] = 1;
           p.minSliders[0] = 0; p.maxSliders[0] = 2; m->appendFloat(p); }
+        {
+            // MIDI コンは 0〜1 で来るので、既定は「そのパラメータの min〜max へ引き伸ばす」
+            OP_StringParameter p("Inputrange"); p.label = "Input Range"; p.page = P;
+            p.defaultValue = "Normalized";
+            const char* n[] = {"Normalized", "Raw"};
+            const char* l[] = {"Normalized 0-1 -> parameter range", "Raw value"};
+            m->appendMenu(p, 2, n, l);
+        }
         { OP_NumericParameter p("Showui"); p.label = "Display GUI"; p.page = P; p.defaultValues[0] = 0; m->appendToggle(p); }
         { OP_NumericParameter p("Alwaysontop"); p.label = "Always On Top"; p.page = P; p.defaultValues[0] = 1; m->appendToggle(p); }
         { OP_NumericParameter p("Resetstate"); p.label = "Reset Plugin State"; p.page = P; m->appendPulse(p); }
+
+        // Audio VST CHOP の learn parms 相当。TD は実行中にパラメータを増やせないので、
+        // 枠を先に kLearnSlots 個用意しておき、GUI で触ったパラメータをそこへ割り当てる
+        const char* L = "Learn";
+        { OP_NumericParameter p("Learn"); p.label = "Learn Parameters"; p.page = L; p.defaultValues[0] = 0; m->appendToggle(p); }
+        { OP_NumericParameter p("Clearlearned"); p.label = "Clear Learned"; p.page = L; m->appendPulse(p); }
+        {
+            OP_StringParameter p("Learnmap"); p.label = "Learned Mapping"; p.page = L;
+            p.defaultValue = ""; m->appendString(p);
+        }
+        for (int i = 1; i <= kLearnSlots; i++) {
+            char nm[16], lb[32];
+            snprintf(nm, sizeof nm, "Learn%d", i);
+            snprintf(lb, sizeof lb, "Learn %d", i);
+            OP_NumericParameter p(nm); p.label = lb; p.page = "Learned";
+            p.defaultValues[0] = 0; p.minSliders[0] = 0; p.maxSliders[0] = 1;
+            p.minValues[0] = 0; p.maxValues[0] = 1; p.clampMins[0] = true; p.clampMaxes[0] = true;
+            m->appendFloat(p);
+        }
 
         const char* S = "State";
         { OP_NumericParameter p("Loadstate"); p.label = "Load Plugin State"; p.page = S; p.defaultValues[0] = 1; m->appendToggle(p); }
@@ -236,6 +269,7 @@ public:
         if (!strcmp(name, "Rescan")) rescan();
         else if (!strcmp(name, "Resetstate")) myWantReset = true;
         else if (!strcmp(name, "Savestate")) myWantSaveState = true;
+        else if (!strcmp(name, "Clearlearned")) myWantClearLearn = true;
     }
 
     void buildDynamicMenu(const OP_Inputs*, OP_BuildDynamicMenuInfo* info, void*) override
@@ -253,21 +287,21 @@ public:
 
     // ------------------------------------------------------------ info
 
-    int32_t getNumInfoCHOPChans(void*) override { return 7; }
+    int32_t getNumInfoCHOPChans(void*) override { return 8; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override
     {
         static const char* n[] = { "executes", "renders", "samplerate", "loaded",
-                                   "params", "latency_ms", "bypassed" };
+                                   "params", "latency_ms", "bypassed", "learned" };
         const float v[] = { (float)myExec.load(), (float)myRenders.load(), (float)mySampleRate,
                             (float)(myUnit != nil), (float)myParams.size(),
-                            (float)(myLatencySec * 1000.0), (float)myBypassed };
+                            (float)(myLatencySec * 1000.0), (float)myBypassed, (float)learnedCount() };
         c->name->setString(n[i]); c->value = v[i];
     }
 
     bool getInfoDATSize(OP_InfoDATSize* s, void*) override
     {
         s->rows = 1 + (int)myParams.size();
-        s->cols = 7;
+        s->cols = 8;
         s->byColumn = false;
         return true;
     }
@@ -278,7 +312,7 @@ public:
         };
         if (row == 0) {
             set(0, "index"); set(1, "channel"); set(2, "name");
-            set(3, "min"); set(4, "max"); set(5, "value"); set(6, "unit");
+            set(3, "min"); set(4, "max"); set(5, "value"); set(6, "unit"); set(7, "learn");
             return;
         }
         const ParamEntry& p = myParams[row - 1];
@@ -290,12 +324,20 @@ public:
         snprintf(b, sizeof(b), "%g", p.maxV); set(4, b);
         snprintf(b, sizeof(b), "%g", p.p ? p.p.value : p.cur); set(5, b);
         set(6, p.unit);
+        set(7, p.learnSlot > 0 ? ("learn" + std::to_string(p.learnSlot)) : "");
     }
 
     void getWarningString(OP_String* s, void*) override { if (!myWarn.empty()) s->setString(myWarn.c_str()); }
     void getErrorString(OP_String* s, void*) override { if (!myErr.empty()) s->setString(myErr.c_str()); }
 
 private:
+    int learnedCount() const
+    {
+        int n = 0;
+        for (int i = 0; i < kLearnSlots; i++) if (myLearnIdx[i] >= 0) n++;
+        return n;
+    }
+
     // ------------------------------------------------------------ scan
 
     void rescan()
@@ -359,6 +401,7 @@ private:
                 e.name  = p.displayName.UTF8String ?: e.ident;
                 e.unit  = p.unitName.UTF8String ?: "";
                 e.minV = p.minValue; e.maxV = p.maxValue; e.cur = p.value;
+                e.address = p.address;
                 // チャンネル名は**表示名から**作る。AU の identifier は AUDistortion のように
                 // "0" "1" "2" と数字だけのことがあり、それを p0/p1 にすると別パラメータの
                 // 添え字別名 p<index> と衝突しうる（実測で発覚）。表示名なら意味も読める
@@ -372,6 +415,9 @@ private:
         }
         for (AUAudioUnitPreset* pr in (au.factoryPresets ?: @[]))
             myPresets.push_back(pr.name.UTF8String ?: "preset");
+        myAddrToIndex.clear();
+        for (size_t i = 0; i < myParams.size(); i++) myAddrToIndex[myParams[i].address] = (int)i;
+        installObserver();
     }
 
     // ------------------------------------------------------------ engine
@@ -432,6 +478,7 @@ private:
     }
     void teardownUnit()
     {
+        removeObserver();
         destroyWindow();
         teardownEngine();
         myUnit = nil; myPendingUnit = nil;
@@ -470,24 +517,140 @@ private:
         }
     }
 
-    // 入力1のチャンネル名でパラメータを動かす。**値が変わったときだけ書く**ので、
-    // 自動化していないパラメータはプラグインの GUI やプリセット側が持ち主のままになる
+    // 値の書き込みはここだけ。normalized なら 0〜1 をそのパラメータの min〜max へ引き伸ばす。
+    // **自分が最後に書いた値と同じなら書かない**ので、動かしていないパラメータは
+    // プラグインの GUI やプリセットが持ち主のままになる
+    void writeParam(ParamEntry& e, float v, bool normalized)
+    {
+        float target = normalized ? (e.minV + (v < 0 ? 0 : (v > 1 ? 1 : v)) * (e.maxV - e.minV)) : v;
+        if (target < e.minV) target = e.minV;
+        if (target > e.maxV) target = e.maxV;
+        if (!std::isnan(e.lastWritten) && fabsf(target - e.lastWritten) < 1e-7f) return;
+        e.p.value = target;
+        e.lastWritten = target;
+    }
+
+    // 入力1のチャンネル名でパラメータを動かす。
+    // 名前は Info DAT の channel 列 / `p<index>` / 割り当て済みの `learn<n>` が使える
     void applyParamsFromInput(const OP_Inputs* in)
     {
+        if (myLearning) return;                    // 学習中は自分で書かない(GUI 操作の誤検出を防ぐ)
         const OP_CHOPInput* pi = in->getInputCHOP(1);
         if (!pi || pi->numSamples < 1) return;
+        const char* rng = in->getParString("Inputrange");
+        const bool norm = !rng || strcmp(rng, "Raw") != 0;
         for (int c = 0; c < pi->numChannels; c++) {
             const char* nm = pi->getChannelName(c);
             if (!nm) continue;
             auto it = myChanMap.find(nm);
             if (it == myChanMap.end()) continue;
-            ParamEntry& e = myParams[it->second];
-            const float v = pi->getChannelData(c)[pi->numSamples - 1];
-            if (!std::isnan(e.lastWritten) && fabsf(v - e.lastWritten) < 1e-7f) continue;
-            const float cl = v < e.minV ? e.minV : (v > e.maxV ? e.maxV : v);
-            e.p.value = cl;
-            e.lastWritten = v;
+            writeParam(myParams[it->second], pi->getChannelData(c)[pi->numSamples - 1], norm);
         }
+    }
+
+    // ------------------------------------------------------------ learn
+
+    // Learn 中に GUI で触られたパラメータを空いている枠へ割り当てる。
+    // 学習中はこちらから値を書かない(自分の書き込みを「触られた」と誤検出しないため)
+    void handleLearn(const OP_Inputs* in)
+    {
+        if (myWantClearLearn.exchange(false)) {
+            for (auto& e : myParams) e.learnSlot = -1;
+            for (int i = 0; i < kLearnSlots; i++) myLearnIdx[i] = -1;
+            rebuildLearnAliases(); saveLearnMap();
+        }
+        myLearning = in->getParInt("Learn") != 0;
+        if (!myLearning) return;
+        const uint64_t raw = myTouchedAddr.exchange(0);
+        if (!raw) return;
+        auto it = myAddrToIndex.find(raw - 1);
+        if (it == myAddrToIndex.end()) return;
+        const int idx = it->second;
+        if (myParams[idx].learnSlot > 0) return;              // 既に割り当て済み
+        for (int i = 0; i < kLearnSlots; i++) {
+            if (myLearnIdx[i] >= 0) continue;
+            myLearnIdx[i] = idx;
+            myParams[idx].learnSlot = i + 1;
+            rebuildLearnAliases(); saveLearnMap();
+            return;
+        }
+        myWarn = "all learn slots are used";
+    }
+
+    void applyLearnSlots(const OP_Inputs* in)
+    {
+        if (myLearning) return;
+        for (int i = 0; i < kLearnSlots; i++) {
+            const int idx = myLearnIdx[i];
+            if (idx < 0 || idx >= (int)myParams.size()) continue;
+            char nm[16]; snprintf(nm, sizeof nm, "Learn%d", i + 1);
+            writeParam(myParams[idx], (float)in->getParDouble(nm), true);   // 枠は常に 0〜1
+        }
+    }
+
+    // 入力CHOP から `learn1` `learn2` … でも指せるようにする
+    void rebuildLearnAliases()
+    {
+        for (int i = 0; i < kLearnSlots; i++) myChanMap.erase("learn" + std::to_string(i + 1));
+        for (int i = 0; i < kLearnSlots; i++)
+            if (myLearnIdx[i] >= 0) myChanMap["learn" + std::to_string(i + 1)] = myLearnIdx[i];
+    }
+
+    void saveLearnMap()
+    {
+        std::string v = myWantId + "|";
+        for (int i = 0; i < kLearnSlots; i++) {
+            if (i) v += ",";
+            v += std::to_string(myLearnIdx[i]);
+        }
+        tdpycb::setStringPars(myNode, {{"Learnmap", v}});
+    }
+
+    void restoreLearnMap(const OP_Inputs* in)
+    {
+        for (int i = 0; i < kLearnSlots; i++) myLearnIdx[i] = -1;
+        for (auto& e : myParams) e.learnSlot = -1;
+        const char* raw = in->getParString("Learnmap");
+        if (raw && *raw) {
+            std::string s2 = raw;
+            const size_t bar = s2.find('|');
+            if (bar != std::string::npos && s2.substr(0, bar) == myWantId) {
+                std::string body = s2.substr(bar + 1);
+                int i = 0; size_t pos = 0;
+                while (i < kLearnSlots && pos <= body.size()) {
+                    const size_t c = body.find(',', pos);
+                    const std::string tok = body.substr(pos, c == std::string::npos ? std::string::npos : c - pos);
+                    const int idx = tok.empty() ? -1 : atoi(tok.c_str());
+                    if (idx >= 0 && idx < (int)myParams.size()) {
+                        myLearnIdx[i] = idx; myParams[idx].learnSlot = i + 1;
+                    }
+                    i++;
+                    if (c == std::string::npos) break;
+                    pos = c + 1;
+                }
+            }
+        }
+        rebuildLearnAliases();
+    }
+
+    // GUI で動かされたパラメータを知るためのオブザーバ。AU 側のスレッドから来るので
+    // アドレスを1つ置くだけにして、割り当ては cook 側で行う
+    void installObserver()
+    {
+        removeObserver();
+        if (!myUnit) return;
+        AUParameterTree* tree = myUnit.AUAudioUnit.parameterTree;
+        if (!tree) return;
+        std::atomic<uint64_t>* touched = &myTouchedAddr;
+        myObserverTree = tree;
+        myObserverToken = [tree tokenByAddingParameterObserver:^(AUParameterAddress address, AUValue) {
+            touched->store(address + 1);          // 0 を「無し」に使うので +1
+        }];
+    }
+    void removeObserver()
+    {
+        if (myObserverTree && myObserverToken) [myObserverTree removeParameterObserver:myObserverToken];
+        myObserverTree = nil; myObserverToken = nullptr; myTouchedAddr = 0;
     }
 
     // ------------------------------------------------------------ plugin UI window
@@ -627,7 +790,7 @@ private:
     std::vector<ParamEntry>  myParams;
     std::vector<std::string> myPresets;
     std::unordered_map<std::string, int> myChanMap;
-    std::string myScratch[8];
+    std::string myScratch[9];
 
     std::string myWantId, myWarn, myErr, myErrPending;
     std::atomic<bool> myLoaded{false}, myLoadFailed{false};
@@ -648,6 +811,13 @@ private:
     int  myAppliedPreset = -2;
     bool myWantReset = false;
     std::atomic<bool> myWantSaveState{false};
+    std::atomic<bool> myWantClearLearn{false};
+    std::atomic<uint64_t> myTouchedAddr{0};
+    bool myLearning = false;
+    int  myLearnIdx[kLearnSlots] = { -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1 };
+    std::unordered_map<uint64_t,int> myAddrToIndex;
+    AUParameterTree* myObserverTree = nil;
+    AUParameterObserverToken myObserverToken = nullptr;
     std::atomic<int64_t> myStateSaves{0};
     bool myAlwaysOnTop = true;
     bool myBypassed = false;

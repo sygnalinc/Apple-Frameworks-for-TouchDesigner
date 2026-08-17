@@ -30,6 +30,8 @@ Measured on a stock M2 (macOS 26.6): **0 VST3 plugins installed, 30 Audio Units*
 - Applies **factory presets**
 - Opens the plugin's **own GUI** in a floating window
 - **Saves the plugin's state into the .toe** so a sound you dialled in by hand survives a reopen
+- **Learn**: touch a knob in the GUI to bind it to one of 16 slots — drive them from MIDI, keyframes
+  or expressions. Assignments are remembered per plugin
 
 ### Measured (M2, macOS 26.6)
 
@@ -43,6 +45,7 @@ Measured on a stock M2 (macOS 26.6): **0 VST3 plugins installed, 30 Audio Units*
 | Parameter automation | `Delay_Mix` 0 / 45 / 100 → AU value and output follow |
 | Plugin state | 463 base64 characters for AUDistortion; restored correctly after switching plugins away and back |
 | GUI | AUDistortion's own view, 581×518, floating (window layer 3) |
+| Learn | Touching a parameter assigns it to `learn1`; slider 0 / 0.25 / 0.5 / 1 → `WetDry_Mix` 0 / 25 / 50 / 100; the same via a `learn1` input channel; the mapping came back after switching plugins away and back |
 
 ### Inputs
 
@@ -53,11 +56,54 @@ Measured on a stock M2 (macOS 26.6): **0 VST3 plugins installed, 30 Audio Units*
 
 Output is always **stereo** (`left` / `right`).
 
+### Learn (assigning parameters, like the VST CHOP)
+
+TouchDesigner's Audio VST CHOP has **Learn Parameters**, which turns plugin parameters into real
+TD parameters. That exact behaviour is impossible here: `setupParameters` is called **once per
+instance** (measured), so a C++ Custom OP cannot grow parameters at runtime. What this operator
+does instead is pre-declare **16 slots** and let you assign plugin parameters to them.
+
+1. Turn **Learn Parameters** on
+2. Open the GUI and touch the knobs you want — each one is assigned to the next free slot
+3. Turn Learn off
+
+Now `Learn 1` … `Learn 16` on the **Learned** page drive those parameters. They are normal TD
+parameters, so you can bind them, keyframe them, or drive them by expression. The Info DAT's
+`learn` column shows which slot owns which parameter.
+
+The slots are always **0–1**, stretched to each parameter's own `min`–`max`. That is what makes a
+MIDI controller work without any scaling on your side.
+
+While Learn is on, the operator stops writing parameters itself, so that its own writes are not
+mistaken for you touching a knob.
+
+**Assignments are stored per plugin** in the `Learned Mapping` parameter, which saves with the
+.toe. Switch to another plugin and back and your mapping returns.
+
+### Driving from a MIDI controller
+
+Wire a MIDI In CHOP (or [CoreMIDI In](../CoreMIDI/)) into input 1 and rename its channels to the
+slot names:
+
+```
+MIDI In CHOP  →  Rename CHOP ("ch1c74 ch1c75" → "learn1 learn2")  →  AudioUnit CHOP input 1
+```
+
+Or skip the input entirely and bind the parameter directly:
+
+```python
+op('audiounit1').par.Learn1.expr = "op('midiin1')['ch1c74']"
+```
+
 ### Driving parameters
 
 Attach an Info DAT to see the parameter table — `index`, `channel`, `name`, `min`, `max`, `value`,
 `unit`. **The `channel` column is the exact channel name to use.** For example AUDistortion gives
-`Delay`, `Decay`, `Delay_Mix`, `Ring_Mod_Freq_1`, … `WetDry_Mix`.
+`Delay`, `Decay`, `Delay_Mix`, `Ring_Mod_Freq_1`, … `WetDry_Mix`. Assigned slots can also be
+addressed as `learn1`, `learn2`, ….
+
+`Input Range` decides how the incoming value is read: **Normalized** (default) treats 0–1 as the
+parameter's full range, **Raw** writes the value as it is.
 
 Channel names come from the parameter's **display name**, not its identifier — several Apple AUs
 report identifiers that are just `"0"`, `"1"`, `"2"`, which would collide with the `p<index>`
@@ -89,6 +135,8 @@ one plugin's state into another.
 | Always On Top | Floating window vs a normal one |
 | Reset Plugin State | Clears the AU's internal state (reverb tails etc.) |
 | Load / Save Plugin State, Plugin State | See above |
+| Learn Parameters / Clear Learned / Learned Mapping | See "Learn" above |
+| Learn 1 … 16 | The assigned parameters, always 0–1 |
 
 ### Notes
 
@@ -97,9 +145,8 @@ one plugin's state into another.
 - Plugins load with the system's default policy for that component, so v3 app-extension plugins run
   **out of process** and a crash there does not take TouchDesigner with it
 - **TouchDesigner cannot grow parameters at runtime.** `setupParameters` is called exactly once per
-  instance (measured), so the VST CHOP's "learn parameters" — which turns plugin parameters into
-  real TD parameters — cannot be reproduced through the public C++ SDK. The automation input plus
-  the Info DAT is the equivalent here
+  instance (measured), so the VST CHOP's "learn parameters" cannot be reproduced literally. The 16
+  pre-declared slots described under "Learn" are the equivalent here
 - This operator only cooks when something downstream asks for it. If the GUI does not appear, check
   that the CHOP is actually cooking
 
@@ -139,6 +186,8 @@ TouchDesigner には **Audio VST CHOP** があるが、macOS では **VST3 し�
 - **ファクトリープリセット**の適用
 - プラグイン**自身の GUI** をフローティングウインドウで表示
 - **プラグインの状態を .toe に保存**。GUI で作り込んだ音が開き直しても残る
+- **Learn**: GUI でつまみを触るとその場で16個の枠に割り当て。MIDI・キーフレーム・式から動かせる。
+  割り当てはプラグインごとに覚える
 
 ### 実測(M2・macOS 26.6)
 
@@ -152,6 +201,7 @@ TouchDesigner には **Audio VST CHOP** があるが、macOS では **VST3 し�
 | パラメータ自動化 | `Delay_Mix` 0 / 45 / 100 で AU 側の値と出音が追従 |
 | プラグイン状態 | AUDistortion で base64 463文字。別プラグインへ切り替えて戻しても復元される |
 | GUI | AUDistortion 自身の画面 581×518・最前面(layer 3) |
+| Learn | パラメータを触ると `learn1` に割り当て。スライダ 0 / 0.25 / 0.5 / 1 → `WetDry_Mix` 0 / 25 / 50 / 100。入力CHOP の `learn1` でも同じ。別プラグインへ切り替えて戻しても割り当てが復元 |
 
 ### 入力
 
@@ -162,11 +212,52 @@ TouchDesigner には **Audio VST CHOP** があるが、macOS では **VST3 し�
 
 出力は常に**ステレオ**(`left` / `right`)。
 
+### Learn(パラメータの割り当て。VST CHOP 相当)
+
+TouchDesigner の Audio VST CHOP には **Learn Parameters**(プラグインのパラメータを TD の
+パラメータとして生やす)がある。**同じことはできない** — `setupParameters` は
+インスタンスにつき**1回きり**しか呼ばれず(実測)、C++ Custom OP は実行中にパラメータを
+増やせない。そこでこの op は **16個の枠を先に用意**して、そこへ割り当てる形にした。
+
+1. **Learn Parameters** を On
+2. GUI を開いて、使いたいつまみを触る。触った順に空いている枠へ割り当てられる
+3. Learn を Off
+
+以降は **Learned ページの `Learn 1` 〜 `Learn 16`** がそのパラメータを動かす。普通の TD
+パラメータなので、バインドもキーフレームも式も使える。どの枠がどれを持っているかは
+Info DAT の `learn` 列で分かる。
+
+枠は常に **0〜1** で、各パラメータの `min`〜`max` へ引き伸ばされる。MIDI コンを
+スケーリング無しでそのまま使えるのはこのため。
+
+Learn 中はこちらから値を書かない(自分の書き込みを「つまみを触った」と誤検出しないため)。
+
+**割り当てはプラグインごとに** `Learned Mapping` パラメータへ保存され、.toe と一緒に残る。
+別のプラグインへ切り替えて戻すと、そのプラグイン用の割り当てが戻る。
+
+### MIDI コンから動かす
+
+MIDI In CHOP(または [CoreMIDI In](../CoreMIDI/))を入力1へ繋ぎ、チャンネル名を枠の名前に変える:
+
+```
+MIDI In CHOP  →  Rename CHOP（"ch1c74 ch1c75" → "learn1 learn2"）  →  AudioUnit CHOP 入力1
+```
+
+入力を使わず、パラメータへ直接バインドしてもよい:
+
+```python
+op('audiounit1').par.Learn1.expr = "op('midiin1')['ch1c74']"
+```
+
 ### パラメータの動かし方
 
 Info DAT を繋ぐとパラメータ表が出る(`index` / `channel` / `name` / `min` / `max` / `value` /
 `unit`)。**`channel` 列がそのまま使うチャンネル名**。例えば AUDistortion なら
-`Delay` `Decay` `Delay_Mix` `Ring_Mod_Freq_1` … `WetDry_Mix`。
+`Delay` `Decay` `Delay_Mix` `Ring_Mod_Freq_1` … `WetDry_Mix`。割り当て済みの枠は
+`learn1` `learn2` … でも指せる。
+
+`Input Range` は入力値の読み方。**Normalized**(既定)は 0〜1 をそのパラメータの
+フルレンジとして扱い、**Raw** はそのまま書く。
 
 チャンネル名は識別子ではなく**表示名**から作っている。Apple の AU には識別子が `"0"` `"1"` `"2"` と
 数字だけのものがあり、それだと添え字別名 `p<index>` と衝突するため(実測で発覚)。位置で指したい
@@ -197,6 +288,8 @@ base64 にして `Plugin State` 文字列パラメータへ入れる(.toe と一
 | Always On Top | 最前面に固定するか |
 | Reset Plugin State | AU の内部状態(残響など)を消す |
 | Load / Save Plugin State・Plugin State | 上記 |
+| Learn Parameters / Clear Learned / Learned Mapping | 上記「Learn」 |
+| Learn 1 〜 16 | 割り当てたパラメータ。常に 0〜1 |
 
 ### 注意
 
@@ -205,8 +298,8 @@ base64 にして `Plugin State` 文字列パラメータへ入れる(.toe と一
 - 読み込み方はそのコンポーネントの既定に任せているので、v3 のアプリ拡張型プラグインは
   **別プロセスで動く**。そちらが落ちても TouchDesigner は巻き込まれない
 - **TD は実行中にパラメータを増やせない。** `setupParameters` はインスタンスにつき**1回きり**しか
-  呼ばれない(実測)。そのため VST CHOP の「learn parms」(プラグインのパラメータを TD のパラメータ
-  として生やす機能)は公開 C++ SDK では再現できない。ここでは自動化入力 + Info DAT がその代わり
+  呼ばれない(実測)。そのため VST CHOP の「learn parms」をそのままの形では再現できない。
+  上の「Learn」で説明した**16個の枠**がその代わりになる
 - この op は下流から要求されたときだけ cook する。GUI が出ないときは、まず**cook されているか**を疑う
 
 ### ビルド
