@@ -58,58 +58,33 @@ Measured on a stock M2 (macOS 26.6): **0 VST3 plugins installed, 30 Audio Units*
 
 Output is always **stereo** (`left` / `right`).
 
-### Learn (assigning parameters, like the VST CHOP)
+### Learn (choosing which parameters go on the panel)
 
-TouchDesigner's Audio VST CHOP has **Learn Parameters**, which turns plugin parameters into real
-TD parameters. That exact behaviour is impossible here: `setupParameters` is called **once per
-instance** (measured), so a C++ Custom OP cannot grow parameters at runtime. What this operator
-does instead is pre-declare **16 slots** and let you assign plugin parameters to them.
+TouchDesigner's Audio VST CHOP has **Learn Parameters**, which turns plugin parameters into real TD
+parameters. A C++ Custom OP cannot do that — `setupParameters` is called **once per instance**
+(measured), and Python cannot add parameters to a CHOP either (`appendCustomPage` exists on COMPs
+but not on a CHOP, measured). **A Script CHOP can**, so that is where the controls live.
 
 1. Turn **Learn Parameters** on
-2. Open the GUI and touch the knobs you want — each one is assigned to the next free slot
+2. Open the GUI and touch the knobs you want — each one is marked as learned
+3. Press **Create / Rebuild Panel**
 
-That is all. `Learn 1` … `Learn 16` sit on the same page and drive those parameters. They are normal
-TD parameters, so you can bind them, keyframe them, or drive them by expression. The Info DAT's
-`learn` column shows which slot owns which parameter.
-
-The slots are always **0–1**, stretched to each parameter's own `min`–`max`. That is what makes a
-MIDI controller work without any scaling on your side.
-
-**The two sides stay in sync, both ways, all the time** — including while Learn is still on:
-
-- Move a knob in the plugin's GUI → the matching `Learn n` slot follows
-- Move a `Learn n` slot → the plugin's GUI knob follows
-
-Leaving Learn on simply means new knobs you touch keep getting assigned. Turning it off freezes the
-assignments; the two-way sync carries on either way.
-
-**Assignments are stored per plugin** in the `Learned Mapping` parameter, which saves with the
-.toe. Switch to another plugin and back and your mapping returns.
-
-Slots you have not assigned are **greyed out**, so the page reads as "these are the ones I learned"
-and grows as you go. The count is fixed at 16 — see the note below on why it cannot grow at runtime.
-
-**The slot follows the knob's own curve, not the raw value.** Audio Units declare how their GUI
-sweeps a parameter, and many are logarithmic. AUPeakLimiter's `Attack Time` runs 0.0005–0.03 s on a
-log scale: its knob at centre is 0.00387, which a plain linear normalization would report as
-**0.114**, not 0.5. This operator reads that flag and applies the same curve, so the slot and the
-GUI knob always agree. Measured across the 24 installed effects: 181 parameters linear,
-41 logarithmic, 4 squared, 3 square-root, 1 cubed, 1 exponential.
+**Assignments are stored per plugin** in the `Learned Mapping` parameter, which saves with the .toe.
+Switch to another plugin and back and your selection returns. The Info DAT's `learn` column shows
+what is currently selected.
 
 ### Driving from a MIDI controller
 
-Wire a MIDI In CHOP (or [CoreMIDI In](../CoreMIDI/)) into input 1 and rename its channels to the
-slot names:
+Wire the controller into the **panel's** input and name the channels after the parameters:
 
 ```
-MIDI In CHOP  →  Rename CHOP ("ch1c74 ch1c75" → "learn1 learn2")  →  AudioUnit CHOP input 1
+MIDI In CHOP  →  Rename CHOP ("ch1c74" → "Low_Frequency")  →  panel Script CHOP input 0
 ```
 
-Or skip the input entirely and bind the parameter directly:
-
-```python
-op('audiounit1').par.Learn1.expr = "op('midiin1')['ch1c74']"
-```
+Incoming values are read as **0–1 and stretched along the parameter's own display curve**, so a
+plain CC sweeps the knob exactly as the plugin's GUI would. Measured on `Low Frequency`
+(10–21829.5 Hz, logarithmic): 0.25 → 68.35 Hz, 0.5 → 467.22 Hz, 1.0 → 21829.5 Hz — log positions
+0.250 / 0.500 / 1.000. The panel's own control shows the real value while it is being driven.
 
 ### Driving parameters
 
@@ -164,11 +139,6 @@ follows; move a panel control and the plugin follows. Measured: panel 400 / 5000
 5000 exactly, menu → `High Pass`, gain → −12 dB; and with the plugin driven from elsewhere the panel
 tracked it (10 Hz / 21829.5 Hz). Steady-state cost of the pair is **0.45 ms** per frame.
 
-> **Known limitation.** While the panel is connected, the `Learn 1…16` slots cannot move the same
-> parameters — the panel emits its value every frame and wins. Use the panel *or* the slots for a
-> given parameter, not both; disconnect the panel from input 1 if you want to drive those
-> parameters from the slots (e.g. from MIDI).
-
 ### Plugin state
 
 The GUI is only useful if what you set there survives. `Save Plugin State` serializes the AU's
@@ -192,9 +162,8 @@ one plugin's state into another.
 | Always On Top | Floating window vs a normal one (default off) |
 | Reset Plugin State | Clears the AU's internal state (reverb tails etc.) |
 | Load / Save Plugin State, Plugin State | See above |
-| Learn Parameters / Clear Learned / Learned Mapping | See "Learn" above |
+| Learn Parameters / Clear Learned / Learned Mapping | Which parameters go on the panel |
 | Create / Rebuild Panel | Generates the Script CHOP panel described above |
-| Learn 1 … 16 | The assigned parameters, always 0–1. Two-way with the GUI |
 
 ### Notes
 
@@ -274,56 +243,34 @@ TouchDesigner には **Audio VST CHOP** があるが、macOS では **VST3 し�
 
 出力は常に**ステレオ**(`left` / `right`)。
 
-### Learn(パラメータの割り当て。VST CHOP 相当)
+### Learn(どのパラメータをパネルに載せるか)
 
 TouchDesigner の Audio VST CHOP には **Learn Parameters**(プラグインのパラメータを TD の
-パラメータとして生やす)がある。**同じことはできない** — `setupParameters` は
-インスタンスにつき**1回きり**しか呼ばれず(実測)、C++ Custom OP は実行中にパラメータを
-増やせない。そこでこの op は **16個の枠を先に用意**して、そこへ割り当てる形にした。
+パラメータとして生やす)がある。C++ Custom OP にはできない — `setupParameters` は
+インスタンスにつき**1回きり**しか呼ばれず(実測)、Python からも足せない
+(`appendCustomPage` は COMP にはあるが CHOP には無い・実測)。**Script CHOP なら生やせる**ので、
+コントロールはそちらに置く。
 
 1. **Learn Parameters** を On
-2. GUI を開いて、使いたいつまみを触る。触った順に空いている枠へ割り当てられる
+2. GUI を開いて、使いたいつまみを触る。触ったものが対象として記録される
+3. **Create / Rebuild Panel** を押す
 
-これだけ。**同じページの `Learn 1` 〜 `Learn 16`** がそのパラメータを動かす。普通の TD
-パラメータなので、バインドもキーフレームも式も使える。どの枠がどれを持っているかは
+**選択はプラグインごとに** `Learned Mapping` パラメータへ保存され、.toe と一緒に残る。
+別のプラグインへ切り替えて戻すと、そのプラグイン用の選択が戻る。今どれが選ばれているかは
 Info DAT の `learn` 列で分かる。
-
-枠は常に **0〜1** で、各パラメータの `min`〜`max` へ引き伸ばされる。MIDI コンを
-スケーリング無しでそのまま使えるのはこのため。
-
-**両側は常に双方向で同期する。Learn を On にしたままでも同じ**:
-
-- プラグインの GUI でつまみを動かす → 対応する `Learn n` の枠が追従する
-- `Learn n` の枠を動かす → プラグインの GUI のつまみが追従する
-
-Learn を On のままにしておくと、新しく触ったつまみが割り当てられ続ける、というだけの違い。
-Off にすると割り当てが固定される。双方向の同期はどちらでも働く。
-
-**割り当てはプラグインごとに** `Learned Mapping` パラメータへ保存され、.toe と一緒に残る。
-別のプラグインへ切り替えて戻すと、そのプラグイン用の割り当てが戻る。
-
-割り当てていない枠は**グレーアウト**するので、ページは「learn した分だけ」に見えて、
-learn するたびに増えていく。枠の数は16固定(実行中に増やせない理由は下の注意を参照)。
-
-**枠はつまみ自身の曲線に従う。生の値ではない。** Audio Unit は GUI がパラメータをどう振るかを
-フラグで持っていて、対数のものが多い。AUPeakLimiter の `Attack Time` は 0.0005〜0.03 秒の
-**対数**で、つまみ中央は 0.00387。素の線形正規化だとこれが **0.114** になってしまい 0.5 にならない。
-この op はそのフラグを読んで同じ曲線を掛けるので、枠と GUI のつまみは常に一致する。
-インストール済みエフェクト24個での実測: 線形181・**対数41**・Squared 4・SquareRoot 3・Cubed 1・Exponential 1。
 
 ### MIDI コンから動かす
 
-MIDI In CHOP(または [CoreMIDI In](../CoreMIDI/))を入力1へ繋ぎ、チャンネル名を枠の名前に変える:
+コントローラは**パネルの入力**へ繋ぎ、チャンネル名をパラメータ名に合わせる:
 
 ```
-MIDI In CHOP  →  Rename CHOP（"ch1c74 ch1c75" → "learn1 learn2"）  →  AudioUnit CHOP 入力1
+MIDI In CHOP  →  Rename CHOP（"ch1c74" → "Low_Frequency"）  →  パネル Script CHOP の入力0
 ```
 
-入力を使わず、パラメータへ直接バインドしてもよい:
-
-```python
-op('audiounit1').par.Learn1.expr = "op('midiin1')['ch1c74']"
-```
+入ってきた値は **0〜1 として読まれ、そのパラメータ自身の表示曲線に沿って引き伸ばされる**ので、
+素の CC がプラグインの GUI と同じ振れ方をする。`Low Frequency`(10〜21829.5 Hz・対数)での実測:
+0.25 → 68.35 Hz、0.5 → 467.22 Hz、0.75 → 3193.6 Hz、1.0 → 21829.5 Hz — 対数位置で
+0.250 / 0.500 / 0.750 / 1.000。動かしている間、パネルのコントロールには実値が表示される。
 
 ### パラメータの動かし方
 
@@ -379,10 +326,6 @@ learn の内容が変わると自分で作り直す。
 (厳密一致)、プルダウン → `High Pass`、ゲイン → −12 dB。逆にプラグイン側を動かすと
 パネルが 10 Hz / 21829.5 Hz へ追従した。2つ合わせた定常負荷は **1フレーム 0.45 ms**。
 
-> **既知の制限。** パネルを繋いでいる間は `Learn 1〜16` の枠から同じパラメータを動かせない。
-> パネルが毎フレーム値を出しているので、そちらが勝つ。**1つのパラメータはパネルか枠の
-> どちらか**で扱うこと。枠(MIDI など)から動かしたいときはパネルを入力1から外す。
-
 ### プラグインの状態
 
 GUI は「そこで作った音が残る」ことで初めて役に立つ。`Save Plugin State` で AU の `fullState` を
@@ -405,9 +348,8 @@ base64 にして `Plugin State` 文字列パラメータへ入れる(.toe と一
 | Always On Top | 最前面に固定するか(既定 Off) |
 | Reset Plugin State | AU の内部状態(残響など)を消す |
 | Load / Save Plugin State・Plugin State | 上記 |
-| Learn Parameters / Clear Learned / Learned Mapping | 上記「Learn」 |
+| Learn Parameters / Clear Learned / Learned Mapping | どのパラメータをパネルに載せるか |
 | Create / Rebuild Panel | 上記のパネル(Script CHOP)を生成する |
-| Learn 1 〜 16 | 割り当てたパラメータ。常に 0〜1。GUI と双方向 |
 
 ### 注意
 

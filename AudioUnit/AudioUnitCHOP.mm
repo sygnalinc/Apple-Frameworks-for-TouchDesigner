@@ -222,6 +222,24 @@ def onSetupParameters(scriptOp):
     return
 
 
+def _curve_to_value(curve, p, lo, hi):
+    # 枠を廃止したので、0〜1 の自動化(MIDI)はここで実値へ直す。
+    # AU が持っている表示曲線に合わせないと、対数パラメータで中央が合わない
+    p = 0.0 if p < 0 else (1.0 if p > 1 else p)
+    if curve == "log" and lo > 0 and hi > lo:
+        return lo * (hi / lo) ** p
+    n = p
+    if curve == "sqrt":
+        n = p * p
+    elif curve == "sq":
+        n = p ** 0.5
+    elif curve == "cube":
+        n = p ** (1.0 / 3.0)
+    elif curve == "cbrt":
+        n = p * p * p
+    return lo + n * (hi - lo)
+
+
 def _read(par, lo):
     if par.style == "Menu":
         return float(lo + par.menuIndex)
@@ -243,11 +261,6 @@ def onCook(scriptOp):
     # **表の作り直しは Info DAT が cook されたときだけ。**
     # 16x10 のセルを毎フレーム読むと Python だけで数 ms かかる(実測)
     d = _params_dat(scriptOp)
-    # **毎cook 最新の値を読む。** このパネルは AudioUnit CHOP の上流にあるので、
-    # cook させないと1フレーム古い値を出し続け、Learn 枠からの変更を打ち消してしまう(実測)
-    if d:
-        d.cook(force=True)
-    tc = d.totalCooks if d else -1
     sig = "%d:%s" % (d.numRows if d else 0,
                      "".join(d[r, "learn"].val for r in range(1, d.numRows)) if d else "")
     rows = st.get("rows")
@@ -274,10 +287,21 @@ def onCook(scriptOp):
         hi = float(r["max"])
         auv = float(d[r["_row"], "value"].val) if d else float(r["value"])
         span = (hi - lo) if hi > lo else 1.0
+        # 入力0に 0〜1 の自動化(MIDI など)が来ていれば、それを最優先で反映する
+        drv = None
+        if scriptOp.inputs and scriptOp.inputs[0]:
+            ch = scriptOp.inputs[0].chan(r["channel"])
+            if ch is not None:
+                drv = _curve_to_value(r.get("curve", "linear"), float(ch[0]), lo, hi)
+        if drv is not None:
+            _write(par, drv, lo)
+            seen[nm] = drv
         # プラグイン側(GUI)が動いていたら、こちらのパラメータへ書き戻す
-        if nm not in seen or abs(auv - seen[nm]) > span * 1e-5:
+        elif nm not in seen or abs(auv - seen[nm]) > span * 1e-5:
             _write(par, auv, lo)
-        seen[nm] = auv
+            seen[nm] = auv
+        else:
+            seen[nm] = auv
         # 現在値をチャンネルで出す。AudioUnit CHOP が入力1で受け取る
         scriptOp.appendChan(r["channel"])[0] = _read(par, lo)
     st["au"] = seen
@@ -436,15 +460,6 @@ public:
             OP_StringParameter p("Learnmap"); p.label = "Learned Mapping"; p.page = L;
             p.defaultValue = ""; m->appendString(p);
         }
-        for (int i = 1; i <= kLearnSlots; i++) {
-            char nm[16], lb[32];
-            snprintf(nm, sizeof nm, "Learn%d", i);
-            snprintf(lb, sizeof lb, "Learn %d", i);
-            OP_NumericParameter p(nm); p.label = lb; p.page = L;
-            p.defaultValues[0] = 0; p.minSliders[0] = 0; p.maxSliders[0] = 1;
-            p.minValues[0] = 0; p.maxValues[0] = 1; p.clampMins[0] = true; p.clampMaxes[0] = true;
-            m->appendFloat(p);
-        }
 
         const char* S = "State";
         { OP_NumericParameter p("Loadstate"); p.label = "Load Plugin State"; p.page = S; p.defaultValues[0] = 1; m->appendToggle(p); }
@@ -495,7 +510,7 @@ public:
     bool getInfoDATSize(OP_InfoDATSize* s, void*) override
     {
         s->rows = 1 + (int)myParams.size();
-        s->cols = 10;
+        s->cols = 11;
         s->byColumn = false;
         return true;
     }
@@ -507,7 +522,7 @@ public:
         if (row == 0) {
             set(0, "index"); set(1, "channel"); set(2, "name");
             set(3, "min"); set(4, "max"); set(5, "value"); set(6, "unit"); set(7, "learn");
-            set(8, "type"); set(9, "values");
+            set(8, "type"); set(9, "values"); set(10, "curve");
             return;
         }
         const ParamEntry& p = myParams[row - 1];
@@ -522,6 +537,17 @@ public:
         set(7, p.learnSlot > 0 ? ("learn" + std::to_string(p.learnSlot)) : "");
         set(8, p.type);
         set(9, p.values);
+        {   // パネルが 0〜1 の自動化(MIDI)を実値へ直すのに使う
+            const AudioUnitParameterOptions t = GetAudioUnitParameterDisplayType(p.curve);
+            const char* c = "linear";
+            if (t == kAudioUnitParameterFlag_DisplayLogarithmic ||
+                t == kAudioUnitParameterFlag_DisplayExponential) c = "log";
+            else if (t == kAudioUnitParameterFlag_DisplaySquareRoot) c = "sqrt";
+            else if (t == kAudioUnitParameterFlag_DisplaySquared)    c = "sq";
+            else if (t == kAudioUnitParameterFlag_DisplayCubed)      c = "cube";
+            else if (t == kAudioUnitParameterFlag_DisplayCubeRoot)   c = "cbrt";
+            set(10, c);
+        }
     }
 
     void getWarningString(OP_String* s, void*) override { if (!myWarn.empty()) s->setString(myWarn.c_str()); }
@@ -824,50 +850,17 @@ private:
         myLearning = in->getParInt("Learn") != 0;
         if (myWantPanel.exchange(false)) createPanel();
 
-        std::vector<std::pair<std::string, double>> slotWrites;
+        // AU 側(GUI・プリセット・パネル)で動いたパラメータを検出する。
+        // Learn 中で未割り当てなら、その場でパネルへ載せる対象にする。
+        // **値そのものはここでは書かない。** 書き手はパネル(入力1)に一本化した
         for (size_t i = 0; i < myParams.size(); i++) {
             ParamEntry& e = myParams[i];
             const float now  = readParam(e);
             const float span = (e.maxV - e.minV) > 0 ? (e.maxV - e.minV) : 1.0f;
-            const float eps  = span * 0.001f;
-
-            if (std::isnan(e.lastAU)) { e.lastAU = now; continue; }   // 初回は基準を作るだけ
-
-            if (fabsf(now - e.lastAU) > eps) {          // --- AU 側が動いた(GUI / プリセット)
-                e.lastAU = now;
-                if (myLearning && e.learnSlot <= 0) assignLearnSlot((int)i);
-                if (e.learnSlot > 0) {
-                    float nrm = valueToCurve(e.curve, now, e.minV, e.maxV);
-                    nrm = nrm < 0 ? 0 : (nrm > 1 ? 1 : nrm);
-                    e.lastSlot = nrm;                   // 書き戻しは次cookに届くので先に控える
-                    slotWrites.push_back({"Learn" + std::to_string(e.learnSlot), nrm});
-                }
-                continue;
-            }
-            if (e.learnSlot <= 0) continue;
-
-            char nm[16]; snprintf(nm, sizeof nm, "Learn%d", e.learnSlot);
-            const float slotVal = (float)in->getParDouble(nm);
-            if (std::isnan(e.lastSlot)) { e.lastSlot = slotVal; continue; }
-            if (fabsf(slotVal - e.lastSlot) > 1e-6f) {  // --- 枠が動いた(TD 側)
-                e.lastSlot = slotVal;
-                writeParam(e, slotVal, true);           // AU へ書いて GUI へ通知
-            }
-        }
-        if (!slotWrites.empty()) tdpycb::setFloatPars(myNode, slotWrites);
-
-        // 枠は実行中に増やせない(setupParameters はインスタンスにつき1回きり・実測)。
-        // 代わりに**割り当て済みの枠だけを有効化**して、learn した分だけ生きて見えるようにする。
-        // **毎cook 呼んではいけない**: enablePar はパラメータUIを更新させるので、
-        // 16個ぶん毎フレーム叩くとパラメータダイアログを開いているときに fps が落ちる(実測)
-        uint32_t mask = 0;
-        for (int i = 0; i < kLearnSlots; i++) if (myLearnIdx[i] >= 0) mask |= (1u << i);
-        if (mask != myEnableMask) {
-            myEnableMask = mask;
-            for (int i = 0; i < kLearnSlots; i++) {
-                char nm[16]; snprintf(nm, sizeof nm, "Learn%d", i + 1);
-                in->enablePar(nm, myLearnIdx[i] >= 0);
-            }
+            if (std::isnan(e.lastAU)) { e.lastAU = now; continue; }
+            if (fabsf(now - e.lastAU) <= span * 0.001f) continue;
+            e.lastAU = now;
+            if (myLearning && e.learnSlot <= 0) assignLearnSlot((int)i);
         }
     }
 
@@ -1120,7 +1113,7 @@ private:
     std::vector<ParamEntry>  myParams;
     std::vector<std::string> myPresets;
     std::unordered_map<std::string, int> myChanMap;
-    std::string myScratch[11];
+    std::string myScratch[12];
 
     std::string myWantId, myWarn, myErr, myErrPending;
     std::atomic<bool> myLoaded{false}, myLoadFailed{false};
@@ -1143,7 +1136,6 @@ private:
     std::atomic<bool> myWantSaveState{false};
     std::atomic<bool> myWantClearLearn{false};
     std::atomic<bool> myWantPanel{false};
-    uint32_t myEnableMask = 0xFFFFFFFFu;  // 初回は必ず更新させる
     std::atomic<uint64_t> myTouchedAddr{0};
     bool myLearning = false;
     int  myLearnIdx[kLearnSlots] = { -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1 };
