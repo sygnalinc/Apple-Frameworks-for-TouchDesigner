@@ -140,42 +140,26 @@ struct ParamEntry {
 
 static const char* kPanelScript = R"AUPANEL(# AudioUnit CHOP が生成した Learned パネル。
 #
-# 隣の Info DAT を読み、learn 済みパラメータの**型どおりの**TDパラメータを生やす
-# (スライダー / プルダウン / トグル / 整数)。値はプラグインと双方向に同期する:
-#   プラグインの GUI を動かす → ここのパラメータが追従
-#   ここのパラメータを動かす → チャンネルで出力され AudioUnit CHOP の入力1が受け取る
+# **この op は AudioUnit CHOP を一切読まない。** パネルは AudioUnit CHOP の入力1に
+# 繋がる(=上流)ので、こちらから AudioUnit CHOP の Info DAT を読むと
+# 「Cook dependency loop」になる(実測で TD が警告を出す)。
 #
-# learn の内容が変わったら自動で作り直す。手で編集してもよいが
-# Create / Rebuild Panel を押すと上書きされる。
+# 代わりに:
+#   ・パラメータの仕様は AudioUnit CHOP が storage("spec") に入れてくれる
+#   ・プラグイン側で動いた値も AudioUnit CHOP がこちらのパラメータへ書き込む
+#   ・こちらは自分のパラメータを 0〜1 のつまみ位置でチャンネルに出すだけ
+#
+# Float は常に 0〜1(実値は AudioUnit CHOP の Info DAT で見る)。
+# 入力0に 0〜1 の自動化(MIDI など)を繋ぐと、それが優先される。
 
-def _params_dat(scriptOp):
-    # **参照をカスタムパラメータに持たせてはいけない。** setuppars はカスタム
-    # パラメータを作り直すので、そのたびに参照が消えて何も生えなくなる(実測)。
-    # storage(パラメータではないので消えない)+ 命名規則で解決する
-    path = scriptOp.fetch("params", "")
-    d = op(path) if path else None
-    if d is None:
-        nm = scriptOp.name
-        host = nm[:-6] if nm.endswith("_panel") else nm
-        d = scriptOp.parent().op(host + "_params")
-    return d
+import json
 
 
-def _rows(scriptOp):
+def _spec(scriptOp):
     try:
-        d = _params_dat(scriptOp)
+        return json.loads(scriptOp.fetch("spec", "[]"))
     except Exception:
         return []
-    if not d or d.numRows < 2:
-        return []
-    hdr = [d[0, c].val for c in range(d.numCols)]
-    out = []
-    for r in range(1, d.numRows):
-        row = dict(zip(hdr, [d[r, c].val for c in range(d.numCols)]))
-        if row.get("learn"):
-            row["_row"] = r
-            out.append(row)
-    return out
 
 
 def _pname(ch):
@@ -185,161 +169,89 @@ def _pname(ch):
 
 def onSetupParameters(scriptOp):
     page = scriptOp.appendCustomPage("Learned")
-    for row in _rows(scriptOp):
-        nm = _pname(row["channel"])
-        t = row.get("type", "float")
-        lo = float(row["min"])
-        hi = float(row["max"])
-        cur = float(row["value"])
-        label = row["name"]
+    for r in _spec(scriptOp):
+        nm = _pname(r["ch"])
+        t = r.get("t", "float")
+        lo = float(r["lo"])
+        hi = float(r["hi"])
+        pos = float(r.get("pos", 0.0))
+        label = r.get("nm", r["ch"])
         if t == "toggle":
             p = page.appendToggle(nm, label=label)[0]
-            p.default = int(round(cur))
-            p.val = int(round(cur))
+            p.default = 1 if pos >= 0.5 else 0
+            p.val = p.default
         elif t == "menu":
             p = page.appendMenu(nm, label=label)[0]
             n = int(round(hi - lo)) + 1
-            labels = row.get("values", "").split("|") if row.get("values") else []
+            labels = r.get("vs") or []
             if len(labels) != n:
                 labels = [str(int(lo) + i) for i in range(n)]
             p.menuNames = ["v%d" % (int(lo) + i) for i in range(n)]
             p.menuLabels = labels
-            p.menuIndex = max(0, min(n - 1, int(round(cur - lo))))
+            p.menuIndex = max(0, min(n - 1, int(round(pos * (n - 1)))))
         elif t == "int":
             p = page.appendInt(nm, label=label)[0]
             p.normMin, p.normMax = lo, hi
             p.min, p.max = lo, hi
             p.clampMin = p.clampMax = True
-            p.default = int(round(cur))
-            p.val = int(round(cur))
+            p.default = int(round(lo + pos * (hi - lo)))
+            p.val = p.default
         else:
-            # **Float は常に 0〜1 のつまみ位置**。プラグインの GUI が半分なら 0.5 になる。
-            # 実値(Hz や ms)は Info DAT の value 列で確認できる
             p = page.appendFloat(nm, label=label)[0]
             p.normMin, p.normMax = 0.0, 1.0
             p.min, p.max = 0.0, 1.0
             p.clampMin = p.clampMax = True
-            pos = _value_to_curve(row.get("curve", "linear"), cur, lo, hi)
             p.default = pos
             p.val = pos
     return
 
 
-def _curve_to_value(curve, p, lo, hi):
-    # 枠を廃止したので、0〜1 の自動化(MIDI)はここで実値へ直す。
-    # AU が持っている表示曲線に合わせないと、対数パラメータで中央が合わない
-    p = 0.0 if p < 0 else (1.0 if p > 1 else p)
-    if curve == "log" and lo > 0 and hi > lo:
-        return lo * (hi / lo) ** p
-    n = p
-    if curve == "sqrt":
-        n = p * p
-    elif curve == "sq":
-        n = p ** 0.5
-    elif curve == "cube":
-        n = p ** (1.0 / 3.0)
-    elif curve == "cbrt":
-        n = p * p * p
-    return lo + n * (hi - lo)
-
-
-def _value_to_curve(curve, v, lo, hi):
-    # 実値 → つまみ位置(0〜1)。_curve_to_value の逆。
-    # **パネルの出力はこの 0〜1**。実値のまま出すと Input Range=Normalized の
-    # ときに 0〜1 と解釈されてクランプされ、パラメータが張り付く(実測)
-    if hi <= lo:
-        return 0.0
-    v = lo if v < lo else (hi if v > hi else v)
-    if curve == "log" and lo > 0:
-        import math
-        return math.log(v / lo) / math.log(hi / lo)
-    n = (v - lo) / (hi - lo)
-    if curve == "sqrt":
-        return n ** 0.5
-    if curve == "sq":
-        return n * n
-    if curve == "cube":
-        return n * n * n
-    if curve == "cbrt":
-        return n ** (1.0 / 3.0)
-    return n
-
-
-def _to_par(par, auv, curve, lo, hi):
-    # AU の実値 → パラメータの表示。Float はつまみ位置、他は実値/添え字のまま
+def _pos_of(par, lo, hi):
+    # パラメータの表示 → つまみ位置(0〜1)。Float は既に 0〜1
     if par.style == "Menu":
-        par.menuIndex = max(0, min(len(par.menuNames) - 1, int(round(auv - lo))))
+        n = len(par.menuNames)
+        return float(par.menuIndex) / (n - 1) if n > 1 else 0.0
+    if par.style == "Toggle":
+        return 1.0 if par.eval() else 0.0
+    if par.style == "Int":
+        return (float(par.eval()) - lo) / (hi - lo) if hi > lo else 0.0
+    return float(par.eval())
+
+
+def _set_pos(par, pos, lo, hi):
+    if par.style == "Menu":
+        n = len(par.menuNames)
+        par.menuIndex = max(0, min(n - 1, int(round(pos * (n - 1))))) if n > 1 else 0
     elif par.style == "Toggle":
-        par.val = 1 if auv >= 0.5 else 0
+        par.val = 1 if pos >= 0.5 else 0
     elif par.style == "Int":
-        par.val = int(round(auv))
+        par.val = int(round(lo + pos * (hi - lo)))
     else:
-        par.val = _value_to_curve(curve, auv, lo, hi)
-
-
-def _to_pos(par, curve, lo, hi):
-    # パラメータの表示 → つまみ位置(0〜1)。これが CHOP の出力になる
-    if par.style == "Menu":
-        v = float(lo + par.menuIndex)
-    elif par.style in ("Toggle", "Int"):
-        v = float(par.eval())
-    else:
-        return float(par.eval())          # Float は既に 0〜1
-    return _value_to_curve(curve, v, lo, hi)
+        par.val = pos
 
 
 def onCook(scriptOp):
     scriptOp.clear()
-    st = scriptOp.storage
-    # **表の作り直しは Info DAT が cook されたときだけ。**
-    # 16x10 のセルを毎フレーム読むと Python だけで数 ms かかる(実測)
-    d = _params_dat(scriptOp)
-    sig = "%d:%s" % (d.numRows if d else 0,
-                     "".join(d[r, "learn"].val for r in range(1, d.numRows)) if d else "")
-    rows = st.get("rows")
-    if rows is None or st.get("sig") != sig:
-        rows = _rows(scriptOp)
-        st["rows"] = rows
-        st["sig"] = sig
-    # **実際に生えているパラメータ**と learn の内容を突き合わせる。
-    # 「作り直した」というフラグを持つと、作り直しに失敗したときに詰まって復帰できない
-    built = set(p.name for p in scriptOp.customPars if p.page.name == "Learned")
-    want = set(_pname(r["channel"]) for r in rows)
+    rows = _spec(scriptOp)
+    built = set(x.name for x in scriptOp.customPars if x.page.name == "Learned")
+    want = set(_pname(r["ch"]) for r in rows)
     if built != want:
-        st["au"] = {}
         run("op(%r).par.setuppars.pulse()" % scriptOp.path, delayFrames=1)
         return
-    names = built
-    seen = st.get("au", {})
+    src = scriptOp.inputs[0] if scriptOp.inputs else None
     for r in rows:
-        nm = _pname(r["channel"])
-        if nm not in names:
+        nm = _pname(r["ch"])
+        if nm not in built:
             continue
         par = scriptOp.par[nm]
-        lo = float(r["min"])
-        hi = float(r["max"])
-        auv = float(d[r["_row"], "value"].val) if d else float(r["value"])
-        span = (hi - lo) if hi > lo else 1.0
-        curve = r.get("curve", "linear")
-        # 入力0に 0〜1 の自動化(MIDI など)が来ていれば、それを最優先で反映する
-        drv = None
-        if scriptOp.inputs and scriptOp.inputs[0]:
-            ch = scriptOp.inputs[0].chan(r["channel"])
+        lo = float(r["lo"])
+        hi = float(r["hi"])
+        # 入力0に 0〜1 の自動化が来ていれば、それを反映する
+        if src is not None:
+            ch = src.chan(r["ch"])
             if ch is not None:
-                drv = _curve_to_value(curve, float(ch[0]), lo, hi)
-        if drv is not None:
-            _to_par(par, drv, curve, lo, hi)
-            seen[nm] = drv
-        # プラグイン側(GUI)が動いていたら、こちらのパラメータへ書き戻す
-        elif nm not in seen or abs(auv - seen[nm]) > span * 1e-5:
-            _to_par(par, auv, curve, lo, hi)
-            seen[nm] = auv
-        else:
-            seen[nm] = auv
-        # 出力は**つまみ位置(0〜1)**。AudioUnit CHOP が入力1で
-        # Input Range=Normalized のまま受け取れるので、MIDI 直結と同じ土俵になる
-        scriptOp.appendChan(r["channel"])[0] = _to_pos(par, curve, lo, hi)
-    st["au"] = seen
+                _set_pos(par, float(ch[0]), lo, hi)
+        scriptOp.appendChan(r["ch"])[0] = _pos_of(par, lo, hi)
     return
 )AUPANEL";
 
@@ -882,6 +794,7 @@ private:
         myLearning = learn;
         if (myWantPanel.exchange(false)) createPanel(false);
 
+        std::vector<std::pair<std::string, double>> push;
         // AU 側(GUI・プリセット・パネル)で動いたパラメータを検出する。
         // Learn 中で未割り当てなら、その場でパネルへ載せる対象にする。
         // **値そのものはここでは書かない。** 書き手はパネル(入力1)に一本化した
@@ -893,7 +806,10 @@ private:
             if (fabsf(now - e.lastAU) <= span * 0.001f) continue;
             e.lastAU = now;
             if (myLearning && e.learnSlot <= 0) assignLearnSlot((int)i);
+            if (e.learnSlot > 0)
+                push.push_back({panelParName(e.chan), valueToCurve(e.curve, now, e.minV, e.maxV)});
         }
+        pushToPanel(push);
     }
 
     // 隣に Script CHOP のパネルを生成して入力1へ配線する。
@@ -906,17 +822,24 @@ private:
         py += "p = n.parent()\n";
         py += "base = n.name\n";
         py += std::string("__au_only = ") + (onlyIfMissing ? "True" : "False") + "\n";
-        py += "if not (__au_only and p.op(base + '_panel')):\n";
-        py += " info = p.op(base + '_params') or p.create(td.infoDAT, base + '_params')\n";
+        py += "if not (__au_only and p.op(base + '_params')):\n";
+        py += " info = p.op(base + '_info') or p.create(td.infoDAT, base + '_info')\n";
         py += " info.par.op = n\n";
-        py += " cb = p.op(base + '_panel_callbacks') or p.create(td.textDAT, base + '_panel_callbacks')\n";
+        // **Script CHOP を先に作る。** Script CHOP は生成時に自前の callbacks DAT を
+        // 作るので、先にこちらで同名の DAT を用意すると `..._callbacks1` が余分にできる(実測)。
+        // TD が作ったものをそのまま使い回す
+        py += " sc = p.op(base + '_params') or p.create(td.scriptCHOP, base + '_params')\n";
+        py += " cb = sc.par.callbacks.eval() if hasattr(sc.par, 'callbacks') else None\n";
+        py += " if cb is None: cb = p.op(base + '_params_callbacks') or p.create(td.textDAT, base + '_params_callbacks')\n";
         py += " cb.text = __au_panel_src\n";
-        py += " sc = p.op(base + '_panel') or p.create(td.scriptCHOP, base + '_panel')\n";
         py += " sc.nodeX, sc.nodeY = n.nodeX, n.nodeY - 160\n";   // AudioUnit CHOP の真下
         py += " sc.viewer = True\n";                        // 値がすぐ見えるように開いておく
+        // 選択したときに Learned ページが出るようにする。pageindex は
+        // 「組み込みページの数 + カスタムページの位置」(pages は組み込みのみ・実測)
+        py += " __au_pg = [q.name for q in sc.customPages]\n";
+        py += " if 'Learned' in __au_pg: sc.par.pageindex = len(sc.pages) + __au_pg.index('Learned')\n";
         py += " sc.par.callbacks = cb\n";
-        py += " sc.store('params', info.path)\n";   // 参照は storage(setuppars で消えない)
-        py += " info.cook(force=True)\n";           // 生成直後は未cookで中身が空
+        py += " sc.store('spec', __au_spec)\n";     // パネルはこれだけを見る(op を読まない)
         py += " sc.par.setuppars.pulse()\n";        // 型付きパラメータを作る
         py += " n.inputConnectors[1].connect(sc)\n";
         // 2つの DAT は既定で**閉じたドックチップ**にしてネットワークを散らかさない。
@@ -936,10 +859,78 @@ private:
             if (PyObject* dict = PyModule_GetDict(main)) {
                 PyObject* v = PyUnicode_FromString(kPanelScript);
                 if (v) { PyDict_SetItemString(dict, "__au_panel_src", v); Py_DECREF(v); }
+                const std::string spec = learnedSpecJSON();
+                PyObject* sp = PyUnicode_FromString(spec.c_str());
+                if (sp) { PyDict_SetItemString(dict, "__au_spec", sp); Py_DECREF(sp); }
             }
         }
         PyGILState_Release(g);
         if (!tdpycb::runWithNode(myNode, py)) myWarn = "could not create the panel";
+    }
+
+    static std::string jesc(const std::string& v)
+    {
+        std::string r;
+        for (char c : v) { if (c == '"' || c == '\\') r += '\\'; r += c; }
+        return r;
+    }
+
+    // learn 済みパラメータの仕様を JSON に。パネルはこれだけを見て UI を作る
+    // (AudioUnit CHOP を読まないので Cook dependency loop にならない)
+    std::string learnedSpecJSON()
+    {
+        std::string j = "[";
+        bool first = true;
+        for (int i = 0; i < kLearnSlots; i++) {
+            const int idx = myLearnIdx[i];
+            if (idx < 0 || idx >= (int)myParams.size()) continue;
+            const ParamEntry& e = myParams[idx];
+            if (!first) j += ",";
+            first = false;
+            char b[256];
+            snprintf(b, sizeof b,
+                     "{\"ch\":\"%s\",\"nm\":\"%s\",\"t\":\"%s\",\"lo\":%g,\"hi\":%g,\"pos\":%g",
+                     jesc(e.chan).c_str(), jesc(e.name).c_str(), e.type.c_str(),
+                     e.minV, e.maxV, valueToCurve(e.curve, readParam(e), e.minV, e.maxV));
+            j += b;
+            if (e.type == "menu" && !e.values.empty()) {
+                j += ",\"vs\":[";
+                std::string tok; bool f2 = true;
+                std::string src = e.values + "|";
+                for (char c : src) {
+                    if (c == '|') { if (!f2) j += ","; f2 = false; j += "\"" + jesc(tok) + "\""; tok.clear(); }
+                    else tok += c;
+                }
+                j += "]";
+            }
+            j += "}";
+        }
+        return j + "]";
+    }
+
+    // プラグイン側で動いた値をパネルのパラメータへ押し込む。
+    // パネルからこちらを読ませるとループになるので、**押す向き**にしてある
+    void pushToPanel(const std::vector<std::pair<std::string, double>>& vals)
+    {
+        if (vals.empty()) return;
+        std::string py = "sc = n.parent().op(n.name + '_params')\nif sc:\n";
+        for (const auto& kv : vals) {
+            char line[160];
+            snprintf(line, sizeof line, " sc.par.%s = %.6f\n", kv.first.c_str(), kv.second);
+            py += line;
+        }
+        tdpycb::runWithNode(myNode, py);
+    }
+
+    // 表示用のパラメータ名(パネル側の _pname と同じ規則)
+    static std::string panelParName(const std::string& ch)
+    {
+        std::string r;
+        for (char c : ch) if (isalnum((unsigned char)c)) r += c;
+        if (r.empty()) return "P";
+        r[0] = (char)toupper((unsigned char)r[0]);
+        for (size_t i = 1; i < r.size(); i++) r[i] = (char)tolower((unsigned char)r[i]);
+        return r;
     }
 
     void assignLearnSlot(int idx)

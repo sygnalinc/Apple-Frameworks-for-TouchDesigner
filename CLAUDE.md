@@ -7365,3 +7365,23 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
     **`Learn` ページを廃止して `AudioUnit` ページへ統合**。ページは AudioUnit(15)と State(3)の2枚に
 - 実測: 新規ノードの Always On Top = True、パネルが (-1000, -1560) で op の (-1000, -1400) の真下、
   viewer=True。ページ構成も意図どおり
+
+### 2026-08-16 AudioUnit CHOP: Cook dependency loop を解消 + パネルの命名/既定ページ
+
+- ユーザーが TD の警告を提示: `Audiounit1 → Audiounit1_panel → Audiounit1_params → Audiounit1`
+  の **Cook dependency loop**。**私の設計の欠陥**だった: パネルは入力1へ繋がる**上流**なのに、
+  op に依存する Info DAT を読んでいた
+- **パネルが op を一切読まない形に作り替えた**:
+  - パラメータの仕様は op が `sc.store('spec', <JSON>)` で渡す(パネルは storage だけ見る)
+  - プラグイン側で動いた値は **op がパネルのパラメータへ押し込む**(`pushToPanel`)
+  - Info DAT は人が確認するためだけに残す(誰も読まない)
+- あわせてユーザー指示:
+  - ノード名を整理: Script CHOP = `<node>_params` / callbacks = `<node>_params_callbacks` /
+    Info DAT = `<node>_info`
+  - **選択時に Learned ページが開く**ようにした。`pageindex` は
+    **「組み込みページ数 + カスタムページの位置」**(`pages` は組み込みのみ・`customPages` が別・実測)
+- **踏んだ罠**: **Script CHOP は生成時に自前の callbacks DAT を作る**ので、先に同名の DAT を
+  用意すると `..._callbacks1` が余分にできる。**Script CHOP を先に作って、TD が作った
+  callbacks DAT を使い回す**のが正しい
+- 実測: パネル 0.0 / 0.5 / 1.0 → AU 実値 0.0005 / 0.00387298 / 0.03(対数位置と厳密一致)、
+  警告なし。生成物は `_au` / `_au_info` / `_au_params` / `_au_params_callbacks` の4つで重複なし
