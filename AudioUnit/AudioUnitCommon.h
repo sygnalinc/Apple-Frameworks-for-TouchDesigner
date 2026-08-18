@@ -1,3 +1,13 @@
+#pragma once
+// AudioUnit Effect / AudioUnit Instrument の共通実装。
+//
+// **ObjC のクラス名はバンドルごとに変える。** 同名クラスを複数の .plugin が定義すると
+// ObjC ランタイムは片方の実装だけを使い回し、owner の C++ キャスト先が食い違う
+// (MapKit で踏んだ罠)。各 .mm が TDAU_DELEGATE を define してから include する。
+#ifndef TDAU_DELEGATE
+#error "define TDAU_DELEGATE before including AudioUnitCommon.h"
+#endif
+
 // AudioUnit CHOP — Audio Unit エフェクトを TD のオーディオ経路でホストする
 //
 // TouchDesigner の Audio VST CHOP は **VST3 専用**（同梱 JUCE に AudioUnitPluginFormat が
@@ -16,6 +26,7 @@
 
 #include "CHOP_CPlusPlusBase.h"
 #include "PyCallbacksBootstrap.h"
+#include <map>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -28,10 +39,10 @@ using namespace TD;
 // cook 側で Show UI トグルを落とす（AppKit から TD に触ると THREAD CONFLICT になる）。
 // クラス名はバンドル固有にする（同名クラスを複数バンドルで定義すると ObjC ランタイムが
 // 1つの実装を使い回して owner のキャスト先が食い違う）
-@interface TDAudioUnitWinDelegate : NSObject <NSWindowDelegate>
+@interface TDAU_DELEGATE : NSObject <NSWindowDelegate>
 @property (assign, nonatomic) std::atomic<bool>* flag;
 @end
-@implementation TDAudioUnitWinDelegate
+@implementation TDAU_DELEGATE
 - (BOOL)windowShouldClose:(NSWindow*)sender
 {
     if (self.flag) self.flag->store(true);
@@ -113,6 +124,12 @@ inline float valueToCurve(AudioUnitParameterOptions curve, float v, float lo, fl
     else if (t == kAudioUnitParameterFlag_DisplayCubeRoot)   return cbrtf(n);
     return n;
 }
+
+// エフェクト(aufx)と楽器(aumu)の違いはここだけ。あとは全部共通
+struct AUKind {
+    OSType componentType;   // kAudioUnitType_Effect / kAudioUnitType_MusicDevice
+    bool   instrument;      // 音声入力を持たず、ノートで鳴らす
+};
 
 struct PluginEntry {
     std::string id;      // "aufx:dist:appl" を16進にしたもの
@@ -309,15 +326,15 @@ def onCook(scriptOp):
 
 // ---------------------------------------------------------------- plugin
 
-class AudioUnitCHOP : public CHOP_CPlusPlusBase
+class AudioUnitBase : public CHOP_CPlusPlusBase
 {
 public:
-    explicit AudioUnitCHOP(const OP_NodeInfo* info) : myNode(info)
+    AudioUnitBase(const OP_NodeInfo* info, const AUKind& kind) : myNode(info), myKind(kind)
     {
         for (int i = 0; i < kLearnSlots; i++) myLearnIdx[i] = -1;
         rescan();
     }
-    virtual ~AudioUnitCHOP() { closeWindowSync(); teardown(); }
+    virtual ~AudioUnitBase() { closeWindowSync(); teardown(); }
 
     void getGeneralInfo(CHOP_GeneralInfo* g, const OP_Inputs*, void*) override
     {
@@ -330,6 +347,9 @@ public:
         // 入力がモノでもステレオを出す。true を返して 2ch を明示しないと、
         // 出力 ch 数が入力に一致してしまい channels[1] が範囲外になる（AVAudio Spatial の教訓）
         info->numChannels = 2;
+        // **音を生成して出す CHOP はサンプルレートを明示しないと 60Hz 扱いになる**
+        // (CoreAudio Tap で踏んだ罠)。エフェクトは入力に合わせるので TD 任せでよい
+        if (myKind.instrument) info->sampleRate = 44100;
         return true;
     }
     void getChannelName(int32_t i, OP_String* name, const OP_Inputs*, void*) override
@@ -368,11 +388,15 @@ public:
                 // Learn 枠の変更を上書きしてしまい、枠から動かせなくなる(実測)
                 applyParamsFromInput(in);
                 syncParams(in);
-                myBypassed = in->getParInt("Bypass") != 0;
-                myUnit.AUAudioUnit.shouldBypassEffect = myBypassed;
+                if (!myKind.instrument) {     // 楽器に Bypass / Dry-Wet は無い
+                    myBypassed = in->getParInt("Bypass") != 0;
+                    myUnit.AUAudioUnit.shouldBypassEffect = myBypassed;
+                }
                 if (myWantSaveState.exchange(false)) saveState();
             }
             syncWindow(in);
+
+            if (myKind.instrument) { renderInstrument(out, in, n, active); return; }
 
             const OP_CHOPInput* ci = in->getInputCHOP(0);
             if (!active || !ci || ci->numChannels < 1 || ci->numSamples < 1 || out->numChannels < 2) return;
@@ -438,10 +462,12 @@ public:
             p.defaultValue = "none";
             m->appendDynamicStringMenu(p);
         }
-        { OP_NumericParameter p("Bypass"); p.label = "Bypass"; p.page = P; p.defaultValues[0] = 0; m->appendToggle(p); }
-        { OP_NumericParameter p("Drywet"); p.label = "Dry / Wet"; p.page = P; p.defaultValues[0] = 1;
-          p.minSliders[0] = 0; p.maxSliders[0] = 1; p.minValues[0] = 0; p.maxValues[0] = 1;
-          p.clampMins[0] = true; p.clampMaxes[0] = true; m->appendFloat(p); }
+        if (!myKind.instrument) {
+            { OP_NumericParameter p("Bypass"); p.label = "Bypass"; p.page = P; p.defaultValues[0] = 0; m->appendToggle(p); }
+            { OP_NumericParameter p("Drywet"); p.label = "Dry / Wet"; p.page = P; p.defaultValues[0] = 1;
+              p.minSliders[0] = 0; p.maxSliders[0] = 1; p.minValues[0] = 0; p.maxValues[0] = 1;
+              p.clampMins[0] = true; p.clampMaxes[0] = true; m->appendFloat(p); }
+        }
         { OP_NumericParameter p("Gain"); p.label = "Output Gain"; p.page = P; p.defaultValues[0] = 1;
           p.minSliders[0] = 0; p.maxSliders[0] = 2; m->appendFloat(p); }
         {
@@ -466,6 +492,23 @@ public:
             p.defaultValue = ""; m->appendString(p);
         }
 
+        if (myKind.instrument) {
+            // 手元にノート入力が無くても鳴らせるように、パラメータだけで打てるようにしておく
+            const char* PL = "Play";
+            { OP_NumericParameter p("Note"); p.label = "Note"; p.page = PL; p.defaultValues[0] = 60;
+              p.minSliders[0] = 0; p.maxSliders[0] = 127; p.minValues[0] = 0; p.maxValues[0] = 127;
+              p.clampMins[0] = true; p.clampMaxes[0] = true; m->appendInt(p); }
+            { OP_NumericParameter p("Velocity"); p.label = "Velocity"; p.page = PL; p.defaultValues[0] = 0.8;
+              p.minSliders[0] = 0; p.maxSliders[0] = 1; p.minValues[0] = 0; p.maxValues[0] = 1;
+              p.clampMins[0] = true; p.clampMaxes[0] = true; m->appendFloat(p); }
+            { OP_NumericParameter p("Midichannel"); p.label = "MIDI Channel"; p.page = PL; p.defaultValues[0] = 1;
+              p.minSliders[0] = 1; p.maxSliders[0] = 16; p.minValues[0] = 1; p.maxValues[0] = 16;
+              p.clampMins[0] = true; p.clampMaxes[0] = true; m->appendInt(p); }
+            { OP_NumericParameter p("Noteon"); p.label = "Note On"; p.page = PL; m->appendPulse(p); }
+            { OP_NumericParameter p("Noteoff"); p.label = "Note Off"; p.page = PL; m->appendPulse(p); }
+            { OP_NumericParameter p("Allnotesoff"); p.label = "All Notes Off"; p.page = PL; m->appendPulse(p); }
+        }
+
         const char* S = "State";
         { OP_NumericParameter p("Loadstate"); p.label = "Load Plugin State"; p.page = S; p.defaultValues[0] = 1; m->appendToggle(p); }
         { OP_NumericParameter p("Savestate"); p.label = "Save Plugin State"; p.page = S; m->appendPulse(p); }
@@ -484,6 +527,9 @@ public:
         else if (!strcmp(name, "Savestate")) myWantSaveState = true;
         else if (!strcmp(name, "Clearlearned")) myWantClearLearn = true;
         else if (!strcmp(name, "Createpanel")) myWantPanel = true;
+        else if (!strcmp(name, "Noteon"))  myWantNoteOn = true;
+        else if (!strcmp(name, "Noteoff")) myWantNoteOff = true;
+        else if (!strcmp(name, "Allnotesoff")) myWantAllOff = true;
     }
 
     void buildDynamicMenu(const OP_Inputs*, OP_BuildDynamicMenuInfo* info, void*) override
@@ -501,14 +547,18 @@ public:
 
     // ------------------------------------------------------------ info
 
-    int32_t getNumInfoCHOPChans(void*) override { return 8; }
+    int32_t getNumInfoCHOPChans(void*) override { return myKind.instrument ? 10 : 8; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override
     {
         static const char* n[] = { "executes", "renders", "samplerate", "loaded",
-                                   "params", "latency_ms", "bypassed", "learned" };
+                                   "params", "latency_ms", "bypassed", "learned",
+                                   "notes_sent", "notes_held" };
+        int held = 0;
+        for (const auto& kv : myHeld) if (kv.second > 0) held++;
         const float v[] = { (float)myExec.load(), (float)myRenders.load(), (float)mySampleRate,
                             (float)(myUnit != nil), (float)myParams.size(),
-                            (float)(myLatencySec * 1000.0), (float)myBypassed, (float)learnedCount() };
+                            (float)(myLatencySec * 1000.0), (float)myBypassed, (float)learnedCount(),
+                            (float)myNotesSent, (float)held };
         c->name->setString(n[i]); c->value = v[i];
     }
 
@@ -573,7 +623,7 @@ private:
         @autoreleasepool {
             myPlugins.clear();
             AudioComponentDescription d = {};
-            d.componentType = kAudioUnitType_Effect;
+            d.componentType = myKind.componentType;
             NSArray<AVAudioUnitComponent*>* comps =
                 [[AVAudioUnitComponentManager sharedAudioUnitComponentManager] componentsMatchingDescription:d];
             for (AVAudioUnitComponent* c in comps) {
@@ -675,6 +725,103 @@ private:
 
     // ------------------------------------------------------------ engine
 
+    // ------------------------------------------------------ 楽器(aumu)
+    AVAudioUnitMIDIInstrument* midiUnit() const
+    {
+        return [myUnit isKindOfClass:[AVAudioUnitMIDIInstrument class]]
+                   ? (AVAudioUnitMIDIInstrument*)myUnit : nil;
+    }
+
+    static int velByte(float v)
+    {
+        // 0〜1 で来ることも、生の MIDI 値(1〜127)で来ることもある
+        const float f = v <= 1.0f ? v * 127.0f : v;
+        const int b = (int)lroundf(f);
+        return b < 1 ? 1 : (b > 127 ? 127 : b);
+    }
+
+    // 入力0のチャンネル名からノートを拾う。CoreMIDI In CHOP の `ch1n60` と
+    // 素の `note60` の両方を受ける(値=ベロシティ、0でノートオフ)
+    static bool parseNote(const char* nm, int& ch, int& note)
+    {
+        if (!nm) return false;
+        if (nm[0] == 'c' && nm[1] == 'h') {
+            const char* n = strchr(nm + 2, 'n');
+            if (!n) return false;
+            ch = atoi(nm + 2); note = atoi(n + 1);
+        } else if (!strncmp(nm, "note", 4)) {
+            ch = 1; note = atoi(nm + 4);
+        } else return false;
+        return ch >= 1 && ch <= 16 && note >= 0 && note <= 127;
+    }
+
+    void allNotesOff()
+    {
+        AVAudioUnitMIDIInstrument* mi = midiUnit();
+        if (mi) for (const auto& kv : myHeld)
+            if (kv.second > 0) [mi stopNote:(uint8_t)(kv.first & 0xff) onChannel:(uint8_t)(kv.first >> 8)];
+        myHeld.clear();
+    }
+
+    void applyNotes(const OP_Inputs* in)
+    {
+        AVAudioUnitMIDIInstrument* mi = midiUnit();
+        if (!mi) { myWarn = "this plugin is not a MIDI instrument"; return; }
+
+        if (myWantAllOff.exchange(false)) allNotesOff();
+
+        const int pnote = in->getParInt("Note");
+        const int pch   = in->getParInt("Midichannel") - 1;
+        if (myWantNoteOn.exchange(false))
+        {
+            [mi startNote:(uint8_t)pnote withVelocity:(uint8_t)velByte((float)in->getParDouble("Velocity"))
+                onChannel:(uint8_t)pch];
+            myNotesSent++;
+            myHeld[(pch << 8) | pnote] = 1.f;
+        }
+        if (myWantNoteOff.exchange(false)) [mi stopNote:(uint8_t)pnote onChannel:(uint8_t)pch];
+
+        const OP_CHOPInput* ni = in->getInputCHOP(0);
+        if (!ni || ni->numSamples < 1) return;
+        for (int c = 0; c < ni->numChannels; c++) {
+            int ch = 0, note = 0;
+            if (!parseNote(ni->getChannelName(c), ch, note)) continue;
+            const float v = ni->getChannelData(c)[ni->numSamples - 1];
+            const int key = ((ch - 1) << 8) | note;
+            const float prev = myHeld.count(key) ? myHeld[key] : 0.f;
+            if (v > 0.0001f && prev <= 0.0001f)
+                { [mi startNote:(uint8_t)note withVelocity:(uint8_t)velByte(v) onChannel:(uint8_t)(ch - 1)];
+                  myNotesSent++; }
+            else if (v <= 0.0001f && prev > 0.0001f)
+                [mi stopNote:(uint8_t)note onChannel:(uint8_t)(ch - 1)];
+            myHeld[key] = v;
+        }
+    }
+
+    void renderInstrument(CHOP_Output* out, const OP_Inputs* in, int n, bool active)
+    {
+        if (out->numChannels < 2 || !myUnit) return;
+        if (!active) { allNotesOff(); return; }
+        const double sr = out->sampleRate > 0 ? out->sampleRate : 44100.0;
+        if (!ensureEngine(sr, n)) return;
+        applyNotes(in);
+
+        NSError* err = nil;
+        AVAudioEngineManualRenderingStatus st =
+            [myEngine renderOffline:(AVAudioFrameCount)n toBuffer:myOutBuf error:&err];
+        if (st != AVAudioEngineManualRenderingStatusSuccess) { myWarn = "render failed"; return; }
+
+        const int copy = n < (int)myOutBuf.frameLength ? n : (int)myOutBuf.frameLength;
+        const float* L = myOutBuf.floatChannelData[0];
+        const float* R = myOutBuf.floatChannelData[1];
+        const float gain = (float)in->getParDouble("Gain");
+        for (int i = 0; i < copy; i++) {
+            out->channels[0][i] = L[i] * gain;
+            out->channels[1][i] = R[i] * gain;
+        }
+        myRenders++;
+    }
+
     bool ensureEngine(double sr, int maxFrames)
     {
         const int cap = maxFrames * 2 < 4096 ? 4096 : maxFrames * 2;
@@ -687,7 +834,23 @@ private:
         if (!fmt) { myErr = "bad format"; return false; }
 
         myEngine = [[AVAudioEngine alloc] init];
-        AudioUnitCHOP* self_ = this;
+        if (myKind.instrument) {
+            // 楽器は自分が音源。source node を挟まずミキサーへ直結する
+            [myEngine attachNode:myUnit];
+            [myEngine connect:myUnit to:myEngine.mainMixerNode format:fmt];
+            NSError* e2 = nil;
+            if (![myEngine enableManualRenderingMode:AVAudioEngineManualRenderingModeOffline
+                                              format:fmt maximumFrameCount:(AVAudioFrameCount)cap error:&e2] ||
+                ![myEngine startAndReturnError:&e2]) {
+                myErr = e2.localizedDescription.UTF8String ?: "engine start failed";
+                teardownEngine(); return false;
+            }
+            myOutBuf = [[AVAudioPCMBuffer alloc] initWithPCMFormat:myEngine.manualRenderingFormat
+                                                     frameCapacity:(AVAudioFrameCount)cap];
+            myEngineUnit = myUnit; myErr.clear();
+            return true;
+        }
+        AudioUnitBase* self_ = this;
         mySource = [[AVAudioSourceNode alloc] initWithFormat:fmt renderBlock:
             ^OSStatus(BOOL*, const AudioTimeStamp*, AVAudioFrameCount frames, AudioBufferList* abl) {
                 const int avail = (int)self_->myInL.size() - self_->myInPos;
@@ -1202,7 +1365,7 @@ private:
                     [w makeKeyAndOrderFront:nil];
                     // 閉じるボタンは AppKit スレッドで押される。ここで TD に触ると
                     // THREAD CONFLICT になるのでフラグを立てるだけにして cook 側で処理する
-                    TDAudioUnitWinDelegate* del = [[TDAudioUnitWinDelegate alloc] init];
+                    TDAU_DELEGATE* del = [[TDAU_DELEGATE alloc] init];
                     del.flag = closedFlag;
                     w.delegate = del;
                     objc_setAssociatedObject(w, "tdaudel", del, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -1306,9 +1469,15 @@ private:
     std::atomic<bool> myWantSaveState{false};
     std::atomic<bool> myWantClearLearn{false};
     std::atomic<bool> myWantPanel{false};
+    std::atomic<bool> myWantNoteOn{false};
+    std::atomic<bool> myWantNoteOff{false};
+    std::atomic<bool> myWantAllOff{false};
+    int myNotesSent = 0;
+    std::map<int, float> myHeld;      // (ch<<8 | note) -> 直前のベロシティ
     bool myPanelDirty = false;
     bool myFirstSync = true;
     bool myRawMode = false;
+    const AUKind myKind;
     std::atomic<uint64_t> myTouchedAddr{0};
     bool myLearning = false;
     int  myLearnIdx[kLearnSlots];
@@ -1327,36 +1496,3 @@ private:
 
     std::atomic<int64_t> myExec{0}, myRenders{0};
 };
-
-// ---------------------------------------------------------------- entry
-
-extern "C" {
-
-DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* info)
-{
-    info->setAPIVersion(CHOPCPlusPlusAPIVersion);   // apiVersion は private。直接代入は不可
-    info->customOPInfo.opType->setString("Audiounit");
-    info->customOPInfo.opLabel->setString("AudioUnit");
-    info->customOPInfo.opIcon->setString("AUN");
-    info->customOPInfo.authorName->setString("SYGNAL Inc.");
-    info->customOPInfo.authorEmail->setString("");
-    info->customOPInfo.minInputs = 1;
-    info->customOPInfo.maxInputs = 2;
-    info->customOPInfo.majorVersion = 0;
-    info->customOPInfo.minorVersion = 9;
-    if (info->customOPInfo.opHelpURL)
-        info->customOPInfo.opHelpURL->setString(
-            "https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/AudioUnit/README.md");
-}
-
-DLLEXPORT CHOP_CPlusPlusBase* CreateCHOPInstance(const OP_NodeInfo* info)
-{
-    return new AudioUnitCHOP(info);
-}
-
-DLLEXPORT void DestroyCHOPInstance(CHOP_CPlusPlusBase* instance)
-{
-    delete (AudioUnitCHOP*)instance;
-}
-
-}

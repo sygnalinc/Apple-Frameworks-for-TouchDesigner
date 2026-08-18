@@ -7462,3 +7462,32 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   `Ring Mod Freq 1` 0.6689→324.5(範囲0.5〜8000)。Raw で 40 / 1000 を打つと AU も 40 / 1000。
   Normalized に戻すと 0.4 / **0.7852**(= log(1000/0.5)/log(8000/0.5) と厳密一致)で、
   **AU 側の値は 40 / 999.997 のまま動かない**。警告・エラーなし
+
+### 2026-08-19 AudioUnit CHOP を AU Effect / AU Instrument の2opに分割
+
+- ユーザー提案「今の AudioUnit は AudioUnit Effect にして、もう一つ AudioUnit Instrument を作るのはどう?」
+  → 賛成して実施。続く指摘「OP Dialog に名前が表示できてない」で **AU Effect / AU Instrument** に短縮
+  (opType `Aueffect` / `Auinstrument`、icon AUE / AUI。CI Glass・CA Process Tap と同じ「略称ラベル+
+  展開フォルダ」の型で、フォルダは `AudioUnit/` のまま)
+- **実装は9割共通**なので `AudioUnit/AudioUnitCommon.h` に本体を移し、`.mm` は
+  エントリポイントと `AUKind{ componentType, instrument }` を渡すだけの薄い2ファイルに。
+  1フォルダ2バンドル(Cinematic / MapKit と同じ build_one×2 の手組み)
+  - **ObjC クラス名はバンドルごとに変える**必要があるので、ウインドウデリゲートの名前を
+    `TDAU_DELEGATE` マクロにして各 .mm が define する(MapKit で踏んだ罠の予防)
+- 楽器側の違い: 音声入力なし(minInputs 0)/ Bypass・Dry-Wet なし / **Play ページ**
+  (Note・Velocity・MIDI Channel・Note On/Off・All Notes Off)/ エンジンは source node を挟まず
+  楽器を直接ミキサーへ / **`getOutputInfo` で sampleRate=44100 を明示**(生成側なので必須。
+  CoreAudio Tap で踏んだ罠)/ Info CHOP に `notes_sent` / `notes_held`
+- ノート入力は **入力0の CHOP**。チャンネル名は `ch<ch>n<note>`(CoreMIDI In CHOP の出力そのまま)
+  か `note<note>`。デバイスを直接開く実装は入れていない(CoreMIDI In CHOP を繋げばよく、重複を避けた)
+- **実測(M2)**: 楽器6個を列挙(u-he Zebra2 / Zebralette / ZebraHZ + Apple 3個)。
+  AUMIDISynth で Note On → peak 0.217、`ch1n64`+`ch1n67` 同時 → 0.559、値を 0 に戻すと
+  `notes_held` 0。cook 0.138ms。エフェクト側は従来どおり
+- **DLSMusicDevice だけ TD 内で無音**。単体ハーネス(同じ経路・735フレームずつ)では 0.117 出るので
+  実装ではなく、このプラグインが既定サウンドバンクをこの文脈で読めていない。README に明記
+- **切り分けの型**: 「ノートは送っているのか」「レンダは成功しているのか」を推測しないため、
+  `notes_sent` / `notes_held` を Info CHOP に出し、一時的に `frames_out` / `render_st` も足した。
+  値で「送信1・保持1・735フレーム・status 0(成功)なのに無音」と確定できたので、
+  プラグイン個体の問題だと1手で分かった
+- 注意: opType が変わったので、旧 `Audiounit` を参照する .toe はロードエラーになる
+  (demo.toe には AudioUnit の利用例が無いので影響なし)

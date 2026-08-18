@@ -1,11 +1,35 @@
-# AudioUnit CHOP
+# AU Effect / AU Instrument CHOP
 
 **English** | [日本語](#日本語)
 
 ## English
 
-Hosts **Audio Unit effects** in TouchDesigner's audio path — pick a plugin, wire audio through it,
-automate its parameters from CHOP channels, and open the plugin's own GUI.
+Hosts **Audio Units** in TouchDesigner. Two operators share one implementation:
+
+| Operator | What it hosts | Input 0 | Input 1 |
+|---|---|---|---|
+| **AU Effect** (`Aueffect`) | effects (`aufx`) | audio | parameter panel |
+| **AU Instrument** (`Auinstrument`) | instruments (`aumu`) | notes (optional) | parameter panel |
+
+Pick a plugin, automate its parameters from CHOP channels, and open the plugin's own GUI.
+TouchDesigner's own Audio VST CHOP is **VST3-only** (`libJUCE.dylib` carries `VST3PluginFormat`
+and no `AudioUnitPluginFormat`, measured), so on a stock Mac it finds 0 plugins where these find 30.
+
+### Playing notes with AU Instrument
+
+- **Wire a note CHOP into input 0.** Channels are named `ch<channel>n<note>` (**exactly what
+  CoreMIDI In CHOP emits**) or `note<note>`. The value is velocity: **above 0 starts the note,
+  back to 0 stops it**. Both 0–1 and raw MIDI velocities (1–127) are accepted
+- With no input at all, the **Play page** (`Note`, `Velocity`, `MIDI Channel`, `Note On`,
+  `Note Off`, `All Notes Off`) is enough to hear the plugin
+- The Info CHOP reports `notes_sent` / `notes_held` — check these first when nothing sounds
+- Turning `Active` off sends **all notes off** immediately, so nothing is left ringing
+
+**Measured (M2)**: AUMIDISynth peaks at 0.217 for one note, 0.559 for `ch1n64` + `ch1n67` together,
+and `notes_held` returns to 0 when the values go back to 0. Cook time 0.138 ms.
+**DLSMusicDevice is silent inside TouchDesigner** — the same code reaches 0.117 in a standalone
+process, so that plugin appears not to load its default sound bank in this context. If you hear
+nothing, try **AUMIDISynth, AUSampler, or a third-party instrument** before suspecting the wiring.
 
 > **Status: experimental.** Verified end to end on macOS 26 with Apple's bundled effects (audio
 > processing, parameter automation, presets, state save/restore, GUI window). Not tested with
@@ -212,8 +236,33 @@ cd AudioUnit && ./build.sh   # → build/AudioUnitCHOP.plugin
 
 ## 日本語
 
-**Audio Unit エフェクト**を TouchDesigner のオーディオ経路でホストする。プラグインを選んで音を
-通し、CHOP のチャンネルでパラメータを動かし、プラグイン自身の GUI も開ける。
+**Audio Unit** を TouchDesigner でホストする。実装は共通で、オペレータが2つある:
+
+| オペレータ | ホストするもの | 入力0 | 入力1 |
+|---|---|---|---|
+| **AU Effect**(`Aueffect`) | エフェクト(`aufx`) | 音声 | パラメータのパネル |
+| **AU Instrument**(`Auinstrument`) | 楽器(`aumu`) | ノート(任意) | パラメータのパネル |
+
+プラグインを選び、CHOP のチャンネルでパラメータを動かし、プラグイン自身の GUI も開ける。
+TouchDesigner 標準の Audio VST CHOP は **VST3 専用**(`libJUCE.dylib` に `VST3PluginFormat` は
+あるが `AudioUnitPluginFormat` は無い・実測)なので、素の Mac では VST3 が0個に対し
+こちらは30個見つかる。
+
+### AU Instrument でノートを鳴らす
+
+- **入力0にノートの CHOP** を繋ぐ。チャンネル名は `ch<チャンネル>n<ノート番号>`
+  (**CoreMIDI In CHOP の出力そのまま**)か `note<ノート番号>`。値がベロシティで、
+  **0 より大きくなったらノートオン / 0 に戻ったらノートオフ**。0〜1 でも生の MIDI 値(1〜127)でも受ける
+- 入力が無くても **Play ページ**の `Note` / `Velocity` / `MIDI Channel` と
+  `Note On` / `Note Off` / `All Notes Off` で鳴らせる(動作確認用)
+- Info CHOP に `notes_sent` / `notes_held` を出す。鳴らないときはまずここを見る
+- **`Active` を切るとその場で全ノートオフ**する(音が残らない)
+
+**実測(M2)**: AUMIDISynth に Note On で peak 0.217、`ch1n64`+`ch1n67` を同時に鳴らして 0.559、
+値を 0 に戻すと `notes_held` が 0 に。cook 0.138ms。
+**DLSMusicDevice は TouchDesigner 内では無音**だった(単体プロセスでは 0.117 出るので、
+このプラグインが既定のサウンドバンクをこの文脈で読めていないと思われる)。
+音が出ないときは **AUMIDISynth や AUSampler、サードパーティの楽器で確かめる**
 
 > **状態: experimental。** macOS 26 上で Apple 純正エフェクトを使い、音の処理・パラメータ自動化・
 > プリセット・状態の保存復元・GUI 表示まで一通り実測済み。ただし**サードパーティ製プラグインでは

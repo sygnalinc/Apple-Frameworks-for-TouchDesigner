@@ -191,7 +191,8 @@ and are unsupported. The source is here so you can build and try them yourself
 | [AVAudio Spatial](AVAudioSpatial/) | CHOP | experimental |
 | [AVF Camera](AVFoundationCamera/) | TOP | experimental |
 | [AudioToolbox Mix](AudioToolboxMix/) | CHOP | experimental |
-| [AudioUnit](AudioUnit/) | CHOP | experimental |
+| [AU Effect](AudioUnit/) | CHOP | experimental |
+| [AU Instrument](AudioUnit/) | CHOP | experimental |
 | [Caption Author](CaptionAuthor/) | DAT | experimental |
 | [ColorSync](ColorSync/) | TOP | experimental |
 | [CI Bokeh](CoreImageBokeh/) | TOP | experimental |

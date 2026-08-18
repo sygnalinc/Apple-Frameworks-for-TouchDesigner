@@ -190,7 +190,8 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [AVAudio Spatial](AVAudioSpatial/) | CHOP | 実験中 |
 | [AVF Camera](AVFoundationCamera/) | TOP | 実験中 |
 | [AudioToolbox Mix](AudioToolboxMix/) | CHOP | 実験中 |
-| [AudioUnit](AudioUnit/) | CHOP | 実験中 |
+| [AU Effect](AudioUnit/) | CHOP | 実験中 |
+| [AU Instrument](AudioUnit/) | CHOP | 実験中 |
 | [Caption Author](CaptionAuthor/) | DAT | 実験中 |
 | [ColorSync](ColorSync/) | TOP | 実験中 |
 | [CI Bokeh](CoreImageBokeh/) | TOP | 実験中 |
