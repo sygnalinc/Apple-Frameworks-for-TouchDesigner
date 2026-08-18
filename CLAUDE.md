@@ -7307,3 +7307,21 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - 実測: Learn=On で `_panel` / `_panel_callbacks` / `_params` が生成され、入力1へ配線されて
   Input Range=Raw に。両 DAT とも `showDocked=False` の閉じたチップ。Create / Rebuild Panel
   での作り直しも従来どおり型付きパラメータが出る
+
+### 2026-08-16 AudioUnit CHOP: v2/v3 のパラメータ対応を添え字→address に修正(重大)
+
+- ユーザー「chop からのパラメータ操作がまだ対数になっているっぽい」→ 調べると**もっと根本的な
+  バグ**が出た。**v2 の `kAudioUnitProperty_ParameterList` と v3 の `parameterTree` は
+  並び順が違う**(実測: AUDistortion 16個中11個・AUMatrixReverb 17個中11個がずれ。
+  AUFilter と AUNBandEQ はたまたま一致)。私は添え字で対応づけていたので、
+  **書く先(v3)と読む先(v2)が別パラメータになり**、値が動かない・曲線も別物、という状態だった
+- **`AUParameter.address` が v2 のパラメータIDそのもの**と判明(6プラグインで address から
+  `ParameterInfo` を引き、名前が100%一致)。`ParameterList` の走査をやめ、address を使うよう修正
+- **以前の記録は誤り**: 「address は v2 のIDではない(v2id=3 ↔ addr=10)」と書いたが、
+  これは**並びがずれているのに添え字で突き合わせた**結果の見かけ。README も訂正した
+- **実測(AUDistortion・修正後)**: 入力 0.25 → `Ring_Mod_Freq_1`=5.623(log位置 0.250)/
+  `Delay`=31.34(sqrt位置 0.250)/ `Delay_Mix`=25(線形 0.250)。3種類の曲線が全て厳密に一致
+- `Input Range` の既定を **Normalized** に(ユーザー指示。MIDI が素の 0〜1 で来るため)
+- **測り方の罠(また踏んだ)**: この op は timeslice なので、**1つのスクリプト内で force cook
+  しても実時間が進まずサンプル数0になり `execute` が早期 return する**。値を変えて効果を見るには
+  **設定 → シェル側で待つ → 別呼び出しで読む**。これを忘れて「最小値に張り付いている」と誤診した

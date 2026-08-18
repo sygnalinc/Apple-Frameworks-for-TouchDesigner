@@ -124,8 +124,11 @@ So this operator **reads the v2 side** (`AudioUnitGetParameter`) and **posts an 
 write**. Learn works by polling those v2 values rather than by the parameter observer, which is why
 turning a knob in the plugin's own window is picked up at all.
 
-One more trap: **`AUParameter.address` is not the v2 parameter ID** (measured: v2 id 3 maps to
-address 10). The two lists line up by position, not by value.
+One more trap: **`AUParameter.address` *is* the v2 parameter ID** — verified against six plugins,
+100% of names matched when the v2 `ParameterInfo` was fetched by address. What is *not* safe is
+walking `kAudioUnitProperty_ParameterList` and pairing it with the v3 tree by position: **the two
+orders differ** (AUDistortion, 11 of 16 out of place; AUMatrixReverb, 11 of 17). Pairing by index
+makes the host read one parameter while writing another, and values appear stuck.
 
 ### A panel with the right controls for each parameter
 
@@ -314,8 +317,11 @@ Apple 純正の AU は **v2** のユニットを AUv3 のブリッジで包ん�
 Learn もオブザーバではなく **v2 側の値のポーリング**で検出している。プラグイン自身のウインドウで
 つまみを回したときに拾えるのはこのため。
 
-もう1つの罠: **`AUParameter.address` は v2 のパラメータIDではない**(実測: v2id=3 ↔ addr=10)。
-2つの一覧は値ではなく**並び順**で対応する。
+もう1つの罠: **`AUParameter.address` は v2 のパラメータID そのもの**(6プラグインで検証し、
+address で `ParameterInfo` を引くと名前が100%一致)。**危ないのは
+`kAudioUnitProperty_ParameterList` を並び順で v3 のツリーと突き合わせること** —
+**両者の並びは違う**(AUDistortion は16個中11個、AUMatrixReverb は17個中11個がずれ)。
+添え字で対応づけると**書く先と読む先が食い違い、値が動かなくなる**。
 
 ### パラメータの型どおりのパネル
 

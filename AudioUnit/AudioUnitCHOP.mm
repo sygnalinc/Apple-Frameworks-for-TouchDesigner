@@ -441,7 +441,7 @@ public:
         {
             // MIDI コンは 0〜1 で来るので、既定は「そのパラメータの min〜max へ引き伸ばす」
             OP_StringParameter p("Inputrange"); p.label = "Input Range"; p.page = P;
-            p.defaultValue = "Normalized";
+            p.defaultValue = "Normalized";   // MIDI が素の 0〜1 で来るので既定はこちら
             const char* n[] = {"Normalized", "Raw"};
             const char* l[] = {"Normalized 0-1 -> parameter range", "Raw value"};
             m->appendMenu(p, 2, n, l);
@@ -641,34 +641,29 @@ private:
         myAddrToIndex.clear();
         for (size_t i = 0; i < myParams.size(); i++) myAddrToIndex[myParams[i].address] = (int)i;
 
-        // v2 側のパラメータID一覧。**AUParameter.address とは一致しない**(実測: v2id=3 ↔ addr=10)。
-        // 並び順は同じなので添え字で対応づける
+        // **v2 側のIDは `AUParameter.address` そのもの**(6プラグインで100%一致・実測)。
+        // 以前 kAudioUnitProperty_ParameterList を添え字で突き合わせていたが、
+        // **v2 と v3 では並び順が違う**(AUDistortion は16個中11個ずれ・AUMatrixReverb は
+        // 17個中11個)。そのせいで書く先と読む先が食い違い、値が動かなくなっていた
         myAU2 = myUnit.audioUnit;
-        UInt32 sz = 0;
-        if (myAU2 && AudioUnitGetPropertyInfo(myAU2, kAudioUnitProperty_ParameterList,
-                                              kAudioUnitScope_Global, 0, &sz, nullptr) == noErr && sz) {
-            std::vector<AudioUnitParameterID> ids(sz / sizeof(AudioUnitParameterID));
-            if (AudioUnitGetProperty(myAU2, kAudioUnitProperty_ParameterList, kAudioUnitScope_Global,
-                                     0, ids.data(), &sz) == noErr)
-                for (size_t i = 0; i < myParams.size() && i < ids.size(); i++) {
-                    myParams[i].pid = ids[i];
-                    AudioUnitParameterInfo pinfo; UInt32 isz = sizeof(pinfo);
-                    if (AudioUnitGetProperty(myAU2, kAudioUnitProperty_ParameterInfo, kAudioUnitScope_Global,
-                                             ids[i], &pinfo, &isz) == noErr) {
-                        ParamEntry& pe = myParams[i];
-                        pe.curve = pinfo.flags;
-                        // AU はパラメータの単位で型を伝えてくる。実測(エフェクト24個・231個)では
-                        // Boolean 18 / Indexed 24(うち19個は選択肢名あり)/ それ以外 189
-                        if (pinfo.unit == kAudioUnitParameterUnit_Boolean) pe.type = "toggle";
-                        else if (pinfo.unit == kAudioUnitParameterUnit_Indexed) {
-                            NSArray<NSString*>* vs = pe.p ? pe.p.valueStrings : nil;
-                            if (vs.count) {
-                                pe.type = "menu";
-                                pe.values = [[vs componentsJoinedByString:@"|"] UTF8String] ?: "";
-                            } else pe.type = "int";
-                        }
-                    }
+        if (myAU2) {
+            for (auto& e : myParams) {
+                e.pid = (AudioUnitParameterID)e.address;
+                AudioUnitParameterInfo pinfo; UInt32 isz = sizeof(pinfo);
+                if (AudioUnitGetProperty(myAU2, kAudioUnitProperty_ParameterInfo, kAudioUnitScope_Global,
+                                         e.pid, &pinfo, &isz) != noErr) continue;
+                e.curve = pinfo.flags;
+                // AU はパラメータの単位で型を伝えてくる。実測(エフェクト24個・231個)では
+                // Boolean 18 / Indexed 24(うち19個は選択肢名あり)/ それ以外 189
+                if (pinfo.unit == kAudioUnitParameterUnit_Boolean) e.type = "toggle";
+                else if (pinfo.unit == kAudioUnitParameterUnit_Indexed) {
+                    NSArray<NSString*>* vs = e.p ? e.p.valueStrings : nil;
+                    if (vs.count) {
+                        e.type = "menu";
+                        e.values = [[vs componentsJoinedByString:@"|"] UTF8String] ?: "";
+                    } else e.type = "int";
                 }
+            }
         }
         installObserver();
     }
