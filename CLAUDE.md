@@ -7385,3 +7385,30 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   callbacks DAT を使い回す**のが正しい
 - 実測: パネル 0.0 / 0.5 / 1.0 → AU 実値 0.0005 / 0.00387298 / 0.03(対数位置と厳密一致)、
   警告なし。生成物は `_au` / `_au_info` / `_au_params` / `_au_params_callbacks` の4つで重複なし
+
+### 2026-08-19 AudioUnit CHOP: learn がパネルに反映されない/音が無いと動かない を修正
+
+- ユーザー報告「learn Parameters で GUI を動かしてもパラメーターが保存されない」
+- **原因は2つ**:
+  1. **learn した内容がパネルに渡っていなかった**。割り当ては `Learnmap` に入るが、パネルの仕様
+     (storage の JSON)は **Create / Rebuild Panel を押したときにしか更新されない**設計だった。
+     利用者から見ると「触っても何も出てこない」=保存されていないように見える
+     → 割り当てが変わったら `refreshPanelSpec()` で仕様を渡し直す。**パラメータの顔ぶれだけの
+     署名**(値は毎cook変わるので比較に使えない)を持たせ、**同じ顔ぶれなら作り直さない**ので
+     起動直後の再送でも値が飛ばない
+  2. **音声入力が無いとパラメータ側が丸ごと止まっていた**。`execute` が
+     `if (!active || !ci || ci->numSamples < 1 ...) return;` で早期 return しており、
+     その手前に `applyParamsFromInput`(=入力1のパネルを読む)が無かった。
+     **入力1を読まないとパネルは cook されない**ので、つまみを動かしても何も起きない。
+     Learn の検出も止まる → パラメータ・GUI・Learn を早期 return の**前**に移した
+- **実測(M2・AUDistortion・実時間で cook)**: Learn On + プリセット適用で **15個が自動でパネルに載る**
+  (Create を押さない)。値も curve どおり — Delay(sqrt) 15.5→0.1755 / Delay_Mix(linear) 75.7→0.757 /
+  Ring Mod Freq 1(log) 324.5→0.6689 は全て手計算と一致。パネル 0.3 → AU 30。op の cook 0.35ms
+- **パネルの spec パースをキャッシュ**(storage の文字列が変わったときだけ `json.loads`)。
+  毎cook パースで 2.21ms かかっていたのを解消
+- **検証で自分が2度ハマった(既出の罠の再発)**:
+  ① **Script CHOP は入力も時間依存も無いと dirty にならないので、force cook では再 cook されない**。
+     さらに force cook は timeslice のサンプル数が0になるので、この op 自体も早期 return する。
+     **パラメータの効きを見るなら Audio Device Out(Volume 0)を繋いで実時間で回す**
+  ② **ドックした Info DAT はホストを destroy すると一緒に消える**。テストで op を作り直すと
+     `_info` が消えるので「作られていない」と誤診しかけた(TD再起動では消えない)
