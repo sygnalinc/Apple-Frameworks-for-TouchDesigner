@@ -30,7 +30,7 @@ Measured on a stock M2 (macOS 26.6): **0 VST3 plugins installed, 30 Audio Units*
 - Applies **factory presets**
 - Opens the plugin's **own GUI** in a floating window
 - **Saves the plugin's state into the .toe** so a sound you dialled in by hand survives a reopen
-- **Learn**: touch a knob in the GUI to bind it to one of 16 slots — drive them from MIDI, keyframes
+- **Learn**: touch a knob in the GUI and it appears on the panel — drive it from MIDI, keyframes
   or expressions. Assignments are remembered per plugin
 
 ### Measured (M2, macOS 26.6)
@@ -192,11 +192,11 @@ one plugin's state into another.
   not handled yet — pair a future version with [CoreMIDI In](../CoreMIDI/)
 - Plugins load with the system's default policy for that component, so v3 app-extension plugins run
   **out of process** and a crash there does not take TouchDesigner with it
-- **TouchDesigner cannot grow parameters at runtime.** `setupParameters` is called exactly once per
-  instance (measured), so the VST CHOP's "learn parameters" cannot be reproduced literally, and the
-  slots cannot grow as you learn. Python cannot add them either — `appendCustomPage` exists on COMPs
-  but not on a CHOP (measured). The 16 pre-declared slots, with the unassigned ones greyed out, are
-  the equivalent here; raising the count is a one-line change to `kLearnSlots`
+- **A C++ Custom OP cannot grow parameters at runtime.** `setupParameters` is called exactly once
+  per instance (measured), and Python cannot add them either — `appendCustomPage` exists on COMPs but
+  not on a CHOP (measured). That is why the controls live on a generated **Script CHOP**, which can
+  grow. Up to **128** parameters can be learned; past that you get a warning and **Clear Learned**
+  starts over (the limit is `kLearnSlots`, a one-line change)
 - This operator only cooks when something downstream asks for it. If the GUI does not appear, check
   that the CHOP is actually cooking
 
@@ -236,7 +236,7 @@ TouchDesigner には **Audio VST CHOP** があるが、macOS では **VST3 し�
 - **ファクトリープリセット**の適用
 - プラグイン**自身の GUI** をフローティングウインドウで表示
 - **プラグインの状態を .toe に保存**。GUI で作り込んだ音が開き直しても残る
-- **Learn**: GUI でつまみを触るとその場で16個の枠に割り当て。MIDI・キーフレーム・式から動かせる。
+- **Learn**: GUI でつまみを触るとその場でパネルに出る。MIDI・キーフレーム・式から動かせる。
   割り当てはプラグインごとに覚える
 
 ### 実測(M2・macOS 26.6)
@@ -405,10 +405,10 @@ base64 にして `Plugin State` 文字列パラメータへ入れる(.toe と一
 - 読み込み方はそのコンポーネントの既定に任せているので、v3 のアプリ拡張型プラグインは
   **別プロセスで動く**。そちらが落ちても TouchDesigner は巻き込まれない
 - **TD は実行中にパラメータを増やせない。** `setupParameters` はインスタンスにつき**1回きり**しか
-  呼ばれない(実測)。そのため VST CHOP の「learn parms」をそのままの形では再現できず、
-  **learn するたびに枠を増やすこともできない**。Python からも足せない
-  (`appendCustomPage` は COMP にはあるが CHOP には無い・実測)。上の「Learn」で説明した
-  **16個の枠**(未割り当てはグレー)がその代わり。数を増やすのは `kLearnSlots` の1行
+  呼ばれない(実測)。Python からも足せない
+  (`appendCustomPage` は COMP にはあるが CHOP には無い・実測)。だからコントロールは
+  **生成した Script CHOP** に置いている(こちらは増やせる)。learn できるのは **128個**まで。
+  超えると警告が出るので **Clear Learned** でやり直す(上限は `kLearnSlots` の1行)
 - この op は下流から要求されたときだけ cook する。GUI が出ないときは、まず**cook されているか**を疑う
 
 ### ビルド

@@ -75,7 +75,7 @@ std::string sanitize(NSString* s)
     return r;
 }
 
-constexpr int kLearnSlots = 16;
+constexpr int kLearnSlots = 128;   // パネルに載せられるパラメータの上限
 
 // AU は「GUI のつまみをどう振るか」をフラグで持っている(bit16〜18 に値 + bit22)。
 // 線形正規化のままだと対数パラメータでズレる: AUPeakLimiter の Attack Time は
@@ -274,7 +274,11 @@ def onCook(scriptOp):
 class AudioUnitCHOP : public CHOP_CPlusPlusBase
 {
 public:
-    explicit AudioUnitCHOP(const OP_NodeInfo* info) : myNode(info) { rescan(); }
+    explicit AudioUnitCHOP(const OP_NodeInfo* info) : myNode(info)
+    {
+        for (int i = 0; i < kLearnSlots; i++) myLearnIdx[i] = -1;
+        rescan();
+    }
     virtual ~AudioUnitCHOP() { closeWindowSync(); teardown(); }
 
     void getGeneralInfo(CHOP_GeneralInfo* g, const OP_Inputs*, void*) override
@@ -1013,7 +1017,8 @@ private:
             myPanelDirty = true;      // learn した瞬間にパネルへ反映する
             return;
         }
-        myWarn = "all learn slots are used";
+        myWarn = "learn slots are full (" + std::to_string(kLearnSlots) +
+                 ") - use Clear Learned to start over";
     }
 
     // 入力CHOP から `learn1` `learn2` … でも指せるようにする
@@ -1059,6 +1064,9 @@ private:
             }
         }
         rebuildLearnAliases();
+        // プラグインを切り替えるとここで別の割り当てが復元される。
+        // パネルにも渡し直さないと、前のプラグインのつまみが残ったままになる(実測)
+        myPanelDirty = true;
     }
 
     // GUI で動かされたパラメータを知るためのオブザーバ。AU 側のスレッドから来るので
@@ -1245,7 +1253,7 @@ private:
     bool myFirstSync = true;
     std::atomic<uint64_t> myTouchedAddr{0};
     bool myLearning = false;
-    int  myLearnIdx[kLearnSlots] = { -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1 };
+    int  myLearnIdx[kLearnSlots];
     std::unordered_map<uint64_t,int> myAddrToIndex;
     AudioUnit myAU2 = nullptr;
     AUParameterTree* myObserverTree = nil;
