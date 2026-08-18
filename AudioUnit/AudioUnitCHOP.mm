@@ -240,6 +240,28 @@ def _curve_to_value(curve, p, lo, hi):
     return lo + n * (hi - lo)
 
 
+def _value_to_curve(curve, v, lo, hi):
+    # 実値 → つまみ位置(0〜1)。_curve_to_value の逆。
+    # **パネルの出力はこの 0〜1**。実値のまま出すと Input Range=Normalized の
+    # ときに 0〜1 と解釈されてクランプされ、パラメータが張り付く(実測)
+    if hi <= lo:
+        return 0.0
+    v = lo if v < lo else (hi if v > hi else v)
+    if curve == "log" and lo > 0:
+        import math
+        return math.log(v / lo) / math.log(hi / lo)
+    n = (v - lo) / (hi - lo)
+    if curve == "sqrt":
+        return n ** 0.5
+    if curve == "sq":
+        return n * n
+    if curve == "cube":
+        return n * n * n
+    if curve == "cbrt":
+        return n ** (1.0 / 3.0)
+    return n
+
+
 def _read(par, lo):
     if par.style == "Menu":
         return float(lo + par.menuIndex)
@@ -302,8 +324,10 @@ def onCook(scriptOp):
             seen[nm] = auv
         else:
             seen[nm] = auv
-        # 現在値をチャンネルで出す。AudioUnit CHOP が入力1で受け取る
-        scriptOp.appendChan(r["channel"])[0] = _read(par, lo)
+        # 現在値を**つまみ位置(0〜1)**で出す。AudioUnit CHOP が入力1で
+        # Input Range=Normalized のまま受け取れるので、MIDI 直結と同じ土俵になる
+        scriptOp.appendChan(r["channel"])[0] = _value_to_curve(
+            r.get("curve", "linear"), _read(par, lo), lo, hi)
     st["au"] = seen
     return
 )AUPANEL";
@@ -884,7 +908,6 @@ private:
         py += " info.cook(force=True)\n";           // 生成直後は未cookで中身が空
         py += " sc.par.setuppars.pulse()\n";        // 型付きパラメータを作る
         py += " n.inputConnectors[1].connect(sc)\n";
-        py += " n.par.Inputrange = 'Raw'\n";        // パネルは実値を出すので Raw
         // 2つの DAT は既定で**閉じたドックチップ**にしてネットワークを散らかさない。
         // 開閉の実体は showDocked(expose=False は「×」チップになるので使わない)。
         // ドック後は nodeX/Y が無効になるので位置は設定しない
