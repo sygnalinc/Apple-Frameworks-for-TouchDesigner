@@ -89,10 +89,10 @@ struct ParamEntry {
     std::string name;    // 表示名
     std::string unit;
     float minV = 0, maxV = 1, cur = 0;
-    float lastWritten = NAN;   // 自分が最後に書いた AU 側の値。GUI/プリセットと喧嘩しないための記録
+    float lastAU   = NAN;      // AU側で最後に見た値。ここから動いていたら GUI が動かされた
+    float lastSlot = NAN;      // Learn 枠で最後に見た値。ここから動いていたら TD 側で動かされた
     uint64_t address = 0;      // AUParameter のアドレス。**v2 のパラメータIDとは別物**(実測)
     AudioUnitParameterID pid = 0;  // v2 側のID。GUI はこちらを読み書きする
-    float learnBase = 0;       // Learn 開始時の値。GUI で動かされたかの判定に使う
     int      learnSlot = -1;   // 割り当てられた Learn 枠(1始まり。-1=未割り当て)
 };
 
@@ -157,8 +157,7 @@ public:
             if (!ensureEngine(sr, n)) { passThrough(out, ci, n, in); return; }
 
             applyPreset(in);
-            handleLearn(in);
-            applyLearnSlots(in);
+            syncParams(in);
             applyParamsFromInput(in);
             myBypassed = in->getParInt("Bypass") != 0;
             myUnit.AUAudioUnit.shouldBypassEffect = myBypassed;
@@ -234,7 +233,7 @@ public:
             m->appendMenu(p, 2, n, l);
         }
         { OP_NumericParameter p("Showui"); p.label = "Display GUI"; p.page = P; p.defaultValues[0] = 0; m->appendToggle(p); }
-        { OP_NumericParameter p("Alwaysontop"); p.label = "Always On Top"; p.page = P; p.defaultValues[0] = 1; m->appendToggle(p); }
+        { OP_NumericParameter p("Alwaysontop"); p.label = "Always On Top"; p.page = P; p.defaultValues[0] = 0; m->appendToggle(p); }
         { OP_NumericParameter p("Resetstate"); p.label = "Reset Plugin State"; p.page = P; m->appendPulse(p); }
 
         // Audio VST CHOP の learn parms 相当。TD は実行中にパラメータを増やせないので、
@@ -250,7 +249,7 @@ public:
             char nm[16], lb[32];
             snprintf(nm, sizeof nm, "Learn%d", i);
             snprintf(lb, sizeof lb, "Learn %d", i);
-            OP_NumericParameter p(nm); p.label = lb; p.page = "Learned";
+            OP_NumericParameter p(nm); p.label = lb; p.page = L;
             p.defaultValues[0] = 0; p.minSliders[0] = 0; p.maxSliders[0] = 1;
             p.minValues[0] = 0; p.maxValues[0] = 1; p.clampMins[0] = true; p.clampMaxes[0] = true;
             m->appendFloat(p);
@@ -528,7 +527,8 @@ private:
         NSArray<AUAudioUnitPreset*>* pr = myUnit.AUAudioUnit.factoryPresets;
         if (want < (int)pr.count) {
             myUnit.AUAudioUnit.currentPreset = pr[want];
-            for (auto& p : myParams) p.lastWritten = NAN;   // プリセットが上書きした値を尊重する
+            // 基準はリセットしない。プリセットによる変化も syncParams に
+            // 「AU 側が動いた」として拾わせ、Learn 枠へ反映させる
         }
     }
 
@@ -540,11 +540,12 @@ private:
         float target = normalized ? (e.minV + (v < 0 ? 0 : (v > 1 ? 1 : v)) * (e.maxV - e.minV)) : v;
         if (target < e.minV) target = e.minV;
         if (target > e.maxV) target = e.maxV;
-        if (!std::isnan(e.lastWritten) && fabsf(target - e.lastWritten) < 1e-7f) return;
+        if (!std::isnan(e.lastAU) && fabsf(target - e.lastAU) < 1e-7f) return;
         e.p.value = target;              // v3→v2 は同期するので、音はこれだけで変わる
         notifyGUI(e);                    // ただし GUI は通知しないと描き直さない
-        e.lastWritten = target;
-        e.learnBase = target;            // 自分の書き込みを「GUI で触られた」と誤検出しないように
+        // **書いた値ではなく読み戻した値**を控える。量子化するパラメータだと
+        // 書いた値と実際の値がずれ、毎cook「GUIが動いた」と誤検出してしまう
+        e.lastAU = readParam(e);
     }
 
     // v2 のプラグイン GUI は AUEventListener で変更を受け取る。こちらが新 API で書いても
@@ -575,7 +576,6 @@ private:
     // 名前は Info DAT の channel 列 / `p<index>` / 割り当て済みの `learn<n>` が使える
     void applyParamsFromInput(const OP_Inputs* in)
     {
-        if (myLearning) return;                    // 学習中は自分で書かない(GUI 操作の誤検出を防ぐ)
         const OP_CHOPInput* pi = in->getInputCHOP(1);
         if (!pi || pi->numSamples < 1) return;
         const char* rng = in->getParString("Inputrange");
@@ -593,42 +593,54 @@ private:
 
     // Learn 中に GUI で触られたパラメータを空いている枠へ割り当てる。
     // 学習中はこちらから値を書かない(自分の書き込みを「触られた」と誤検出しないため)
-    void handleLearn(const OP_Inputs* in)
+    // AU 側(=GUI が書く方)と Learn 枠(=TD のパラメータ)を**毎cook 双方向で同期**する。
+    //
+    //  ・AU 側が動いていた → GUI かプリセットで動かされた。枠へ書き戻す
+    //                        （Learn 中で未割り当てなら、その場で枠に割り当てる）
+    //  ・枠が動いていた     → TD 側で動かされた。AU へ書いて GUI にも通知する
+    //
+    // Learn の On/Off は「未割り当てのものを拾うかどうか」だけの違いにしてある。
+    // Learn 中でも枠は生きているし、Learn を切っても GUI 追従は続く
+    void syncParams(const OP_Inputs* in)
     {
         if (myWantClearLearn.exchange(false)) {
             for (auto& e : myParams) e.learnSlot = -1;
             for (int i = 0; i < kLearnSlots; i++) myLearnIdx[i] = -1;
             rebuildLearnAliases(); saveLearnMap();
         }
-        const bool learn = in->getParInt("Learn") != 0;
-        if (learn && !myLearning) {                      // Off→On: 今の値を基準として控える
-            for (auto& e : myParams) e.learnBase = readParam(e);
-            myLearning = true;
-            myLearnArmed = true;
-            return;                                      // armした cook では判定しない
-        }                                                // (直前の書き込みが落ち着く前に拾ってしまう)
-        myLearning = learn;
-        if (!learn) return;
+        myLearning = in->getParInt("Learn") != 0;
 
-        // **v2 側の値を毎cook読んで、動いたものを割り当てる。**
-        // v2 プラグインの GUI は旧 API で書くのでパラメータオブザーバが発火せず、
-        // AUParameter.value も更新されない(実測)。ポーリングだけが確実
+        std::vector<std::pair<std::string, double>> slotWrites;
         for (size_t i = 0; i < myParams.size(); i++) {
             ParamEntry& e = myParams[i];
-            const float now = readParam(e);
-            const float span = e.maxV - e.minV;
-            const float eps = (span > 0 ? span : 1.0f) * 0.002f;   // 範囲の 0.2%
-            if (fabsf(now - e.learnBase) <= eps) continue;
-            e.learnBase = now;
-            if (e.learnSlot > 0) continue;                          // 既に割り当て済み
-            assignLearnSlot((int)i);
+            const float now  = readParam(e);
+            const float span = (e.maxV - e.minV) > 0 ? (e.maxV - e.minV) : 1.0f;
+            const float eps  = span * 0.001f;
+
+            if (std::isnan(e.lastAU)) { e.lastAU = now; continue; }   // 初回は基準を作るだけ
+
+            if (fabsf(now - e.lastAU) > eps) {          // --- AU 側が動いた(GUI / プリセット)
+                e.lastAU = now;
+                if (myLearning && e.learnSlot <= 0) assignLearnSlot((int)i);
+                if (e.learnSlot > 0) {
+                    float nrm = (now - e.minV) / span;
+                    nrm = nrm < 0 ? 0 : (nrm > 1 ? 1 : nrm);
+                    e.lastSlot = nrm;                   // 書き戻しは次cookに届くので先に控える
+                    slotWrites.push_back({"Learn" + std::to_string(e.learnSlot), nrm});
+                }
+                continue;
+            }
+            if (e.learnSlot <= 0) continue;
+
+            char nm[16]; snprintf(nm, sizeof nm, "Learn%d", e.learnSlot);
+            const float slotVal = (float)in->getParDouble(nm);
+            if (std::isnan(e.lastSlot)) { e.lastSlot = slotVal; continue; }
+            if (fabsf(slotVal - e.lastSlot) > 1e-6f) {  // --- 枠が動いた(TD 側)
+                e.lastSlot = slotVal;
+                writeParam(e, slotVal, true);           // AU へ書いて GUI へ通知
+            }
         }
-        // オブザーバ経由(v3 プラグイン用)。こちらは即座に届く
-        const uint64_t raw = myTouchedAddr.exchange(0);
-        if (raw) {
-            auto it = myAddrToIndex.find(raw - 1);
-            if (it != myAddrToIndex.end() && myParams[it->second].learnSlot <= 0) assignLearnSlot(it->second);
-        }
+        if (!slotWrites.empty()) tdpycb::setFloatPars(myNode, slotWrites);
     }
 
     void assignLearnSlot(int idx)
@@ -641,32 +653,6 @@ private:
             return;
         }
         myWarn = "all learn slots are used";
-    }
-
-    void applyLearnSlots(const OP_Inputs* in)
-    {
-        if (myLearning) return;
-        if (myLearnArmed) {   // Learn を抜けた直後は、GUI の現在値を枠へ書き戻す
-            myLearnArmed = false;
-            std::vector<std::pair<std::string,double>> vals;
-            for (int i = 0; i < kLearnSlots; i++) {
-                const int idx = myLearnIdx[i];
-                if (idx < 0 || idx >= (int)myParams.size()) continue;
-                ParamEntry& e = myParams[idx];
-                const float span = e.maxV - e.minV;
-                const float nrm = span > 0 ? (readParam(e) - e.minV) / span : 0.f;
-                e.lastWritten = readParam(e);
-                vals.push_back({"Learn" + std::to_string(i + 1), nrm < 0 ? 0 : (nrm > 1 ? 1 : nrm)});
-            }
-            if (!vals.empty()) tdpycb::setFloatPars(myNode, vals);
-            return;                       // この cook は書かない(書き戻しが1フレーム遅れて届くため)
-        }
-        for (int i = 0; i < kLearnSlots; i++) {
-            const int idx = myLearnIdx[i];
-            if (idx < 0 || idx >= (int)myParams.size()) continue;
-            char nm[16]; snprintf(nm, sizeof nm, "Learn%d", i + 1);
-            writeParam(myParams[idx], (float)in->getParDouble(nm), true);   // 枠は常に 0〜1
-        }
     }
 
     // 入力CHOP から `learn1` `learn2` … でも指せるようにする
@@ -858,7 +844,7 @@ private:
         id plist = [NSPropertyListSerialization propertyListWithData:pl options:0 format:NULL error:&e];
         if ([plist isKindOfClass:[NSDictionary class]]) {
             myUnit.AUAudioUnit.fullState = plist;
-            for (auto& p : myParams) { p.lastWritten = NAN; p.cur = p.p ? p.p.value : p.cur; }
+            for (auto& p : myParams) { p.lastAU = NAN; p.lastSlot = NAN; p.cur = p.p ? p.p.value : p.cur; }
         }
     }
 
@@ -898,11 +884,10 @@ private:
     int  myLearnIdx[kLearnSlots] = { -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1 };
     std::unordered_map<uint64_t,int> myAddrToIndex;
     AudioUnit myAU2 = nullptr;
-    bool myLearnArmed = false;
     AUParameterTree* myObserverTree = nil;
     AUParameterObserverToken myObserverToken = nullptr;
     std::atomic<int64_t> myStateSaves{0};
-    bool myAlwaysOnTop = true;
+    bool myAlwaysOnTop = false;
     bool myBypassed = false;
     double myLatencySec = 0;
 

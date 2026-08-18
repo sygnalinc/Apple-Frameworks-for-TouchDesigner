@@ -46,6 +46,7 @@ Measured on a stock M2 (macOS 26.6): **0 VST3 plugins installed, 30 Audio Units*
 | Plugin state | 463 base64 characters for AUDistortion; restored correctly after switching plugins away and back |
 | GUI | AUDistortion's own view, 581×518, floating (window layer 3) |
 | Learn | Touching a parameter assigns it to `learn1`; slider 0 / 0.25 / 0.5 / 1 → `WetDry_Mix` 0 / 25 / 50 / 100; the same via a `learn1` input channel; the mapping came back after switching plugins away and back |
+| Two-way sync | With Learn still on: AU side moves → slot follows (`Delay` 1.6 → 0.003, 15.5 → 0.031); slot moves → AU follows (0.0 / 0.4 / 1.0 → 0.1 / 200.06 / 500) |
 
 ### Inputs
 
@@ -65,17 +66,21 @@ does instead is pre-declare **16 slots** and let you assign plugin parameters to
 
 1. Turn **Learn Parameters** on
 2. Open the GUI and touch the knobs you want — each one is assigned to the next free slot
-3. Turn Learn off
 
-Now `Learn 1` … `Learn 16` on the **Learned** page drive those parameters. They are normal TD
-parameters, so you can bind them, keyframe them, or drive them by expression. The Info DAT's
+That is all. `Learn 1` … `Learn 16` sit on the same page and drive those parameters. They are normal
+TD parameters, so you can bind them, keyframe them, or drive them by expression. The Info DAT's
 `learn` column shows which slot owns which parameter.
 
 The slots are always **0–1**, stretched to each parameter's own `min`–`max`. That is what makes a
 MIDI controller work without any scaling on your side.
 
-While Learn is on, the operator stops writing parameters itself, so that its own writes are not
-mistaken for you touching a knob.
+**The two sides stay in sync, both ways, all the time** — including while Learn is still on:
+
+- Move a knob in the plugin's GUI → the matching `Learn n` slot follows
+- Move a `Learn n` slot → the plugin's GUI knob follows
+
+Leaving Learn on simply means new knobs you touch keep getting assigned. Turning it off freezes the
+assignments; the two-way sync carries on either way.
 
 **Assignments are stored per plugin** in the `Learned Mapping` parameter, which saves with the
 .toe. Switch to another plugin and back and your mapping returns.
@@ -152,11 +157,11 @@ one plugin's state into another.
 | Dry / Wet | 1 is fully processed, 0 is the original |
 | Output Gain | Applied after the mix |
 | Display GUI | Opens the plugin's own interface |
-| Always On Top | Floating window vs a normal one |
+| Always On Top | Floating window vs a normal one (default off) |
 | Reset Plugin State | Clears the AU's internal state (reverb tails etc.) |
 | Load / Save Plugin State, Plugin State | See above |
 | Learn Parameters / Clear Learned / Learned Mapping | See "Learn" above |
-| Learn 1 … 16 | The assigned parameters, always 0–1 |
+| Learn 1 … 16 | The assigned parameters, always 0–1. Two-way with the GUI |
 
 ### Notes
 
@@ -222,6 +227,7 @@ TouchDesigner には **Audio VST CHOP** があるが、macOS では **VST3 し�
 | プラグイン状態 | AUDistortion で base64 463文字。別プラグインへ切り替えて戻しても復元される |
 | GUI | AUDistortion 自身の画面 581×518・最前面(layer 3) |
 | Learn | パラメータを触ると `learn1` に割り当て。スライダ 0 / 0.25 / 0.5 / 1 → `WetDry_Mix` 0 / 25 / 50 / 100。入力CHOP の `learn1` でも同じ。別プラグインへ切り替えて戻しても割り当てが復元 |
+| 双方向同期 | Learn を On のまま: AU 側が動く → 枠が追従(`Delay` 1.6 → 0.003・15.5 → 0.031)。枠を動かす → AU が追従(0.0 / 0.4 / 1.0 → 0.1 / 200.06 / 500) |
 
 ### 入力
 
@@ -241,16 +247,21 @@ TouchDesigner の Audio VST CHOP には **Learn Parameters**(プラグインの�
 
 1. **Learn Parameters** を On
 2. GUI を開いて、使いたいつまみを触る。触った順に空いている枠へ割り当てられる
-3. Learn を Off
 
-以降は **Learned ページの `Learn 1` 〜 `Learn 16`** がそのパラメータを動かす。普通の TD
+これだけ。**同じページの `Learn 1` 〜 `Learn 16`** がそのパラメータを動かす。普通の TD
 パラメータなので、バインドもキーフレームも式も使える。どの枠がどれを持っているかは
 Info DAT の `learn` 列で分かる。
 
 枠は常に **0〜1** で、各パラメータの `min`〜`max` へ引き伸ばされる。MIDI コンを
 スケーリング無しでそのまま使えるのはこのため。
 
-Learn 中はこちらから値を書かない(自分の書き込みを「つまみを触った」と誤検出しないため)。
+**両側は常に双方向で同期する。Learn を On にしたままでも同じ**:
+
+- プラグインの GUI でつまみを動かす → 対応する `Learn n` の枠が追従する
+- `Learn n` の枠を動かす → プラグインの GUI のつまみが追従する
+
+Learn を On のままにしておくと、新しく触ったつまみが割り当てられ続ける、というだけの違い。
+Off にすると割り当てが固定される。双方向の同期はどちらでも働く。
 
 **割り当てはプラグインごとに** `Learned Mapping` パラメータへ保存され、.toe と一緒に残る。
 別のプラグインへ切り替えて戻すと、そのプラグイン用の割り当てが戻る。
@@ -325,11 +336,11 @@ base64 にして `Plugin State` 文字列パラメータへ入れる(.toe と一
 | Dry / Wet | 1 で全部エフェクト、0 で原音 |
 | Output Gain | ミックス後に掛かる |
 | Display GUI | プラグイン自身の画面を開く |
-| Always On Top | 最前面に固定するか |
+| Always On Top | 最前面に固定するか(既定 Off) |
 | Reset Plugin State | AU の内部状態(残響など)を消す |
 | Load / Save Plugin State・Plugin State | 上記 |
 | Learn Parameters / Clear Learned / Learned Mapping | 上記「Learn」 |
-| Learn 1 〜 16 | 割り当てたパラメータ。常に 0〜1 |
+| Learn 1 〜 16 | 割り当てたパラメータ。常に 0〜1。GUI と双方向 |
 
 ### 注意
 
