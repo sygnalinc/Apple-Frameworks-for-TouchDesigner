@@ -7214,3 +7214,30 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   (0.0 / 0.4 / 1.0 → 0.1 / 200.06 / 500)。新規ノードの既定 Always On Top = False
 - **測り方の注意(再発)**: 検証ヘルパから cook を外したら「割り当てなし」が並び、実装の不具合と
   誤診しかけた。この op は下流が無いと cook されないので、**設定のたびに force cook を挟む**
+
+### 2026-08-16 AudioUnit CHOP: 対数パラメータのズレを修正 + 枠の有効/無効
+
+- ユーザー報告「AUPeakLimiter の AttackTime / ReleaseTime が UI 0.5 なのに Learn CHOP は 0.1、
+  0 と 1 は合う。Pre-Gain は 0.5 で一致」→ **典型的な対数スケールのズレ**。実測で確定:
+  - `AttackTime` は min 0.0005 / max 0.03 で **`DisplayLogarithmic`**。つまみ中央の実値は
+    0.00387 で、線形正規化すると **0.114** → ユーザー報告の「0.1くらい」と一致
+  - `Pre-Gain` は linear なので合っていた
+- **`Display*` フラグは bit16〜18 に「値」として詰まっている**(1=SquareRoot 2=Squared 3=Cubed
+  4=CubeRoot 5=Exponential)+ Logarithmic は bit22。**`&` で判定すると Cubed(3<<16)を
+  SquareRoot(1<<16)と誤判定する**(実際に最初の集計を間違えた)。公式ヘルパ
+  `GetAudioUnitParameterDisplayType(flags)` でマスクしてから `==` で比較する
+- **実測の分布**(この Mac のエフェクト24個・231パラメータ): 線形181 / **対数41** /
+  Squared 4 / SquareRoot 3 / Cubed 1 / Exponential 1
+- `curveToValue` / `valueToCurve` を追加し、枠(0〜1 = つまみ位置)⇔ 実値 の両方向で同じ曲線を通す。
+  対数は `v = lo * (hi/lo)^p`。**min<=0 のときは線形にフォールバック**(この Mac には無いが
+  サードパーティにあり得る)
+- **実測**: AUPeakLimiter で枠 0.7 → `Attack Time` 0.0087837 = 対数位置ちょうど 0.700
+  (線形なら 0.281)。`Pre-Gain` 0.7 → 16(線形)
+
+- ユーザー質問「Learn 1-16 は learn するたびに動的に増やせないか」→ **不可**と実測で確定:
+  - `setupParameters` はインスタンスにつき1回きり(既出)
+  - **Python からも足せない**。`appendCustomPage` は COMP には在るが **CHOP には無い**
+    (`hasattr` が False・tdAttributeError)
+  - 代わりに SDK の **`OP_Inputs::enablePar`** で**未割り当ての枠をグレーアウト**した。
+    実測: 13個 learn した状態で枠1〜13が有効・14〜16がグレー。「learn した分だけ生きて見える」
+  - 数を増やしたいときは `kLearnSlots` の1行

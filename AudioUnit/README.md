@@ -47,6 +47,7 @@ Measured on a stock M2 (macOS 26.6): **0 VST3 plugins installed, 30 Audio Units*
 | GUI | AUDistortion's own view, 581×518, floating (window layer 3) |
 | Learn | Touching a parameter assigns it to `learn1`; slider 0 / 0.25 / 0.5 / 1 → `WetDry_Mix` 0 / 25 / 50 / 100; the same via a `learn1` input channel; the mapping came back after switching plugins away and back |
 | Two-way sync | With Learn still on: AU side moves → slot follows (`Delay` 1.6 → 0.003, 15.5 → 0.031); slot moves → AU follows (0.0 / 0.4 / 1.0 → 0.1 / 200.06 / 500) |
+| Display curve | AUPeakLimiter, slot 0.7 → `Attack Time` 0.0087837 = exactly 0.700 on its log curve (linear would read 0.281); `Pre-Gain` 0.7 → 16 (linear) |
 
 ### Inputs
 
@@ -84,6 +85,16 @@ assignments; the two-way sync carries on either way.
 
 **Assignments are stored per plugin** in the `Learned Mapping` parameter, which saves with the
 .toe. Switch to another plugin and back and your mapping returns.
+
+Slots you have not assigned are **greyed out**, so the page reads as "these are the ones I learned"
+and grows as you go. The count is fixed at 16 — see the note below on why it cannot grow at runtime.
+
+**The slot follows the knob's own curve, not the raw value.** Audio Units declare how their GUI
+sweeps a parameter, and many are logarithmic. AUPeakLimiter's `Attack Time` runs 0.0005–0.03 s on a
+log scale: its knob at centre is 0.00387, which a plain linear normalization would report as
+**0.114**, not 0.5. This operator reads that flag and applies the same curve, so the slot and the
+GUI knob always agree. Measured across the 24 installed effects: 181 parameters linear,
+41 logarithmic, 4 squared, 3 square-root, 1 cubed, 1 exponential.
 
 ### Driving from a MIDI controller
 
@@ -170,8 +181,10 @@ one plugin's state into another.
 - Plugins load with the system's default policy for that component, so v3 app-extension plugins run
   **out of process** and a crash there does not take TouchDesigner with it
 - **TouchDesigner cannot grow parameters at runtime.** `setupParameters` is called exactly once per
-  instance (measured), so the VST CHOP's "learn parameters" cannot be reproduced literally. The 16
-  pre-declared slots described under "Learn" are the equivalent here
+  instance (measured), so the VST CHOP's "learn parameters" cannot be reproduced literally, and the
+  slots cannot grow as you learn. Python cannot add them either — `appendCustomPage` exists on COMPs
+  but not on a CHOP (measured). The 16 pre-declared slots, with the unassigned ones greyed out, are
+  the equivalent here; raising the count is a one-line change to `kLearnSlots`
 - This operator only cooks when something downstream asks for it. If the GUI does not appear, check
   that the CHOP is actually cooking
 
@@ -228,6 +241,7 @@ TouchDesigner には **Audio VST CHOP** があるが、macOS では **VST3 し�
 | GUI | AUDistortion 自身の画面 581×518・最前面(layer 3) |
 | Learn | パラメータを触ると `learn1` に割り当て。スライダ 0 / 0.25 / 0.5 / 1 → `WetDry_Mix` 0 / 25 / 50 / 100。入力CHOP の `learn1` でも同じ。別プラグインへ切り替えて戻しても割り当てが復元 |
 | 双方向同期 | Learn を On のまま: AU 側が動く → 枠が追従(`Delay` 1.6 → 0.003・15.5 → 0.031)。枠を動かす → AU が追従(0.0 / 0.4 / 1.0 → 0.1 / 200.06 / 500) |
+| 表示曲線 | AUPeakLimiter で枠 0.7 → `Attack Time` 0.0087837 = 対数位置ちょうど 0.700(線形なら 0.281)。`Pre-Gain` 0.7 → 16(線形) |
 
 ### 入力
 
@@ -265,6 +279,15 @@ Off にすると割り当てが固定される。双方向の同期はどちら�
 
 **割り当てはプラグインごとに** `Learned Mapping` パラメータへ保存され、.toe と一緒に残る。
 別のプラグインへ切り替えて戻すと、そのプラグイン用の割り当てが戻る。
+
+割り当てていない枠は**グレーアウト**するので、ページは「learn した分だけ」に見えて、
+learn するたびに増えていく。枠の数は16固定(実行中に増やせない理由は下の注意を参照)。
+
+**枠はつまみ自身の曲線に従う。生の値ではない。** Audio Unit は GUI がパラメータをどう振るかを
+フラグで持っていて、対数のものが多い。AUPeakLimiter の `Attack Time` は 0.0005〜0.03 秒の
+**対数**で、つまみ中央は 0.00387。素の線形正規化だとこれが **0.114** になってしまい 0.5 にならない。
+この op はそのフラグを読んで同じ曲線を掛けるので、枠と GUI のつまみは常に一致する。
+インストール済みエフェクト24個での実測: 線形181・**対数41**・Squared 4・SquareRoot 3・Cubed 1・Exponential 1。
 
 ### MIDI コンから動かす
 
@@ -349,8 +372,10 @@ base64 にして `Plugin State` 文字列パラメータへ入れる(.toe と一
 - 読み込み方はそのコンポーネントの既定に任せているので、v3 のアプリ拡張型プラグインは
   **別プロセスで動く**。そちらが落ちても TouchDesigner は巻き込まれない
 - **TD は実行中にパラメータを増やせない。** `setupParameters` はインスタンスにつき**1回きり**しか
-  呼ばれない(実測)。そのため VST CHOP の「learn parms」をそのままの形では再現できない。
-  上の「Learn」で説明した**16個の枠**がその代わりになる
+  呼ばれない(実測)。そのため VST CHOP の「learn parms」をそのままの形では再現できず、
+  **learn するたびに枠を増やすこともできない**。Python からも足せない
+  (`appendCustomPage` は COMP にはあるが CHOP には無い・実測)。上の「Learn」で説明した
+  **16個の枠**(未割り当てはグレー)がその代わり。数を増やすのは `kLearnSlots` の1行
 - この op は下流から要求されたときだけ cook する。GUI が出ないときは、まず**cook されているか**を疑う
 
 ### ビルド

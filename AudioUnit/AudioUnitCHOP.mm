@@ -77,6 +77,43 @@ std::string sanitize(NSString* s)
 
 constexpr int kLearnSlots = 16;
 
+// AU は「GUI のつまみをどう振るか」をフラグで持っている(bit16〜18 に値 + bit22)。
+// 線形正規化のままだと対数パラメータでズレる: AUPeakLimiter の Attack Time は
+// つまみ中央(0.5)が実値 0.00387 で、線形正規化すると 0.114 にしかならない(実測)。
+// 実測の内訳(この Mac のエフェクト24個・231パラメータ):
+//   linear 181 / Logarithmic 41 / SquareRoot 3 / Squared 4 / Cubed 1 / Exponential 1
+//
+// p = つまみ位置(0〜1) ⇔ v = 実値
+inline float curveToValue(AudioUnitParameterOptions curve, float p, float lo, float hi)
+{
+    if (p < 0) p = 0; else if (p > 1) p = 1;
+    const AudioUnitParameterOptions t = GetAudioUnitParameterDisplayType(curve);
+    if ((t == kAudioUnitParameterFlag_DisplayLogarithmic ||
+         t == kAudioUnitParameterFlag_DisplayExponential) && lo > 0 && hi > lo)
+        return lo * powf(hi / lo, p);
+    float n = p;
+    if      (t == kAudioUnitParameterFlag_DisplaySquareRoot) n = p * p;
+    else if (t == kAudioUnitParameterFlag_DisplaySquared)    n = sqrtf(p);
+    else if (t == kAudioUnitParameterFlag_DisplayCubed)      n = cbrtf(p);
+    else if (t == kAudioUnitParameterFlag_DisplayCubeRoot)   n = p * p * p;
+    return lo + n * (hi - lo);
+}
+inline float valueToCurve(AudioUnitParameterOptions curve, float v, float lo, float hi)
+{
+    if (hi <= lo) return 0.f;
+    if (v < lo) v = lo; else if (v > hi) v = hi;
+    const AudioUnitParameterOptions t = GetAudioUnitParameterDisplayType(curve);
+    if ((t == kAudioUnitParameterFlag_DisplayLogarithmic ||
+         t == kAudioUnitParameterFlag_DisplayExponential) && lo > 0 && hi > lo)
+        return logf(v / lo) / logf(hi / lo);
+    const float n = (v - lo) / (hi - lo);
+    if      (t == kAudioUnitParameterFlag_DisplaySquareRoot) return sqrtf(n);
+    else if (t == kAudioUnitParameterFlag_DisplaySquared)    return n * n;
+    else if (t == kAudioUnitParameterFlag_DisplayCubed)      return n * n * n;
+    else if (t == kAudioUnitParameterFlag_DisplayCubeRoot)   return cbrtf(n);
+    return n;
+}
+
 struct PluginEntry {
     std::string id;      // "aufx:dist:appl" を16進にしたもの
     std::string label;   // "AUDistortion — Apple"
@@ -93,6 +130,7 @@ struct ParamEntry {
     float lastSlot = NAN;      // Learn 枠で最後に見た値。ここから動いていたら TD 側で動かされた
     uint64_t address = 0;      // AUParameter のアドレス。**v2 のパラメータIDとは別物**(実測)
     AudioUnitParameterID pid = 0;  // v2 側のID。GUI はこちらを読み書きする
+    AudioUnitParameterOptions curve = 0;  // GUI のつまみの振り方(対数など)
     int      learnSlot = -1;   // 割り当てられた Learn 枠(1始まり。-1=未割り当て)
 };
 
@@ -429,7 +467,13 @@ private:
             std::vector<AudioUnitParameterID> ids(sz / sizeof(AudioUnitParameterID));
             if (AudioUnitGetProperty(myAU2, kAudioUnitProperty_ParameterList, kAudioUnitScope_Global,
                                      0, ids.data(), &sz) == noErr)
-                for (size_t i = 0; i < myParams.size() && i < ids.size(); i++) myParams[i].pid = ids[i];
+                for (size_t i = 0; i < myParams.size() && i < ids.size(); i++) {
+                    myParams[i].pid = ids[i];
+                    AudioUnitParameterInfo pinfo; UInt32 isz = sizeof(pinfo);
+                    if (AudioUnitGetProperty(myAU2, kAudioUnitProperty_ParameterInfo, kAudioUnitScope_Global,
+                                             ids[i], &pinfo, &isz) == noErr)
+                        myParams[i].curve = pinfo.flags;
+                }
         }
         installObserver();
     }
@@ -537,7 +581,7 @@ private:
     // プラグインの GUI やプリセットが持ち主のままになる
     void writeParam(ParamEntry& e, float v, bool normalized)
     {
-        float target = normalized ? (e.minV + (v < 0 ? 0 : (v > 1 ? 1 : v)) * (e.maxV - e.minV)) : v;
+        float target = normalized ? curveToValue(e.curve, v, e.minV, e.maxV) : v;
         if (target < e.minV) target = e.minV;
         if (target > e.maxV) target = e.maxV;
         if (!std::isnan(e.lastAU) && fabsf(target - e.lastAU) < 1e-7f) return;
@@ -623,7 +667,7 @@ private:
                 e.lastAU = now;
                 if (myLearning && e.learnSlot <= 0) assignLearnSlot((int)i);
                 if (e.learnSlot > 0) {
-                    float nrm = (now - e.minV) / span;
+                    float nrm = valueToCurve(e.curve, now, e.minV, e.maxV);
                     nrm = nrm < 0 ? 0 : (nrm > 1 ? 1 : nrm);
                     e.lastSlot = nrm;                   // 書き戻しは次cookに届くので先に控える
                     slotWrites.push_back({"Learn" + std::to_string(e.learnSlot), nrm});
@@ -641,6 +685,13 @@ private:
             }
         }
         if (!slotWrites.empty()) tdpycb::setFloatPars(myNode, slotWrites);
+
+        // 枠は実行中に増やせない(setupParameters はインスタンスにつき1回きり・実測)。
+        // 代わりに**割り当て済みの枠だけを有効化**して、learn した分だけ生きて見えるようにする
+        for (int i = 0; i < kLearnSlots; i++) {
+            char nm[16]; snprintf(nm, sizeof nm, "Learn%d", i + 1);
+            in->enablePar(nm, myLearnIdx[i] >= 0);
+        }
     }
 
     void assignLearnSlot(int idx)
