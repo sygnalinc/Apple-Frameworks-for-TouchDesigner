@@ -76,6 +76,11 @@ Turning Learn off and on again does not disturb an existing panel. The panel lan
 the operator with its viewer open**, and the two DATs it needs (its callbacks and the parameter
 table) are **docked to their host as closed chips** — click a chip to open one.
 
+The panel is never written to from inside the operator's cook. Its parameters sit **upstream on
+input 1**, so touching them while the operator cooks makes TouchDesigner report a **Cook dependency
+loop** — the rebuild is deferred by one frame instead. For the same reason the panel script never
+calls `store()` on itself (its parse cache is a module-level dict).
+
 **Assignments are stored per plugin** in the `Learned Mapping` parameter, which saves with the .toe.
 Switch to another plugin and back and your selection returns. The Info DAT's `learn` column shows
 what is currently selected.
@@ -277,6 +282,11 @@ TouchDesigner の Audio VST CHOP には **Learn Parameters**(プラグインの�
 Learn を Off にして再度 On にしても、既にあるパネルは作り直されない。パネルは**この op の
 真下にビューアを開いた状態**で置かれ、パネルが使う2つの DAT(callbacks とパラメータ表)は
 **ホストに閉じたチップとしてドック**される。チップをクリックすれば開く。
+
+**op の cook 中にパネルへ書き込まない。** パネルは入力1に繋がる*上流*なので、
+op が cook している最中にパネルのパラメータを触ると **Cook dependency loop** になる。
+作り直しは1フレーム遅らせている。同じ理由で、パネルのスクリプトは**自分自身に `store()` しない**
+(パースのキャッシュはモジュール変数の辞書に置いている)。
 
 **パネルはこの op を一切読まない。** パネルは入力1へ繋がる*上流*なので、そこから op の
 Info DAT を読むと TouchDesigner が **Cook dependency loop** を報告する。代わりに op が

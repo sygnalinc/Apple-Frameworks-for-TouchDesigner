@@ -155,18 +155,24 @@ static const char* kPanelScript = R"AUPANEL(# AudioUnit CHOP が生成した Lea
 import json
 
 
+_SPEC_CACHE = {}
+
+
 def _spec(scriptOp):
     # **毎cook パースしない。** storage の文字列が変わったときだけ解析する
     # (毎フレーム json.loads すると Python だけで 2ms 超かかる・実測)
+    # **自分自身に store しない。** 自分の cook 中に store すると dirty になり、
+    # TouchDesigner が自己ループ(Cook dependency loop)を報告する(実測)
     raw = scriptOp.fetch("spec", "[]")
-    cache = scriptOp.fetch("_spec_cache", None)
+    key = scriptOp.path
+    cache = _SPEC_CACHE.get(key)
     if cache is not None and cache[0] == raw:
         return cache[1]
     try:
         rows = json.loads(raw)
     except Exception:
         rows = []
-    scriptOp.store("_spec_cache", (raw, rows))
+    _SPEC_CACHE[key] = (raw, rows)
     return rows
 
 
@@ -842,12 +848,17 @@ private:
             }
         }
         PyGILState_Release(g);
+        // storage への書き込みは cook 依存にならないので即時でよい。
+        // **パラメータの作り直し(setuppars)だけは cook スタックの外へ回す** —
+        // execute の時点でパネル(入力1)は cook 中で、そこで dirty にすると
+        // TouchDesigner が Cook dependency loop を報告する(実測)
         std::string py = "sc = n.parent().op(n.name + '_params')\n";
         py += "if sc:\n";
         py += " sc.store('spec', __au_spec)\n";
         py += " if sc.fetch('sig', '') != __au_sig:\n";
         py += "  sc.store('sig', __au_sig)\n";
-        py += "  sc.par.setuppars.pulse()\n";
+        py += "  import td\n";
+        py += "  td.run('op(' + repr(sc.path) + ').par.setuppars.pulse()', delayFrames=1)\n";
         tdpycb::runWithNode(myNode, py);
     }
 
@@ -963,15 +974,21 @@ private:
 
     // プラグイン側で動いた値をパネルのパラメータへ押し込む。
     // パネルからこちらを読ませるとループになるので、**押す向き**にしてある
+    // **パネルのパラメータは execute の中で直接書かない。**
+    // このとき入力1のパネルは cook スタックにいるので、書くと dirty になり
+    // TouchDesigner が Cook dependency loop を報告する(実測)。1フレーム遅らせる
     void pushToPanel(const std::vector<std::pair<std::string, double>>& vals)
     {
         if (vals.empty()) return;
-        std::string py = "sc = n.parent().op(n.name + '_params')\nif sc:\n";
+        std::string body;
         for (const auto& kv : vals) {
             char line[160];
-            snprintf(line, sizeof line, " sc.par.%s = %.6f\n", kv.first.c_str(), kv.second);
-            py += line;
+            snprintf(line, sizeof line, "sc.par.%s = %.6f\n", kv.first.c_str(), kv.second);
+            body += line;
         }
+        std::string py = "sc = n.parent().op(n.name + '_params')\nif sc:\n";
+        py += " import td\n";
+        py += " td.run('sc = op(' + repr(sc.path) + ')\\n' + \'\'\'" + body + "\'\'\', delayFrames=1)\n";
         tdpycb::runWithNode(myNode, py);
     }
 

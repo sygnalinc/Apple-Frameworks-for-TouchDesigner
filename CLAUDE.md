@@ -7412,3 +7412,23 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
      **パラメータの効きを見るなら Audio Device Out(Volume 0)を繋いで実時間で回す**
   ② **ドックした Info DAT はホストを destroy すると一緒に消える**。テストで op を作り直すと
      `_info` が消えるので「作られていない」と誤診しかけた(TD再起動では消えない)
+
+### 2026-08-19 AudioUnit CHOP: Cook dependency loop(自己ループ)を修正
+
+- ユーザー報告(警告のスクリーンショット): `_params` が**自分自身**に対してループ
+  (`# Cook dependency loop starts /project1/Audiounit1_params`)
+- **真因は前エントリで入れた spec キャッシュ**。パネルの `onCook` から
+  **`scriptOp.store("_spec_cache", ...)` と自分自身に store していた**。
+  **自分の cook 中に自分へ store すると dirty になり、TD が自己ループと報告する**。
+  → キャッシュを**モジュール変数の辞書**(パスをキー)に変更
+- あわせて **`setuppars` の pulse を1フレーム遅延**に(`td.run(..., delayFrames=1)`)。
+  execute の時点で入力1のパネルは cook スタックの中にいるので、そこでパラメータを
+  作り直すと同じくループになる。`pushToPanel`(値の書き戻し)も同じ理由で遅延にした。
+  **storage への書き込みは cook 依存にならないので即時のままでよい**
+- **実測(M2・AUDistortion・Audio Device Out で実時間 cook)**: Learn On + プリセットで
+  15個が自動でパネルに載り、**全ノードで警告・エラーなし**。パネル 0.62 → AU 62。
+  op の cook 0.228ms・60fps 維持。パネルは毎フレームは cook されない(418 対 3170)
+- **遠回りした点**: 最初 op 側の store も遅延させようとして、遅延実行するコード文字列を
+  入れ子で組み立てたら壊れた(spec が `[]` のまま入った)。**ループの原因は op 側ではなく
+  パネルの自己 store だった**ので、op 側は即時 store のままでよかった。
+  **入れ子の文字列生成は壊れても静かに失敗する**ので、原因を1つに絞ってから最小の変更にする
