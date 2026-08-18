@@ -105,11 +105,13 @@ Attach an Info DAT to see the parameter table — `index`, `channel`, `name`, `m
 `Delay`, `Decay`, `Delay_Mix`, `Ring_Mod_Freq_1`, … `WetDry_Mix`. Assigned slots can also be
 addressed as `learn1`, `learn2`, ….
 
-`Input Range` decides how the incoming value is read: **Normalized** (default) treats 0–1 as a knob
-position and stretches it along the parameter's display curve, **Raw** writes the value as it is.
-The panel emits knob positions too, so everything on input 1 speaks the same language and the
-setting rarely needs changing — leaving it on `Raw` while a panel is connected pins the parameters
-at their maximum and you can no longer move the plugin's GUI.
+`Input Range` decides what the numbers on input 1 mean: **Normalized** (default) treats 0–1 as a
+knob position and stretches it along the parameter's display curve, **Raw** takes the value in the
+parameter's own unit (Hz, ms, dB) and clamps it to min–max. **The generated panel follows this
+setting** — switch it and the panel is rebuilt with the matching sliders, converting the values as
+it goes, so nothing jumps: `Delay_Mix` at 75.7% shows `0.757` in Normalized and `75.7` (range
+0–100) in Raw, and `Ring Mod Freq 1` at 1000 Hz shows `1000` (range 0.5–8000) or `0.7852`, its
+position on the log curve. The plugin's own value is untouched either way.
 
 Channel names come from the parameter's **display name**, not its identifier — several Apple AUs
 report identifiers that are just `"0"`, `"1"`, `"2"`, which would collide with the `p<index>`
@@ -317,11 +319,13 @@ Info DAT を繋ぐとパラメータ表が出る(`index` / `channel` / `name` / 
 `Delay` `Decay` `Delay_Mix` `Ring_Mod_Freq_1` … `WetDry_Mix`。割り当て済みの枠は
 `learn1` `learn2` … でも指せる。
 
-`Input Range` は入力値の読み方。**Normalized**(既定)は 0〜1 を**つまみ位置**として扱い、
-そのパラメータの表示曲線に沿って引き伸ばす。**Raw** はそのまま書く。パネルも
-つまみ位置を出すので入力1は全部同じ土俵になり、ここを触る必要はほとんど無い —
-パネルを繋いだまま `Raw` にすると、実値が 0〜1 と解釈されてパラメータが最大値に張り付き、
-**プラグインの GUI も動かせなくなる**。
+`Input Range` は**入力1に来る数値の意味**。**Normalized**(既定)は 0〜1 を**つまみ位置**として
+扱い、そのパラメータの表示曲線に沿って引き伸ばす。**Raw** はそのパラメータ自身の単位
+(Hz・ms・dB)として受け取り min〜max にクランプする。**生成されるパネルもこの設定に追従する** —
+切り替えるとパネルが作り直され、値も換算されるので飛ばない。`Delay_Mix` が 75.7% なら
+Normalized で `0.757`、Raw で `75.7`(範囲 0〜100)。`Ring Mod Freq 1` が 1000Hz なら
+Raw で `1000`(範囲 0.5〜8000)、Normalized で `0.7852`(対数カーブ上の位置)。
+どちらでもプラグイン側の値は動かない。
 
 チャンネル名は識別子ではなく**表示名**から作っている。Apple の AU には識別子が `"0"` `"1"` `"2"` と
 数字だけのものがあり、それだと添え字別名 `p<index>` と衝突するため(実測で発覚)。位置で指したい

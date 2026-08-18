@@ -149,8 +149,11 @@ static const char* kPanelScript = R"AUPANEL(# AudioUnit CHOP が生成した Lea
 #   ・プラグイン側で動いた値も AudioUnit CHOP がこちらのパラメータへ書き込む
 #   ・こちらは自分のパラメータを 0〜1 のつまみ位置でチャンネルに出すだけ
 #
-# Float は常に 0〜1(実値は AudioUnit CHOP の Info DAT で見る)。
-# 入力0に 0〜1 の自動化(MIDI など)を繋ぐと、それが優先される。
+# パラメータの単位は AudioUnit CHOP の **Input Range** に従う:
+#   Normalized … Float は 0〜1 のつまみ位置(表示曲線を通して実値になる)
+#   Raw        … Float はそのパラメータ自身の単位(Hz・ms・dB…)
+# 切り替えると AudioUnit CHOP がパネルを作り直し、値も新しい単位に置き換える。
+# 入力0に自動化(MIDI など)を繋ぐと、それが優先される(単位は同じ約束に従う)。
 
 import json
 
@@ -189,6 +192,8 @@ def onSetupParameters(scriptOp):
         lo = float(r["lo"])
         hi = float(r["hi"])
         pos = float(r.get("pos", 0.0))
+        raw = int(r.get("rw", 0))
+        val = float(r.get("v", lo + pos * (hi - lo)))
         label = r.get("nm", r["ch"])
         if t == "toggle":
             p = page.appendToggle(nm, label=label)[0]
@@ -212,12 +217,42 @@ def onSetupParameters(scriptOp):
             p.val = p.default
         else:
             p = page.appendFloat(nm, label=label)[0]
-            p.normMin, p.normMax = 0.0, 1.0
-            p.min, p.max = 0.0, 1.0
+            # Raw は実単位、Normalized は 0〜1 のつまみ位置
+            p.normMin, p.normMax = (lo, hi) if raw else (0.0, 1.0)
+            p.min, p.max = (lo, hi) if raw else (0.0, 1.0)
             p.clampMin = p.clampMax = True
-            p.default = pos
-            p.val = pos
+            p.default = val if raw else pos
+            p.val = p.default
     return
+
+
+def _emit(par, r):
+    # チャンネルへ出す値。Raw は実単位のまま、Normalized はつまみ位置
+    lo = float(r["lo"]); hi = float(r["hi"])
+    if int(r.get("rw", 0)):
+        if par.style == "Menu":
+            return float(int(lo) + par.menuIndex)
+        if par.style == "Toggle":
+            return 1.0 if par.eval() else 0.0
+        return float(par.eval())
+    return _pos_of(par, lo, hi)
+
+
+def _take(par, v, r):
+    # 入力0から来た値をパラメータへ
+    lo = float(r["lo"]); hi = float(r["hi"])
+    if int(r.get("rw", 0)):
+        if par.style == "Menu":
+            n = len(par.menuNames)
+            par.menuIndex = max(0, min(n - 1, int(round(v - lo)))) if n > 1 else 0
+        elif par.style == "Toggle":
+            par.val = 1 if v >= 0.5 else 0
+        elif par.style == "Int":
+            par.val = int(round(max(lo, min(hi, v))))
+        else:
+            par.val = max(lo, min(hi, v))
+        return
+    _set_pos(par, v, lo, hi)
 
 
 def _pos_of(par, lo, hi):
@@ -258,14 +293,17 @@ def onCook(scriptOp):
         if nm not in built:
             continue
         par = scriptOp.par[nm]
-        lo = float(r["lo"])
-        hi = float(r["hi"])
-        # 入力0に 0〜1 の自動化が来ていれば、それを反映する
+        # 入力0に自動化が来ていれば、それを反映する
         if src is not None:
             ch = src.chan(r["ch"])
             if ch is not None:
-                _set_pos(par, float(ch[0]), lo, hi)
-        scriptOp.appendChan(r["ch"])[0] = _pos_of(par, lo, hi)
+                _take(par, float(ch[0]), r)
+        scriptOp.appendChan(r["ch"])[0] = _emit(par, r)
+    # **今どちらの単位で出しているかを添える。** AudioUnit CHOP は Input Range を
+    # 切り替えた直後、この印が自分の設定と合うまで入力を適用しない
+    # (作り直しが1フレーム遅れるので、その間に古い単位の値を書かないため)
+    mode = int(rows[0].get("rw", 0)) if rows else 0
+    scriptOp.appendChan("__range")[0] = float(mode)
     return
 )AUPANEL";
 
@@ -781,6 +819,16 @@ private:
         if (!pi || pi->numSamples < 1) return;
         const char* rng = in->getParString("Inputrange");
         const bool norm = !rng || strcmp(rng, "Raw") != 0;
+        // パネルは今どちらの単位で出しているかを `__range` で申告する。
+        // Input Range を切り替えた直後はパネルの作り直しが1フレーム遅れるので、
+        // 印が合うまで適用しない(古い単位の値をそのまま書かないため)
+        for (int c = 0; c < pi->numChannels; c++) {
+            const char* mn = pi->getChannelName(c);
+            if (mn && strcmp(mn, "__range") == 0) {
+                const bool panelRaw = pi->getChannelData(c)[pi->numSamples - 1] >= 0.5f;
+                if (panelRaw == norm) return;
+            }
+        }
         for (int c = 0; c < pi->numChannels; c++) {
             const char* nm = pi->getChannelName(c);
             if (!nm) continue;
@@ -810,6 +858,10 @@ private:
             rebuildLearnAliases(); saveLearnMap();
             myPanelDirty = true;
         }
+        const char* rngp = in->getParString("Inputrange");
+        const bool raw = rngp && strcmp(rngp, "Raw") == 0;
+        if (raw != myRawMode) { myRawMode = raw; myPanelDirty = true; }  // 単位が変わったら作り直す
+
         const bool learn = in->getParInt("Learn") != 0;
         // Learn を On にした瞬間、パネルが無ければ作る(触ったつまみをすぐ見られるように)
         if (learn && !myLearning && myUnit) createPanel(true);
@@ -830,7 +882,8 @@ private:
             e.lastAU = now;
             if (myLearning && e.learnSlot <= 0) assignLearnSlot((int)i);
             if (e.learnSlot > 0)
-                push.push_back({panelParName(e.chan), valueToCurve(e.curve, now, e.minV, e.maxV)});
+                push.push_back({panelParName(e.chan),
+                                myRawMode ? now : valueToCurve(e.curve, now, e.minV, e.maxV)});
         }
         pushToPanel(push);
         if (myPanelDirty) { myPanelDirty = false; refreshPanelSpec(); }
@@ -942,6 +995,7 @@ private:
             const ParamEntry& e = myParams[idx];
             sig += e.chan; sig += ":"; sig += e.type; sig += ",";
         }
+        sig += myRawMode ? "|raw" : "|norm";
         return sig;
     }
 
@@ -956,10 +1010,13 @@ private:
             if (!first) j += ",";
             first = false;
             char b[256];
+            const float cur = readParam(e);
             snprintf(b, sizeof b,
-                     "{\"ch\":\"%s\",\"nm\":\"%s\",\"t\":\"%s\",\"lo\":%g,\"hi\":%g,\"pos\":%g",
+                     "{\"ch\":\"%s\",\"nm\":\"%s\",\"t\":\"%s\",\"lo\":%g,\"hi\":%g,"
+                     "\"pos\":%g,\"v\":%g,\"rw\":%d",
                      jesc(e.chan).c_str(), jesc(e.name).c_str(), e.type.c_str(),
-                     e.minV, e.maxV, valueToCurve(e.curve, readParam(e), e.minV, e.maxV));
+                     e.minV, e.maxV, valueToCurve(e.curve, cur, e.minV, e.maxV),
+                     cur, myRawMode ? 1 : 0);
             j += b;
             if (e.type == "menu" && !e.values.empty()) {
                 j += ",\"vs\":[";
@@ -1251,6 +1308,7 @@ private:
     std::atomic<bool> myWantPanel{false};
     bool myPanelDirty = false;
     bool myFirstSync = true;
+    bool myRawMode = false;
     std::atomic<uint64_t> myTouchedAddr{0};
     bool myLearning = false;
     int  myLearnIdx[kLearnSlots];
