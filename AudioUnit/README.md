@@ -148,6 +148,27 @@ turning a knob in the plugin's own window is picked up at all.
 One more trap: **`AUParameter.address` is not the v2 parameter ID** (measured: v2 id 3 maps to
 address 10). The two lists line up by position, not by value.
 
+### A panel with the right controls for each parameter
+
+`Create / Rebuild Panel` generates a **Script CHOP** beside the node and wires it into input 1. It
+reads the parameter table and grows a **properly typed control for each learned parameter** — a
+menu with the plugin's own choice names, a toggle, an integer, or a float with the real range and
+units. Measured across the 24 installed effects: 189 parameters want a slider, **24 are indexed
+(menus)** and **18 are boolean (toggles)**, so a page of bare 0–1 sliders throws away a lot.
+
+The op cannot grow parameters itself, but a Script CHOP can — `onSetupParameters` may append
+`Float` / `Int` / `Menu` / `Toggle` at any time, and it rebuilds itself when the learned set changes.
+
+The panel is **two-way with the plugin's own GUI**: move a knob in the plugin window and the panel
+follows; move a panel control and the plugin follows. Measured: panel 400 / 5000 Hz → plugin 400 /
+5000 exactly, menu → `High Pass`, gain → −12 dB; and with the plugin driven from elsewhere the panel
+tracked it (10 Hz / 21829.5 Hz). Steady-state cost of the pair is **0.45 ms** per frame.
+
+> **Known limitation.** While the panel is connected, the `Learn 1…16` slots cannot move the same
+> parameters — the panel emits its value every frame and wins. Use the panel *or* the slots for a
+> given parameter, not both; disconnect the panel from input 1 if you want to drive those
+> parameters from the slots (e.g. from MIDI).
+
 ### Plugin state
 
 The GUI is only useful if what you set there survives. `Save Plugin State` serializes the AU's
@@ -172,6 +193,7 @@ one plugin's state into another.
 | Reset Plugin State | Clears the AU's internal state (reverb tails etc.) |
 | Load / Save Plugin State, Plugin State | See above |
 | Learn Parameters / Clear Learned / Learned Mapping | See "Learn" above |
+| Create / Rebuild Panel | Generates the Script CHOP panel described above |
 | Learn 1 … 16 | The assigned parameters, always 0–1. Two-way with the GUI |
 
 ### Notes
@@ -340,6 +362,27 @@ Learn もオブザーバではなく **v2 側の値のポーリング**で検出
 もう1つの罠: **`AUParameter.address` は v2 のパラメータIDではない**(実測: v2id=3 ↔ addr=10)。
 2つの一覧は値ではなく**並び順**で対応する。
 
+### パラメータの型どおりのパネル
+
+`Create / Rebuild Panel` を押すと、隣に **Script CHOP** が生成されて入力1へ配線される。
+パラメータ表を読んで、**learn 済みパラメータごとに型どおりのコントロール**を生やす —
+プラグイン自身の選択肢名が入ったプルダウン、トグル、整数、実単位・実レンジのスライダー。
+実測(エフェクト24個)では 189個がスライダー向き・**24個が Indexed(プルダウン)**・
+**18個が Boolean(トグル)**なので、0〜1 のスライダーだけでは情報がかなり落ちる。
+
+op 自身は実行中にパラメータを増やせないが、**Script CHOP なら増やせる** —
+`onSetupParameters` で `Float` / `Int` / `Menu` / `Toggle` をいつでも append でき、
+learn の内容が変わると自分で作り直す。
+
+パネルは**プラグイン自身の GUI と双方向**。プラグインのつまみを回せばパネルが追従し、
+パネルを動かせばプラグインが追従する。実測: パネル 400 / 5000 Hz → プラグインも 400 / 5000
+(厳密一致)、プルダウン → `High Pass`、ゲイン → −12 dB。逆にプラグイン側を動かすと
+パネルが 10 Hz / 21829.5 Hz へ追従した。2つ合わせた定常負荷は **1フレーム 0.45 ms**。
+
+> **既知の制限。** パネルを繋いでいる間は `Learn 1〜16` の枠から同じパラメータを動かせない。
+> パネルが毎フレーム値を出しているので、そちらが勝つ。**1つのパラメータはパネルか枠の
+> どちらか**で扱うこと。枠(MIDI など)から動かしたいときはパネルを入力1から外す。
+
 ### プラグインの状態
 
 GUI は「そこで作った音が残る」ことで初めて役に立つ。`Save Plugin State` で AU の `fullState` を
@@ -363,6 +406,7 @@ base64 にして `Plugin State` 文字列パラメータへ入れる(.toe と一
 | Reset Plugin State | AU の内部状態(残響など)を消す |
 | Load / Save Plugin State・Plugin State | 上記 |
 | Learn Parameters / Clear Learned / Learned Mapping | 上記「Learn」 |
+| Create / Rebuild Panel | 上記のパネル(Script CHOP)を生成する |
 | Learn 1 〜 16 | 割り当てたパラメータ。常に 0〜1。GUI と双方向 |
 
 ### 注意

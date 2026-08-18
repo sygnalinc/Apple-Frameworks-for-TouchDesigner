@@ -96,6 +96,41 @@ inline bool setStringPars(const TD::OP_NodeInfo* node,
     return ok;
 }
 
+// 自ノードを `n` として、任意の Python を実行する。
+//
+// パラメータ書き戻しだけでは足りない、ノードの自動生成のような処理に使う。
+// cook スレッドから呼ぶこと(AppKit のコールバック等から触ると THREAD CONFLICT になる)。
+// 失敗したときの traceback は __tdpy_err に残る。
+inline bool runWithNode(const TD::OP_NodeInfo* node, const std::string& code)
+{
+    if (!node || !node->context) return false;
+    PyGILState_STATE g = PyGILState_Ensure();
+    std::string py = "__tdpy_ok = False\ntry:\n\tn = __tdpy_node\n";
+    // 渡されたコードをそのまま try ブロックへ入れる(行頭にタブを足す)
+    std::string line;
+    for (size_t i = 0; i <= code.size(); i++) {
+        if (i == code.size() || code[i] == '\n') { py += "\t" + line + "\n"; line.clear(); }
+        else line += code[i];
+    }
+    py += "\t__tdpy_ok = True\nexcept Exception:\n";
+    py += "\timport traceback as __tdpy_tb\n\t__tdpy_err = __tdpy_tb.format_exc()\n";
+    bool ok = false;
+    PyObject* main = PyImport_AddModule("__main__");
+    PyObject* dict = main ? PyModule_GetDict(main) : nullptr;
+    PyObject* args = node->context->createArgumentsTuple(0, nullptr);
+    if (dict && args) {
+        PyDict_SetItemString(dict, "__tdpy_node", PyTuple_GET_ITEM(args, 0));
+        PyObject* r = PyRun_String(py.c_str(), Py_file_input, dict, dict);
+        if (r) Py_DECREF(r); else PyErr_Clear();
+        PyObject* v = PyDict_GetItemString(dict, "__tdpy_ok");
+        ok = v && PyObject_IsTrue(v) == 1;
+        PyDict_DelItemString(dict, "__tdpy_node");
+    }
+    if (args) Py_DECREF(args);
+    PyGILState_Release(g);
+    return ok;
+}
+
 // Callbacks DAT が未接続なら、雛形入り Text DAT を生成してホストへドック接続(閉じた↓チップ)。
 // 戻り値: callbacks が接続済みなら true(以後呼ばなくてよい)
 inline bool bootstrapCallbacksDAT(const TD::OP_NodeInfo* node, const char* stubs)

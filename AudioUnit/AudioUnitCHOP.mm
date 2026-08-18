@@ -131,10 +131,158 @@ struct ParamEntry {
     uint64_t address = 0;      // AUParameter のアドレス。**v2 のパラメータIDとは別物**(実測)
     AudioUnitParameterID pid = 0;  // v2 側のID。GUI はこちらを読み書きする
     AudioUnitParameterOptions curve = 0;  // GUI のつまみの振り方(対数など)
+    std::string type = "float";   // float / int / menu / toggle
+    std::string values;           // menu のときの選択肢名を | で連結
     int      learnSlot = -1;   // 割り当てられた Learn 枠(1始まり。-1=未割り当て)
 };
 
 } // namespace
+
+static const char* kPanelScript = R"AUPANEL(# AudioUnit CHOP が生成した Learned パネル。
+#
+# 隣の Info DAT を読み、learn 済みパラメータの**型どおりの**TDパラメータを生やす
+# (スライダー / プルダウン / トグル / 整数)。値はプラグインと双方向に同期する:
+#   プラグインの GUI を動かす → ここのパラメータが追従
+#   ここのパラメータを動かす → チャンネルで出力され AudioUnit CHOP の入力1が受け取る
+#
+# learn の内容が変わったら自動で作り直す。手で編集してもよいが
+# Create / Rebuild Panel を押すと上書きされる。
+
+def _params_dat(scriptOp):
+    # **参照をカスタムパラメータに持たせてはいけない。** setuppars はカスタム
+    # パラメータを作り直すので、そのたびに参照が消えて何も生えなくなる(実測)。
+    # storage(パラメータではないので消えない)+ 命名規則で解決する
+    path = scriptOp.fetch("params", "")
+    d = op(path) if path else None
+    if d is None:
+        nm = scriptOp.name
+        host = nm[:-6] if nm.endswith("_panel") else nm
+        d = scriptOp.parent().op(host + "_params")
+    return d
+
+
+def _rows(scriptOp):
+    try:
+        d = _params_dat(scriptOp)
+    except Exception:
+        return []
+    if not d or d.numRows < 2:
+        return []
+    hdr = [d[0, c].val for c in range(d.numCols)]
+    out = []
+    for r in range(1, d.numRows):
+        row = dict(zip(hdr, [d[r, c].val for c in range(d.numCols)]))
+        if row.get("learn"):
+            row["_row"] = r
+            out.append(row)
+    return out
+
+
+def _pname(ch):
+    s = "".join(c for c in ch if c.isalnum())
+    return (s[:1].upper() + s[1:].lower()) if s else "P"
+
+
+def onSetupParameters(scriptOp):
+    page = scriptOp.appendCustomPage("Learned")
+    for row in _rows(scriptOp):
+        nm = _pname(row["channel"])
+        t = row.get("type", "float")
+        lo = float(row["min"])
+        hi = float(row["max"])
+        cur = float(row["value"])
+        label = row["name"]
+        if t == "toggle":
+            p = page.appendToggle(nm, label=label)[0]
+            p.default = int(round(cur))
+            p.val = int(round(cur))
+        elif t == "menu":
+            p = page.appendMenu(nm, label=label)[0]
+            n = int(round(hi - lo)) + 1
+            labels = row.get("values", "").split("|") if row.get("values") else []
+            if len(labels) != n:
+                labels = [str(int(lo) + i) for i in range(n)]
+            p.menuNames = ["v%d" % (int(lo) + i) for i in range(n)]
+            p.menuLabels = labels
+            p.menuIndex = max(0, min(n - 1, int(round(cur - lo))))
+        elif t == "int":
+            p = page.appendInt(nm, label=label)[0]
+            p.normMin, p.normMax = lo, hi
+            p.min, p.max = lo, hi
+            p.clampMin = p.clampMax = True
+            p.default = int(round(cur))
+            p.val = int(round(cur))
+        else:
+            p = page.appendFloat(nm, label=label)[0]
+            p.normMin, p.normMax = lo, hi
+            p.min, p.max = lo, hi
+            p.clampMin = p.clampMax = True
+            p.default = cur
+            p.val = cur
+    return
+
+
+def _read(par, lo):
+    if par.style == "Menu":
+        return float(lo + par.menuIndex)
+    return float(par.eval())
+
+
+def _write(par, v, lo):
+    if par.style == "Menu":
+        par.menuIndex = max(0, min(len(par.menuNames) - 1, int(round(v - lo))))
+    elif par.style == "Toggle":
+        par.val = 1 if v >= 0.5 else 0
+    else:
+        par.val = v
+
+
+def onCook(scriptOp):
+    scriptOp.clear()
+    st = scriptOp.storage
+    # **表の作り直しは Info DAT が cook されたときだけ。**
+    # 16x10 のセルを毎フレーム読むと Python だけで数 ms かかる(実測)
+    d = _params_dat(scriptOp)
+    # **毎cook 最新の値を読む。** このパネルは AudioUnit CHOP の上流にあるので、
+    # cook させないと1フレーム古い値を出し続け、Learn 枠からの変更を打ち消してしまう(実測)
+    if d:
+        d.cook(force=True)
+    tc = d.totalCooks if d else -1
+    sig = "%d:%s" % (d.numRows if d else 0,
+                     "".join(d[r, "learn"].val for r in range(1, d.numRows)) if d else "")
+    rows = st.get("rows")
+    if rows is None or st.get("sig") != sig:
+        rows = _rows(scriptOp)
+        st["rows"] = rows
+        st["sig"] = sig
+    # **実際に生えているパラメータ**と learn の内容を突き合わせる。
+    # 「作り直した」というフラグを持つと、作り直しに失敗したときに詰まって復帰できない
+    built = set(p.name for p in scriptOp.customPars if p.page.name == "Learned")
+    want = set(_pname(r["channel"]) for r in rows)
+    if built != want:
+        st["au"] = {}
+        run("op(%r).par.setuppars.pulse()" % scriptOp.path, delayFrames=1)
+        return
+    names = built
+    seen = st.get("au", {})
+    for r in rows:
+        nm = _pname(r["channel"])
+        if nm not in names:
+            continue
+        par = scriptOp.par[nm]
+        lo = float(r["min"])
+        hi = float(r["max"])
+        auv = float(d[r["_row"], "value"].val) if d else float(r["value"])
+        span = (hi - lo) if hi > lo else 1.0
+        # プラグイン側(GUI)が動いていたら、こちらのパラメータへ書き戻す
+        if nm not in seen or abs(auv - seen[nm]) > span * 1e-5:
+            _write(par, auv, lo)
+        seen[nm] = auv
+        # 現在値をチャンネルで出す。AudioUnit CHOP が入力1で受け取る
+        scriptOp.appendChan(r["channel"])[0] = _read(par, lo)
+    st["au"] = seen
+    return
+)AUPANEL";
 
 // ---------------------------------------------------------------- plugin
 
@@ -195,8 +343,12 @@ public:
             if (!ensureEngine(sr, n)) { passThrough(out, ci, n, in); return; }
 
             applyPreset(in);
-            syncParams(in);
+            // **入力を先に適用する。** 逆順だと、パネル(入力1)が毎cook 出す値が
+            // Learn 枠の変更を上書きしてしまい、枠から動かせなくなる(実測)。
+            // 先に入力を反映しておけば syncParams から見て「AU は動いていない」状態になり、
+            // 枠の変更がそのまま通る
             applyParamsFromInput(in);
+            syncParams(in);
             myBypassed = in->getParInt("Bypass") != 0;
             myUnit.AUAudioUnit.shouldBypassEffect = myBypassed;
             syncWindow(in);
@@ -279,6 +431,7 @@ public:
         const char* L = "Learn";
         { OP_NumericParameter p("Learn"); p.label = "Learn Parameters"; p.page = L; p.defaultValues[0] = 0; m->appendToggle(p); }
         { OP_NumericParameter p("Clearlearned"); p.label = "Clear Learned"; p.page = L; m->appendPulse(p); }
+        { OP_NumericParameter p("Createpanel"); p.label = "Create / Rebuild Panel"; p.page = L; m->appendPulse(p); }
         {
             OP_StringParameter p("Learnmap"); p.label = "Learned Mapping"; p.page = L;
             p.defaultValue = ""; m->appendString(p);
@@ -310,6 +463,7 @@ public:
         else if (!strcmp(name, "Resetstate")) myWantReset = true;
         else if (!strcmp(name, "Savestate")) myWantSaveState = true;
         else if (!strcmp(name, "Clearlearned")) myWantClearLearn = true;
+        else if (!strcmp(name, "Createpanel")) myWantPanel = true;
     }
 
     void buildDynamicMenu(const OP_Inputs*, OP_BuildDynamicMenuInfo* info, void*) override
@@ -341,7 +495,7 @@ public:
     bool getInfoDATSize(OP_InfoDATSize* s, void*) override
     {
         s->rows = 1 + (int)myParams.size();
-        s->cols = 8;
+        s->cols = 10;
         s->byColumn = false;
         return true;
     }
@@ -353,6 +507,7 @@ public:
         if (row == 0) {
             set(0, "index"); set(1, "channel"); set(2, "name");
             set(3, "min"); set(4, "max"); set(5, "value"); set(6, "unit"); set(7, "learn");
+            set(8, "type"); set(9, "values");
             return;
         }
         const ParamEntry& p = myParams[row - 1];
@@ -365,6 +520,8 @@ public:
         snprintf(b, sizeof(b), "%g", readParam(p)); set(5, b);
         set(6, p.unit);
         set(7, p.learnSlot > 0 ? ("learn" + std::to_string(p.learnSlot)) : "");
+        set(8, p.type);
+        set(9, p.values);
     }
 
     void getWarningString(OP_String* s, void*) override { if (!myWarn.empty()) s->setString(myWarn.c_str()); }
@@ -471,8 +628,20 @@ private:
                     myParams[i].pid = ids[i];
                     AudioUnitParameterInfo pinfo; UInt32 isz = sizeof(pinfo);
                     if (AudioUnitGetProperty(myAU2, kAudioUnitProperty_ParameterInfo, kAudioUnitScope_Global,
-                                             ids[i], &pinfo, &isz) == noErr)
-                        myParams[i].curve = pinfo.flags;
+                                             ids[i], &pinfo, &isz) == noErr) {
+                        ParamEntry& pe = myParams[i];
+                        pe.curve = pinfo.flags;
+                        // AU はパラメータの単位で型を伝えてくる。実測(エフェクト24個・231個)では
+                        // Boolean 18 / Indexed 24(うち19個は選択肢名あり)/ それ以外 189
+                        if (pinfo.unit == kAudioUnitParameterUnit_Boolean) pe.type = "toggle";
+                        else if (pinfo.unit == kAudioUnitParameterUnit_Indexed) {
+                            NSArray<NSString*>* vs = pe.p ? pe.p.valueStrings : nil;
+                            if (vs.count) {
+                                pe.type = "menu";
+                                pe.values = [[vs componentsJoinedByString:@"|"] UTF8String] ?: "";
+                            } else pe.type = "int";
+                        }
+                    }
                 }
         }
         installObserver();
@@ -653,6 +822,7 @@ private:
             rebuildLearnAliases(); saveLearnMap();
         }
         myLearning = in->getParInt("Learn") != 0;
+        if (myWantPanel.exchange(false)) createPanel();
 
         std::vector<std::pair<std::string, double>> slotWrites;
         for (size_t i = 0; i < myParams.size(); i++) {
@@ -687,11 +857,53 @@ private:
         if (!slotWrites.empty()) tdpycb::setFloatPars(myNode, slotWrites);
 
         // 枠は実行中に増やせない(setupParameters はインスタンスにつき1回きり・実測)。
-        // 代わりに**割り当て済みの枠だけを有効化**して、learn した分だけ生きて見えるようにする
-        for (int i = 0; i < kLearnSlots; i++) {
-            char nm[16]; snprintf(nm, sizeof nm, "Learn%d", i + 1);
-            in->enablePar(nm, myLearnIdx[i] >= 0);
+        // 代わりに**割り当て済みの枠だけを有効化**して、learn した分だけ生きて見えるようにする。
+        // **毎cook 呼んではいけない**: enablePar はパラメータUIを更新させるので、
+        // 16個ぶん毎フレーム叩くとパラメータダイアログを開いているときに fps が落ちる(実測)
+        uint32_t mask = 0;
+        for (int i = 0; i < kLearnSlots; i++) if (myLearnIdx[i] >= 0) mask |= (1u << i);
+        if (mask != myEnableMask) {
+            myEnableMask = mask;
+            for (int i = 0; i < kLearnSlots; i++) {
+                char nm[16]; snprintf(nm, sizeof nm, "Learn%d", i + 1);
+                in->enablePar(nm, myLearnIdx[i] >= 0);
+            }
         }
+    }
+
+    // 隣に Script CHOP のパネルを生成して入力1へ配線する。
+    // TD は実行中にこの op のパラメータを増やせないが、**Script CHOP なら
+    // onSetupParameters で型付きパラメータを生やせる**(実測)。そこを使う
+    void createPanel()
+    {
+        std::string py;
+        py += "import td\n";
+        py += "p = n.parent()\n";
+        py += "base = n.name\n";
+        py += "info = p.op(base + '_params') or p.create(td.infoDAT, base + '_params')\n";
+        py += "info.par.op = n\n";
+        py += "info.nodeX, info.nodeY = n.nodeX + 200, n.nodeY - 150\n";
+        py += "cb = p.op(base + '_panel_callbacks') or p.create(td.textDAT, base + '_panel_callbacks')\n";
+        py += "cb.text = __au_panel_src\n";
+        py += "cb.nodeX, cb.nodeY = n.nodeX - 250, n.nodeY - 300\n";
+        py += "sc = p.op(base + '_panel') or p.create(td.scriptCHOP, base + '_panel')\n";
+        py += "sc.nodeX, sc.nodeY = n.nodeX - 250, n.nodeY - 150\n";
+        py += "sc.par.callbacks = cb\n";
+        py += "sc.store('params', info.path)\n";   // 参照は storage(setuppars で消えない)
+        py += "info.cook(force=True)\n";           // 生成直後は未cookで中身が空
+        py += "sc.par.setuppars.pulse()\n";        // 型付きパラメータを作る
+        py += "n.inputConnectors[1].connect(sc)\n";
+        py += "n.par.Inputrange = 'Raw'\n";   // パネルは実値を出すので Raw
+        // スクリプト本体は Python 側の変数に入れてから使う(エスケープ地獄を避ける)
+        PyGILState_STATE g = PyGILState_Ensure();
+        if (PyObject* main = PyImport_AddModule("__main__")) {
+            if (PyObject* dict = PyModule_GetDict(main)) {
+                PyObject* v = PyUnicode_FromString(kPanelScript);
+                if (v) { PyDict_SetItemString(dict, "__au_panel_src", v); Py_DECREF(v); }
+            }
+        }
+        PyGILState_Release(g);
+        if (!tdpycb::runWithNode(myNode, py)) myWarn = "could not create the panel";
     }
 
     void assignLearnSlot(int idx)
@@ -908,7 +1120,7 @@ private:
     std::vector<ParamEntry>  myParams;
     std::vector<std::string> myPresets;
     std::unordered_map<std::string, int> myChanMap;
-    std::string myScratch[9];
+    std::string myScratch[11];
 
     std::string myWantId, myWarn, myErr, myErrPending;
     std::atomic<bool> myLoaded{false}, myLoadFailed{false};
@@ -930,6 +1142,8 @@ private:
     bool myWantReset = false;
     std::atomic<bool> myWantSaveState{false};
     std::atomic<bool> myWantClearLearn{false};
+    std::atomic<bool> myWantPanel{false};
+    uint32_t myEnableMask = 0xFFFFFFFFu;  // 初回は必ず更新させる
     std::atomic<uint64_t> myTouchedAddr{0};
     bool myLearning = false;
     int  myLearnIdx[kLearnSlots] = { -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1 };
