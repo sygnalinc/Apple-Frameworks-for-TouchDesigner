@@ -65,9 +65,13 @@ parameters. A C++ Custom OP cannot do that — `setupParameters` is called **onc
 (measured), and Python cannot add parameters to a CHOP either (`appendCustomPage` exists on COMPs
 but not on a CHOP, measured). **A Script CHOP can**, so that is where the controls live.
 
-1. Turn **Learn Parameters** on
+1. Turn **Learn Parameters** on — the panel is created for you if it does not exist yet
 2. Open the GUI and touch the knobs you want — each one is marked as learned
-3. Press **Create / Rebuild Panel**
+3. Press **Create / Rebuild Panel** to put them on the panel
+
+Turning Learn off and on again does not disturb an existing panel. The two DATs the panel needs
+(its callbacks and the parameter table) are **docked to their host as closed chips**, so they stay
+out of the way — click the chip to open one.
 
 **Assignments are stored per plugin** in the `Learned Mapping` parameter, which saves with the .toe.
 Switch to another plugin and back and your selection returns. The Info DAT's `learn` column shows
@@ -251,9 +255,13 @@ TouchDesigner の Audio VST CHOP には **Learn Parameters**(プラグインの�
 (`appendCustomPage` は COMP にはあるが CHOP には無い・実測)。**Script CHOP なら生やせる**ので、
 コントロールはそちらに置く。
 
-1. **Learn Parameters** を On
+1. **Learn Parameters** を On にする — パネルが無ければこのとき自動で作られる
 2. GUI を開いて、使いたいつまみを触る。触ったものが対象として記録される
-3. **Create / Rebuild Panel** を押す
+3. **Create / Rebuild Panel** を押してパネルに載せる
+
+Learn を Off にして再度 On にしても、既にあるパネルは作り直されない。パネルが使う2つの DAT
+(callbacks とパラメータ表)は**ホストに閉じたチップとしてドック**されるので、ネットワークは
+散らからない。チップをクリックすれば開く。
 
 **選択はプラグインごとに** `Learned Mapping` パラメータへ保存され、.toe と一緒に残る。
 別のプラグインへ切り替えて戻すと、そのプラグイン用の選択が戻る。今どれが選ばれているかは

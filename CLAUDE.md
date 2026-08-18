@@ -7293,3 +7293,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   (パネル生成・プラグイン再ロード・入力の繋ぎ替えの一時コスト)。これを定常値と誤読して
   「fps が落ちた」「まだ重い」と2回誤診した。**何十回か cook を回してから複数回サンプリングし、
   中央値で見る**こと
+
+### 2026-08-16 AudioUnit CHOP: Learn On でパネルを自動生成 + DAT を閉じたドックチップに
+
+- ユーザー要望: ①Learn Parameters を On にしたときパネルが無ければ作る ②その際 DAT は
+  既定で格納された状態にする
+- `createPanel(bool onlyIfMissing)` に。Learn の off→on 遷移で `createPanel(true)` を呼ぶ。
+  既にパネルがあれば何もしない(実測: Off/On を繰り返してもノード id が変わらず storage も保持)
+- パネルが使う2つの DAT を**ホストへドックした閉じたチップ**にした。CoreWLANScan で確立した型:
+  `dock` + `expose=True` + `viewer=True` + **`showDocked=False`**(開閉の実体は showDocked)。
+  callbacks → パネル Script CHOP、パラメータ表(Info DAT)→ AudioUnit CHOP へドック。
+  **ドック後は nodeX/Y が無効**なので位置は設定しない
+- 実測: Learn=On で `_panel` / `_panel_callbacks` / `_params` が生成され、入力1へ配線されて
+  Input Range=Raw に。両 DAT とも `showDocked=False` の閉じたチップ。Create / Rebuild Panel
+  での作り直しも従来どおり型付きパラメータが出る

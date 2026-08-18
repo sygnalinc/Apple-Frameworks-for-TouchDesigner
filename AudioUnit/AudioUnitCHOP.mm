@@ -847,8 +847,11 @@ private:
             for (int i = 0; i < kLearnSlots; i++) myLearnIdx[i] = -1;
             rebuildLearnAliases(); saveLearnMap();
         }
-        myLearning = in->getParInt("Learn") != 0;
-        if (myWantPanel.exchange(false)) createPanel();
+        const bool learn = in->getParInt("Learn") != 0;
+        // Learn を On にした瞬間、パネルが無ければ作る(触ったつまみをすぐ見られるように)
+        if (learn && !myLearning && myUnit) createPanel(true);
+        myLearning = learn;
+        if (myWantPanel.exchange(false)) createPanel(false);
 
         // AU 側(GUI・プリセット・パネル)で動いたパラメータを検出する。
         // Learn 中で未割り当てなら、その場でパネルへ載せる対象にする。
@@ -867,26 +870,37 @@ private:
     // 隣に Script CHOP のパネルを生成して入力1へ配線する。
     // TD は実行中にこの op のパラメータを増やせないが、**Script CHOP なら
     // onSetupParameters で型付きパラメータを生やせる**(実測)。そこを使う
-    void createPanel()
+    void createPanel(bool onlyIfMissing)
     {
         std::string py;
         py += "import td\n";
         py += "p = n.parent()\n";
         py += "base = n.name\n";
-        py += "info = p.op(base + '_params') or p.create(td.infoDAT, base + '_params')\n";
-        py += "info.par.op = n\n";
-        py += "info.nodeX, info.nodeY = n.nodeX + 200, n.nodeY - 150\n";
-        py += "cb = p.op(base + '_panel_callbacks') or p.create(td.textDAT, base + '_panel_callbacks')\n";
-        py += "cb.text = __au_panel_src\n";
-        py += "cb.nodeX, cb.nodeY = n.nodeX - 250, n.nodeY - 300\n";
-        py += "sc = p.op(base + '_panel') or p.create(td.scriptCHOP, base + '_panel')\n";
-        py += "sc.nodeX, sc.nodeY = n.nodeX - 250, n.nodeY - 150\n";
-        py += "sc.par.callbacks = cb\n";
-        py += "sc.store('params', info.path)\n";   // 参照は storage(setuppars で消えない)
-        py += "info.cook(force=True)\n";           // 生成直後は未cookで中身が空
-        py += "sc.par.setuppars.pulse()\n";        // 型付きパラメータを作る
-        py += "n.inputConnectors[1].connect(sc)\n";
-        py += "n.par.Inputrange = 'Raw'\n";   // パネルは実値を出すので Raw
+        py += std::string("__au_only = ") + (onlyIfMissing ? "True" : "False") + "\n";
+        py += "if not (__au_only and p.op(base + '_panel')):\n";
+        py += " info = p.op(base + '_params') or p.create(td.infoDAT, base + '_params')\n";
+        py += " info.par.op = n\n";
+        py += " cb = p.op(base + '_panel_callbacks') or p.create(td.textDAT, base + '_panel_callbacks')\n";
+        py += " cb.text = __au_panel_src\n";
+        py += " sc = p.op(base + '_panel') or p.create(td.scriptCHOP, base + '_panel')\n";
+        py += " sc.nodeX, sc.nodeY = n.nodeX - 250, n.nodeY\n";
+        py += " sc.par.callbacks = cb\n";
+        py += " sc.store('params', info.path)\n";   // 参照は storage(setuppars で消えない)
+        py += " info.cook(force=True)\n";           // 生成直後は未cookで中身が空
+        py += " sc.par.setuppars.pulse()\n";        // 型付きパラメータを作る
+        py += " n.inputConnectors[1].connect(sc)\n";
+        py += " n.par.Inputrange = 'Raw'\n";        // パネルは実値を出すので Raw
+        // 2つの DAT は既定で**閉じたドックチップ**にしてネットワークを散らかさない。
+        // 開閉の実体は showDocked(expose=False は「×」チップになるので使わない)。
+        // ドック後は nodeX/Y が無効になるので位置は設定しない
+        py += " cb.dock = sc\n";
+        py += " cb.expose = True\n";
+        py += " cb.viewer = True\n";
+        py += " cb.showDocked = False\n";
+        py += " info.dock = n\n";
+        py += " info.expose = True\n";
+        py += " info.viewer = True\n";
+        py += " info.showDocked = False\n";
         // スクリプト本体は Python 側の変数に入れてから使う(エスケープ地獄を避ける)
         PyGILState_STATE g = PyGILState_Ensure();
         if (PyObject* main = PyImport_AddModule("__main__")) {
