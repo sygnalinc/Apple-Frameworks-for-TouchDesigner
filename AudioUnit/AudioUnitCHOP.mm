@@ -213,12 +213,15 @@ def onSetupParameters(scriptOp):
             p.default = int(round(cur))
             p.val = int(round(cur))
         else:
+            # **Float は常に 0〜1 のつまみ位置**。プラグインの GUI が半分なら 0.5 になる。
+            # 実値(Hz や ms)は Info DAT の value 列で確認できる
             p = page.appendFloat(nm, label=label)[0]
-            p.normMin, p.normMax = lo, hi
-            p.min, p.max = lo, hi
+            p.normMin, p.normMax = 0.0, 1.0
+            p.min, p.max = 0.0, 1.0
             p.clampMin = p.clampMax = True
-            p.default = cur
-            p.val = cur
+            pos = _value_to_curve(row.get("curve", "linear"), cur, lo, hi)
+            p.default = pos
+            p.val = pos
     return
 
 
@@ -262,19 +265,27 @@ def _value_to_curve(curve, v, lo, hi):
     return n
 
 
-def _read(par, lo):
+def _to_par(par, auv, curve, lo, hi):
+    # AU の実値 → パラメータの表示。Float はつまみ位置、他は実値/添え字のまま
     if par.style == "Menu":
-        return float(lo + par.menuIndex)
-    return float(par.eval())
-
-
-def _write(par, v, lo):
-    if par.style == "Menu":
-        par.menuIndex = max(0, min(len(par.menuNames) - 1, int(round(v - lo))))
+        par.menuIndex = max(0, min(len(par.menuNames) - 1, int(round(auv - lo))))
     elif par.style == "Toggle":
-        par.val = 1 if v >= 0.5 else 0
+        par.val = 1 if auv >= 0.5 else 0
+    elif par.style == "Int":
+        par.val = int(round(auv))
     else:
-        par.val = v
+        par.val = _value_to_curve(curve, auv, lo, hi)
+
+
+def _to_pos(par, curve, lo, hi):
+    # パラメータの表示 → つまみ位置(0〜1)。これが CHOP の出力になる
+    if par.style == "Menu":
+        v = float(lo + par.menuIndex)
+    elif par.style in ("Toggle", "Int"):
+        v = float(par.eval())
+    else:
+        return float(par.eval())          # Float は既に 0〜1
+    return _value_to_curve(curve, v, lo, hi)
 
 
 def onCook(scriptOp):
@@ -309,25 +320,25 @@ def onCook(scriptOp):
         hi = float(r["max"])
         auv = float(d[r["_row"], "value"].val) if d else float(r["value"])
         span = (hi - lo) if hi > lo else 1.0
+        curve = r.get("curve", "linear")
         # 入力0に 0〜1 の自動化(MIDI など)が来ていれば、それを最優先で反映する
         drv = None
         if scriptOp.inputs and scriptOp.inputs[0]:
             ch = scriptOp.inputs[0].chan(r["channel"])
             if ch is not None:
-                drv = _curve_to_value(r.get("curve", "linear"), float(ch[0]), lo, hi)
+                drv = _curve_to_value(curve, float(ch[0]), lo, hi)
         if drv is not None:
-            _write(par, drv, lo)
+            _to_par(par, drv, curve, lo, hi)
             seen[nm] = drv
         # プラグイン側(GUI)が動いていたら、こちらのパラメータへ書き戻す
         elif nm not in seen or abs(auv - seen[nm]) > span * 1e-5:
-            _write(par, auv, lo)
+            _to_par(par, auv, curve, lo, hi)
             seen[nm] = auv
         else:
             seen[nm] = auv
-        # 現在値を**つまみ位置(0〜1)**で出す。AudioUnit CHOP が入力1で
+        # 出力は**つまみ位置(0〜1)**。AudioUnit CHOP が入力1で
         # Input Range=Normalized のまま受け取れるので、MIDI 直結と同じ土俵になる
-        scriptOp.appendChan(r["channel"])[0] = _value_to_curve(
-            r.get("curve", "linear"), _read(par, lo), lo, hi)
+        scriptOp.appendChan(r["channel"])[0] = _to_pos(par, curve, lo, hi)
     st["au"] = seen
     return
 )AUPANEL";

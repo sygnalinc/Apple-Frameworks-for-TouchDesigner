@@ -137,8 +137,11 @@ makes the host read one parameter while writing another, and values appear stuck
 
 `Create / Rebuild Panel` generates a **Script CHOP** beside the node and wires it into input 1. It
 reads the parameter table and grows a **properly typed control for each learned parameter** — a
-menu with the plugin's own choice names, a toggle, an integer, or a float with the real range and
-units. Measured across the 24 installed effects: 189 parameters want a slider, **24 are indexed
+menu with the plugin's own choice names, a toggle, an integer, or a float. **Float controls are
+always 0–1 knob position**, so a knob sitting halfway in the plugin's window reads 0.5 here no
+matter what the underlying units or curve are; the real value (Hz, ms, dB) is in the Info DAT's
+`value` column. Measured on AUPeakLimiter: `Pre-Gain` centred in the GUI → 0.5000 exactly, while
+`Attack Time` at 0.002 s (log, 0.0005–0.03) reads 0.3386. Measured across the 24 installed effects: 189 parameters want a slider, **24 are indexed
 (menus)** and **18 are boolean (toggles)**, so a page of bare 0–1 sliders throws away a lot.
 
 The op cannot grow parameters itself, but a Script CHOP can — `onSetupParameters` may append
@@ -333,7 +336,10 @@ address で `ParameterInfo` を引くと名前が100%一致)。**危ないのは
 
 `Create / Rebuild Panel` を押すと、隣に **Script CHOP** が生成されて入力1へ配線される。
 パラメータ表を読んで、**learn 済みパラメータごとに型どおりのコントロール**を生やす —
-プラグイン自身の選択肢名が入ったプルダウン、トグル、整数、実単位・実レンジのスライダー。
+プラグイン自身の選択肢名が入ったプルダウン、トグル、整数、そして Float。**Float は常に
+0〜1 のつまみ位置**なので、プラグインのウインドウでつまみが半分なら、単位や曲線に関わらず
+ここでも 0.5 になる。実値(Hz・ms・dB)は Info DAT の `value` 列で見る。AUPeakLimiter での実測:
+GUI で中央の `Pre-Gain` はちょうど 0.5000、`Attack Time` は 0.002 秒(対数 0.0005〜0.03)で 0.3386。
 実測(エフェクト24個)では 189個がスライダー向き・**24個が Indexed(プルダウン)**・
 **18個が Boolean(トグル)**なので、0〜1 のスライダーだけでは情報がかなり落ちる。
 
