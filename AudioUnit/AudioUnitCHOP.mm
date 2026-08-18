@@ -156,10 +156,18 @@ import json
 
 
 def _spec(scriptOp):
+    # **毎cook パースしない。** storage の文字列が変わったときだけ解析する
+    # (毎フレーム json.loads すると Python だけで 2ms 超かかる・実測)
+    raw = scriptOp.fetch("spec", "[]")
+    cache = scriptOp.fetch("_spec_cache", None)
+    if cache is not None and cache[0] == raw:
+        return cache[1]
     try:
-        return json.loads(scriptOp.fetch("spec", "[]"))
+        rows = json.loads(raw)
     except Exception:
-        return []
+        rows = []
+    scriptOp.store("_spec_cache", (raw, rows))
+    return rows
 
 
 def _pname(ch):
