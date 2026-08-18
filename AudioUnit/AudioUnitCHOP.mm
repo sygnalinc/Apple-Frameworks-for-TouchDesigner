@@ -311,6 +311,21 @@ public:
             if (myLoaded.exchange(false)) { adoptLoadedUnit(); restoreState(in); restoreLearnMap(in); }
             if (myLoadFailed.exchange(false)) myErr = myErrPending;
 
+            // **パラメータ・GUI・Learn は音が流れていなくても動かす。**
+            // 音声入力の有無で早期 return すると、入力1(パネル)を読まないので
+            // パネルが cook されず、つまみを動かしても何も起きない(実測)
+            if (myUnit) {
+                applyPreset(in);
+                // **入力を先に適用する。** 逆順だと、パネル(入力1)が毎cook 出す値が
+                // Learn 枠の変更を上書きしてしまい、枠から動かせなくなる(実測)
+                applyParamsFromInput(in);
+                syncParams(in);
+                myBypassed = in->getParInt("Bypass") != 0;
+                myUnit.AUAudioUnit.shouldBypassEffect = myBypassed;
+                if (myWantSaveState.exchange(false)) saveState();
+            }
+            syncWindow(in);
+
             const OP_CHOPInput* ci = in->getInputCHOP(0);
             if (!active || !ci || ci->numChannels < 1 || ci->numSamples < 1 || out->numChannels < 2) return;
 
@@ -320,18 +335,6 @@ public:
                 return;
             }
             if (!ensureEngine(sr, n)) { passThrough(out, ci, n, in); return; }
-
-            applyPreset(in);
-            // **入力を先に適用する。** 逆順だと、パネル(入力1)が毎cook 出す値が
-            // Learn 枠の変更を上書きしてしまい、枠から動かせなくなる(実測)。
-            // 先に入力を反映しておけば syncParams から見て「AU は動いていない」状態になり、
-            // 枠の変更がそのまま通る
-            applyParamsFromInput(in);
-            syncParams(in);
-            myBypassed = in->getParInt("Bypass") != 0;
-            myUnit.AUAudioUnit.shouldBypassEffect = myBypassed;
-            syncWindow(in);
-            if (myWantSaveState.exchange(false)) saveState();
 
             // 入力をステレオに整えて source node に渡す
             const int inN = ci->numSamples;
@@ -795,12 +798,14 @@ private:
             for (auto& e : myParams) e.learnSlot = -1;
             for (int i = 0; i < kLearnSlots; i++) myLearnIdx[i] = -1;
             rebuildLearnAliases(); saveLearnMap();
+            myPanelDirty = true;
         }
         const bool learn = in->getParInt("Learn") != 0;
         // Learn を On にした瞬間、パネルが無ければ作る(触ったつまみをすぐ見られるように)
         if (learn && !myLearning && myUnit) createPanel(true);
         myLearning = learn;
         if (myWantPanel.exchange(false)) createPanel(false);
+        if (myFirstSync) { myFirstSync = false; if (myUnit) myPanelDirty = true; }
 
         std::vector<std::pair<std::string, double>> push;
         // AU 側(GUI・プリセット・パネル)で動いたパラメータを検出する。
@@ -818,6 +823,32 @@ private:
                 push.push_back({panelParName(e.chan), valueToCurve(e.curve, now, e.minV, e.maxV)});
         }
         pushToPanel(push);
+        if (myPanelDirty) { myPanelDirty = false; refreshPanelSpec(); }
+    }
+
+    // learn の内容が変わったら、パネルへ新しい仕様を渡して作り直させる。
+    // これをしないと Learnmap には入るのにパネルには出てこない
+    void refreshPanelSpec()
+    {
+        const std::string spec = learnedSpecJSON();
+        PyGILState_STATE g = PyGILState_Ensure();
+        if (PyObject* main = PyImport_AddModule("__main__")) {
+            if (PyObject* dict = PyModule_GetDict(main)) {
+                PyObject* sp = PyUnicode_FromString(spec.c_str());
+                if (sp) { PyDict_SetItemString(dict, "__au_spec", sp); Py_DECREF(sp); }
+                const std::string sig = learnedSigString();
+                PyObject* sg = PyUnicode_FromString(sig.c_str());
+                if (sg) { PyDict_SetItemString(dict, "__au_sig", sg); Py_DECREF(sg); }
+            }
+        }
+        PyGILState_Release(g);
+        std::string py = "sc = n.parent().op(n.name + '_params')\n";
+        py += "if sc:\n";
+        py += " sc.store('spec', __au_spec)\n";
+        py += " if sc.fetch('sig', '') != __au_sig:\n";
+        py += "  sc.store('sig', __au_sig)\n";
+        py += "  sc.par.setuppars.pulse()\n";
+        tdpycb::runWithNode(myNode, py);
     }
 
     // 隣に Script CHOP のパネルを生成して入力1へ配線する。
@@ -885,6 +916,20 @@ private:
 
     // learn 済みパラメータの仕様を JSON に。パネルはこれだけを見て UI を作る
     // (AudioUnit CHOP を読まないので Cook dependency loop にならない)
+    // 「どのパラメータが載っているか」だけの署名(値は含めない)。
+    // パネルを作り直すべきかの判定に使う
+    std::string learnedSigString()
+    {
+        std::string sig;
+        for (int i = 0; i < kLearnSlots; i++) {
+            const int idx = myLearnIdx[i];
+            if (idx < 0 || idx >= (int)myParams.size()) continue;
+            const ParamEntry& e = myParams[idx];
+            sig += e.chan; sig += ":"; sig += e.type; sig += ",";
+        }
+        return sig;
+    }
+
     std::string learnedSpecJSON()
     {
         std::string j = "[";
@@ -948,6 +993,7 @@ private:
             myLearnIdx[i] = idx;
             myParams[idx].learnSlot = i + 1;
             rebuildLearnAliases(); saveLearnMap();
+            myPanelDirty = true;      // learn した瞬間にパネルへ反映する
             return;
         }
         myWarn = "all learn slots are used";
@@ -1178,6 +1224,8 @@ private:
     std::atomic<bool> myWantSaveState{false};
     std::atomic<bool> myWantClearLearn{false};
     std::atomic<bool> myWantPanel{false};
+    bool myPanelDirty = false;
+    bool myFirstSync = true;
     std::atomic<uint64_t> myTouchedAddr{0};
     bool myLearning = false;
     int  myLearnIdx[kLearnSlots] = { -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1 };

@@ -66,8 +66,11 @@ parameters. A C++ Custom OP cannot do that — `setupParameters` is called **onc
 but not on a CHOP, measured). **A Script CHOP can**, so that is where the controls live.
 
 1. Turn **Learn Parameters** on — the panel is created for you if it does not exist yet
-2. Open the GUI and touch the knobs you want — each one is marked as learned
-3. Press **Create / Rebuild Panel** to put them on the panel
+2. Open the GUI and touch the knobs you want — **each one appears on the panel as you touch it**
+
+There is no third step: the panel is rebuilt the moment a parameter is learned. **Create / Rebuild
+Panel** is only there to recreate the panel if you deleted it. Learning works whether or not audio
+is flowing — the parameter side of the operator runs even with no signal on input 0.
 
 Turning Learn off and on again does not disturb an existing panel. The panel lands **directly below
 the operator with its viewer open**, and the two DATs it needs (its callbacks and the parameter
@@ -265,8 +268,11 @@ TouchDesigner の Audio VST CHOP には **Learn Parameters**(プラグインの�
 コントロールはそちらに置く。
 
 1. **Learn Parameters** を On にする — パネルが無ければこのとき自動で作られる
-2. GUI を開いて、使いたいつまみを触る。触ったものが対象として記録される
-3. **Create / Rebuild Panel** を押してパネルに載せる
+2. GUI を開いて、使いたいつまみを触る。**触った瞬間にパネルへ出る**
+
+3つ目の手順は無い。learn した時点でパネルが作り直される。**Create / Rebuild Panel** は
+パネルを消してしまったときに作り直すためだけにある。learn は**音が流れていなくても動く**
+(入力0に信号が無くても、この op のパラメータ側は動く)。
 
 Learn を Off にして再度 On にしても、既にあるパネルは作り直されない。パネルは**この op の
 真下にビューアを開いた状態**で置かれ、パネルが使う2つの DAT(callbacks とパラメータ表)は
