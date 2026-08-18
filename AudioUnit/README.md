@@ -69,9 +69,9 @@ but not on a CHOP, measured). **A Script CHOP can**, so that is where the contro
 2. Open the GUI and touch the knobs you want — each one is marked as learned
 3. Press **Create / Rebuild Panel** to put them on the panel
 
-Turning Learn off and on again does not disturb an existing panel. The two DATs the panel needs
-(its callbacks and the parameter table) are **docked to their host as closed chips**, so they stay
-out of the way — click the chip to open one.
+Turning Learn off and on again does not disturb an existing panel. The panel lands **directly below
+the operator with its viewer open**, and the two DATs it needs (its callbacks and the parameter
+table) are **docked to their host as closed chips** — click a chip to open one.
 
 **Assignments are stored per plugin** in the `Learned Mapping` parameter, which saves with the .toe.
 Switch to another plugin and back and your selection returns. The Info DAT's `learn` column shows
@@ -172,7 +172,7 @@ one plugin's state into another.
 | Dry / Wet | 1 is fully processed, 0 is the original |
 | Output Gain | Applied after the mix |
 | Display GUI | Opens the plugin's own interface |
-| Always On Top | Floating window vs a normal one (default off) |
+| Always On Top | Floating window vs a normal one |
 | Reset Plugin State | Clears the AU's internal state (reverb tails etc.) |
 | Load / Save Plugin State, Plugin State | See above |
 | Learn Parameters / Clear Learned / Learned Mapping | Which parameters go on the panel |
@@ -268,9 +268,9 @@ TouchDesigner の Audio VST CHOP には **Learn Parameters**(プラグインの�
 2. GUI を開いて、使いたいつまみを触る。触ったものが対象として記録される
 3. **Create / Rebuild Panel** を押してパネルに載せる
 
-Learn を Off にして再度 On にしても、既にあるパネルは作り直されない。パネルが使う2つの DAT
-(callbacks とパラメータ表)は**ホストに閉じたチップとしてドック**されるので、ネットワークは
-散らからない。チップをクリックすれば開く。
+Learn を Off にして再度 On にしても、既にあるパネルは作り直されない。パネルは**この op の
+真下にビューアを開いた状態**で置かれ、パネルが使う2つの DAT(callbacks とパラメータ表)は
+**ホストに閉じたチップとしてドック**される。チップをクリックすれば開く。
 
 **選択はプラグインごとに** `Learned Mapping` パラメータへ保存され、.toe と一緒に残る。
 別のプラグインへ切り替えて戻すと、そのプラグイン用の選択が戻る。今どれが選ばれているかは
@@ -371,7 +371,7 @@ base64 にして `Plugin State` 文字列パラメータへ入れる(.toe と一
 | Dry / Wet | 1 で全部エフェクト、0 で原音 |
 | Output Gain | ミックス後に掛かる |
 | Display GUI | プラグイン自身の画面を開く |
-| Always On Top | 最前面に固定するか(既定 Off) |
+| Always On Top | 最前面に固定するか |
 | Reset Plugin State | AU の内部状態(残響など)を消す |
 | Load / Save Plugin State・Plugin State | 上記 |
 | Learn Parameters / Clear Learned / Learned Mapping | どのパラメータをパネルに載せるか |

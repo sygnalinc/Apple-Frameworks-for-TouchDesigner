@@ -7354,3 +7354,14 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   = 対数位置 0.0000 / 0.2500 / 0.5000 / 1.0000
 - **注意**: 既にあるパネルは古いスクリプトを持っているので、**Create / Rebuild Panel を
   押して作り直す**必要がある(自動生成は「無ければ作る」なので上書きしない)
+
+### 2026-08-16 AudioUnit CHOP: パネルの配置・Always On Top の既定・ページ統合
+
+- ユーザー指示3件を実施:
+  - パネル生成時に **viewer を開いた状態**にし、**AudioUnit CHOP の真下**へ置く
+    (`nodeX` は同じ・`nodeY` を 160 下)。入力1へ繋がる関係上は上流だが、見た目は真下が扱いやすい
+  - `Always On Top` の既定を **On** へ戻す(一度 Off にしたが再度 On の指示)
+  - Learn 関連が4つ(Learn / Clear Learned / Create Panel / Learned Mapping)まで減ったので、
+    **`Learn` ページを廃止して `AudioUnit` ページへ統合**。ページは AudioUnit(15)と State(3)の2枚に
+- 実測: 新規ノードの Always On Top = True、パネルが (-1000, -1560) で op の (-1000, -1400) の真下、
+  viewer=True。ページ構成も意図どおり

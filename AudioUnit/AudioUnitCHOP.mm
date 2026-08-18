@@ -482,12 +482,11 @@ public:
             m->appendMenu(p, 2, n, l);
         }
         { OP_NumericParameter p("Showui"); p.label = "Display GUI"; p.page = P; p.defaultValues[0] = 0; m->appendToggle(p); }
-        { OP_NumericParameter p("Alwaysontop"); p.label = "Always On Top"; p.page = P; p.defaultValues[0] = 0; m->appendToggle(p); }
+        { OP_NumericParameter p("Alwaysontop"); p.label = "Always On Top"; p.page = P; p.defaultValues[0] = 1; m->appendToggle(p); }
         { OP_NumericParameter p("Resetstate"); p.label = "Reset Plugin State"; p.page = P; m->appendPulse(p); }
 
-        // Audio VST CHOP の learn parms 相当。TD は実行中にパラメータを増やせないので、
-        // 枠を先に kLearnSlots 個用意しておき、GUI で触ったパラメータをそこへ割り当てる
-        const char* L = "Learn";
+        // Learn 関連は数が少ないので AudioUnit ページにまとめる
+        const char* L = P;
         { OP_NumericParameter p("Learn"); p.label = "Learn Parameters"; p.page = L; p.defaultValues[0] = 0; m->appendToggle(p); }
         { OP_NumericParameter p("Clearlearned"); p.label = "Clear Learned"; p.page = L; m->appendPulse(p); }
         { OP_NumericParameter p("Createpanel"); p.label = "Create / Rebuild Panel"; p.page = L; m->appendPulse(p); }
@@ -913,7 +912,8 @@ private:
         py += " cb = p.op(base + '_panel_callbacks') or p.create(td.textDAT, base + '_panel_callbacks')\n";
         py += " cb.text = __au_panel_src\n";
         py += " sc = p.op(base + '_panel') or p.create(td.scriptCHOP, base + '_panel')\n";
-        py += " sc.nodeX, sc.nodeY = n.nodeX - 250, n.nodeY\n";
+        py += " sc.nodeX, sc.nodeY = n.nodeX, n.nodeY - 160\n";   // AudioUnit CHOP の真下
+        py += " sc.viewer = True\n";                        // 値がすぐ見えるように開いておく
         py += " sc.par.callbacks = cb\n";
         py += " sc.store('params', info.path)\n";   // 参照は storage(setuppars で消えない)
         py += " info.cook(force=True)\n";           // 生成直後は未cookで中身が空
@@ -1187,7 +1187,7 @@ private:
     AUParameterTree* myObserverTree = nil;
     AUParameterObserverToken myObserverToken = nullptr;
     std::atomic<int64_t> myStateSaves{0};
-    bool myAlwaysOnTop = false;
+    bool myAlwaysOnTop = true;
     bool myBypassed = false;
     double myLatencySec = 0;
 
