@@ -40,6 +40,15 @@ arriving through a CHOP still cost a frame — about 30 ms all in, against 35–
 path. Going below that means the instrument opening CoreMIDI itself instead of taking notes from a
 CHOP.
 
+- **Program change** picks the instrument: a `ch<channel>p` channel switches the GM program on that
+  channel (TouchDesigner reports GM programs **1-based**, so 69 means Oboe). This is what lets one
+  multi-timbral instrument play a multi-track MIDI file with its real orchestration
+- **`Sound Bank` matters**: AUMIDISynth ignores program changes with no bank loaded — measured, every
+  program renders a **byte-identical** waveform. The parameter defaults to the bank macOS ships
+  (`/System/Library/.../gs_instruments.dls`); with it loaded, programs sound clearly different
+  (piano rms 0.022 / violin 0.058 / oboe 0.072). DLSMusicDevice responds without a bank but is
+  silent inside TouchDesigner, so **AUMIDISynth + the default bank** is the combination that works
+
 ### Playing notes with AU Instrument
 
 - **Wire a note CHOP into input 0.** Channels are named `ch<channel>n<note>` (**exactly what
@@ -295,6 +304,15 @@ MIDI キーボードで弾いて音が遅れるときは、**ほぼ Audio Device
 **13.7ms**(48kHz・バッファ512フレーム + latency 74 + safety 73)で、CHOP 経由のノートは
 どのみち1フレーム掛かるので合計 約30ms。詰めた CHOP 経路の 35〜50ms との差は小さい。
 これより下げるには、**楽器側が CoreMIDI を自分で開いて** cook を介さずノートを受ける必要がある。
+
+- **音色はプログラムチェンジで決まる**。`ch<チャンネル>p` のチャンネルでそのチャンネルの GM 音色を
+  切り替える(TouchDesigner は GM の慣習どおり**1始まり**で出すので 69 = Oboe)。これがあると
+  1台のマルチティンバー音源で、多トラックの MIDI ファイルを本来の楽器編成のまま鳴らせる
+- **`Sound Bank` が要る**: AUMIDISynth はバンクを読ませないとプログラムチェンジを無視する —
+  実測で**全プログラムの波形が完全に一致**した。既定は macOS 同梱の
+  `/System/Library/.../gs_instruments.dls`。読ませると音色がはっきり変わる
+  (ピアノ rms 0.022 / ヴァイオリン 0.058 / オーボエ 0.072)。DLSMusicDevice はバンク無しでも
+  音色は変わるが **TouchDesigner 内では無音**なので、**AUMIDISynth + 既定バンク**が正解
 
 ### AU Instrument でノートを鳴らす
 

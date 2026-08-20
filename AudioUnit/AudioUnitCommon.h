@@ -504,6 +504,13 @@ public:
             { OP_NumericParameter p("Midichannel"); p.label = "MIDI Channel"; p.page = PL; p.defaultValues[0] = 1;
               p.minSliders[0] = 1; p.maxSliders[0] = 16; p.minValues[0] = 1; p.maxValues[0] = 16;
               p.clampMins[0] = true; p.clampMaxes[0] = true; m->appendInt(p); }
+            {
+                // **AUMIDISynth は既定では音色が切り替わらない**(全プログラムで波形が完全に同一・実測)。
+                // GM のサウンドバンクを読ませると切り替わるので、既定で macOS 同梱のものを指す
+                OP_StringParameter p("Soundbank"); p.label = "Sound Bank"; p.page = PL;
+                p.defaultValue = "/System/Library/Components/CoreAudio.component/Contents/Resources/gs_instruments.dls";
+                m->appendFile(p);
+            }
             { OP_NumericParameter p("Noteon"); p.label = "Note On"; p.page = PL; m->appendPulse(p); }
             { OP_NumericParameter p("Noteoff"); p.label = "Note Off"; p.page = PL; m->appendPulse(p); }
             { OP_NumericParameter p("Allnotesoff"); p.label = "All Notes Off"; p.page = PL; m->appendPulse(p); }
@@ -547,18 +554,18 @@ public:
 
     // ------------------------------------------------------------ info
 
-    int32_t getNumInfoCHOPChans(void*) override { return myKind.instrument ? 10 : 8; }
+    int32_t getNumInfoCHOPChans(void*) override { return myKind.instrument ? 11 : 8; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override
     {
         static const char* n[] = { "executes", "renders", "samplerate", "loaded",
                                    "params", "latency_ms", "bypassed", "learned",
-                                   "notes_sent", "notes_held" };
+                                   "notes_sent", "notes_held", "programs_sent" };
         int held = 0;
-        for (const auto& kv : myHeld) if (kv.second > 0) held++;
+        for (const auto& kv : myHeld) if (kv.first < 0x10000 && kv.second > 0) held++;
         const float v[] = { (float)myExec.load(), (float)myRenders.load(), (float)mySampleRate,
                             (float)(myUnit != nil), (float)myParams.size(),
                             (float)(myLatencySec * 1000.0), (float)myBypassed, (float)learnedCount(),
-                            (float)myNotesSent, (float)held };
+                            (float)myNotesSent, (float)held, (float)myProgsSent };
         c->name->setString(n[i]); c->value = v[i];
     }
 
@@ -660,6 +667,7 @@ private:
         teardownEngine();
         myUnit = myPendingUnit; myPendingUnit = nil;
         myAppliedPreset = -2;
+        myBankPath.clear();          // 楽器が変わったらサウンドバンクを入れ直す
         buildParamTable();
         myLatencySec = myUnit ? myUnit.AUAudioUnit.latency : 0;
         myWindowTitle = myUnit ? (myUnit.name.UTF8String ?: "AudioUnit") : "AudioUnit";
@@ -740,6 +748,19 @@ private:
         return b < 1 ? 1 : (b > 127 ? 127 : b);
     }
 
+    // `ch<ch>p` = プログラムチェンジ(音色切替)。TouchDesigner の MIDI In CHOP は
+    // GM の慣習どおり **1始まり**で出す(生の 68 = Oboe が 69)ので、送るときに1引く
+    static bool parseProgram(const char* nm, int& ch)
+    {
+        if (!nm || nm[0] != 'c' || nm[1] != 'h') return false;
+        const char* q = nm + 2;
+        int v = 0;
+        while (*q >= '0' && *q <= '9') { v = v * 10 + (*q - '0'); q++; }
+        if (q == nm + 2 || *q != 'p' || q[1] != '\0') return false;
+        ch = v;
+        return ch >= 1 && ch <= 16;
+    }
+
     // 入力0のチャンネル名からノートを拾う。CoreMIDI In CHOP の `ch1n60` と
     // 素の `note60` の両方を受ける(値=ベロシティ、0でノートオフ)
     static bool parseNote(const char* nm, int& ch, int& note)
@@ -759,14 +780,34 @@ private:
     {
         AVAudioUnitMIDIInstrument* mi = midiUnit();
         if (mi) for (const auto& kv : myHeld)
-            if (kv.second > 0) [mi stopNote:(uint8_t)(kv.first & 0xff) onChannel:(uint8_t)(kv.first >> 8)];
+            if (kv.first < 0x10000 && kv.second > 0)
+                [mi stopNote:(uint8_t)(kv.first & 0xff) onChannel:(uint8_t)(kv.first >> 8)];
         myHeld.clear();
+    }
+
+    // サウンドバンクを読ませる。受け付けない楽器(サードパーティ等)ではエラーが返るだけなので無視する
+    void applySoundBank(const OP_Inputs* in)
+    {
+        const char* sb = in->getParString("Soundbank");
+        const std::string want = sb ? sb : "";
+        if (want == myBankPath || !myUnit) return;
+        myBankPath = want;
+        if (want.empty()) return;
+        NSString* path = [NSString stringWithUTF8String:want.c_str()];
+        if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+            myWarn = "sound bank not found: " + want;
+            return;
+        }
+        NSURL* url = [NSURL fileURLWithPath:path];
+        AudioUnitSetProperty(myUnit.audioUnit, kMusicDeviceProperty_SoundBankURL,
+                             kAudioUnitScope_Global, 0, &url, sizeof(url));
     }
 
     void applyNotes(const OP_Inputs* in)
     {
         AVAudioUnitMIDIInstrument* mi = midiUnit();
         if (!mi) { myWarn = "this plugin is not a MIDI instrument"; return; }
+        applySoundBank(in);
 
         if (myWantAllOff.exchange(false)) allNotesOff();
 
@@ -783,6 +824,21 @@ private:
 
         const OP_CHOPInput* ni = in->getInputCHOP(0);
         if (!ni || ni->numSamples < 1) return;
+
+        // **音色はノートより先に送る。** 同じ cook で音色とノートが来たとき、
+        // 順序が逆だと最初の1音が前の音色で鳴る
+        for (int c = 0; c < ni->numChannels; c++) {
+            int ch = 0;
+            if (!parseProgram(ni->getChannelName(c), ch)) continue;
+            const int prog = (int)lroundf(ni->getChannelData(c)[ni->numSamples - 1]) - 1;
+            if (prog < 0 || prog > 127) continue;
+            const int key = 0x10000 | (ch - 1);
+            if (myHeld.count(key) && (int)myHeld[key] == prog) continue;
+            myHeld[key] = (float)prog;
+            [mi sendMIDIEvent:(uint8_t)(0xC0 | (ch - 1)) data1:(uint8_t)prog];
+            myProgsSent++;
+        }
+
         for (int c = 0; c < ni->numChannels; c++) {
             int ch = 0, note = 0;
             if (!parseNote(ni->getChannelName(c), ch, note)) continue;
@@ -1472,7 +1528,9 @@ private:
     std::atomic<bool> myWantNoteOn{false};
     std::atomic<bool> myWantNoteOff{false};
     std::atomic<bool> myWantAllOff{false};
+    std::string myBankPath;
     int myNotesSent = 0;
+    int myProgsSent = 0;
     std::map<int, float> myHeld;      // (ch<<8 | note) -> 直前のベロシティ
     bool myPanelDirty = false;
     bool myFirstSync = true;

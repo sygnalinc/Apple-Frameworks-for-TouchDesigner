@@ -7567,3 +7567,29 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **実測(M2)**: peak 0.12、`notes_sent` 141、`notes_held` 2(ベース+アルペジオ)、エラー警告なし。
   Plugin は AUMIDISynth(**DLSMusicDevice は TD 内で無音**なので選ばない)
 - 他の利用例と同じく **allowCooking = False** で保存。`_README` の 07 Sound の説明も更新
+
+### 2026-08-19 多楽器 MIDI を鳴らす: PD 素材の入手 + プログラムチェンジ + サウンドバンク
+
+- ユーザー「いろんな楽器が鳴っている、配布しても問題ない、みんなが知っている曲の MIDI を探して」
+- **採用: モーツァルト 交響曲第25番 第1楽章(K.183)**。出典 **Mutopia Project・Public Domain**
+  (楽譜は Breitkopf und Härtel 1880 版由来)。映画『アマデウス』冒頭の曲。
+  `Assets/mozart_symphony25_mvt1.mid`(87KB・format 1・8トラック)。**中身を実測で確認**:
+  Oboe / English Horn×2 / Violin×2 / Viola / Cello の**7パートに GM プログラムが入っている**、
+  9639音、152bpm、全長10.9分。MIDI チャンネルは**2〜8**(生ニブル1〜7)
+  - **MIDI は楽曲がPDでも「その MIDI データ自体」の権利が別にある**ので、Mutopia のように
+    データ側のライセンスが明示されているものを選ぶ。Wikimedia の候補は
+    「attribution only・出典が第三者サイト」で素性が弱かったので見送った
+- **AU Instrument にプログラムチェンジ対応を追加**: `ch<ch>p` チャンネルで音色切替。
+  **TD は GM 慣習どおり1始まりで出す**(生 68 Oboe → TD 69)ので送信時に1引く。
+  音色はノートより先に送る(同じ cook で来たとき最初の1音が前の音色で鳴らないように)
+- **最大のハマりどころ: AUMIDISynth は既定ではプログラムチェンジを無視する**。
+  単体ハーネスで測ると**全プログラムで peak/rms/zcr が完全に一致**(0.2676/0.1892/0.0119)。
+  **`kMusicDeviceProperty_SoundBankURL` で GM バンクを読ませると音色が変わる**
+  (piano rms 0.022 / violin 0.058 / oboe 0.072 / organ 0.032 / trumpet 0.049)。
+  → **`Sound Bank` パラメータ**を追加し、既定を macOS 同梱の
+  `/System/Library/Components/CoreAudio.component/Contents/Resources/gs_instruments.dls` に
+  - DLSMusicDevice はバンク無しでも音色が変わるが**TD 内では無音**(既知)。
+    よって **AUMIDISynth + 既定バンク**が唯一まともに動く組合せ
+- demo `/project1/AUInstrument` をこのファイルに差し替え(`entire=Off` + Start/End で 0〜30秒。
+  全曲だと 2080ch × 39150サンプルでメモリが重い)。**実測: programs_sent 7 / notes_held 5 /
+  peak 0.49 / エラーなし**。自作の `Assets/sample_midi.mid` は役目を終えたので削除
