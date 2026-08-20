@@ -7609,3 +7609,23 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **踏んだ罠: MIDI In CHOP はファイルを差し替えても前のファイルの鳴りっぱなしノートが残る**。
   実測で ch4〜6(前のモーツァルトのパート)に 1 が残っていた。
   **`Reset Channels` / `Reset Values` をパルス**すると消える
+
+### 2026-08-19 AU Instrument に MIDI ファイル再生を内蔵(Movie File In 相当の操作)
+
+- ユーザー「MIDI ファイルを最後まで再生したり timeline に合わせて再生したり、Movie File In の
+  再生モードみたいにコントロールしたい」
+- **SMF パーサ(`MidiSeq`)を C++ で実装**して op に内蔵。format 0/1・テンポマップ・
+  ランニングステータス対応。全イベントを**秒に展開**して持つ。ノート/プログラム/CC/ピッチベンドを送る
+- **MIDI File ページ**: MIDI File / Play / Play Mode(sequential・locked・index)/ Speed / Loop /
+  Cue / Cue Point / Cue Pulse / Position。Info CHOP に `file_position` / `file_duration`
+  - **Sequential は実時計(mach)で進める** — タイムラインを止めても鳴り続ける
+  - **Locked は `getTimeInfo()->frame / rate`**(deltaMS はタイムライン停止で0になるので使わない)
+  - シーク・ループの度に**全ノートオフ**。取りこぼしで音が残らない
+- **実測(M2)**: 実時間の **1.00倍**(17.37秒の経過で17.37秒ぶん進み、ループも折り返した)、
+  Locked は file_pos 5.03 対 timeline 5.05・Cue Point 8 のとき 10.32 = 2.33+8 と厳密一致、
+  停止中は位置を保持、停止中の Cue Pulse で 12.0 へ正確にジャンプ。
+  4パート同時・notes_held 7・peak 0.56・**cook 0.007ms**
+- **踏んだ実バグ**: 停止中に `Cue Pulse` を押すと、**パルスを消費しておいて早期 return で捨てていた**。
+  停止判定をキュー処理の後ろに移し、シーク時は停止中でも位置を反映するようにした
+- demo `/project1/AUInstrument` を内蔵再生に置き換え(MIDI In CHOP と Trim を撤去)。
+  **CHOP経由は 2080ch・約0.7ms、内蔵は 0.007ms** と負荷も大きく違う

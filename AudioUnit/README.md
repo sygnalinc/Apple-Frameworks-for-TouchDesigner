@@ -49,6 +49,29 @@ CHOP.
   (piano rms 0.022 / violin 0.058 / oboe 0.072). DLSMusicDevice responds without a bank but is
   silent inside TouchDesigner, so **AUMIDISynth + the default bank** is the combination that works
 
+### Playing a MIDI file
+
+AU Instrument reads Standard MIDI Files itself, with the transport Movie File In has — no CHOP
+wiring needed. Set `MIDI File` on the **MIDI File** page and it plays.
+
+| Parameter | What it does |
+|---|---|
+| `Play Mode` = **Sequential** | runs off a real clock, so it keeps playing even when the timeline is stopped |
+| `Play Mode` = **Locked to Timeline** | position = timeline seconds x `Speed` + `Cue Point`; follows scrubbing |
+| `Play Mode` = **Specify Index** | `Position` (0–1) drives the position directly |
+| `Play` / `Loop` / `Speed` | stop holds position and releases held notes; negative `Speed` rewinds without emitting notes |
+| `Cue` / `Cue Point` / `Cue Pulse` | jump to a point — **works while stopped** |
+
+The parser handles format 0 and 1, the tempo map, and running status. Notes, program changes,
+controllers and pitch bend are all forwarded, so a multi-track file plays with its own orchestration
+(with a `Sound Bank` loaded — see below). Every seek and loop point sends **all notes off** first,
+so nothing hangs. `file_position` and `file_duration` appear in the Info CHOP.
+
+**Measured (M2)**: a 4-part file (piano / bass / guitar / drums) plays at 1.00x real time,
+7 notes held, cook time **0.007 ms** — the whole file lives in the operator, so there is no CHOP
+clip to carry. Reading the same file through TouchDesigner's MIDI In CHOP instead costs 2080
+channels and ~0.7 ms.
+
 ### Playing notes with AU Instrument
 
 - **Wire a note CHOP into input 0.** Channels are named `ch<channel>n<note>` (**exactly what
@@ -313,6 +336,28 @@ MIDI キーボードで弾いて音が遅れるときは、**ほぼ Audio Device
   `/System/Library/.../gs_instruments.dls`。読ませると音色がはっきり変わる
   (ピアノ rms 0.022 / ヴァイオリン 0.058 / オーボエ 0.072)。DLSMusicDevice はバンク無しでも
   音色は変わるが **TouchDesigner 内では無音**なので、**AUMIDISynth + 既定バンク**が正解
+
+### MIDI ファイルを再生する
+
+AU Instrument は Standard MIDI File を自分で読んで再生する。操作は Movie File In と同じ形で、
+**CHOP を組む必要がない**。**MIDI File** ページの `MIDI File` を指定すれば鳴る。
+
+| パラメータ | 挙動 |
+|---|---|
+| `Play Mode` = **Sequential** | 実時計で進む。**タイムラインを止めても鳴り続ける** |
+| `Play Mode` = **Locked to Timeline** | 位置 = タイムライン秒 × `Speed` + `Cue Point`。スクラブに追従 |
+| `Play Mode` = **Specify Index** | `Position`(0〜1)で位置を直接指定 |
+| `Play` / `Loop` / `Speed` | 停止するとその場で保持し鳴っている音は止める。`Speed` 負値は逆送り(ノートは出さない) |
+| `Cue` / `Cue Point` / `Cue Pulse` | 頭出し。**停止中でも効く** |
+
+パーサは format 0 / 1・テンポマップ・ランニングステータスに対応。ノート・プログラムチェンジ・
+コントローラ・ピッチベンドをそのまま送るので、多トラックのファイルが**本来の楽器編成のまま**鳴る
+(下記の `Sound Bank` が要る)。シークとループの度に**全ノートオフ**を送るので音は残らない。
+Info CHOP に `file_position` / `file_duration` が出る。
+
+**実測(M2)**: 4パート(ピアノ/ベース/ギター/ドラム)のファイルが**実時間の1.00倍**で再生、
+同時発音7、cook **0.007ms**。ファイルは op の中にあるので CHOP のクリップを持ち回らない。
+同じファイルを TouchDesigner の MIDI In CHOP 経由で読むと 2080チャンネル・約0.7ms かかる。
 
 ### AU Instrument でノートを鳴らす
 

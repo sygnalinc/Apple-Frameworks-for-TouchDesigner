@@ -26,6 +26,8 @@
 
 #include "CHOP_CPlusPlusBase.h"
 #include "PyCallbacksBootstrap.h"
+#include <mach/mach_time.h>
+#include <algorithm>
 #include <map>
 #include <string>
 #include <vector>
@@ -126,6 +128,83 @@ inline float valueToCurve(AudioUnitParameterOptions curve, float v, float lo, fl
 }
 
 // エフェクト(aufx)と楽器(aumu)の違いはここだけ。あとは全部共通
+// Standard MIDI File を秒に展開したもの。format 0/1・テンポマップ・ランニングステータス対応
+struct MidiEvent { double t; uint8_t s, d1, d2; };
+
+struct MidiSeq {
+    std::vector<MidiEvent> ev;
+    double duration = 0;
+    std::string path, err;
+
+    static uint32_t be32(const uint8_t* p) { return (p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3]; }
+
+    bool load(const std::string& file)
+    {
+        ev.clear(); duration = 0; err.clear(); path = file;
+        if (file.empty()) return false;
+        FILE* f = fopen(file.c_str(), "rb");
+        if (!f) { err = "cannot open MIDI file"; return false; }
+        fseek(f, 0, SEEK_END); long n = ftell(f); fseek(f, 0, SEEK_SET);
+        std::vector<uint8_t> d((size_t)std::max(0L, n));
+        if (n <= 0 || fread(d.data(), 1, (size_t)n, f) != (size_t)n) { fclose(f); err = "cannot read MIDI file"; return false; }
+        fclose(f);
+        if (d.size() < 14 || memcmp(d.data(), "MThd", 4)) { err = "not a Standard MIDI File"; return false; }
+
+        const int ntrk = (d[10]<<8)|d[11];
+        const int div  = (int16_t)((d[12]<<8)|d[13]);
+        // (tick, 順序, status, d1, d2)。tempo は同時刻の音より先に処理する
+        struct Raw { uint64_t tick; int ord; uint8_t s, d1, d2; uint32_t tempo; };
+        std::vector<Raw> raw;
+        size_t p = 8 + be32(&d[4]);
+        for (int t = 0; t < ntrk && p + 8 <= d.size(); t++) {
+            if (memcmp(&d[p], "MTrk", 4)) break;
+            const size_t len = be32(&d[p+4]);
+            size_t q = p + 8, end = std::min(d.size(), q + len);
+            uint64_t tick = 0; uint8_t run = 0;
+            while (q < end) {
+                uint64_t v = 0;                       // 可変長デルタ
+                while (q < end) { const uint8_t b = d[q++]; v = (v<<7)|(b&0x7f); if (!(b&0x80)) break; }
+                tick += v;
+                if (q >= end) break;
+                uint8_t st = d[q];
+                if (st == 0xff) {
+                    q++; const uint8_t ty = d[q++];
+                    uint64_t l = 0;
+                    while (q < end) { const uint8_t b = d[q++]; l = (l<<7)|(b&0x7f); if (!(b&0x80)) break; }
+                    if (ty == 0x51 && l == 3 && q + 3 <= end)
+                        raw.push_back({tick, -1, 0, 0, 0, (uint32_t)((d[q]<<16)|(d[q+1]<<8)|d[q+2])});
+                    q += l;
+                } else if (st == 0xf0 || st == 0xf7) {
+                    q++; uint64_t l = 0;
+                    while (q < end) { const uint8_t b = d[q++]; l = (l<<7)|(b&0x7f); if (!(b&0x80)) break; }
+                    q += l;
+                } else {
+                    if (st & 0x80) { run = st; q++; } else st = run;   // ランニングステータス
+                    const int nb = ((st & 0xf0) == 0xc0 || (st & 0xf0) == 0xd0) ? 1 : 2;
+                    if (q + nb > end) break;
+                    const uint8_t a = d[q], b = nb > 1 ? d[q+1] : 0;
+                    q += nb;
+                    raw.push_back({tick, 1, st, a, b, 0});
+                }
+            }
+            p = q > p + 8 + len ? q : p + 8 + len;
+        }
+        std::stable_sort(raw.begin(), raw.end(),
+                         [](const Raw& a, const Raw& b){ return a.tick != b.tick ? a.tick < b.tick : a.ord < b.ord; });
+
+        const double tpq = div > 0 ? div : 480;      // SMPTE 分解能は稀なので既定にフォールバック
+        double sec = 0, us = 500000; uint64_t last = 0;
+        for (const Raw& r : raw) {
+            sec += (double)(r.tick - last) / tpq * us / 1e6; last = r.tick;
+            if (r.ord < 0) { us = r.tempo ? r.tempo : us; continue; }
+            ev.push_back({sec, r.s, r.d1, r.d2});
+        }
+        duration = sec;
+        if (ev.empty()) { err = "no MIDI events in file"; return false; }
+        return true;
+    }
+};
+
 struct AUKind {
     OSType componentType;   // kAudioUnitType_Effect / kAudioUnitType_MusicDevice
     bool   instrument;      // 音声入力を持たず、ノートで鳴らす
@@ -332,6 +411,8 @@ public:
     AudioUnitBase(const OP_NodeInfo* info, const AUKind& kind) : myNode(info), myKind(kind)
     {
         for (int i = 0; i < kLearnSlots; i++) myLearnIdx[i] = -1;
+        mach_timebase_info_data_t tb; mach_timebase_info(&tb);
+        myTimebase = (double)tb.numer / (double)tb.denom;
         rescan();
     }
     virtual ~AudioUnitBase() { closeWindowSync(); teardown(); }
@@ -514,6 +595,28 @@ public:
             { OP_NumericParameter p("Noteon"); p.label = "Note On"; p.page = PL; m->appendPulse(p); }
             { OP_NumericParameter p("Noteoff"); p.label = "Note Off"; p.page = PL; m->appendPulse(p); }
             { OP_NumericParameter p("Allnotesoff"); p.label = "All Notes Off"; p.page = PL; m->appendPulse(p); }
+
+            // ---- MIDI ファイル再生。Movie File In と同じ形の操作にそろえる ----
+            const char* MF = "MIDI File";
+            { OP_StringParameter p("Midifile"); p.label = "MIDI File"; p.page = MF; m->appendFile(p); }
+            { OP_NumericParameter p("Play"); p.label = "Play"; p.page = MF; p.defaultValues[0] = 1; m->appendToggle(p); }
+            {
+                OP_StringParameter p("Playmode"); p.label = "Play Mode"; p.page = MF;
+                const char* n[] = { "sequential", "locked", "index" };
+                const char* l[] = { "Sequential", "Locked to Timeline", "Specify Index" };
+                p.defaultValue = "sequential";
+                m->appendMenu(p, 3, n, l);
+            }
+            { OP_NumericParameter p("Speed"); p.label = "Speed"; p.page = MF; p.defaultValues[0] = 1;
+              p.minSliders[0] = -2; p.maxSliders[0] = 2; m->appendFloat(p); }
+            { OP_NumericParameter p("Loop"); p.label = "Loop"; p.page = MF; p.defaultValues[0] = 1; m->appendToggle(p); }
+            { OP_NumericParameter p("Cue"); p.label = "Cue"; p.page = MF; p.defaultValues[0] = 0; m->appendToggle(p); }
+            { OP_NumericParameter p("Cuepoint"); p.label = "Cue Point (s)"; p.page = MF; p.defaultValues[0] = 0;
+              p.minSliders[0] = 0; p.maxSliders[0] = 60; m->appendFloat(p); }
+            { OP_NumericParameter p("Cuepulse"); p.label = "Cue Pulse"; p.page = MF; m->appendPulse(p); }
+            { OP_NumericParameter p("Position"); p.label = "Position"; p.page = MF; p.defaultValues[0] = 0;
+              p.minSliders[0] = 0; p.maxSliders[0] = 1; p.minValues[0] = 0; p.maxValues[0] = 1;
+              p.clampMins[0] = true; p.clampMaxes[0] = true; m->appendFloat(p); }
         }
 
         const char* S = "State";
@@ -537,6 +640,7 @@ public:
         else if (!strcmp(name, "Noteon"))  myWantNoteOn = true;
         else if (!strcmp(name, "Noteoff")) myWantNoteOff = true;
         else if (!strcmp(name, "Allnotesoff")) myWantAllOff = true;
+        else if (!strcmp(name, "Cuepulse")) myWantCue = true;
     }
 
     void buildDynamicMenu(const OP_Inputs*, OP_BuildDynamicMenuInfo* info, void*) override
@@ -554,18 +658,20 @@ public:
 
     // ------------------------------------------------------------ info
 
-    int32_t getNumInfoCHOPChans(void*) override { return myKind.instrument ? 11 : 8; }
+    int32_t getNumInfoCHOPChans(void*) override { return myKind.instrument ? 14 : 8; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override
     {
         static const char* n[] = { "executes", "renders", "samplerate", "loaded",
                                    "params", "latency_ms", "bypassed", "learned",
-                                   "notes_sent", "notes_held", "programs_sent" };
+                                   "notes_sent", "notes_held", "programs_sent",
+                                   "file_position", "file_duration", "bank_status" };
         int held = 0;
         for (const auto& kv : myHeld) if (kv.first < 0x10000 && kv.second > 0) held++;
         const float v[] = { (float)myExec.load(), (float)myRenders.load(), (float)mySampleRate,
                             (float)(myUnit != nil), (float)myParams.size(),
                             (float)(myLatencySec * 1000.0), (float)myBypassed, (float)learnedCount(),
-                            (float)myNotesSent, (float)held, (float)myProgsSent };
+                            (float)myNotesSent, (float)held, (float)myProgsSent,
+                            (float)mySeqPos, (float)mySeq.duration, (float)myBankStatus };
         c->name->setString(n[i]); c->value = v[i];
     }
 
@@ -799,8 +905,87 @@ private:
             return;
         }
         NSURL* url = [NSURL fileURLWithPath:path];
-        AudioUnitSetProperty(myUnit.audioUnit, kMusicDeviceProperty_SoundBankURL,
-                             kAudioUnitScope_Global, 0, &url, sizeof(url));
+        const OSStatus st = AudioUnitSetProperty(myUnit.audioUnit, kMusicDeviceProperty_SoundBankURL,
+                                                 kAudioUnitScope_Global, 0, &url, sizeof(url));
+        myBankStatus = (int)st;
+        if (st != noErr) myWarn = "this plugin did not accept the sound bank (" + std::to_string((int)st) + ")";
+    }
+
+    // ---------------------------------------------- MIDI ファイル再生
+    // Movie File In と同じ考え方。位置は秒。Sequential は実時計で進めるので
+    // タイムラインを止めても鳴り続ける(タイムラインに合わせたいときは Locked)
+    void playFile(const OP_Inputs* in, AVAudioUnitMIDIInstrument* mi)
+    {
+        const char* fp = in->getParString("Midifile");
+        const std::string want = fp ? fp : "";
+        if (want != mySeq.path) {
+            allNotesOff();
+            mySeq.load(want);
+            mySeqPos = 0; mySeqPrev = -1;
+            if (!want.empty() && !mySeq.err.empty()) myWarn = mySeq.err;
+        }
+        if (mySeq.ev.empty() || mySeq.duration <= 0) return;
+
+        const double dur = mySeq.duration;
+        const char* pm = in->getParString("Playmode");
+        const bool locked = pm && !strcmp(pm, "locked");
+        const bool index  = pm && !strcmp(pm, "index");
+        const bool play   = in->getParInt("Play") != 0;
+        const bool loop   = in->getParInt("Loop") != 0;
+        const double cuePt = in->getParDouble("Cuepoint");
+
+        double pos = mySeqPos;
+        bool seek = false;
+        if (myWantCue.exchange(false)) { pos = cuePt; seek = true; }
+        else if (in->getParInt("Cue") != 0) { pos = cuePt; seek = (fabs(pos - mySeqPos) > 1e-6); }
+        else if (index) {
+            pos = in->getParDouble("Position") * dur;
+            seek = (fabs(pos - mySeqPos) > 0.05);
+        } else if (locked) {
+            const OP_TimeInfo* ti = in->getTimeInfo();
+            const double t = ti && ti->rate > 0 ? (double)ti->frame / ti->rate : 0;
+            pos = t * in->getParDouble("Speed") + cuePt;
+            seek = (fabs(pos - mySeqPos) > 0.25);
+        } else if (play) {
+            const uint64_t now = mach_absolute_time();
+            if (mySeqClock == 0) mySeqClock = now;
+            const double dt = (double)(now - mySeqClock) * myTimebase / 1e9;
+            mySeqClock = now;
+            pos = mySeqPos + dt * in->getParDouble("Speed");
+        }
+        if (!play && !index && !locked) {
+            // 止めたらその場で保持する。**ただしキューは停止中でも効かせる** —
+            // ここで return してしまうと Cue Pulse を消費だけして捨てることになる(実測で踏んだ)
+            mySeqClock = 0;
+            if (seek) { allNotesOff(); mySeqPos = pos; mySeqPrev = pos; }
+            return;
+        }
+
+        if (pos > dur || pos < 0) {                    // 端に来た
+            if (loop) { pos = pos - floor(pos / dur) * dur; seek = true; }
+            else { pos = pos < 0 ? 0 : dur; if (mySeqPos != pos) { allNotesOff(); } }
+        }
+        if (seek) { allNotesOff(); mySeqPrev = pos - 1e-9; }
+
+        // 前回位置から今の位置までのイベントを出す(逆再生時は送らない)
+        const double a = mySeqPrev < 0 ? -1e-9 : mySeqPrev, b = pos;
+        if (b > a) {
+            for (const MidiEvent& e : mySeq.ev) {
+                if (e.t <= a) continue;
+                if (e.t > b) break;
+                sendEvent(mi, e);
+            }
+        }
+        mySeqPrev = b; mySeqPos = b;
+    }
+
+    void sendEvent(AVAudioUnitMIDIInstrument* mi, const MidiEvent& e)
+    {
+        const uint8_t hi = e.s & 0xf0, ch = e.s & 0x0f;
+        if (hi == 0x90 && e.d2 > 0) { [mi startNote:e.d1 withVelocity:e.d2 onChannel:ch]; myNotesSent++; myHeld[(ch<<8)|e.d1] = 1.f; }
+        else if (hi == 0x80 || hi == 0x90) { [mi stopNote:e.d1 onChannel:ch]; myHeld[(ch<<8)|e.d1] = 0.f; }
+        else if (hi == 0xc0) { [mi sendMIDIEvent:e.s data1:e.d1]; myProgsSent++; }
+        else { [mi sendMIDIEvent:e.s data1:e.d1 data2:e.d2]; }
     }
 
     void applyNotes(const OP_Inputs* in)
@@ -808,6 +993,7 @@ private:
         AVAudioUnitMIDIInstrument* mi = midiUnit();
         if (!mi) { myWarn = "this plugin is not a MIDI instrument"; return; }
         applySoundBank(in);
+        playFile(in, mi);
 
         if (myWantAllOff.exchange(false)) allNotesOff();
 
@@ -1528,7 +1714,13 @@ private:
     std::atomic<bool> myWantNoteOn{false};
     std::atomic<bool> myWantNoteOff{false};
     std::atomic<bool> myWantAllOff{false};
+    std::atomic<bool> myWantCue{false};
     std::string myBankPath;
+    int myBankStatus = -12345;
+    MidiSeq  mySeq;
+    double   mySeqPos = 0, mySeqPrev = -1;
+    uint64_t mySeqClock = 0;
+    double   myTimebase = 1.0;
     int myNotesSent = 0;
     int myProgsSent = 0;
     std::map<int, float> myHeld;      // (ch<<8 | note) -> 直前のベロシティ
