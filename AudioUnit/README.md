@@ -40,8 +40,9 @@ arriving through a CHOP still cost a frame — about 30 ms all in, against 35–
 path. Going below that means the instrument opening CoreMIDI itself instead of taking notes from a
 CHOP.
 
-- **Program change** picks the instrument: a `ch<channel>p` channel switches the GM program on that
-  channel (TouchDesigner reports GM programs **1-based**, so 69 means Oboe). This is what lets one
+- **Program change** picks the instrument: `ch<channel>p` (TouchDesigner's MIDI In CHOP, **1-based**,
+  so 69 means Oboe) or `ch<channel>prog` (this repo's CoreMIDI In CHOP, **raw** value) — both are
+  accepted and converted accordingly. This is what lets one
   multi-timbral instrument play a multi-track MIDI file with its real orchestration
 - **`Sound Bank` matters**: AUMIDISynth ignores program changes with no bank loaded — measured, every
   program renders a **byte-identical** waveform. The parameter defaults to the bank macOS ships
@@ -338,8 +339,9 @@ MIDI キーボードで弾いて音が遅れるときは、**ほぼ Audio Device
 どのみち1フレーム掛かるので合計 約30ms。詰めた CHOP 経路の 35〜50ms との差は小さい。
 これより下げるには、**楽器側が CoreMIDI を自分で開いて** cook を介さずノートを受ける必要がある。
 
-- **音色はプログラムチェンジで決まる**。`ch<チャンネル>p` のチャンネルでそのチャンネルの GM 音色を
-  切り替える(TouchDesigner は GM の慣習どおり**1始まり**で出すので 69 = Oboe)。これがあると
+- **音色はプログラムチェンジで決まる**。`ch<チャンネル>p`(TouchDesigner 標準の MIDI In CHOP。
+  **1始まり**なので 69 = Oboe)または `ch<チャンネル>prog`(このリポジトリの CoreMIDI In CHOP。
+  **生の値**)。どちらも受けて自動で読み分ける。これがあると
   1台のマルチティンバー音源で、多トラックの MIDI ファイルを本来の楽器編成のまま鳴らせる
 - **`Sound Bank` が要る**: AUMIDISynth はバンクを読ませないとプログラムチェンジを無視する —
   実測で**全プログラムの波形が完全に一致**した。既定は macOS 同梱の

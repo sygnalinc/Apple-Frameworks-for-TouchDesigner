@@ -222,6 +222,30 @@ for their aftertouch, `ch14n36`–`n101` for the keyboard, `ch14c21`–`c28` for
 `ch14c1` (modulation) and `ch14bend`. The MIDI channel numbers come straight from the device, so
 check the controller's own settings if they are not what you expect.
 
+### Playing a MIDI file
+
+The same Standard MIDI File player AU Instrument has is here too, and its events land on the **same
+channels device input uses** — so a file and a live keyboard can play together, and the result can
+drive anything downstream (AU Instrument, CoreMIDI Out to a DAW, or your own logic).
+
+Point `MIDI File` at a `.mid` and it plays. `Play Mode` is **Sequential** (real clock, keeps going
+when the timeline is stopped), **Locked to Timeline** (timeline seconds x `Speed` + `Cue Point`) or
+**Specify Index** (`Position` 0–1). `Speed`, `Loop`, `Cue` / `Cue Point` / `Cue Pulse` behave like
+Movie File In; **`Sync to TD Tempo`** scales playback by *TouchDesigner's BPM / the file's BPM*.
+Seeking, looping and stopping release the notes the file is holding, so nothing sticks on.
+
+TouchDesigner's own MIDI In CHOP also reads MIDI files, but it hands you the whole file as a clip
+spanning the timeline and no transport — you build playback yourself out of a Trim CHOP. That is the
+gap this fills.
+
+**Measured (M2)**: a 4-part file (piano / bass / guitar / drums) produced `ch1n*`, `ch2n*`, `ch3n*`
+and `ch10n*` plus `ch1prog` 0 / `ch2prog` 33 / `ch3prog` 27, and feeding that straight into
+AU Instrument played it back with the right instruments (`programs_sent` 3, peak 0.087, no warnings).
+
+**Program change naming**: this operator emits `ch<n>prog` with the **raw** MIDI value, while
+TouchDesigner's MIDI In CHOP emits `ch<n>p` **1-based**. AU Instrument accepts both and converts
+accordingly. Turn the `Program Change` toggle on — it is off by default.
+
 ### If a device does not appear in the Device menu
 
 Hot-plug is verified: with the op present, unplugging and replugging a Launchkey Mini MK4 took the
@@ -499,6 +523,30 @@ Novation Launchkey Mini MK4 37 で実測: 鍵盤を弾き、パッドを叩き�
 鍵盤が `ch14n36`〜`n101`、ノブ8個が `ch14c21`〜`c28`、ほかに `ch14c1`(モジュレーション)と
 `ch14bend`。**MIDI チャンネル番号は機材が送ってきたそのまま**なので、思った番号でなければ
 コントローラ側の設定を見ること。
+
+### MIDI ファイルを再生する
+
+AU Instrument と同じ Standard MIDI File プレイヤーがこちらにも入っている。イベントは
+**デバイス入力とまったく同じチャンネル**に出るので、ファイル再生と鍵盤演奏を重ねられるし、
+その結果を下流の何にでも渡せる(AU Instrument、DAW へ送る CoreMIDI Out、自前のロジック)。
+
+`MIDI File` に `.mid` を指すと鳴る。`Play Mode` は **Sequential**(実時計。タイムラインを止めても
+鳴り続ける)/ **Locked to Timeline**(タイムライン秒 × `Speed` + `Cue Point`)/
+**Specify Index**(`Position` 0〜1)。`Speed`・`Loop`・`Cue` / `Cue Point` / `Cue Pulse` は
+Movie File In と同じ。**`Sync to TD Tempo`** で *TD の BPM ÷ ファイルの BPM* を掛ける。
+シーク・ループ・停止のときはファイルが鳴らしているノートを解放するので、音が残らない。
+
+TouchDesigner 標準の MIDI In CHOP も MIDI ファイルを読めるが、**タイムライン長のクリップとして
+丸ごと渡してくるだけでトランスポートが無く**、再生は Trim CHOP で自分で組むことになる。
+ここが埋めている差はそこ。
+
+**実測(M2)**: 4パート(ピアノ/ベース/ギター/ドラム)のファイルで `ch1n*` `ch2n*` `ch3n*` `ch10n*` と
+`ch1prog` 0 / `ch2prog` 33 / `ch3prog` 27 が出て、そのまま AU Instrument に繋ぐと正しい楽器で鳴った
+(`programs_sent` 3・peak 0.087・警告なし)。
+
+**プログラムチェンジの命名**: この op は `ch<n>prog` に**生の MIDI 値**を出す。TouchDesigner 標準の
+MIDI In CHOP は `ch<n>p` に**1始まり**で出す。AU Instrument は両方を受けて自動で読み分ける。
+`Program Change` トグルは**既定オフ**なので、音色も渡したいときは On にする。
 
 ### デバイスが Device メニューに出ないとき
 

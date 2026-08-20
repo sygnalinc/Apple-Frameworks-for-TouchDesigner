@@ -128,87 +128,7 @@ inline float valueToCurve(AudioUnitParameterOptions curve, float v, float lo, fl
 }
 
 // エフェクト(aufx)と楽器(aumu)の違いはここだけ。あとは全部共通
-// Standard MIDI File を秒に展開したもの。format 0/1・テンポマップ・ランニングステータス対応
-struct MidiEvent { double t; uint8_t s, d1, d2; };
-
-struct MidiSeq {
-    std::vector<MidiEvent> ev;
-    double duration = 0;
-    double bpm = 120;          // ファイル先頭のテンポ。TD テンポ同期の分母に使う
-    std::string path, err;
-
-    static uint32_t be32(const uint8_t* p) { return (p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3]; }
-
-    bool load(const std::string& file)
-    {
-        ev.clear(); duration = 0; bpm = 120; err.clear(); path = file;
-        if (file.empty()) return false;
-        FILE* f = fopen(file.c_str(), "rb");
-        if (!f) { err = "cannot open MIDI file"; return false; }
-        fseek(f, 0, SEEK_END); long n = ftell(f); fseek(f, 0, SEEK_SET);
-        std::vector<uint8_t> d((size_t)std::max(0L, n));
-        if (n <= 0 || fread(d.data(), 1, (size_t)n, f) != (size_t)n) { fclose(f); err = "cannot read MIDI file"; return false; }
-        fclose(f);
-        if (d.size() < 14 || memcmp(d.data(), "MThd", 4)) { err = "not a Standard MIDI File"; return false; }
-
-        const int ntrk = (d[10]<<8)|d[11];
-        const int div  = (int16_t)((d[12]<<8)|d[13]);
-        // (tick, 順序, status, d1, d2)。tempo は同時刻の音より先に処理する
-        struct Raw { uint64_t tick; int ord; uint8_t s, d1, d2; uint32_t tempo; };
-        std::vector<Raw> raw;
-        size_t p = 8 + be32(&d[4]);
-        for (int t = 0; t < ntrk && p + 8 <= d.size(); t++) {
-            if (memcmp(&d[p], "MTrk", 4)) break;
-            const size_t len = be32(&d[p+4]);
-            size_t q = p + 8, end = std::min(d.size(), q + len);
-            uint64_t tick = 0; uint8_t run = 0;
-            while (q < end) {
-                uint64_t v = 0;                       // 可変長デルタ
-                while (q < end) { const uint8_t b = d[q++]; v = (v<<7)|(b&0x7f); if (!(b&0x80)) break; }
-                tick += v;
-                if (q >= end) break;
-                uint8_t st = d[q];
-                if (st == 0xff) {
-                    q++; const uint8_t ty = d[q++];
-                    uint64_t l = 0;
-                    while (q < end) { const uint8_t b = d[q++]; l = (l<<7)|(b&0x7f); if (!(b&0x80)) break; }
-                    if (ty == 0x51 && l == 3 && q + 3 <= end)
-                        raw.push_back({tick, -1, 0, 0, 0, (uint32_t)((d[q]<<16)|(d[q+1]<<8)|d[q+2])});
-                    q += l;
-                } else if (st == 0xf0 || st == 0xf7) {
-                    q++; uint64_t l = 0;
-                    while (q < end) { const uint8_t b = d[q++]; l = (l<<7)|(b&0x7f); if (!(b&0x80)) break; }
-                    q += l;
-                } else {
-                    if (st & 0x80) { run = st; q++; } else st = run;   // ランニングステータス
-                    const int nb = ((st & 0xf0) == 0xc0 || (st & 0xf0) == 0xd0) ? 1 : 2;
-                    if (q + nb > end) break;
-                    const uint8_t a = d[q], b = nb > 1 ? d[q+1] : 0;
-                    q += nb;
-                    raw.push_back({tick, 1, st, a, b, 0});
-                }
-            }
-            p = q > p + 8 + len ? q : p + 8 + len;
-        }
-        std::stable_sort(raw.begin(), raw.end(),
-                         [](const Raw& a, const Raw& b){ return a.tick != b.tick ? a.tick < b.tick : a.ord < b.ord; });
-
-        const double tpq = div > 0 ? div : 480;      // SMPTE 分解能は稀なので既定にフォールバック
-        double sec = 0, us = 500000; uint64_t last = 0; bool firstTempo = true;
-        for (const Raw& r : raw) {
-            sec += (double)(r.tick - last) / tpq * us / 1e6; last = r.tick;
-            if (r.ord < 0) {
-                us = r.tempo ? r.tempo : us;
-                if (firstTempo) { firstTempo = false; bpm = 6e7 / us; }
-                continue;
-            }
-            ev.push_back({sec, r.s, r.d1, r.d2});
-        }
-        duration = sec;
-        if (ev.empty()) { err = "no MIDI events in file"; return false; }
-        return true;
-    }
-};
+#include "MidiSeq.h"
 
 struct AUKind {
     OSType componentType;   // kAudioUnitType_Effect / kAudioUnitType_MusicDevice
@@ -868,13 +788,18 @@ private:
 
     // `ch<ch>p` = プログラムチェンジ(音色切替)。TouchDesigner の MIDI In CHOP は
     // GM の慣習どおり **1始まり**で出す(生の 68 = Oboe が 69)ので、送るときに1引く
-    static bool parseProgram(const char* nm, int& ch)
+    static bool parseProgram(const char* nm, int& ch, bool& oneBased)
     {
         if (!nm || nm[0] != 'c' || nm[1] != 'h') return false;
         const char* q = nm + 2;
         int v = 0;
         while (*q >= '0' && *q <= '9') { v = v * 10 + (*q - '0'); q++; }
-        if (q == nm + 2 || *q != 'p' || q[1] != '\0') return false;
+        if (q == nm + 2) return false;
+        // `ch1p`    = TouchDesigner の MIDI In CHOP。GM の慣習で **1始まり**
+        // `ch1prog` = CoreMIDI In CHOP(このリポジトリ)。**生の MIDI 値**
+        if (!strcmp(q, "p")) oneBased = true;
+        else if (!strcmp(q, "prog")) oneBased = false;
+        else return false;
         ch = v;
         return ch >= 1 && ch <= 16;
     }
@@ -1049,9 +974,9 @@ private:
         // **音色はノートより先に送る。** 同じ cook で音色とノートが来たとき、
         // 順序が逆だと最初の1音が前の音色で鳴る
         for (int c = 0; c < ni->numChannels; c++) {
-            int ch = 0;
-            if (!parseProgram(ni->getChannelName(c), ch)) continue;
-            const int prog = (int)lroundf(ni->getChannelData(c)[ni->numSamples - 1]) - 1;
+            int ch = 0; bool oneBased = true;
+            if (!parseProgram(ni->getChannelName(c), ch, oneBased)) continue;
+            const int prog = (int)lroundf(ni->getChannelData(c)[ni->numSamples - 1]) - (oneBased ? 1 : 0);
             if (prog < 0 || prog > 127) continue;
             const int key = 0x10000 | (ch - 1);
             if (myHeld.count(key) && (int)myHeld[key] == prog) continue;

@@ -18,6 +18,10 @@
 #include <cstring>
 #include <mach/mach_time.h>
 #include <mutex>
+#include <set>
+#include <mach/mach_time.h>
+#include <Python.h>
+#include "MidiSeq.h"
 #include <string>
 #include <thread>
 #include <vector>
@@ -47,6 +51,8 @@ class CoreMIDIInCHOP final : public CHOP_CPlusPlusBase {
 public:
     CoreMIDIInCHOP(const OP_NodeInfo*)
     {
+        mach_timebase_info_data_t tb; mach_timebase_info(&tb);
+        myTimebase = (double)tb.numer / (double)tb.denom;
         myThread = std::thread([this] { midiThread(); });
         for (int i = 0; i < 100 && !myReady.load(); i++)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
@@ -124,6 +130,8 @@ public:
             myVoiceNames.clear(); myVoiceVals.clear(); myVoiceIndex.clear();
         }
 
+        playFile(in);
+
         const char* sel = in->getParString("Device");
         const SInt32 wantUID = (sel && *sel) ? (SInt32)strtol(sel, nullptr, 10) : 0;
         if (wantUID != myBoundUID) bind(wantUID);
@@ -167,6 +175,7 @@ public:
         else if (!strcmp(name, "Restartmidi")) myRestart = true;
         else if (!strcmp(name, "Resetchans")) myResetChans = true;
         else if (!strcmp(name, "Reset")) myReset = true;
+        else if (!strcmp(name, "Cuepulse")) myWantCue = true;
     }
 
     void setupParameters(OP_ParameterManager* m, void*) override
@@ -205,6 +214,31 @@ public:
             m->appendInt(p);
         }
         { OP_NumericParameter p("Reset"); p.label = "Reset Position"; p.page = PAGE; m->appendPulse(p); }
+
+        // ---- MIDI ファイル再生。デバイス入力と同じチャンネルに出るので、
+        //      鍵盤で弾くのとファイル再生を重ねられる。操作は Movie File In と同じ形
+        const char* MF = "MIDI File";
+        { OP_StringParameter p("Midifile"); p.label = "MIDI File"; p.page = MF; m->appendFile(p); }
+        { OP_NumericParameter p("Play"); p.label = "Play"; p.page = MF; p.defaultValues[0] = 1; m->appendToggle(p); }
+        {
+            OP_StringParameter p("Playmode"); p.label = "Play Mode"; p.page = MF;
+            const char* n[] = { "sequential", "locked", "index" };
+            const char* l[] = { "Sequential", "Locked to Timeline", "Specify Index" };
+            p.defaultValue = "sequential";
+            m->appendMenu(p, 3, n, l);
+        }
+        { OP_NumericParameter p("Speed"); p.label = "Speed"; p.page = MF; p.defaultValues[0] = 1;
+          p.minSliders[0] = -2; p.maxSliders[0] = 2; m->appendFloat(p); }
+        { OP_NumericParameter p("Loop"); p.label = "Loop"; p.page = MF; p.defaultValues[0] = 1; m->appendToggle(p); }
+        { OP_NumericParameter p("Synctempo"); p.label = "Sync to TD Tempo"; p.page = MF;
+          p.defaultValues[0] = 0; m->appendToggle(p); }
+        { OP_NumericParameter p("Cue"); p.label = "Cue"; p.page = MF; p.defaultValues[0] = 0; m->appendToggle(p); }
+        { OP_NumericParameter p("Cuepoint"); p.label = "Cue Point (s)"; p.page = MF; p.defaultValues[0] = 0;
+          p.minSliders[0] = 0; p.maxSliders[0] = 60; m->appendFloat(p); }
+        { OP_NumericParameter p("Cuepulse"); p.label = "Cue Pulse"; p.page = MF; m->appendPulse(p); }
+        { OP_NumericParameter p("Position"); p.label = "Position"; p.page = MF; p.defaultValues[0] = 0;
+          p.minSliders[0] = 0; p.maxSliders[0] = 1; p.minValues[0] = 0; p.maxValues[0] = 1;
+          p.clampMins[0] = true; p.clampMaxes[0] = true; m->appendFloat(p); }
     }
 
     void buildDynamicMenu(const OP_Inputs*, OP_BuildDynamicMenuInfo* info, void*) override
@@ -261,6 +295,9 @@ public:
     void getWarningString(OP_String* w, void*) override
     {
         std::lock_guard<std::mutex> l(myMutex);
+        if (!mySeqErr.empty()) { w->setString(mySeqErr.c_str()); return; }
+        // ファイルを再生しているならデバイスは要らない。「デバイス未選択」を出すと紛らわしい
+        if (!mySeq.ev.empty()) return;
         if (myDevices.empty())
             w->setString("No MIDI sources. Start the sending app or connect a device.");
         else if (!mySource && !myBoundUID)
@@ -297,8 +334,113 @@ private:
         }
     }
 
+    // ---------------------------------------------- MIDI ファイル再生
+    // 操作は Movie File In と同じ。イベントは onVoice() に流すので、
+    // **デバイスから来たときとまったく同じチャンネル**(ch1n60 等)に出る
+    void playFile(const OP_Inputs* in)
+    {
+        const char* fp = in->getParString("Midifile");
+        const std::string want = fp ? fp : "";
+        if (want != mySeq.path) {
+            releaseSeqNotes();
+            mySeq.load(want);
+            mySeqPos = 0; mySeqPrev = -1;
+            std::lock_guard<std::mutex> l(myMutex);
+            mySeqErr = (!want.empty() && !mySeq.err.empty()) ? mySeq.err : std::string();
+        }
+        if (mySeq.ev.empty() || mySeq.duration <= 0) return;
+
+        const double dur = mySeq.duration;
+        const char* pm = in->getParString("Playmode");
+        const bool locked = pm && !strcmp(pm, "locked");
+        const bool index  = pm && !strcmp(pm, "index");
+        const bool play   = in->getParInt("Play") != 0;
+        const double cuePt = in->getParDouble("Cuepoint");
+        double speed = in->getParDouble("Speed");
+        if (in->getParInt("Synctempo") != 0 && mySeq.bpm > 0) speed *= tdTempo() / mySeq.bpm;
+
+        double pos = mySeqPos;
+        bool seek = false;
+        if (myWantCue.exchange(false)) { pos = cuePt; seek = true; }
+        else if (in->getParInt("Cue") != 0) { pos = cuePt; seek = (fabs(pos - mySeqPos) > 1e-6); }
+        else if (index) { pos = in->getParDouble("Position") * dur; seek = (fabs(pos - mySeqPos) > 0.05); }
+        else if (locked) {
+            const OP_TimeInfo* ti = in->getTimeInfo();
+            const double t = ti && ti->rate > 0 ? (double)ti->frame / ti->rate : 0;
+            pos = t * speed + cuePt;
+            seek = (fabs(pos - mySeqPos) > 0.25);
+        } else if (play) {
+            const uint64_t now = mach_absolute_time();
+            if (mySeqClock == 0) mySeqClock = now;
+            const double dt = (double)(now - mySeqClock) * myTimebase / 1e9;
+            mySeqClock = now;
+            pos = mySeqPos + dt * speed;
+        }
+        if (!play && !index && !locked) {
+            mySeqClock = 0;
+            if (seek) { releaseSeqNotes(); mySeqPos = pos; mySeqPrev = pos; }
+            return;
+        }
+        if (pos > dur || pos < 0) {
+            if (in->getParInt("Loop") != 0) { pos = pos - floor(pos / dur) * dur; seek = true; }
+            else { pos = pos < 0 ? 0 : dur; if (mySeqPos != pos) releaseSeqNotes(); }
+        }
+        if (seek) { releaseSeqNotes(); mySeqPrev = pos - 1e-9; }
+
+        const double a = mySeqPrev < 0 ? -1e-9 : mySeqPrev, b = pos;
+        if (b > a) {
+            std::lock_guard<std::mutex> l(myMutex);
+            for (const MidiEvent& e : mySeq.ev) {
+                if (e.t <= a) continue;
+                if (e.t > b) break;
+                onVoiceLocked(e.s, e.d1, e.d2);
+                if ((e.s & 0xF0) == 0x90 && e.d2 > 0) mySeqHeld.insert((int)((e.s & 0x0F) << 8 | e.d1));
+                else if ((e.s & 0xF0) == 0x80) mySeqHeld.erase((int)((e.s & 0x0F) << 8 | e.d1));
+            }
+        }
+        mySeqPrev = b; mySeqPos = b;
+    }
+
+    // シーク・ループ・停止のときに、ファイル由来で鳴らしっぱなしのノートを 0 に戻す
+    void releaseSeqNotes()
+    {
+        if (mySeqHeld.empty()) return;
+        std::lock_guard<std::mutex> l(myMutex);
+        for (int k : mySeqHeld)
+            onVoiceLocked((uint8_t)(0x80 | ((k >> 8) & 0x0F)), (uint8_t)(k & 0xFF), 0);
+        mySeqHeld.clear();
+    }
+
+    // **OP_TimeInfo にテンポは無い**ので Python から読む。30 cook キャッシュ
+    double tdTempo()
+    {
+        if (myTempoAge > 0 && --myTempoAge > 0 && myTdTempo > 0) return myTdTempo;
+        myTempoAge = 30;
+        PyGILState_STATE g = PyGILState_Ensure();
+        if (PyObject* main = PyImport_AddModule("__main__")) {
+            PyObject* dict = PyModule_GetDict(main);
+            PyObject* r = PyRun_String("import td as __cm_td\n__cm_tempo = float(__cm_td.root.time.tempo)\n",
+                                       Py_file_input, dict, dict);
+            if (r) Py_DECREF(r); else PyErr_Clear();
+            if (PyObject* t = PyDict_GetItemString(dict, "__cm_tempo")) {
+                const double d = PyFloat_AsDouble(t);
+                if (d > 0) myTdTempo = d;
+            }
+        }
+        PyGILState_Release(g);
+        return myTdTempo;
+    }
+
     // ノート / CC 等を値に落とす。**受信スレッドなのでマップを更新するだけ**にする
     void onVoice(uint8_t status, uint8_t d1, uint8_t d2)
+    {
+        std::lock_guard<std::mutex> l(myMutex);
+        onVoiceLocked(status, d1, d2);
+    }
+
+    // **呼び出し側が myMutex を持っていること。** 受信スレッドからは onVoice() 経由、
+    // ファイル再生からはまとめてロックしてからこちらを直接呼ぶ
+    void onVoiceLocked(uint8_t status, uint8_t d1, uint8_t d2)
     {
         const int ch = (status & 0x0F) + 1;      // 表示は 1 始まり(TD と同じ)
         const uint8_t kind = status & 0xF0;
@@ -341,7 +483,6 @@ private:
             }
             default: return;
         }
-        std::lock_guard<std::mutex> l(myMutex);
         auto it = myVoiceIndex.find(nm);
         if (it == myVoiceIndex.end()) {
             if (myVoiceNames.size() >= kMaxVoiceChans) return;   // 暴走よけ
@@ -354,6 +495,15 @@ private:
     }
 
     float scale7(uint8_t v) const { return myNorm ? (float)v / 127.0f : (float)v; }
+
+    MidiSeq  mySeq;
+    double   mySeqPos = 0, mySeqPrev = -1;
+    uint64_t mySeqClock = 0;
+    double   myTimebase = 1.0;
+    std::string mySeqErr;
+    std::set<int> mySeqHeld;                 // ファイル由来で鳴っているノート
+    std::atomic<bool> myWantCue{false};
+    double   myTdTempo = 120; int myTempoAge = 0;
 
     void receive(const MIDIPacketList* pl)
     {
