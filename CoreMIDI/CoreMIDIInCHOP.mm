@@ -255,13 +255,16 @@ public:
         }
     }
 
-    int32_t getNumInfoCHOPChans(void*) override { return 5; }
+    int32_t getNumInfoCHOPChans(void*) override { return 9; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override
     {
-        const char* n[5] = {"executes", "clocks", "devices", "connected", "mtc_frames"};
+        const char* n[9] = {"executes", "clocks", "devices", "connected", "mtc_frames",
+                            "file_position", "file_duration", "file_bpm", "file_events"};
         std::lock_guard<std::mutex> l(myMutex);
-        float v[5] = {(float)myExec.load(), (float)myClockTotal, (float)myDevices.size(),
-                      mySource ? 1.f : 0.f, (float)myMtcTotal};
+        float v[9] = {(float)myExec.load(), (float)myClockTotal, (float)myDevices.size(),
+                      mySource ? 1.f : 0.f, (float)myMtcTotal,
+                      (float)mySeqPos, (float)mySeq.duration, (float)mySeq.bpm,
+                      (float)mySeq.ev.size()};
         c->name->setString(n[i]);
         c->value = v[i];
     }
@@ -344,11 +347,17 @@ private:
         if (want != mySeq.path) {
             releaseSeqNotes();
             mySeq.load(want);
-            mySeqPos = 0; mySeqPrev = -1;
+            mySeqPos = 0; mySeqPrev = -1; mySeqIdx = 0;
             std::lock_guard<std::mutex> l(myMutex);
             mySeqErr = (!want.empty() && !mySeq.err.empty()) ? mySeq.err : std::string();
         }
         if (mySeq.ev.empty() || mySeq.duration <= 0) return;
+
+        // **読み込み直後の初期化はここで済ませる。** これを seek 処理の後ろに置くと、
+        // 折り返しで mySeqPrev を負にした直後に走って**古い位置の索引で上書き**してしまい、
+        // 2巡目以降が丸ごと無音になる(実測で踏んだ)。
+        // seekIndex は「その時刻より後」を返すので少し手前を渡す(tick 0 のイベントを拾うため)
+        if (mySeqPrev < 0 && mySeqIdx == 0 && mySeqPos > 0) mySeqIdx = seekIndex(mySeqPos - 1e-9);
 
         const double dur = mySeq.duration;
         const char* pm = in->getParString("Playmode");
@@ -381,15 +390,25 @@ private:
             // 最後の音を鳴らし続ける(実測で踏んだ)。キューは停止中でも効かせる
             mySeqClock = 0;
             if (mySeqPlaying) { releaseSeqNotes(); mySeqPlaying = false; }
-            if (seek) { releaseSeqNotes(); mySeqPos = pos; mySeqPrev = pos; }
+            if (seek) { releaseSeqNotes(); mySeqPos = pos; mySeqPrev = pos; mySeqIdx = seekIndex(pos - 1e-9); }
             return;
         }
         mySeqPlaying = true;
+        bool wrapped = false;
         if (pos > dur || pos < 0) {
-            if (in->getParInt("Loop") != 0) { pos = pos - floor(pos / dur) * dur; seek = true; }
-            else { pos = pos < 0 ? 0 : dur; if (mySeqPos != pos) releaseSeqNotes(); }
+            if (in->getParInt("Loop") != 0) {
+                // **余りではなく端ちょうどへ戻す。** 余り(数ms)を残すと、その手前にある
+                // 頭の音を飛ばしたり、索引と時刻の噛み合わせが崩れて2巡目が鳴らなくなる
+                pos = (pos < 0) ? dur : 0; seek = true; wrapped = true;
+            } else { pos = pos < 0 ? 0 : dur; if (mySeqPos != pos) releaseSeqNotes(); }
         }
-        if (seek) { releaseSeqNotes(); mySeqPrev = pos - 1e-9; }
+        if (seek) {
+            releaseSeqNotes();
+            // **ループの折り返しは頭から流し直す。** 余り(pos)は 0 ちょうどにならないので、
+            // 普通のシークと同じ扱いにすると 0〜pos にある**頭の音を飛ばす**(実測で踏んだ)
+            if (wrapped) { mySeqPrev = -1e-9; mySeqIdx = 0; }
+            else { mySeqPrev = pos - 1e-9; mySeqIdx = seekIndex(mySeqPrev); }
+        }
 
         const double a = mySeqPrev < 0 ? -1e-9 : mySeqPrev, b = pos;
         if (b > a) {
@@ -398,29 +417,43 @@ private:
             // 最終値が on のままになり**連打が消える**(実測: 8分のハイハットが 64回→43回。
             // ノートオフの隙間 6.5ms / フレーム 16.7ms = 39% しか拾えていなかった)。
             // ぶつかったらそこで窓を切り、続きは次の cook に回す
+            // **どこまで出したかは時刻ではなくイベント番号で覚える。**
+            // 時刻で切ると、同一ティックに同じ音の off と on が同居する譜面
+            // (モーツァルトの実ファイルで 2887 箇所)で切り位置が進まず、
+            // 再生が完全に止まる(実測で踏んだ)。番号なら必ず1つ以上進む
             std::map<int, int> flipped;
-            double stop = b;
             std::lock_guard<std::mutex> l(myMutex);
-            for (const MidiEvent& e : mySeq.ev) {
-                if (e.t <= a) continue;
+            size_t i = mySeqIdx;
+            for (; i < mySeq.ev.size(); i++) {
+                const MidiEvent& e = mySeq.ev[i];
                 if (e.t > b) break;
                 const uint8_t hi = e.s & 0xF0;
                 if (hi == 0x90 || hi == 0x80) {
                     const int key = (int)((e.s & 0x0F) << 8 | e.d1);
                     const int want = (hi == 0x90 && e.d2 > 0) ? 1 : 0;
                     auto it = flipped.find(key);
-                    // **少しだけ手前で切る。** ちょうど e.t で切ると次の窓の
-                    // `e.t <= a` に引っかかって、このイベント自体を落としてしまう
-                    if (it != flipped.end() && it->second != want) { stop = e.t - 1e-9; break; }
+                    if (it != flipped.end() && it->second != want) break;   // 続きは次の cook へ
                     flipped[key] = want;
                     if (want) mySeqHeld.insert(key); else mySeqHeld.erase(key);
                 }
                 onVoiceLocked(e.s, e.d1, e.d2);
             }
-            mySeqPrev = stop; mySeqPos = stop;
+            // **時刻は b まで進める。** 切ったときに時刻まで巻き戻すと、
+            // その窓の残り時間を毎回捨てることになり再生が遅れる(実測で 0.95倍)。
+            // 出していないイベントは番号で覚えてあるので、次の cook でそのまま続けられる
+            mySeqIdx = i;
+            mySeqPos = mySeqPrev = b;
             return;
         }
         mySeqPrev = b; mySeqPos = b;
+    }
+
+    // 時刻から「次に出すイベント番号」を求める
+    size_t seekIndex(double t) const
+    {
+        size_t lo = 0, hi = mySeq.ev.size();
+        while (lo < hi) { const size_t m = (lo + hi) / 2; if (mySeq.ev[m].t <= t) lo = m + 1; else hi = m; }
+        return lo;
     }
 
     // シーク・ループ・停止のときに、ファイル由来で鳴らしっぱなしのノートを 0 に戻す
@@ -521,6 +554,7 @@ private:
     MidiSeq  mySeq;
     double   mySeqPos = 0, mySeqPrev = -1;
     bool     mySeqPlaying = false;
+    size_t   mySeqIdx = 0;
     uint64_t mySeqClock = 0;
     double   myTimebase = 1.0;
     std::string mySeqErr;

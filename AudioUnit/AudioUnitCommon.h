@@ -903,11 +903,15 @@ private:
         }
         mySeqPlaying = true;
 
+        bool wrapped = false;
         if (pos > dur || pos < 0) {                    // 端に来た
-            if (loop) { pos = pos - floor(pos / dur) * dur; seek = true; }
+            // 余りではなく端ちょうどへ戻す(頭の音を確実に鳴らすため)
+            if (loop) { pos = (pos < 0) ? dur : 0; seek = true; wrapped = true; }
             else { pos = pos < 0 ? 0 : dur; if (mySeqPos != pos) { allNotesOff(); } }
         }
-        if (seek) { allNotesOff(); mySeqPrev = pos - 1e-9; }
+        // **ループの折り返しは頭から流し直す。** 余りを普通のシークとして扱うと
+        // 0〜pos にある頭の音を飛ばす
+        if (seek) { allNotesOff(); mySeqPrev = wrapped ? -1e-9 : pos - 1e-9; }
 
         // 前回位置から今の位置までのイベントを出す(逆再生時は送らない)
         const double a = mySeqPrev < 0 ? -1e-9 : mySeqPrev, b = pos;

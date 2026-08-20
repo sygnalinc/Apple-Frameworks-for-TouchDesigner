@@ -255,6 +255,11 @@ sends events straight to the instrument with no CHOP gate in between, so nothing
 frame. Use this operator's player when you want the file *as CHOP channels* — to drive visuals, to
 send it out through CoreMIDI Out, or to layer it with a live keyboard.
 
+The Info CHOP reports `file_position`, `file_duration`, `file_bpm` and `file_events` — check these
+first when playback looks wrong. Note that this operator only advances while it cooks, so give it a
+downstream that pulls every frame (an instrument, a Null being viewed, an Audio Device Out); with
+nothing pulling it the position jumps in large steps whenever something happens to read it.
+
 **Program change naming**: this operator emits `ch<n>prog` with the **raw** MIDI value, while
 TouchDesigner's MIDI In CHOP emits `ch<n>p` **1-based**. AU Instrument accepts both and converts
 accordingly. Turn the `Program Change` toggle on — it is off by default.
@@ -569,6 +574,11 @@ TouchDesigner 標準の MIDI In CHOP も MIDI ファイルを読めるが、**�
 CHOP のゲートを経由せず楽器へ直接イベントを送るので、フレームに量子化されない。
 この op の再生は「**ファイルを CHOP チャンネルとして**扱いたいとき」に使う
 (映像を駆動する、CoreMIDI Out で外部へ送る、鍵盤演奏に重ねる)。
+
+Info CHOP に `file_position` / `file_duration` / `file_bpm` / `file_events` を出す。
+再生がおかしいときはまずここを見る。なお**この op は cook されている間しか進まない**ので、
+毎フレーム引っ張る下流(音源・表示中の Null・Audio Device Out など)を繋いでおく。
+何も繋がっていないと、誰かが読んだ瞬間だけ位置が大きく飛ぶ。
 
 **プログラムチェンジの命名**: この op は `ch<n>prog` に**生の MIDI 値**を出す。TouchDesigner 標準の
 MIDI In CHOP は `ch<n>p` に**1始まり**で出す。AU Instrument は両方を受けて自動で読み分ける。
