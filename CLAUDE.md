@@ -7799,3 +7799,21 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   (いきなり鳴らさない)。比較試聴はユーザーに委ねる
 - PLUGINS.tsv に experimental で登録(新規は指示があるまで experimental の規約どおり)。
   README(新規・英日併記)+ ルート README(英日)の実験中の表に追加
+
+### 2026-08-21 CoreAudio Out に出力設定を追加(デバイス選択・レート・バッファ)
+
+- ユーザー「出力設定の機能を増やして device 選択とか」
+- **Device(動的メニュー)**: `kAudioHardwarePropertyDevices` から**出力ストリームを持つ**デバイスだけを
+  列挙(`kAudioDevicePropertyStreams` の Output scope でフィルタ。マイクを除外)。
+  内部値は AudioDeviceID。`System Default` は OS 設定に追従。
+  **選んだデバイスが抜かれていたら黙って他へ切り替えずエラー**にする(ショーで気づけるように)
+- **Device Sample Rate**: `kAudioDevicePropertyNominalSampleRate` を設定(**システム全体に効く**)。
+  設定は非同期なので反映を最大500msポーリング。非対応レートは警告だけ出してデバイスに触らない。
+  レートが変わったらファイルプレイヤーを開き直して新レートへ変換
+- **Buffer Size (frames)**: `kAudioDevicePropertyBufferFrameSize`(64〜2048)。
+  Info CHOP に実際の `buffer_frames` を出す
+- **実測(M2・BlackHole 仮想デバイスで安全に検証)**: 切替→44100/256→96000/1024 で
+  `device_rate`/`buffer_frames` が毎回追従・再生継続・CHOP出力レートも追従。
+  存在しないID選択で `selected device is not connected` エラー・running=0。復帰も正常
+- 検証の型: **デバイスのレート変更はシステム全体に効く**ので、実機スピーカーではなく
+  仮想デバイス(BlackHole)で検証する。終わったら 48000 へ戻す

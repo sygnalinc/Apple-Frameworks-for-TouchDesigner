@@ -32,6 +32,9 @@ The file player is the part a custom op can actually fix.
 | Page | Parameter | Meaning |
 |---|---|---|
 | CoreAudio Out | Active | start/stop the device connection |
+| | Device | output device (dynamic menu of every device with an output stream; `System Default` follows the OS setting). A selected device that is unplugged raises an error instead of silently falling back |
+| | Device Sample Rate | **changes the device's rate system-wide** (As Is / 44100–96000). Unsupported rates raise a warning without touching the device |
+| | Buffer Size (frames) | the device's I/O buffer (As Is / 64–2048). Smaller = lower latency, easier to underrun |
 | | Input Gain | gain for input 0 |
 | | Exclusive (Hog Mode) | take the device exclusively (no other apps, no rate changes) |
 | File Player | Audio File | any format Core Audio reads (wav/aiff/mp3/m4a/…) |
@@ -39,7 +42,13 @@ The file player is the part a custom op can actually fix.
 | | Cue Point (s) / Cue Pulse | seek |
 
 The CHOP output is a **monitor copy** of what actually played. Info CHOP: `device_rate`, `running`,
-`file_position`, `file_duration`, `file_buffered` (samples of decode-ahead).
+`file_position`, `file_duration`, `file_buffered` (samples of decode-ahead), `buffer_frames`
+(the device's actual I/O buffer). When the device rate changes, the file player reopens and
+converts to the new rate automatically.
+
+**Measured (M2)**: switching to a virtual device (BlackHole) at 44100/256 then 96000/1024 —
+`device_rate` and `buffer_frames` follow each time, playback continues, and the CHOP output rate
+tracks the device. Selecting a disconnected device stops cleanly with an error.
 
 ### Notes
 
@@ -77,6 +86,9 @@ TD の音声は cook 駆動で、Audio File In は cook されたときしかサ
 | ページ | パラメータ | 意味 |
 |---|---|---|
 | CoreAudio Out | Active | デバイス接続の開始/停止 |
+| | Device | 出力デバイス(出力ストリームを持つ全デバイスの動的メニュー。`System Default` は OS の設定に追従)。選んだデバイスが抜かれていたら**黙って他へ切り替えずエラー**にする |
+| | Device Sample Rate | **デバイスのレートを変更する(システム全体に効く)**。As Is / 44100〜96000。非対応レートは警告を出してデバイスに触らない |
+| | Buffer Size (frames) | デバイスの I/O バッファ(As Is / 64〜2048)。小さいほど低レイテンシ・音切れしやすい |
 | | Input Gain | 入力0のゲイン |
 | | Exclusive (Hog Mode) | デバイスを排他で取る(他アプリの音・レート変更が入らない) |
 | File Player | Audio File | Core Audio が読める形式(wav/aiff/mp3/m4a/…) |
@@ -84,7 +96,13 @@ TD の音声は cook 駆動で、Audio File In は cook されたときしかサ
 | | Cue Point (s) / Cue Pulse | 頭出し |
 
 CHOP 出力は**実際に鳴った音のモニタコピー**。Info CHOP: `device_rate` / `running` /
-`file_position` / `file_duration` / `file_buffered`(先読みサンプル数)。
+`file_position` / `file_duration` / `file_buffered`(先読みサンプル数)/ `buffer_frames`
+(デバイスの実際の I/O バッファ)。デバイスのレートが変わるとファイルプレイヤーは
+自動で開き直し、新しいレートへ変換する。
+
+**実測(M2)**: 仮想デバイス(BlackHole)へ切り替えて 44100/256 → 96000/1024 —
+`device_rate` と `buffer_frames` が毎回追従し、再生は継続、CHOP の出力レートもデバイスに追従。
+抜かれたデバイスを選ぶとエラーを出して止まる(黙って別のデバイスへは切り替えない)。
 
 ### 注意
 

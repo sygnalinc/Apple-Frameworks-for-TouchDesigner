@@ -160,6 +160,9 @@ public:
         // ---- ファイル再生の指示(実処理はデコーダスレッド)
         const char* fp = in->getParString("File");
         const std::string want = fp ? fp : "";
+        if (myPlayer.outRate > 0 && fabs(myPlayer.outRate - myDevRate) > 1 && !myFilePath.empty()) {
+            myPlayer.start(myFilePath, myDevRate);      // レートが変わった。開き直す
+        }
         if (want != myFilePath) {
             myFilePath = want;
             if (!want.empty()) myPlayer.start(want, myDevRate);
@@ -199,6 +202,39 @@ public:
     }
 
     // ------------------------------------------------------------ デバイス
+    struct Dev { AudioDeviceID id; std::string name; UInt32 uid; };
+
+    // 出力ストリームを持つデバイスを列挙する
+    static std::vector<Dev> listOutputs()
+    {
+        std::vector<Dev> out;
+        AudioObjectPropertyAddress da = { kAudioHardwarePropertyDevices,
+                                          kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain };
+        UInt32 sz = 0;
+        if (AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &da, 0, nullptr, &sz) != noErr || !sz)
+            return out;
+        std::vector<AudioDeviceID> ids(sz / sizeof(AudioDeviceID));
+        AudioObjectGetPropertyData(kAudioObjectSystemObject, &da, 0, nullptr, &sz, ids.data());
+        for (AudioDeviceID d : ids) {
+            AudioObjectPropertyAddress sa = { kAudioDevicePropertyStreams,
+                                              kAudioObjectPropertyScopeOutput, kAudioObjectPropertyElementMain };
+            UInt32 ssz = 0;
+            if (AudioObjectGetPropertyDataSize(d, &sa, 0, nullptr, &ssz) != noErr || ssz < sizeof(AudioStreamID))
+                continue;                                     // 出力を持たない(マイク等)
+            CFStringRef nm = nullptr; UInt32 nsz = sizeof(nm);
+            AudioObjectPropertyAddress na = { kAudioObjectPropertyName,
+                                              kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain };
+            std::string name = "?";
+            if (AudioObjectGetPropertyData(d, &na, 0, nullptr, &nsz, &nm) == noErr && nm) {
+                char b[256] = {};
+                CFStringGetCString(nm, b, sizeof b, kCFStringEncodingUTF8);
+                name = b; CFRelease(nm);
+            }
+            out.push_back({ d, name, (UInt32)d });
+        }
+        return out;
+    }
+
     static AudioDeviceID defaultOut()
     {
         AudioObjectPropertyAddress a = { kAudioHardwarePropertyDefaultOutputDevice,
@@ -207,6 +243,19 @@ public:
         AudioObjectGetPropertyData(kAudioObjectSystemObject, &a, 0, nullptr, &sz, &d);
         return d;
     }
+    static std::vector<double> ratesOf(AudioDeviceID d)
+    {
+        std::vector<double> out;
+        AudioObjectPropertyAddress a = { kAudioDevicePropertyAvailableNominalSampleRates,
+                                         kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain };
+        UInt32 sz = 0;
+        if (AudioObjectGetPropertyDataSize(d, &a, 0, nullptr, &sz) != noErr || !sz) return out;
+        std::vector<AudioValueRange> rr(sz / sizeof(AudioValueRange));
+        AudioObjectGetPropertyData(d, &a, 0, nullptr, &sz, rr.data());
+        for (const AudioValueRange& r : rr) out.push_back(r.mMinimum);
+        return out;
+    }
+
     static double rateOf(AudioDeviceID d)
     {
         AudioObjectPropertyAddress a = { kAudioDevicePropertyNominalSampleRate,
@@ -218,12 +267,55 @@ public:
 
     void ensureDevice(const OP_Inputs* in)
     {
-        AudioDeviceID dev = defaultOut();
+        // ---- デバイス選択(default = システム既定に追従)
+        const char* sel = in->getParString("Device");
+        AudioDeviceID dev = 0;
+        if (sel && *sel && strcmp(sel, "default")) {
+            const AudioDeviceID want = (AudioDeviceID)strtoul(sel, nullptr, 10);
+            for (const Dev& d : listOutputs()) if (d.id == want) { dev = want; break; }
+            if (!dev) { teardown(); myErr = "selected device is not connected"; return; }
+        } else {
+            dev = defaultOut();
+        }
         const bool hog = in->getParInt("Exclusive") != 0;
-        if (myRunning && dev == myDev && hog == myHog) return;
+
+        // ---- デバイスのレート変更(システム全体に効く)
+        const char* rp = in->getParString("Devicerate");
+        const double wantRate = (rp && strcmp(rp, "asis")) ? atof(rp) : 0;
+        const char* bp = in->getParString("Buffersize");
+        const UInt32 wantBuf = (bp && strcmp(bp, "asis")) ? (UInt32)atoi(bp) : 0;
+
+        if (myRunning && dev == myDev && hog == myHog &&
+            wantRate == myWantRate && wantBuf == myWantBuf) return;
         teardown();
         if (!dev) { myErr = "no output device"; return; }
-        myDev = dev; myHog = hog;
+        myDev = dev; myHog = hog; myWantRate = wantRate; myWantBuf = wantBuf;
+        myWarn.clear();
+
+        if (wantRate > 0) {
+            bool ok = false;
+            for (double r : ratesOf(dev)) if (fabs(r - wantRate) < 1) ok = true;
+            if (!ok) myWarn = "device does not support that sample rate";
+            else {
+                AudioObjectPropertyAddress a = { kAudioDevicePropertyNominalSampleRate,
+                                                 kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain };
+                Float64 v = wantRate;
+                if (AudioObjectSetPropertyData(dev, &a, 0, nullptr, sizeof(v), &v) != noErr)
+                    myWarn = "could not set the device sample rate";
+                else {
+                    // 反映は非同期。少し待って読み直す
+                    for (int i = 0; i < 20 && fabs(rateOf(dev) - wantRate) > 1; i++)
+                        std::this_thread::sleep_for(std::chrono::milliseconds(25));
+                }
+            }
+        }
+        if (wantBuf > 0) {
+            AudioObjectPropertyAddress a = { kAudioDevicePropertyBufferFrameSize,
+                                             kAudioObjectPropertyScopeOutput, kAudioObjectPropertyElementMain };
+            UInt32 v = wantBuf;
+            if (AudioObjectSetPropertyData(dev, &a, 0, nullptr, sizeof(v), &v) != noErr)
+                myWarn = "could not set the buffer size";
+        }
         myDevRate = rateOf(dev);
 
         if (hog) {
@@ -293,6 +385,29 @@ public:
     {
         const char* P = "CoreAudio Out";
         { OP_NumericParameter p("Active"); p.label = "Active"; p.page = P; p.defaultValues[0] = 1; m->appendToggle(p); }
+        {
+            // 出力デバイス。内部値は AudioDeviceID の文字列(default = システム既定に追従)
+            OP_StringParameter p("Device"); p.label = "Device"; p.page = P;
+            p.defaultValue = "default";       // 動的メニューは既定値が空だと生成されない(既知の罠)
+            m->appendDynamicStringMenu(p);
+        }
+        {
+            // デバイスのサンプルレートを変更する(システム全体に効く)。
+            // device = 触らない / 44100〜96000 = そのレートへ設定
+            OP_StringParameter p("Devicerate"); p.label = "Device Sample Rate"; p.page = P;
+            const char* n[] = { "asis", "44100", "48000", "88200", "96000" };
+            const char* l[] = { "As Is", "44100", "48000", "88200", "96000" };
+            p.defaultValue = "asis";
+            m->appendMenu(p, 5, n, l);
+        }
+        {
+            // デバイスの I/O バッファ(フレーム数)。小さいほど低レイテンシ・音切れしやすい
+            OP_StringParameter p("Buffersize"); p.label = "Buffer Size (frames)"; p.page = P;
+            const char* n[] = { "asis", "64", "128", "256", "512", "1024", "2048" };
+            const char* l[] = { "As Is", "64", "128", "256", "512", "1024", "2048" };
+            p.defaultValue = "asis";
+            m->appendMenu(p, 7, n, l);
+        }
         { OP_NumericParameter p("Inputgain"); p.label = "Input Gain"; p.page = P; p.defaultValues[0] = 1;
           p.minSliders[0] = 0; p.maxSliders[0] = 2; m->appendFloat(p); }
         { OP_NumericParameter p("Exclusive"); p.label = "Exclusive (Hog Mode)"; p.page = P; p.defaultValues[0] = 0; m->appendToggle(p); }
@@ -312,15 +427,31 @@ public:
         if (!strcmp(name, "Cuepulse")) myWantCue = true;
     }
 
+    void buildDynamicMenu(const OP_Inputs*, OP_BuildDynamicMenuInfo* info, void*) override
+    {
+        if (strcmp(info->name, "Device")) return;
+        info->addMenuEntry("default", "System Default");
+        for (const Dev& d : listOutputs()) {
+            char v[16]; snprintf(v, sizeof v, "%u", (unsigned)d.uid);
+            info->addMenuEntry(v, d.name.c_str());
+        }
+    }
+
     // ------------------------------------------------------------ info
-    int32_t getNumInfoCHOPChans(void*) override { return 6; }
+    int32_t getNumInfoCHOPChans(void*) override { return 7; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override
     {
         static const char* n[] = { "executes", "device_rate", "running",
-                                   "file_position", "file_duration", "file_buffered" };
+                                   "file_position", "file_duration", "file_buffered", "buffer_frames" };
+        UInt32 bf = 0; UInt32 bsz = sizeof(bf);
+        if (myDev) {
+            AudioObjectPropertyAddress a = { kAudioDevicePropertyBufferFrameSize,
+                                             kAudioObjectPropertyScopeOutput, kAudioObjectPropertyElementMain };
+            AudioObjectGetPropertyData(myDev, &a, 0, nullptr, &bsz, &bf);
+        }
         const float v[] = { (float)myExec.load(), (float)myDevRate, myRunning ? 1.f : 0.f,
                             (float)myPlayer.position.load(), (float)myPlayer.duration.load(),
-                            (float)(myPlayer.w.load() - myPlayer.r.load()) };
+                            (float)(myPlayer.w.load() - myPlayer.r.load()), (float)bf };
         c->name->setString(n[i]); c->value = v[i];
     }
     void getErrorString(OP_String* s, void*) override
@@ -336,6 +467,7 @@ private:
     AudioDeviceIOProcID myProc = nullptr;
     double myDevRate = 48000;
     bool myRunning = false, myHog = false, myHogged = false;
+    double myWantRate = 0; UInt32 myWantBuf = 0;
     std::string myErr, myWarn, myFilePath;
     std::atomic<bool> myWantCue{false};
 
