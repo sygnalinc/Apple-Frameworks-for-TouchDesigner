@@ -7491,3 +7491,18 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   プラグイン個体の問題だと1手で分かった
 - 注意: opType が変わったので、旧 `Audiounit` を参照する .toe はロードエラーになる
   (demo.toe には AudioUnit の利用例が無いので影響なし)
+
+### 2026-08-19 AU Instrument のレイテンシ調査 — 主因は Audio Device Out の既定バッファ
+
+- ユーザー報告「CoreMIDI In と AU Instrument を繋いで外部キーボードで弾くとラグがある」
+- **原因は op ではなく `Audio Device Out` の `Buffer Length` 既定 0.15 秒**(実測)。内訳:
+  CoreMIDI In は受信スレッドにキューが無く cook で最新値を出すだけ(0〜1フレーム)、
+  AU Instrument は `applyNotes` → `renderOffline` が同じ cook 内なので追加ゼロ(cook 0.138ms)、
+  残り 150ms が出力バッファ。**0.02〜0.05 に下げてユーザー確認で解決**
+- **「直接デバイスへ出す」モードは割に合わないと実測で判断**: 出力デバイス自体が
+  **13.7ms**(MacBook Air スピーカー・48kHz・バッファ512フレーム=10.67ms + latency 74 + safety 73。
+  CoreAudio の `kAudioDevicePropertyBufferFrameSize` / `Latency` / `SafetyOffset` を実測)。
+  ノートが CHOP 経由である限り1フレーム(16.7ms)は残るので合計約30ms、詰めた CHOP 経路の
+  35〜50ms との差は10〜20ms。代償(音が TD に戻らない)の方が大きい。
+  **10ms 台にするには楽器側が CoreMIDI を自分で開く**必要がある(将来の選択肢として記録)
+- README(英日)に「レイテンシ」節を追加。**AU Effect には付けない**(入力が TD 側なので効かない)

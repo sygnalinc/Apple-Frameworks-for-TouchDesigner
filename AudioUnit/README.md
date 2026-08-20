@@ -15,6 +15,26 @@ Pick a plugin, automate its parameters from CHOP channels, and open the plugin's
 TouchDesigner's own Audio VST CHOP is **VST3-only** (`libJUCE.dylib` carries `VST3PluginFormat`
 and no `AudioUnitPluginFormat`, measured), so on a stock Mac it finds 0 plugins where these find 30.
 
+### Latency
+
+If notes feel late when you play a MIDI keyboard, it is almost always **Audio Device Out**, not this
+operator. Its `Buffer Length` defaults to **0.15 s**, and that goes straight into the delay you hear.
+
+| Stage | Delay |
+|---|---|
+| CoreMIDI In CHOP | 0–1 frame (16.7 ms at 60 fps) — the receive thread has no queue |
+| AU Effect / AU Instrument | none — notes are applied in the same cook that renders the block |
+| **Audio Device Out `Buffer Length`** | **150 ms by default** |
+
+Drop `Buffer Length` to **0.02–0.05** and raise the project to 120 fps if you need more. Too small a
+buffer causes dropouts, and heavy plugins need more headroom, so tune it by ear.
+
+A "render straight to the audio device" mode would not help much: the output device on this machine
+sits at **13.7 ms** (512-frame buffer at 48 kHz, plus 74 latency and 73 safety frames), and notes
+arriving through a CHOP still cost a frame — about 30 ms all in, against 35–50 ms for a tuned CHOP
+path. Going below that means the instrument opening CoreMIDI itself instead of taking notes from a
+CHOP.
+
 ### Playing notes with AU Instrument
 
 - **Wire a note CHOP into input 0.** Channels are named `ch<channel>n<note>` (**exactly what
@@ -247,6 +267,25 @@ cd AudioUnit && ./build.sh   # → build/AudioUnitCHOP.plugin
 TouchDesigner 標準の Audio VST CHOP は **VST3 専用**(`libJUCE.dylib` に `VST3PluginFormat` は
 あるが `AudioUnitPluginFormat` は無い・実測)なので、素の Mac では VST3 が0個に対し
 こちらは30個見つかる。
+
+### レイテンシ
+
+MIDI キーボードで弾いて音が遅れるときは、**ほぼ Audio Device Out** が原因でこの op ではない。
+`Buffer Length` の既定が **0.15 秒**で、それがそのまま体感の遅れになる。
+
+| 要素 | 遅れ |
+|---|---|
+| CoreMIDI In CHOP | 0〜1フレーム(60fps で 16.7ms)。受信スレッドにキューは無い |
+| AU Effect / AU Instrument | 無し。ノートは**そのブロックをレンダする同じ cook 内**で適用される |
+| **Audio Device Out の `Buffer Length`** | **既定 150ms** |
+
+`Buffer Length` を **0.02〜0.05** に下げる。足りなければ fps を 120 に上げる。
+小さくしすぎると音切れするし、重いプラグインほど余裕が要るので**耳で詰める**。
+
+「オーディオデバイスへ直接出す」モードにしてもあまり得しない: この機体の出力デバイスは
+**13.7ms**(48kHz・バッファ512フレーム + latency 74 + safety 73)で、CHOP 経由のノートは
+どのみち1フレーム掛かるので合計 約30ms。詰めた CHOP 経路の 35〜50ms との差は小さい。
+これより下げるには、**楽器側が CoreMIDI を自分で開いて** cook を介さずノートを受ける必要がある。
 
 ### AU Instrument でノートを鳴らす
 
