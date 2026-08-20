@@ -242,6 +242,19 @@ gap this fills.
 and `ch10n*` plus `ch1prog` 0 / `ch2prog` 33 / `ch3prog` 27, and feeding that straight into
 AU Instrument played it back with the right instruments (`programs_sent` 3, peak 0.087, no warnings).
 
+**A CHOP gate cannot carry more than one flip per frame.** The output is one sample per frame, so a
+note that turns off and on again inside 16.7 ms would collapse into a gate that never returns to 0 —
+the retrigger disappears. Measured on eighth-note hi-hats (6.5 ms gaps): **only 43 of 64 hits per
+loop survived**, matching 6.5 / 16.7 = 39% exactly. The player now **never flips the same note twice
+in one cook** — it cuts the event window there and continues next frame — which brings every hit
+back (68 counted against 64 per loop, the rest being loop-boundary phase). The cost is that gaps
+shorter than a frame get stretched to one frame.
+
+If you want a file played tightly, **AU Instrument's own `MIDI File` page is the better path**: it
+sends events straight to the instrument with no CHOP gate in between, so nothing is quantised to the
+frame. Use this operator's player when you want the file *as CHOP channels* — to drive visuals, to
+send it out through CoreMIDI Out, or to layer it with a live keyboard.
+
 **Program change naming**: this operator emits `ch<n>prog` with the **raw** MIDI value, while
 TouchDesigner's MIDI In CHOP emits `ch<n>p` **1-based**. AU Instrument accepts both and converts
 accordingly. Turn the `Program Change` toggle on — it is off by default.
@@ -543,6 +556,19 @@ TouchDesigner 標準の MIDI In CHOP も MIDI ファイルを読めるが、**�
 **実測(M2)**: 4パート(ピアノ/ベース/ギター/ドラム)のファイルで `ch1n*` `ch2n*` `ch3n*` `ch10n*` と
 `ch1prog` 0 / `ch2prog` 33 / `ch3prog` 27 が出て、そのまま AU Instrument に繋ぐと正しい楽器で鳴った
 (`programs_sent` 3・peak 0.087・警告なし)。
+
+**CHOP のゲートは1フレームに1回しか反転できない。** 出力は1フレーム1サンプルなので、
+16.7ms 以内にノートオフ→オンが起きると**ゲートが 0 に戻らず連打が消える**。
+8分のハイハット(隙間 6.5ms)で実測すると **1ループ 64回のうち 43回しか立たなかった**
+(6.5 ÷ 16.7 = 39% と一致)。現在は**同じノートを1回の cook で2回反転させない**ようにして
+(ぶつかったらそこで窓を切り、続きは次のフレームへ)、全打点が戻った
+(1ループ 64 に対し計測 68。残差はループ境界と位相のぶん)。代償として、
+**1フレームより短い隙間は1フレームぶんに引き伸ばされる**。
+
+タイトに鳴らしたいだけなら、**AU Instrument の `MIDI File` ページの方が適している** —
+CHOP のゲートを経由せず楽器へ直接イベントを送るので、フレームに量子化されない。
+この op の再生は「**ファイルを CHOP チャンネルとして**扱いたいとき」に使う
+(映像を駆動する、CoreMIDI Out で外部へ送る、鍵盤演奏に重ねる)。
 
 **プログラムチェンジの命名**: この op は `ch<n>prog` に**生の MIDI 値**を出す。TouchDesigner 標準の
 MIDI In CHOP は `ch<n>p` に**1始まり**で出す。AU Instrument は両方を受けて自動で読み分ける。

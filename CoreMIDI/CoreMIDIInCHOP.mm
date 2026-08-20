@@ -389,14 +389,32 @@ private:
 
         const double a = mySeqPrev < 0 ? -1e-9 : mySeqPrev, b = pos;
         if (b > a) {
+            // **1回の cook で同じノートを2回反転させない。**
+            // 出力は1フレームに1サンプルのゲートなので、off→on が同じ cook に収まると
+            // 最終値が on のままになり**連打が消える**(実測: 8分のハイハットが 64回→43回。
+            // ノートオフの隙間 6.5ms / フレーム 16.7ms = 39% しか拾えていなかった)。
+            // ぶつかったらそこで窓を切り、続きは次の cook に回す
+            std::map<int, int> flipped;
+            double stop = b;
             std::lock_guard<std::mutex> l(myMutex);
             for (const MidiEvent& e : mySeq.ev) {
                 if (e.t <= a) continue;
                 if (e.t > b) break;
+                const uint8_t hi = e.s & 0xF0;
+                if (hi == 0x90 || hi == 0x80) {
+                    const int key = (int)((e.s & 0x0F) << 8 | e.d1);
+                    const int want = (hi == 0x90 && e.d2 > 0) ? 1 : 0;
+                    auto it = flipped.find(key);
+                    // **少しだけ手前で切る。** ちょうど e.t で切ると次の窓の
+                    // `e.t <= a` に引っかかって、このイベント自体を落としてしまう
+                    if (it != flipped.end() && it->second != want) { stop = e.t - 1e-9; break; }
+                    flipped[key] = want;
+                    if (want) mySeqHeld.insert(key); else mySeqHeld.erase(key);
+                }
                 onVoiceLocked(e.s, e.d1, e.d2);
-                if ((e.s & 0xF0) == 0x90 && e.d2 > 0) mySeqHeld.insert((int)((e.s & 0x0F) << 8 | e.d1));
-                else if ((e.s & 0xF0) == 0x80) mySeqHeld.erase((int)((e.s & 0x0F) << 8 | e.d1));
             }
+            mySeqPrev = stop; mySeqPos = stop;
+            return;
         }
         mySeqPrev = b; mySeqPos = b;
     }
