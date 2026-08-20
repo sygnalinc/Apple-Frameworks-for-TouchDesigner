@@ -7549,3 +7549,21 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **下流が無いと cook されない**(totalCooks が 6 のまま)。「ファイルが進まない」と誤診したが、
   実際は**先頭サンプルだけを見ていた**のが原因。CHOP はクリップなので `chan[0]` ではなく
   サンプル全体を見る
+
+### 2026-08-19 demo に「MIDI ファイル → AU Instrument」を追加
+
+- `/project1/AUInstrument`(Sound の行・x=1800): `midifile`(MIDI In CHOP)→ `playhead`(Trim CHOP)
+  → `Auinstrument1` → `out` → `audiodevout1`。**MIDI ファイルの読み込みは TD 標準**で完結する
+- **素材 `Assets/sample_midi.mid` を自作して同梱**(361バイト・120BPM・Am-F-C-G の8秒・36音。
+  ベース全音符+8分アルペジオ。自作なので権利の問題なし)
+- **詰まりやすい設定を note に明記**:
+  ① `Note Output = separate`(`ch1n60` 形式にしないと AU Instrument が読めない)
+  ② **`Note Scope` の既定は `'60'` で1音しか出てこない** → `*` にする(ここで一度誤診した)
+  ③ `1 Based Index` 既定 On だと半音ずれる → Off
+  ④ 出力はクリップなので `Trim CHOP` で現在フレームの1サンプルを切り出す。
+     `int(me.time.frame) % max(1, op('midifile').numSamples)` にして**ファイル長でループ**
+     (タイムライン長に依存しない)
+  ⑤ `audiodevout1` の **Buffer Length を 0.03**(既定 0.15 では 150ms 遅れる)
+- **実測(M2)**: peak 0.12、`notes_sent` 141、`notes_held` 2(ベース+アルペジオ)、エラー警告なし。
+  Plugin は AUMIDISynth(**DLSMusicDevice は TD 内で無音**なので選ばない)
+- 他の利用例と同じく **allowCooking = False** で保存。`_README` の 07 Sound の説明も更新
