@@ -376,11 +376,15 @@ private:
             mySeqClock = now;
             pos = mySeqPos + dt * speed;
         }
-        if (!play && !index && !locked) {
+        if (!play) {
+            // 止めたら**鳴っているノートを必ず 0 に戻す**。戻さないと下流の音源が
+            // 最後の音を鳴らし続ける(実測で踏んだ)。キューは停止中でも効かせる
             mySeqClock = 0;
+            if (mySeqPlaying) { releaseSeqNotes(); mySeqPlaying = false; }
             if (seek) { releaseSeqNotes(); mySeqPos = pos; mySeqPrev = pos; }
             return;
         }
+        mySeqPlaying = true;
         if (pos > dur || pos < 0) {
             if (in->getParInt("Loop") != 0) { pos = pos - floor(pos / dur) * dur; seek = true; }
             else { pos = pos < 0 ? 0 : dur; if (mySeqPos != pos) releaseSeqNotes(); }
@@ -516,6 +520,7 @@ private:
 
     MidiSeq  mySeq;
     double   mySeqPos = 0, mySeqPrev = -1;
+    bool     mySeqPlaying = false;
     uint64_t mySeqClock = 0;
     double   myTimebase = 1.0;
     std::string mySeqErr;

@@ -892,13 +892,16 @@ private:
             mySeqClock = now;
             pos = mySeqPos + dt * speed;
         }
-        if (!play && !index && !locked) {
-            // 止めたらその場で保持する。**ただしキューは停止中でも効かせる** —
-            // ここで return してしまうと Cue Pulse を消費だけして捨てることになる(実測で踏んだ)
+        if (!play) {
+            // 止めたらその場で保持する。**鳴っている音は必ず止める** —
+            // 解放しないと最後のノートが鳴りっぱなしになる(実測で踏んだ)。
+            // キューは停止中でも効かせる(ここで即 return すると Cue Pulse を捨てることになる)
             mySeqClock = 0;
+            if (mySeqPlaying) { allNotesOff(); mySeqPlaying = false; }
             if (seek) { allNotesOff(); mySeqPos = pos; mySeqPrev = pos; }
             return;
         }
+        mySeqPlaying = true;
 
         if (pos > dur || pos < 0) {                    // 端に来た
             if (loop) { pos = pos - floor(pos / dur) * dur; seek = true; }
@@ -1680,6 +1683,7 @@ private:
     double myTdTempo = 120; int myTempoAge = 0;
     MidiSeq  mySeq;
     double   mySeqPos = 0, mySeqPrev = -1;
+    bool     mySeqPlaying = false;
     uint64_t mySeqClock = 0;
     double   myTimebase = 1.0;
     int myNotesSent = 0;

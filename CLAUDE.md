@@ -7695,3 +7695,15 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   **そのイベント自体を落とす**。43回 → 23回とかえって悪化した。`stop = e.t - 1e-9` で解決
 - 代償として**1フレームより短い隙間は1フレームに引き伸ばされる**。README に明記し、
   **タイトに鳴らしたいなら AU Instrument 内蔵の再生を使う**(CHOP ゲートを経由しない)よう誘導した
+
+### 2026-08-19 MIDI ファイル再生: Play を Off にすると最後の音が残る問題を修正
+
+- ユーザー「再生中に MIDI File の Play を False にすると最後の音が鳴ったままになる」
+- **ドキュメントには「停止すると鳴っている音は止める」と書いたのに実装が抜けていた**。
+  停止時はその場で return するだけで、ノートを解放していなかった
+- `mySeqPlaying` を持たせ、**再生→停止の遷移で全ノートオフ**(AU Instrument は `allNotesOff()`、
+  CoreMIDI In は `releaseSeqNotes()` でゲートを 0 に戻す)。両 op に同じ修正
+- あわせて **`Play` を全モードで有効に**した。従来は Sequential のときしか見ておらず、
+  Locked to Timeline / Specify Index では Play=Off でも鳴り続けていた
+- **実測**: 停止で AU の `notes_held` 3→**0**・出力 peak **0.0**、CoreMIDI In のゲートも 4→**0**。
+  位置は 1.53 で保持され、Play を戻すと 2.68 から続き(notes_held 9・peak 0.67)。警告なし
