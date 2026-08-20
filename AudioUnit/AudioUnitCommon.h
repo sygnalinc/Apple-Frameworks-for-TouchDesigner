@@ -134,13 +134,14 @@ struct MidiEvent { double t; uint8_t s, d1, d2; };
 struct MidiSeq {
     std::vector<MidiEvent> ev;
     double duration = 0;
+    double bpm = 120;          // ファイル先頭のテンポ。TD テンポ同期の分母に使う
     std::string path, err;
 
     static uint32_t be32(const uint8_t* p) { return (p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3]; }
 
     bool load(const std::string& file)
     {
-        ev.clear(); duration = 0; err.clear(); path = file;
+        ev.clear(); duration = 0; bpm = 120; err.clear(); path = file;
         if (file.empty()) return false;
         FILE* f = fopen(file.c_str(), "rb");
         if (!f) { err = "cannot open MIDI file"; return false; }
@@ -193,10 +194,14 @@ struct MidiSeq {
                          [](const Raw& a, const Raw& b){ return a.tick != b.tick ? a.tick < b.tick : a.ord < b.ord; });
 
         const double tpq = div > 0 ? div : 480;      // SMPTE 分解能は稀なので既定にフォールバック
-        double sec = 0, us = 500000; uint64_t last = 0;
+        double sec = 0, us = 500000; uint64_t last = 0; bool firstTempo = true;
         for (const Raw& r : raw) {
             sec += (double)(r.tick - last) / tpq * us / 1e6; last = r.tick;
-            if (r.ord < 0) { us = r.tempo ? r.tempo : us; continue; }
+            if (r.ord < 0) {
+                us = r.tempo ? r.tempo : us;
+                if (firstTempo) { firstTempo = false; bpm = 6e7 / us; }
+                continue;
+            }
             ev.push_back({sec, r.s, r.d1, r.d2});
         }
         duration = sec;
@@ -610,6 +615,12 @@ public:
             { OP_NumericParameter p("Speed"); p.label = "Speed"; p.page = MF; p.defaultValues[0] = 1;
               p.minSliders[0] = -2; p.maxSliders[0] = 2; m->appendFloat(p); }
             { OP_NumericParameter p("Loop"); p.label = "Loop"; p.page = MF; p.defaultValues[0] = 1; m->appendToggle(p); }
+            {
+                // On にすると再生速度に (TD の BPM ÷ ファイルの BPM) を掛ける。
+                // MIDI なので音程は変わらず、テンポだけが TD 側に追従する
+                OP_NumericParameter p("Synctempo"); p.label = "Sync to TD Tempo"; p.page = MF;
+                p.defaultValues[0] = 0; m->appendToggle(p);
+            }
             { OP_NumericParameter p("Cue"); p.label = "Cue"; p.page = MF; p.defaultValues[0] = 0; m->appendToggle(p); }
             { OP_NumericParameter p("Cuepoint"); p.label = "Cue Point (s)"; p.page = MF; p.defaultValues[0] = 0;
               p.minSliders[0] = 0; p.maxSliders[0] = 60; m->appendFloat(p); }
@@ -658,20 +669,21 @@ public:
 
     // ------------------------------------------------------------ info
 
-    int32_t getNumInfoCHOPChans(void*) override { return myKind.instrument ? 14 : 8; }
+    int32_t getNumInfoCHOPChans(void*) override { return myKind.instrument ? 15 : 8; }
     void getInfoCHOPChan(int32_t i, OP_InfoCHOPChan* c, void*) override
     {
         static const char* n[] = { "executes", "renders", "samplerate", "loaded",
                                    "params", "latency_ms", "bypassed", "learned",
                                    "notes_sent", "notes_held", "programs_sent",
-                                   "file_position", "file_duration", "bank_status" };
+                                   "file_position", "file_duration", "bank_status", "file_bpm" };
         int held = 0;
         for (const auto& kv : myHeld) if (kv.first < 0x10000 && kv.second > 0) held++;
         const float v[] = { (float)myExec.load(), (float)myRenders.load(), (float)mySampleRate,
                             (float)(myUnit != nil), (float)myParams.size(),
                             (float)(myLatencySec * 1000.0), (float)myBypassed, (float)learnedCount(),
                             (float)myNotesSent, (float)held, (float)myProgsSent,
-                            (float)mySeqPos, (float)mySeq.duration, (float)myBankStatus };
+                            (float)mySeqPos, (float)mySeq.duration, (float)myBankStatus,
+                            (float)mySeq.bpm };
         c->name->setString(n[i]); c->value = v[i];
     }
 
@@ -933,6 +945,8 @@ private:
         const bool play   = in->getParInt("Play") != 0;
         const bool loop   = in->getParInt("Loop") != 0;
         const double cuePt = in->getParDouble("Cuepoint");
+        double speed = in->getParDouble("Speed");
+        if (in->getParInt("Synctempo") != 0 && mySeq.bpm > 0) speed *= tdTempo() / mySeq.bpm;
 
         double pos = mySeqPos;
         bool seek = false;
@@ -944,14 +958,14 @@ private:
         } else if (locked) {
             const OP_TimeInfo* ti = in->getTimeInfo();
             const double t = ti && ti->rate > 0 ? (double)ti->frame / ti->rate : 0;
-            pos = t * in->getParDouble("Speed") + cuePt;
+            pos = t * speed + cuePt;
             seek = (fabs(pos - mySeqPos) > 0.25);
         } else if (play) {
             const uint64_t now = mach_absolute_time();
             if (mySeqClock == 0) mySeqClock = now;
             const double dt = (double)(now - mySeqClock) * myTimebase / 1e9;
             mySeqClock = now;
-            pos = mySeqPos + dt * in->getParDouble("Speed");
+            pos = mySeqPos + dt * speed;
         }
         if (!play && !index && !locked) {
             // 止めたらその場で保持する。**ただしキューは停止中でも効かせる** —
@@ -977,6 +991,27 @@ private:
             }
         }
         mySeqPrev = b; mySeqPos = b;
+    }
+
+    // **OP_TimeInfo にテンポは無い**(frame / rate / deltaMS のみ)ので Python から読む。
+    // テンポはめったに変わらないので 30 cook キャッシュする(毎cook 読むと重い)
+    double tdTempo()
+    {
+        if (myTempoAge > 0 && --myTempoAge > 0 && myTdTempo > 0) return myTdTempo;
+        myTempoAge = 30;
+        PyGILState_STATE g = PyGILState_Ensure();
+        if (PyObject* main = PyImport_AddModule("__main__")) {
+            PyObject* dict = PyModule_GetDict(main);
+            PyObject* r = PyRun_String("import td as __au_td\n__au_tempo = float(__au_td.root.time.tempo)\n",
+                                       Py_file_input, dict, dict);
+            if (r) Py_DECREF(r); else PyErr_Clear();
+            if (PyObject* t = PyDict_GetItemString(dict, "__au_tempo")) {
+                const double d = PyFloat_AsDouble(t);
+                if (d > 0) myTdTempo = d;
+            }
+        }
+        PyGILState_Release(g);
+        return myTdTempo;
     }
 
     void sendEvent(AVAudioUnitMIDIInstrument* mi, const MidiEvent& e)
@@ -1717,6 +1752,7 @@ private:
     std::atomic<bool> myWantCue{false};
     std::string myBankPath;
     int myBankStatus = -12345;
+    double myTdTempo = 120; int myTempoAge = 0;
     MidiSeq  mySeq;
     double   mySeqPos = 0, mySeqPrev = -1;
     uint64_t mySeqClock = 0;

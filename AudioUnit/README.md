@@ -61,6 +61,16 @@ wiring needed. Set `MIDI File` on the **MIDI File** page and it plays.
 | `Play Mode` = **Specify Index** | `Position` (0–1) drives the position directly |
 | `Play` / `Loop` / `Speed` | stop holds position and releases held notes; negative `Speed` rewinds without emitting notes |
 | `Cue` / `Cue Point` / `Cue Pulse` | jump to a point — **works while stopped** |
+| `Sync to TD Tempo` | multiplies the speed by *TouchDesigner's BPM / the file's BPM* |
+
+Playback follows the **tempo written in the MIDI file** (the `FF 51 03` tempo map, honoured through
+tempo changes; 120 BPM if the file has none) — TouchDesigner's timeline BPM is ignored, and
+"Locked to Timeline" locks to timeline *seconds*, not bars. Turn on **`Sync to TD Tempo`** to make
+the file follow `root.time.tempo` instead; the file's own tempo shows up as `file_bpm` in the Info
+CHOP. Being MIDI, only the tempo changes — pitch stays put.
+
+**Measured**: a 116 BPM file with TouchDesigner at 300 BPM ran at **2.586x** with the toggle on
+(300 / 116 = 2.586) and at exactly **1.00x** with it off.
 
 The parser handles format 0 and 1, the tempo map, and running status. Notes, program changes,
 controllers and pitch bend are all forwarded, so a multi-track file plays with its own orchestration
@@ -349,6 +359,16 @@ AU Instrument は Standard MIDI File を自分で読んで再生する。操作�
 | `Play Mode` = **Specify Index** | `Position`(0〜1)で位置を直接指定 |
 | `Play` / `Loop` / `Speed` | 停止するとその場で保持し鳴っている音は止める。`Speed` 負値は逆送り(ノートは出さない) |
 | `Cue` / `Cue Point` / `Cue Pulse` | 頭出し。**停止中でも効く** |
+| `Sync to TD Tempo` | 再生速度に *TouchDesigner の BPM ÷ ファイルの BPM* を掛ける |
+
+再生は **MIDI ファイルに書かれているテンポ**に沿う(`FF 51 03` のテンポマップ。途中のテンポチェンジも
+反映。テンポ指定が無いファイルは 120 BPM)。TouchDesigner のタイムライン BPM は見ておらず、
+「Locked to Timeline」もタイムラインの**秒**に合わせるので小節には合わない。
+TD 側のテンポに追従させたいときは **`Sync to TD Tempo`** を On にする。ファイル自身のテンポは
+Info CHOP の `file_bpm` で確認できる。MIDI なので**変わるのはテンポだけで音程は不変**。
+
+**実測**: 116 BPM のファイルを TouchDesigner 300 BPM で再生すると、On で **2.586倍**
+(300 ÷ 116 = 2.586)、Off でちょうど **1.00倍**。
 
 パーサは format 0 / 1・テンポマップ・ランニングステータスに対応。ノート・プログラムチェンジ・
 コントローラ・ピッチベンドをそのまま送るので、多トラックのファイルが**本来の楽器編成のまま**鳴る
