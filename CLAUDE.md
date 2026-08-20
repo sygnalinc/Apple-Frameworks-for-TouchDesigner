@@ -7506,3 +7506,23 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   35〜50ms との差は10〜20ms。代償(音が TD に戻らない)の方が大きい。
   **10ms 台にするには楽器側が CoreMIDI を自分で開く**必要がある(将来の選択肢として記録)
 - README(英日)に「レイテンシ」節を追加。**AU Effect には付けない**(入力が TD 側なので効かない)
+
+### 2026-08-19 TD 標準 Audio VST は楽器に対応していると判明(前回の書き方を訂正)
+
+- ユーザー質問「TD標準の Audio VST は instrument に対応してる?」→ **対応している**。実測:
+  - Audio VST の実体 **`libC_CHOP.dylib`** が JUCE ホストの
+    `JUCE_VSTPluginHost::sendMidiBytes` / `sendMidiCommand` を参照(未定義シンボル)
+  - CHOP 自体に **MIDI 送信の Python メソッドが11個**(`sendNoteOn` / `sendNoteOff` /
+    `sendControl` / `sendPitchBend` / `sendProgram` / `sendAfterTouch` / `sendChannelPressure` /
+    `sendExclusive` / `sendAllNotesOff` / `panic` / `send`)。`sendNoteOn` には `noteOffDelay`、
+    `send` には `timestamp` がある
+  - `minInputs = 0`(音声入力なしで成立する=楽器の形)
+- **したがって「TD は楽器をホストできない」は誤りで、正しくは「TD は Audio Unit をホストできない」**。
+  AU Instrument が埋めるのは楽器の穴ではなく **AU の穴**。README(英日)を訂正
+- **鳴らし方の設計差**: TD標準は **Python メソッド呼び出し**、こちらは **CHOP のチャンネル**
+  (`ch1n60`)。これは好みではなく **C++ Custom OP の SDK ではカスタム Python メソッドを
+  生やせない**ため。結果的に CoreMIDI In CHOP を配線するだけで完結するのはこちらの利点
+- 調べ方のメモ: **どの dylib に実装があるかは `strings` でパラメータラベルを探す**
+  (`Custom Bus Layout` → libC_CHOP.dylib)。そこから `nm -u` で外部依存を見ると、
+  その op が何を呼んでいるかが分かる。`nm -a` を大きな dylib 全体に掛けると数分かかるので、
+  対象を絞ってから使う

@@ -14,6 +14,11 @@ Hosts **Audio Units** in TouchDesigner. Two operators share one implementation:
 Pick a plugin, automate its parameters from CHOP channels, and open the plugin's own GUI.
 TouchDesigner's own Audio VST CHOP is **VST3-only** (`libJUCE.dylib` carries `VST3PluginFormat`
 and no `AudioUnitPluginFormat`, measured), so on a stock Mac it finds 0 plugins where these find 30.
+It *does* host instruments — `libC_CHOP.dylib` imports `JUCE_VSTPluginHost::sendMidiBytes` and the
+CHOP exposes `sendNoteOn` / `sendControl` / `panic` and eight more MIDI methods — so the gap these
+operators fill is **Audio Units**, not instruments as such. The two also differ in how you play
+them: TD's takes notes through **Python method calls**, while AU Instrument takes them as **CHOP
+channels**, so a CoreMIDI In CHOP wires straight in (a C++ Custom OP cannot add Python methods).
 
 ### Latency
 
@@ -266,7 +271,11 @@ cd AudioUnit && ./build.sh   # → build/AudioUnitCHOP.plugin
 プラグインを選び、CHOP のチャンネルでパラメータを動かし、プラグイン自身の GUI も開ける。
 TouchDesigner 標準の Audio VST CHOP は **VST3 専用**(`libJUCE.dylib` に `VST3PluginFormat` は
 あるが `AudioUnitPluginFormat` は無い・実測)なので、素の Mac では VST3 が0個に対し
-こちらは30個見つかる。
+こちらは30個見つかる。**楽器自体は TD 標準でもホストできる**(`libC_CHOP.dylib` が
+`JUCE_VSTPluginHost::sendMidiBytes` を参照し、CHOP に `sendNoteOn` / `sendControl` / `panic` など
+MIDI メソッドが11個ある)。したがってこの op が埋めるのは「楽器」ではなく **Audio Unit** の穴。
+鳴らし方も違い、TD 標準は **Python のメソッド呼び出し**、AU Instrument は **CHOP のチャンネル**
+なので CoreMIDI In CHOP をそのまま繋げる(C++ Custom OP は Python メソッドを生やせないため)。
 
 ### レイテンシ
 
