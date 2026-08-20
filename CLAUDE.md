@@ -7737,3 +7737,23 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **教訓**: 「窓を時刻で切る」設計は、同時刻に複数イベントがある実データで簡単に破綻する。
   **どこまで出したかは索引で持つ**。また `if (x < 0)` のような復帰処理は、
   それを意図的に負にする処理より**前**に置かないと打ち消し合う
+
+### 2026-08-21 AU Instrument に Sample Rate パラメータを追加(既定でデバイスに追従)
+
+- ユーザー「Mac 標準機能で Audio Device Out より高品質に鳴らす op は作れるか」→ 調査したところ、
+  **TD の音声出力は HAL Output AudioUnit + 自前の `AudioConverter`**(`libCA.dylib` の未定義シンボルで確認)で、
+  **デバイスのレートは変えない**。実測: 内蔵出力は 48000Hz 固定(44100/48000/88200/96000 対応)、
+  hog mode は誰も持っていない。→ **44.1k のチェーンを 48k のデバイスへ出すたびに変換が入っていた**
+- Audio Device Out のパラメータを全部確認したが、**レート指定・排他モード・ビット深度指定は無い**
+  (driver / device / outputs / bufferlength / volume / pan / clamp / スピーカー配置のみ)
+- **CoreAudio 側は特別な権限なしで制御できることを実測**: デバイスの
+  `kAudioDevicePropertyNominalSampleRate` を 48000→44100→復帰(status 0)、
+  `kAudioDevicePropertyHogMode` の取得と解放(status 0)。専用 op を作る余地はある
+- **ただし一番効くのは「TD 側をデバイスと同じレートで回す」こと**。そして
+  **私の AU Instrument は 44100 決め打ち**でチェーンを 44.1k に引きずっていた(自分の落ち度)。
+  → `Sample Rate` パラメータを追加(`Device` 既定 / 44100 / 48000 / 88200 / 96000)。
+  `Device` は `kAudioHardwarePropertyDefaultOutputDevice` のレートを 120 cook キャッシュで読む
+- **実測**: Device→48000(60fps で 800サンプル/フレーム)、44100→735、96000→1600。
+  いずれもエンジンが追従し警告なし。レート変更時は engine を作り直すので1バッファ途切れる
+  (cook 21ms はその過渡。定常は 0.007ms)
+- AU Effect には付けない(エフェクトは入力のレートで動く)

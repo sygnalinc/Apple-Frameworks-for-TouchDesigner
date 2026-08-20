@@ -128,6 +128,7 @@ inline float valueToCurve(AudioUnitParameterOptions curve, float v, float lo, fl
 }
 
 // エフェクト(aufx)と楽器(aumu)の違いはここだけ。あとは全部共通
+#import <CoreAudio/CoreAudio.h>
 #include "MidiSeq.h"
 
 struct AUKind {
@@ -348,14 +349,14 @@ public:
         g->timeslice = true;   // オーディオフィルタなので必須（入出力のサンプル数を TD が揃える）
     }
 
-    bool getOutputInfo(CHOP_OutputInfo* info, const OP_Inputs*, void*) override
+    bool getOutputInfo(CHOP_OutputInfo* info, const OP_Inputs* in, void*) override
     {
         // 入力がモノでもステレオを出す。true を返して 2ch を明示しないと、
         // 出力 ch 数が入力に一致してしまい channels[1] が範囲外になる（AVAudio Spatial の教訓）
         info->numChannels = 2;
         // **音を生成して出す CHOP はサンプルレートを明示しないと 60Hz 扱いになる**
         // (CoreAudio Tap で踏んだ罠)。エフェクトは入力に合わせるので TD 任せでよい
-        if (myKind.instrument) info->sampleRate = 44100;
+        if (myKind.instrument) info->sampleRate = (float)instrumentRate(in);
         return true;
     }
     void getChannelName(int32_t i, OP_String* name, const OP_Inputs*, void*) override
@@ -473,6 +474,16 @@ public:
             { OP_NumericParameter p("Drywet"); p.label = "Dry / Wet"; p.page = P; p.defaultValues[0] = 1;
               p.minSliders[0] = 0; p.maxSliders[0] = 1; p.minValues[0] = 0; p.maxValues[0] = 1;
               p.clampMins[0] = true; p.clampMaxes[0] = true; m->appendFloat(p); }
+        }
+        if (myKind.instrument) {
+            // **出力サンプルレート。** Device にしておくと出力デバイスのレートに合わせるので、
+            // TouchDesigner 側でのサンプルレート変換が入らない(実測: 内蔵出力は 48kHz なので、
+            // 44100 のまま出すと 44.1k→48k の変換が毎回かかる)
+            OP_StringParameter p("Samplerate"); p.label = "Sample Rate"; p.page = P;
+            const char* n[] = { "device", "44100", "48000", "88200", "96000" };
+            const char* l[] = { "Device", "44100", "48000", "88200", "96000" };
+            p.defaultValue = "device";
+            m->appendMenu(p, 5, n, l);
         }
         { OP_NumericParameter p("Gain"); p.label = "Output Gain"; p.page = P; p.defaultValues[0] = 1;
           p.minSliders[0] = 0; p.maxSliders[0] = 2; m->appendFloat(p); }
@@ -770,6 +781,33 @@ private:
     }
 
     // ------------------------------------------------------------ engine
+
+    // 出力デバイスの現在のレート。切り替わることもあるのでたまに読み直す
+    double deviceRate()
+    {
+        if (myRateAge > 0 && --myRateAge > 0 && myDevRate > 0) return myDevRate;
+        myRateAge = 120;
+        AudioObjectPropertyAddress da = { kAudioHardwarePropertyDefaultOutputDevice,
+                                          kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain };
+        AudioDeviceID dev = 0; UInt32 sz = sizeof(dev);
+        if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &da, 0, nullptr, &sz, &dev) == noErr && dev) {
+            AudioObjectPropertyAddress ra = { kAudioDevicePropertyNominalSampleRate,
+                                              kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain };
+            Float64 r = 0; sz = sizeof(r);
+            if (AudioObjectGetPropertyData(dev, &ra, 0, nullptr, &sz, &r) == noErr && r > 0) myDevRate = r;
+        }
+        return myDevRate;
+    }
+
+    double instrumentRate(const OP_Inputs* in)
+    {
+        const char* s = in ? in->getParString("Samplerate") : nullptr;
+        if (s && *s && strcmp(s, "device") != 0) {
+            const double r = atof(s);
+            if (r > 0) return r;
+        }
+        return deviceRate();
+    }
 
     // ------------------------------------------------------ 楽器(aumu)
     AVAudioUnitMIDIInstrument* midiUnit() const
@@ -1685,6 +1723,7 @@ private:
     std::string myBankPath;
     int myBankStatus = -12345;
     double myTdTempo = 120; int myTempoAge = 0;
+    double myDevRate = 44100; int myRateAge = 0;
     MidiSeq  mySeq;
     double   mySeqPos = 0, mySeqPrev = -1;
     bool     mySeqPlaying = false;

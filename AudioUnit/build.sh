@@ -17,7 +17,7 @@ build_one() {
   clang++ -std=c++17 -fobjc-arc -O2 -bundle -I "$SDK" -I "$PYINC" -I ../common \
     -undefined dynamic_lookup "$SRC" \
     -framework Foundation -framework AVFoundation -framework AudioToolbox \
-    -framework CoreAudioKit -framework AppKit \
+    -framework CoreAudioKit -framework CoreAudio -framework AppKit \
     -o "/tmp/$NAME.$$"
   mv "/tmp/$NAME.$$" "$OUT/MacOS/$NAME"
   cat > "$OUT/Info.plist" <<PLIST

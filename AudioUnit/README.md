@@ -50,6 +50,21 @@ CHOP.
   (piano rms 0.022 / violin 0.058 / oboe 0.072). DLSMusicDevice responds without a bank but is
   silent inside TouchDesigner, so **AUMIDISynth + the default bank** is the combination that works
 
+### Sample rate
+
+AU Instrument generates audio, so it has to declare its own rate. **`Sample Rate` defaults to
+`Device`**, which follows the current output device — on this Mac that is 48 kHz. Running the chain
+at the device's rate means **TouchDesigner never has to convert**: its audio output goes through a
+HAL Output AudioUnit with its own `AudioConverter` (measured in `libCA.dylib`), and it does not
+change the device rate, so a 44.1 kHz chain into a 48 kHz device is resampled on every buffer.
+
+Fixed rates (44100 / 48000 / 88200 / 96000) are there when you need to match other material.
+Changing the rate rebuilds the audio engine, which costs one glitchy buffer — set it once, not
+per-frame. AU Effect has no such parameter: an effect runs at whatever its input runs at.
+
+**Measured (M2)**: `Device` gave 48000 (800 samples per 60 fps frame), `44100` gave 735, `96000`
+gave 1600 — the engine follows each time, with no warnings.
+
 ### Playing a MIDI file
 
 AU Instrument reads Standard MIDI Files itself, with the transport Movie File In has — no CHOP
@@ -348,6 +363,21 @@ MIDI キーボードで弾いて音が遅れるときは、**ほぼ Audio Device
   `/System/Library/.../gs_instruments.dls`。読ませると音色がはっきり変わる
   (ピアノ rms 0.022 / ヴァイオリン 0.058 / オーボエ 0.072)。DLSMusicDevice はバンク無しでも
   音色は変わるが **TouchDesigner 内では無音**なので、**AUMIDISynth + 既定バンク**が正解
+
+### サンプルレート
+
+AU Instrument は音を生成する側なので、自分でレートを宣言する必要がある。
+**`Sample Rate` の既定は `Device`** で、そのときの出力デバイスに合わせる(この Mac では 48kHz)。
+デバイスと同じレートで回せば **TouchDesigner 側で変換が起きない** —
+TD の音声出力は HAL Output AudioUnit + 自前の `AudioConverter`(`libCA.dylib` で確認)で、
+**デバイスのレートは変えない**ため、44.1kHz のチェーンを 48kHz のデバイスに出すと毎バッファ変換される。
+
+固定値(44100 / 48000 / 88200 / 96000)は、他の素材に合わせたいときに使う。
+レートを変えると音声エンジンを作り直すので1バッファぶん途切れる。**毎フレーム変える値ではない**。
+AU Effect にこのパラメータは無い(エフェクトは入力のレートで動く)。
+
+**実測(M2)**: `Device` で 48000(60fps で1フレーム800サンプル)、`44100` で 735、
+`96000` で 1600。いずれもエンジンが追従し、警告なし。
 
 ### MIDI ファイルを再生する
 
