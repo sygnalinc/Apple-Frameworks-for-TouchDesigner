@@ -175,6 +175,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | [MapKit MapView](MapKit/) | TOP | **Apple Maps rendered live** — fly through the 3D map (satellite / hybrid, realistic 3D) at 57fps. Camera is two-way with the on-screen window; **Markers DAT** projects lat/lon to screen u/v so you can overlay your own geometry exactly on the map |
 | [MapKit LookAround](MapKit/) | TOP | **Look Around street-level imagery**, live. Heading / Look Pitch drive the view direction (two-way with drag) |
 | [MapKit Search](MapKit/) | DAT | **Search / geocode / reverse geocode / routes** (walking, driving, transit — with the full polyline) and **Look Around coverage** scanning |
+| [CoreAudio Out](CoreAudioOut/) | CHOP | experimental |
 | [CoreMIDI Out](CoreMIDI/) | CHOP | **MIDI out with hot-plug and device identity** (UniqueID survives re-plugging; manufacturer / model / online on its Info DAT). Send notes / CC from the parameters or from CHOP channels, plus **DAW transport (MMC) and sync — MIDI Clock or MTC** with per-packet timestamps |
 | [CoreMIDI In](CoreMIDI/) | CHOP | **MIDI in that builds its own channels**: keys / pads / knobs appear as `ch1n60` / `ch1c74` as they arrive (no need to list them first). Also turns **MIDI Clock into BPM / beat** and receives **MTC** |
 

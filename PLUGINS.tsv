@@ -9,6 +9,7 @@
 #   (macOS 27 の新 API を使うプラグインは 27.0 にする)
 #
 # 追加・昇格したらこの表を直すこと。tools/release.sh が追跡フォルダとの一致を検査する。
+CoreAudioOut	experimental	26.0
 name	status	minos
 AppleScript	released	26.0
 AudioToolboxMix	experimental	26.0

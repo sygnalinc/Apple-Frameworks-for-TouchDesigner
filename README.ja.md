@@ -174,6 +174,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [MapKit MapView](MapKit/) | TOP | **Apple マップをライブでレンダ** — 3D地図(衛星/ハイブリッド・Realistic 3D)の中を 57fps で飛べる。画面に出したウインドウとカメラは双方向。**Markers DAT** で緯度経度を画面 u/v へ射影できるので、自前のジオメトリを地図にぴったり重ねられる |
 | [MapKit LookAround](MapKit/) | TOP | **Look Around(街並みの実写)をライブ表示**。視線の向きは Heading / Look Pitch で操作(ドラッグと双方向) |
 | [MapKit Search](MapKit/) | DAT | **検索 / ジオコーディング / 逆ジオ / 経路**(徒歩・車・公共交通。ポリライン全点も)と **Look Around カバレッジ**の走査 |
+| [CoreAudio Out](CoreAudioOut/) | CHOP | 実験中 |
 | [CoreMIDI Out](CoreMIDI/) | CHOP | **ホットプラグと機材識別に対応した MIDI 出力**(UniqueID で挿し直しても同じ機材。製造元/モデル/オンライン状態は Info DAT)。パラメータからも CHOP チャンネルからも送れ、**DAW のトランスポート(MMC)と同期(MIDI Clock / MTC)** をパケット単位のタイムスタンプ付きで送出 |
 | [CoreMIDI In](CoreMIDI/) | CHOP | **届いた分だけチャンネルを自動生成する MIDI 入力**: 鍵盤・パッド・ノブが `ch1n60` / `ch1c74` として現れる(事前の列挙が要らない)。**MIDI Clock を BPM / 拍**に変換し、**MTC** も受信 |
 
