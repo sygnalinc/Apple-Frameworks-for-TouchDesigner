@@ -78,7 +78,9 @@ The inverse of corner pinning — cut the detected quad out and straighten it to
 This repo's CI Keystone TOP (experimental) does the same thing; it auto-sizes its output to the
 rectangle's real pixel size, at the cost of a CPU round trip (an extra frame or two of latency).
 Either way the detection itself is asynchronous, so with a moving camera the corners trail by a
-frame or two. The demo's `rectify` branch in `/project1/VisionRect` shows the Corner Pin wiring.
+frame or two. The demo in `/project1/VisionRect` shows the wiring: a photo of a document on a desk, rectified
+to an upright A4 page. Its output resolution is set to the document's real aspect (905x1280) —
+leaving it at the input's resolution stretches the cut region and skews the result.
 
 ### Build
 
@@ -157,7 +159,9 @@ GLSL TOP の入力0が元映像、入力1が貼り込む画像。
 このリポジトリの CI Keystone TOP(experimental)も同じことをする。あちらは出力解像度が矩形の
 実寸に自動で合う代わりに、CPU 経由のぶん1〜2フレーム余計に遅れる。どちらでも検出自体は
 非同期なので、カメラが動く素材では四隅が1〜2フレーム遅れて追う。
-demo.toe の `/project1/VisionRect` の `rectify` ブランチが Corner Pin の配線例。
+demo.toe の `/project1/VisionRect` が配線例。机の上の書類の写真を、真上から撮ったように
+起こしている。出力解像度は書類の実際の縦横比(905×1280 = A4 の 1:√2)にしてある —
+既定の『入力と同じ』のままだと切り出した領域を元画像の比に引き伸ばすので歪む。
 
 ### ビルド
 
