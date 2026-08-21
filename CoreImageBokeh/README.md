@@ -3,7 +3,7 @@
 入力画像とグレースケールマスクをCore ImageのMasked Variable Blurへ渡す非同期TOP。
 VisionSubject/VisionSegmentのマスクから被写体を保った背景ぼかしを作れる。
 
-実測（M2 / 640x426静止画）: 640x426 BGRA8を正立出力し、Keystoneとの同時cookでも
+実測（M2 / 640x426静止画）: 640x426 BGRA8を正立出力し、別のCore Image系TOPとの同時cookでも
 エラー・警告・クラッシュなし。
 
 ## 入力・出力

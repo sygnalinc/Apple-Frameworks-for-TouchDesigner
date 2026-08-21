@@ -198,7 +198,6 @@ and are unsupported. The source is here so you can build and try them yourself
 | [ColorSync](ColorSync/) | TOP | experimental |
 | [CI Bokeh](CoreImageBokeh/) | TOP | experimental |
 | [CI Enhance](CoreImageEnhance/) | TOP | experimental |
-| [CI Keystone](CoreImageKeystone/) | TOP | experimental |
 | [CoreLocation Beacon](CoreLocationBeacon/) | CHOP | experimental |
 | [CoreML Motion](CoreMLMotion/) | CHOP | experimental |
 | [CreateML](CreateML/) | DAT | experimental |

@@ -7833,3 +7833,17 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   VisionRect/README(英日)に手順(Perspective 必須 / Aspect Correct UVs は Off / 8本の式)を記載
 - 落とし穴: ①`Mapping` 既定は bilinear で台形が歪む ②Aspect Correct UVs=On だと v が縮んで
   四隅がずれる ③検出は非同期なので動くカメラでは四隅が1〜2フレーム遅れる
+
+### 2026-08-21 CI Keystone を利用者向けドキュメントから外した(リリース予定なし)
+
+- ユーザー「CI keystone はリリース予定ないので、ドキュメントにそれについて言及しないで」
+- **外した場所**: VisionRect/README(英日・正対化の節で代替として挙げていた)/ demo.toe の
+  `/project1/VisionRect` の note / **ルート README(英日)の実験中プラグイン表** /
+  CoreImageBokeh/README の実測メモ(「Keystoneとの同時cook」→「別のCore Image系TOPとの同時cook」)
+- **PLUGINS.tsv には残している**。`tools/release.sh` は**追跡フォルダと表が一致しないと止まる**
+  仕様なので、フォルダがある限り行を消せない(消すとリリースが通らない)。
+  status は experimental のままなので DMG には入らない
+- したがって「ルート README の実験中表 = PLUGINS.tsv の非released」という不変条件は
+  **CI Keystone のぶんだけ意図的に崩している**。次のセッションが『不整合』として
+  README に戻さないこと。本当に不要なら**フォルダごと削除**するのが筋
+- 正対化の手順自体は TD 標準の Corner Pin TOP だけで完結するので、ドキュメント上の損失はない
