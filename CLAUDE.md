@@ -7817,3 +7817,19 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   存在しないID選択で `selected device is not connected` エラー・running=0。復帰も正常
 - 検証の型: **デバイスのレート変更はシステム全体に効く**ので、実機スピーカーではなく
   仮想デバイス(BlackHole)で検証する。終わったら 48000 へ戻す
+
+### 2026-08-21 矩形の正対化: Corner Pin TOP で足りると実証 + demo に追加
+
+- ユーザー「VisionRect で写っている長方形を正対にする方法」→「CI Keystone ではなく
+  Corner Pin TOP でも同じことできる?」
+- **できる。Corner Pin TOP の Extract ページがまさに正対化**(四隅を指定して切り出し)。
+  実測: VisionRect の `rect1/tl:u` 等8chを式で Extract の四隅(fraction)に入れ、
+  **Mapping = Perspective** にすると、ギャラリー映像の斜めの絵画が正面向きに起きた
+- **CI Keystone(experimental)との違い**: Corner Pin は GPU で出力解像度は Common ページ
+  (既定=入力と同じ=切り出しの拡大になりがち)。CI Keystone は出力が矩形の実寸に自動で合うが、
+  CPU 経由で1〜2フレーム余計に遅れる。機能としては同等なので **demo には TD 標準の Corner Pin 版**
+  を入れた(experimental の利用例を demo.toe に入れない規約のため)
+- `/project1/VisionRect` に `rectify`(Corner Pin)→ `rect_out` のブランチを追加。note と
+  VisionRect/README(英日)に手順(Perspective 必須 / Aspect Correct UVs は Off / 8本の式)を記載
+- 落とし穴: ①`Mapping` 既定は bilinear で台形が歪む ②Aspect Correct UVs=On だと v が縮んで
+  四隅がずれる ③検出は非同期なので動くカメラでは四隅が1〜2フレーム遅れる

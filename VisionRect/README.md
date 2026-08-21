@@ -63,6 +63,23 @@ The paste is done by inverse mapping: build the projective transform `M` from th
 the four corners, apply `inverse(M)` to each output pixel to find `st` in the pasted image, and
 composite only where `st` is inside 0–1.
 
+### Rectifying a detected rectangle (perspective correction)
+
+The inverse of corner pinning — cut the detected quad out and straighten it to face the camera.
+**TouchDesigner's stock Corner Pin TOP does this** on its Extract page:
+
+1. Wire the source into a Corner Pin TOP and set **Mapping = Perspective** (the default bilinear
+   distorts a trapezoid)
+2. Set the four Extract corners (unit `fraction`) by expression:
+   `op('visionrect1')['rect1/tl:u']` and so on — tl/tr/bl/br × u/v, eight expressions
+3. Keep this operator's `Aspect Correct UVs` **off** — Extract wants raw 0–1 image coordinates
+4. Output resolution is the Common page (defaults to the input's; larger than the cut means upscaling)
+
+This repo's CI Keystone TOP (experimental) does the same thing; it auto-sizes its output to the
+rectangle's real pixel size, at the cost of a CPU round trip (an extra frame or two of latency).
+Either way the detection itself is asynchronous, so with a moving camera the corners trail by a
+frame or two. The demo's `rectify` branch in `/project1/VisionRect` shows the Corner Pin wiring.
+
 ### Build
 
 ```sh
@@ -125,6 +142,22 @@ GLSL TOP の入力0が元映像、入力1が貼り込む画像。
 
 貼り込みは逆変換で行う。単位正方形 → 四隅 の射影変換 `M` を作り、出力画素 `uv` に
 `inverse(M)` を掛けて貼り込む画像側の `st` を求め、`0〜1` の内側だけ合成する。
+
+### 検出した矩形を正対化する(透視補正)
+
+貼り込みの逆 — 検出した四角形を切り出して正面向きに起こす。
+**TouchDesigner 標準の Corner Pin TOP の Extract ページでできる**:
+
+1. 元映像を Corner Pin TOP に繋ぎ、**Mapping = Perspective** にする(既定の bilinear は台形が歪む)
+2. Extract の四隅(単位 `fraction`)へ式で四隅を入れる:
+   `op('visionrect1')['rect1/tl:u']` など — tl/tr/bl/br × u/v の8本
+3. この op の `Aspect Correct UVs` は **Off のまま**(Extract は生の 0〜1 画像座標を受ける)
+4. 出力解像度は Common ページ(既定=入力と同じ。切り出しの実寸より大きいと拡大になる)
+
+このリポジトリの CI Keystone TOP(experimental)も同じことをする。あちらは出力解像度が矩形の
+実寸に自動で合う代わりに、CPU 経由のぶん1〜2フレーム余計に遅れる。どちらでも検出自体は
+非同期なので、カメラが動く素材では四隅が1〜2フレーム遅れて追う。
+demo.toe の `/project1/VisionRect` の `rectify` ブランチが Corner Pin の配線例。
 
 ### ビルド
 
