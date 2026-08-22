@@ -7847,3 +7847,36 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   **CI Keystone のぶんだけ意図的に崩している**。次のセッションが『不整合』として
   README に戻さないこと。本当に不要なら**フォルダごと削除**するのが筋
 - 正対化の手順自体は TD 標準の Corner Pin TOP だけで完結するので、ドキュメント上の損失はない
+
+### 2026-08-22 Metal コンピュート op の是非を実測(汎用は不要・Metal固有機能だけ価値あり)
+
+- ユーザー「computer shader 処理をさせる METAL op とかは可能性あるか?」→ 実測して判断
+- **SDK が macOS では GPU ハンドルを渡さない**: `TOP_ExecuteMode` は
+  **`CPUMem` / `CUDA` のみ**(`Unsupported` / `Reserved` を除く)。ヘッダに Metal も Vulkan も
+  0件(`grep -ci metal` = 0)。`OP_Context` が公開するのは `beginCUDAOperations` /
+  `endCUDAOperations` だけで、CUDA は Windows+NVIDIA 専用。POP SDK も `POP_BufferLocation::CUDA` のみ。
+  = **カスタム Metal op は必ず CPU 往復になる**
+- **往復コスト(M2・`scratchpad/mtlbench.m`・単純カーネル・50回平均)**:
+
+  | | 1920x1080 | 3840x2160 |
+  |---|---|---|
+  | CPU→GPU | 1.00 ms | 4.84 ms |
+  | **コンピュート実行** | **0.56 ms** | **1.22 ms** |
+  | GPU→CPU | 1.25 ms | 5.01 ms |
+  | 合計 | **2.80 ms** | **11.07 ms** |
+
+  **計算そのものは2割以下**で残りは全部コピー。しかもこれは Metal 側だけの数字で、
+  **TD の downloadTexture/アップロードは別途**掛かり、download は非同期なので1〜2フレーム遅れる
+- **TD には既に GPU 側のコンピュートシェーダがある**: `libTOP.dylib` に
+  `Compute Shader` / `Dispatch Size` / `Auto Dispatch Size` の文字列 = **GLSL TOP のコンピュートモード**
+  (glslmultiTOP を作ると `_compute` DAT が自動生成されるのがこれ)。TD は macOS では
+  **`libMoltenVK.dylib`(Vulkan on Metal)**で描いており、テクスチャの実体は Metal だが SDK が渡さない。
+  **同じ計算なら TD 標準の GLSL コンピュートがコピー0で勝つ**
+- **結論**: 汎用の「Metal コンピュート TOP」は**TD 標準より必ず遅くなるので作る価値がない**。
+  Metal に価値があるのは**「シェーダを走らせたい」ではなく「Metal にしか無いものを使いたい」**とき
+  (MPS / MPSGraph / MetalFX / ANE 相互運用 / レイトレ AS / simdgroup 行列)。
+  これは既に **Metal Upscale(MetalFX)** と **Metal MPS Analyze(MPSImageHistogram)** が
+  やっていることで、あの2つは往復コストを「機能の入場料」として払っている
+- **ゼロコピーの抜け道**: TD は `Syphon.framework` を同梱し **Syphon Spout In/Out TOP** がある。
+  IOSurface でプロセス間をゼロコピー共有できるので、外部 Metal プロセスと GPU 上でやり取りする道は
+  ある(グラフの外に出るので取り回しは悪い)
