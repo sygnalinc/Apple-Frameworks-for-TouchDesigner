@@ -7880,3 +7880,51 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 - **ゼロコピーの抜け道**: TD は `Syphon.framework` を同梱し **Syphon Spout In/Out TOP** がある。
   IOSurface でプロセス間をゼロコピー共有できるので、外部 Metal プロセスと GPU 上でやり取りする道は
   ある(グラフの外に出るので取り回しは悪い)
+
+### 2026-08-22 「ANE で計算を速く回す op」の可能性を実測 → 本命は ANE でなく CPU の AMX
+
+- ユーザー「他に Mac 固有の機能を使って Neural Engine とか計算を早く回せる op の可能性はない?」
+- **① ANE には公開APIが無い**。SDK に neural/ane のフレームワークは0件で、**触れるのは Core ML 経由だけ**。
+  = 「ANE op」は既に CoreML TOP/CHOP/DAT と Vision 系が実現済みで、新規性は無い
+- **② 汎用計算では ANE も GPU も CPU に勝てない**(`MLTensor`(macOS 15+・モデル無しで任意の
+  テンソル演算を投げられる)で行列積を実測・M2):
+
+  | 1024³ | GFLOPS |
+  |---|---|
+  | **cpuOnly** | **1233** |
+  | cpuAndNeuralEngine | 799 |
+  | cpuAndGPU | 725 |
+  | all | 744 |
+
+  **CPU が最速**。転送が支配的になるため。ANE が効くのは「ネットワーク全体がデバイス上に
+  留まる」Core ML モデルのときだけ = **既存 op のケースそのもの**
+- **③ 本命は AMX(CPU の行列コプロセッサ・Accelerate/BLAS 経由)**(`scratchpad/accbench.c`):
+
+  | | 素直な C | Accelerate/BLAS | 倍率 |
+  |---|---|---|---|
+  | 512³ | 20.4 ms (13 GFLOPS) | **0.35 ms (777 GFLOPS)** | **59倍** |
+  | 1024³ | 81.8 ms (26 GFLOPS) | **1.78 ms (1210 GFLOPS)** | **46倍** |
+
+  **ただし vDSP は単純な要素演算では効かない**(4M サンプルの vsma で **0.9倍**。clang が
+  自動ベクトル化するうえメモリ律速)。効くのは**構造のある演算**(FFT・行列積・畳み込み)だけ
+- **④ 決定的: TD の CHOP は Accelerate を一切使っていない**。`libCHOP.dylib` のリンクに
+  Accelerate 無し(使っているのは libCA / libJUCE / libndi / OpenCV / libphonon だけ)。
+  = **CHOP 領域の重い計算は加速の余地がまるごと残っている**
+- **⑤ 前回の Metal の壁がここには無い**: TOP は必ず CPU 往復するが、
+  **CHOP / DAT / SOP は元々 CPU 側のデータなので往復ペナルティがゼロ**。加速が素直に効く
+
+**op 候補(優先順)**
+
+1. **畳み込みリバーブ CHOP**(vDSP の FFT 分割畳み込み)。**TD の Convolve CHOP は `Filter Type` を
+   持つ小カーネル用**でリバーブ長の IR には使えない。CPU 側データ・vDSP が最も効く形で実用価値が高い
+2. **BNNS Realtime**(`BNNSGraph`・macOS 15+): **確保なし・決定的レイテンシ**で Core ML モデルを
+   回す、**音声コールバック向けに設計された API**。CoreAudio Out の IOProc / AU Effect の中で
+   ニューラル音声エフェクトが回せる
+3. **行列 / PCA CHOP**(Accelerate BLAS + LAPACK): 多ch CHOP の共分散→固有値→次元圧縮。
+   TD に `Principal` / `Eigen` / `Covariance` は無い
+4. **MLComputePlan(macOS 15+)による診断**: モデルのどの層が ANE/GPU/CPU で走るかを可視化。
+   **新 op ではなく既存 CoreML op の改善**(「ANE のつもりが CPU だった」を検出できる)
+5. **os_workgroup**(`kAudioDevicePropertyIOThreadOSWorkgroup`): デコードスレッドをデバイスの
+   ワークグループに参加させる。速度ではなく**信頼性**(CoreAudio Out の取りこぼし対策)
+
+- 未着手。着手するなら 1 から
