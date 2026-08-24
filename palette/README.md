@@ -3,8 +3,51 @@
 配線済みの Component を **TD の Palette(My Components / sygnal)** にドラッグ&ドロップで
 使えるようにした .tox。中身の**カスタムOP(.plugin)は別途インストールが必要**(下記)。
 
-> **.plugin(エンジン)+ .tox(テンプレート)の二層**: ネイティブUIのレンダリングは .plugin が担い、
+> **.plugin(エンジン)+ .tox(テンプレート)の二層**: 実際の処理は .plugin が担い、
 > .tox は「配線済み・パラメータ露出済み」の再利用テンプレート。.tox 単体では動かない(プラグイン必須)。
+
+## DroneCamera.tox
+
+**GameController CHOP を繋ぐだけでパッド操作できるドローン飛行カメラ**(Camera COMP)。
+`demo.toe` の `/project1/GameController` にあるドローンデモの「操縦部分」だけを取り出して、
+どのプロジェクトへでもコピペで持っていける形にまとめたもの。
+
+- **Camera COMP そのもの**なので、Render TOP の `Camera` にそのまま指定できる
+- **使い方は「GameController CHOP をワイヤで繋ぐ」だけ**(中の `in1` が受ける)
+- パッドが無くてもキーボードで動く(WASD / Q E / Space / Shift / Z X / R)
+- **複数置いても互いに干渉しない。** コピーすると必ず Home から始まる
+  (COMP の id を状態に持たせて複製を検出しているため、飛行中のものをコピーしても
+  位置を引き継がない)
+
+### 操作
+
+| 入力 | 動作 |
+|---|---|
+| 左スティック / WASD | 前後 = **カメラが向いている方向**へ進む(チルト込み) / 左右 = 水平に平行移動 |
+| 右スティック X / Q E | バンク旋回(倒した量ぶん傾き、その傾きで旋回する。戻せば水平へ復帰) |
+| 右スティック Y | チルト(俯仰)。上に倒すと見上げる |
+| R2 / Space ・ L2 / Shift | 上昇 / 下降 |
+| L1 / R1 ・ Z / X | FOV 望遠 / 広角 |
+| Menu / R | Home へリセット(`Reset To Home` パルスと同じ) |
+
+### パラメータ
+
+- **Drone**: `Active` / `Keyboard Fallback` / `Rumble On Landing` / `Reset To Home` /
+  `Speed` / `Lift Speed` / `Turn Rate` / `Tilt Rate` / `FOV Rate` / `Stick Deadzone` /
+  `Home Position` / `Home Heading` / `Home Tilt` / `Home FOV`
+- **Limits**: `Air Damping` / `Bank Response` / `Bank Max` / `Tilt Min` / `Tilt Max` /
+  `FOV Min` / `FOV Max` / `Altitude Min` / `Altitude Max` / `Range`(**0 = 無制限**)
+
+**必要プラグイン**: [GameController](../GameController/) → `GameControllerCHOP.plugin`
+(キーボードだけで動かすならプラグイン無しでも使える)
+
+> **Rotate Order は `zxy` 固定**。roll を最初に適用することでバンクが**カメラの光軸まわり**になり、
+> 傾けても視線方向が変わらない。`xyz` に変えると傾けたときに視線ごと動いてしまう。
+
+**実測(M2)**: 疑似パッドで前進 → z が減り高度が Altmin まで下がる / バンク上限 ±46°・離すと 0 へ復帰 /
+上昇で高度 12 → 64 / FOV が Fovmax 160 まで / Menu と `Reset To Home` で Home (0,12,34) へ復帰。
+実機パッド(`lsticky = 1.0`)でも追従し、`lstickx = -0.088` は Deadzone 0.15 内なので正しく無視された。
+飛行中の状態をコピーしても、コピー先は次のフレームで Home から始まることを確認。
 
 ## NativePanel.tox
 
@@ -64,10 +107,10 @@
 
 ## Palette への登録
 
-`NativePanel.tox` を TD のユーザーpaletteフォルダへ置く:
+使いたい .tox を TD のユーザーpaletteフォルダへ置く:
 
 ```
-~/Library/Application Support/Derivative/TouchDesigner099/palette/sygnal/NativePanel.tox
+~/Library/Application Support/Derivative/TouchDesigner099/palette/sygnal/
 ```
 
 TD の **Palette Browser**(左の Palette パネル)に `My Components > sygnal > NativePanel` として現れる。

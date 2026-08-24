@@ -163,6 +163,10 @@ different device) crashed TouchDesigner this way. Every CoreHaptics call here is
 its own camera view, a third-person view, a live input panel and scene switching in one container.
 The wiring and controls are written up in the `note` DAT inside it.
 
+The flying camera from that demo is packaged as a reusable Camera COMP —
+[`palette/DroneCamera.tox`](../palette/README.md#dronecameratox). Drop it into any project,
+wire this CHOP into it, and it flies. Nothing else to set up.
+
 What matters for **using the CHOP**:
 
 | You want | Channels |
@@ -344,6 +348,10 @@ cd GameController && ./build.sh   # → build/GameControllerCHOP.plugin
 `/project1/GameController` に、このCHOPで3D空間のカメラを操縦する例を置いてある。
 搭載カメラの映像・サードパーソン・入力パネル・シーン切替を1つのコンテナにまとめたもの。
 配線と操作の詳細はコンテナ内の `note` DAT に書いてある。
+
+このデモの飛行カメラは、そのまま使い回せる Camera COMP として切り出してある →
+[`palette/DroneCamera.tox`](../palette/README.md#dronecameratox)。
+**任意のプロジェクトに置いて、このCHOPをワイヤで繋ぐだけ**で同じように操作できる。
 
 **このCHOPを使う側の要点**:
 

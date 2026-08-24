@@ -8002,3 +8002,43 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
   この数字を信じて映像と音を合わせると外す。同期は実測で詰めること
 - AirPlay 機器の**発見**は既存の Network Discovery DAT でできる(`_airplay._tcp` / `_raop._tcp`)
 - **結論: 新規 op なし。** 作れないし、作らなくても届く
+
+### 2026-08-22 ドローン飛行カメラを再利用可能な Camera COMP に切り出し(palette/DroneCamera.tox)
+
+- ユーザー「GameController のデモにある DroneCamera を他のプロジェクトでも使いやすくしたい。
+  そのままコピペして GameController CHOP を繋いだら同じように操作できるように」
+- **Camera COMP に子オペレータを持たせて自己完結させた**。中身は `in1`(CHOP In)/ `keys`
+  (Keyboard In)/ `fly`(Execute DAT・onFrameEnd)/ `resetpar`(Parameter Execute)。
+  デモの `drone` DAT から**操縦部分だけ**を移植し、`geo_camera`+子カメラの2段構成をやめて
+  **カメラ自身の tx/ty/tz/rx/ry/rz/fov を直接動かす**形にした(サードパーソン・テレメトリ・
+  HUD はデモ固有なので持ち込まない)
+- **`Camera COMP に CHOP In を置くとワイヤ入力ソケットができる**(実測: `inputConnectors` が 1 になり、
+  GameController CHOP を繋ぐと中の `in1` に19チャンネルが届く)。これで「繋ぐだけ」が成立した
+- パラメータは2ページ: **Drone**(Active / Keyboard Fallback / Rumble On Landing / Reset To Home /
+  Speed / Lift Speed / Turn Rate / Tilt Rate / FOV Rate / Stick Deadzone / Home 一式)、
+  **Limits**(Air Damping / Bank Response / Bank Max / Tilt Min·Max / FOV Min·Max /
+  Altitude Min·Max / Range=0で無制限)。デモの定数をそのまま既定値にした
+- **`rord = zxy` を COMP 側で固定**(roll を最初に適用 → バンクがカメラの光軸まわりになる)
+
+**踏んだ罠(いずれも実測で切り分け)**
+
+1. **`appendToggle` は `.default` を設定しても現在値が変わらない。** `Active` が False のままで
+   `fly` が毎フレーム走っているのに何も起きず、原因究明に一番時間を使った。**`.default` と `.val` の
+   両方を設定する**(数値 par は dict でまとめて両方入れていたので無事だった)
+2. **`op.fetch()` は親を遡って探す。** COMP 内から `c.fetch('drone')` すると、**親 `/project1/GameController`
+   にあるデモ自身の `drone` 状態を拾ってしまう**。自分の storage だけを見るには **`c.storage.get(...)`**。
+   なお `fetch(..., searchParents=False)` はこの TD では未対応(`unexpected keywords`)
+3. **COMP をコピーすると storage ごと複製される** → コピー先が元の飛行位置を引き継ぐ。
+   **状態に `owner: c.id` を持たせ、id が一致しなければ Home から初期化**する。
+   実測: 飛行中(88,99,77)の状態をコピーしても、コピー先は次フレームで Home (0,12,34) から始まり、
+   元は 88,99,77 のまま(id 42275 / 42290 で独立)
+4. デモの `keys` フォールバックは**死にコードだった**(`/project1/GameController/keys` が存在せず、
+   さらに Keyboard In のチャンネル名は `w` ではなく **`kw`**)。COMP 内に `keys` を置いて実際に効くようにした
+
+**検証(M2・疑似パッド + 実機パッド)**: Home 初期化 (0,12,34)/(-16,0,0)/fov60 → 前進で z が減り高度が
+Altmin 0.7 まで下降 → バンク上限 ±46°・離すと 0.000 へ復帰 → 上昇で 12→64 → FOV が Fovmax 160 →
+Menu と Reset パルスで Home 復帰。**実機パッドでも `lsticky=1.0` に追従**し、`lstickx=-0.088` は
+Deadzone 0.15 内で正しく無視。**tox から復元したインスタンスでも同じ挙動**を確認
+
+- `palette/DroneCamera.tox`(4.3KB)として保存。TD の `palette/sygnal/` にも置き、`paletteData.json` に登録
+- palette/README.md に節を追加、GameController/README.md(英日)から導線を追加。demo.toe 保存済み
