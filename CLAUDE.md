@@ -8042,3 +8042,34 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
 
 - `palette/DroneCamera.tox`(4.3KB)として保存。TD の `palette/sygnal/` にも置き、`paletteData.json` に登録
 - palette/README.md に節を追加、GameController/README.md(英日)から導線を追加。demo.toe 保存済み
+
+### 2026-08-22 GameController デモを DroneCamera 主導へ組み替え(旧 drone スクリプトを廃止)
+
+- ユーザー「元の drone Script は使わないようにして、今の DroneCamera を使って元のカメラと同じ状態に。
+  geo_camera は DroneCamera の子供にするので、THIRD PERSON View は今と同じ見え方に」
+- **新しい構成**:
+  - **飛行は `DroneCamera`(Camera COMP)が自分で行う**。`render_pov` の camera も DroneCamera。
+    旧 `cam`(geo_camera の子だった POV カメラ・tz=-0.95)は不要になったので削除
+  - **機体モデル `geo_camera` は DroneCamera の子**。local の tx/ty/tz と rx/ry/rz は全部 0 なので
+    機体はカメラ原点に一致する。`render_pov` の geometry から外してあるので自分の機体は POV に写らない
+  - **旧 `drone` DAT を削除し、`view` DAT を新設**。担当は**サードパーソンのビュー切替
+    (CHASE/TOP/MAP)とテレメトリだけ**。**DroneCamera の公開パラメータ(tx/ty/tz・rx/ry/rz・fov)を
+    読むだけ**でコンポーネントの内部状態には触らない(速度は位置の差分から出す)。
+    HUD は従来どおり `vj` が `storage['telemetry']` を読んで組み立てる
+- **親子付けはノードのワイヤ**(ユーザーが実施)。**Object COMP の COMP 入力に繋ぐ方式**で、
+  `parentobject` パラメータは**空のまま**・`parentxformsrc` も `heirarchy` のまま。
+  それでも子の `worldTransform` は親と完全一致する(実測: 最大差 0.00e+00)
+- **私の勘違い**: 「子にする」を**ネットワークの入れ子**と解釈して geo_camera を DroneCamera の中へ
+  コピーしてしまった。ユーザーが元に戻して「親子関係はノードで繋いで実現してます」と指摘。
+  **TD の Object COMP の親子付けはワイヤが基本**で、入れ子にすると `render_tps.geometry` の
+  パスが変わって参照が外れる(実際に外れて機体が TPS に写らなくなった)。ワイヤ方式の方が正しい
+- **踏んだ罠**: **`worldTransform` は親子付けを反映するが、`parentobject` は空を返す**ので、
+  パラメータだけ見ると「親子付けされていない」と誤読する。判定は
+  **`inputCOMPConnectors[0].connections`**(`.owner.path` で親が取れる)か、
+  **local を変えて world がどう動くか**で行う(tx=100 にしたら親の回転が乗った位置へ飛んだ)
+- **検証(M2・実機パッド)**: 3モードとも実測 — CHASE(機体から 6.03 の距離・同じ高さ=水平)/
+  TOP(機体の真上ちょうど +28.0・rx=-90・fov 72)/ MAP(t=(0,210,0)・rx=-90・fov 70)。
+  TPS に機体(緑・camMAT 0.16/0.8/0.48)が正しく写り、テレメトリも ALT/SPD/FOV/HDG/TILT/BANK/VIEW
+  が出る。全ノードでエラー・警告なし
+- `note` DAT を新構成に更新。`palette/DroneCamera.tox` は**storage を空にしてから保存**
+  (飛行中の状態が焼き込まれないように)
