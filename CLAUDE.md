@@ -8073,3 +8073,24 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
   が出る。全ノードでエラー・警告なし
 - `note` DAT を新構成に更新。`palette/DroneCamera.tox` は**storage を空にしてから保存**
   (飛行中の状態が焼き込まれないように)
+
+### 2026-08-22 DroneCamera: 左右スティックの割り当てを総入れ替え
+
+- ユーザー指示で L/R スティックの役割を丸ごと交換:
+
+  | | 旧 | 新 |
+  |---|---|---|
+  | FLY(視線方向へ前後) | L STICK Y | **R STICK Y** |
+  | STRAFE(水平の平行移動) | L STICK X | **R STICK X** |
+  | BANKED TURN(バンク旋回) | R STICK X | **L STICK X** |
+  | TILT(俯仰) | R STICK Y | **L STICK Y** |
+
+- **キーボードの割当は変えていない**(WASD = 前後左右 / Q E = 旋回)。フォールバックは
+  スティックではなく**機能**に紐づいているので、読むチャンネル名だけを差し替えれば済んだ
+- **実測(一時コピー + 疑似パッドで4項目とも確認)**: R STICK Y → z 34→-73.7(前進)/
+  R STICK X → x 0→98.6 で z は 34 のまま(純粋な平行移動)/ L STICK X → rz -46.00(Bankmax)で
+  ry が回る / L STICK Y → rx 26.00(Tiltmax)
+- **検証は実機を邪魔しないよう一時コンテナのコピーで行う**。ユーザーがパッドを触っていると
+  live の値が動いて判定が壊れる(既知)
+- 揃えた箇所: `fly` DAT の入力とヘッダコメント / 画面の CONTROLS(`help` TOP)/ `note` DAT /
+  `palette/README.md` の操作表 / `palette/DroneCamera.tox`(storage を空にして再保存)
