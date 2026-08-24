@@ -7973,3 +7973,32 @@ opLabelとソース/フォルダ/バンドル名がずれていたものを監�
 
 **効かないので作らないもの**: 点群の座標変換(メモリ律速・素直に書く方が3倍速い。GPU の仕事)、
 単純な要素演算(vDSP で 0.9倍)、DTW(動的計画法で行列積にならない)
+
+### 2026-08-22 AirPlay op の可否を調査 → 作れない&作る必要がない(Window COMP で完結)
+
+- ユーザー「AirPlay op を作るのはどう」「touch の TOP から AirPlay に直接映像を送れたらいい」
+- **映像を AirPlay へ送る公開 API は存在しない**(検証の連鎖・すべて SDK 実確認):
+
+  | 調べたもの | 結果 |
+  |---|---|
+  | `AVPlayer.allowsExternalPlayback` | macOS 10.11+ で**公開されている唯一の AirPlay 映像経路** |
+  | `AVPlayerItem` の初期化 | **`initWithAsset:` / `initWithData:` / `initWithURL:` のみ** = ファイル/データ/URL しか再生できず、**生成フレームを流し込む口が無い** |
+  | `AVSampleBufferDisplayLayer` | 生フレームを描ける唯一のクラスだが**ルーティング機能なし**(External が付くのは DRM 保護のみ) |
+  | `AVOutputContext` / `AVOutputDevice` / `AVExternalPlayback` | **公開ヘッダに無し**(SPI) |
+  | `AVRoutePickerView` | ルーティング対象は **`AVPlayer` だけ** |
+  | `AVRouteDetector` | 「他の経路があるか」の bool のみ(`detectsCustomRoutes` は iOS 専用) |
+  | 送信機構の実体 | `AirPlaySender.framework` = **private** |
+
+  = 公開 API の AirPlay は「**ファイルを再生している AVPlayer の出力先を切り替える**」ためのもので、
+  生成した映像を送る用途には最初から穴が空いていない
+- **しかし目的は既存の仕組みで達成できる**。**AirPlay 受信機は macOS からは「ディスプレイ」として見える**。
+  実測(この Mac): `Projector Warp Receiver` が **1920x1080 のディスプレイ**として接続され、
+  同じものが **AirPlay 種別の CoreAudio 出力デバイス(id=140)** としても見えていた
+  → **Window COMP** で完結する(`libC_OBJ.dylib` でパラメータ実確認):
+  **`winop`(出す TOP を直接指定)+ `monitor`(AirPlay のディスプレイ)+ `fullscreen`**。
+  Perform ウインドウもプラグインも不要。音声は Audio Device Out / CoreAudio Out CHOP の Device で同じ機器
+- **実測した注意点**: AirPlay デバイスが CoreAudio に申告する遅延は **0 フレーム**(内蔵スピーカーは 74 =
+  1.54ms)。**AirPlay の実ネットワーク/バッファ遅延はデバイス遅延として報告されない**ので、
+  この数字を信じて映像と音を合わせると外す。同期は実測で詰めること
+- AirPlay 機器の**発見**は既存の Network Discovery DAT でできる(`_airplay._tcp` / `_raop._tcp`)
+- **結論: 新規 op なし。** 作れないし、作らなくても届く
