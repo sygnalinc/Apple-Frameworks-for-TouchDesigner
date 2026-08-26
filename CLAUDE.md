@@ -8213,3 +8213,18 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
   = **API バージョンが食い違う TD では、拒否されるのではなく TD ごとクラッシュする**。3件とも修正
 - **apiscan が無言で落ちること自体が「戻り値を見ていない」の検出器になる**(SETUP.md に明記)
 - 最終確認: **インストール済み84個すべて common=1・不一致なし・読めないものなし**
+
+### 2026-08-26 Vision Subject: instanceMask は常に 512x512(アスペクト比を保たない)
+
+- ユーザー「Instance Mask RGBA とは何?」の確認中に実測。README が「低解像度」とだけ書いていたので具体化した
+- **`obs.instanceMask` は入力に関わらず常に 512x512**。1280x720 / 3024x4032 / 720x720 / 320x180 の
+  どれを入れても 512x512 で、**アスペクト比を保たない**(16:9 は正方形に潰れる)。
+  元の絵に重ねるには Fit TOP の fill / stretch で引き伸ばし直す必要がある
+  (SAM2 のデモで同じ処理を挟んでいたのと同じ理由)
+- 影響するのは **Instance Masks (RGBA)** と、今回追加した **Instance ID Map** の2モード。
+  Soft Mask と Cutout は `generateScaledMaskForImageForInstances:` /
+  `generateMaskedImageOfInstances:` が入力解像度で返すので影響なし
+- Instance Masks (RGBA) の中身も明記した: 1番目→R / 2→G / 3→B / 4→A に **0 か 255** で入れ、
+  **5番目以降は警告もなく捨てている**(`if (idx >= 1 && idx <= 4)`)。
+  1人だけ欲しいなら新しい `Instance` パラメータのほうが上位互換(入力解像度・ソフト・上限なし)で、
+  このモードが今も唯一なのは「4人を別チャンネルとして同時に持てる」点だけ

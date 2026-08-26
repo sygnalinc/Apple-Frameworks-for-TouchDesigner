@@ -18,8 +18,14 @@ the same `VNGenerateForegroundInstanceMaskRequest` (macOS 14+) behind Photos' "C
 |---|---|---|
 | Soft Mask | Mono32Float (input resolution) | A single combined soft mask of every subject (0–1) |
 | Cutout | BGRA (input resolution) | The subject cut out. **The background is transparent** (drop it straight into an Over COMP) |
-| Instance Masks | RGBA8 (low resolution) | Per-subject masks split across R/G/B/A (up to 4) |
-| Instance ID Map | Mono32Float (low resolution) | A label image: **0 = background, 1..N = the instance number**, stored as the raw number (not normalised). No 4-subject limit — pick a subject downstream with a comparison or a Threshold TOP |
+| Instance Masks | RGBA8 (always 512x512) | Subject 1 goes in R, 2 in G, 3 in B, 4 in A, as hard 0/255. **Subjects 5 and up are dropped silently.** Handy when you want four subjects as separate channels in one TOP |
+| Instance ID Map | Mono32Float (always 512x512) | A label image: **0 = background, 1..N = the instance number**, stored as the raw number (not normalised). No 4-subject limit — pick a subject downstream with a comparison or a Threshold TOP |
+
+**Both of these are always 512x512 and do not keep the aspect ratio** — measured with
+1280x720, 3024x4032, 720x720 and 320x180 inputs, all of which produce a 512x512 mask. To lay
+one over the original image, stretch it back with a Fit TOP set to fill/stretch. They are also
+hard-edged (0 or 255 / whole numbers), not soft. Soft Mask and Cutout come back at the input
+resolution with soft edges, so prefer those plus `Instance` when you want quality.
 
 ### Parameters
 
@@ -81,8 +87,14 @@ cd VisionSubject && ./build.sh   # → build/VisionSubjectTOP.plugin
 |---|---|---|
 | Soft Mask | Mono32Float(入力解像度) | 全被写体の統合ソフトマスク(0〜1) |
 | Cutout | BGRA(入力解像度) | 被写体を切り抜いた画像。**背景は透過**(そのまま Over COMP に載せられる) |
-| Instance Masks | RGBA8(低解像度) | 被写体ごとのマスクを R/G/B/A に分離(最大4個) |
-| Instance ID Map | Mono32Float(低解像度) | ラベル画像。**0 = 背景 / 1..N = インスタンス番号**を、正規化せず生の数値で入れてある。4個の上限が無いので、TD 側で比較や Threshold TOP で好きな被写体を選り分けられる |
+| Instance Masks | RGBA8(常に 512x512) | 1番目の被写体を R、2番目を G、3番目を B、4番目を A へ 0/255 で入れる。**5番目以降は警告もなく消える。** 4人ぶんを1枚の TOP に別チャンネルで持ちたいときに手軽 |
+| Instance ID Map | Mono32Float(常に 512x512) | ラベル画像。**0 = 背景 / 1..N = インスタンス番号**を、正規化せず生の数値で入れてある。4個の上限が無いので、TD 側で比較や Threshold TOP で好きな被写体を選り分けられる |
+
+**この2つは常に 512x512 で、アスペクト比を保たない**(1280x720 / 3024x4032 / 720x720 /
+320x180 のどれを入れても 512x512 になることを実測)。元の絵に重ねるには Fit TOP を
+fill / stretch にして引き伸ばし直す。輪郭も 0/255(整数)でソフトではない。
+Soft Mask と Cutout は入力解像度・ソフト輪郭で返るので、品質が要るときは
+そちらに `Instance` を組み合わせるほうがよい。
 
 ### パラメータ
 
