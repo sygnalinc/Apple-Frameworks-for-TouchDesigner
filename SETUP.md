@@ -51,6 +51,36 @@ grep -m1 'OP_CommonAPIVersion = ' \
 
 この2つが一致しない環境では、**そのマシンでビルドし直す**のが唯一の解。
 
+#### TD を複数入れている場合は `TD_APP` で SDK を選ぶ
+
+`/Applications/TouchDesigner.app` 以外の SDK でビルドしたいときは `TD_APP` を渡す:
+
+```bash
+TD_APP=/Applications/TouchDesigner_2.app ./build.sh   # 各プラグインのフォルダで1つずつ
+export TD_APP=/Applications/TouchDesigner_2.app       # そのシェルの間ずっと有効にする
+```
+
+**ビルドの最後に必ず使った SDK が表示される**ので、取り違えたらその場で分かる:
+
+```
+built: .../VisionSubjectTOP.plugin
+  SDK: /Applications/TouchDesigner_2.app (2025.32280)
+```
+
+インストール済みが全部揃っているかの確認:
+
+```bash
+cc -o /tmp/apiscan tools/apiscan.c
+for b in ~/Library/Application\ Support/Derivative/TouchDesigner099/Plugins/*.plugin; do
+  n=$(basename "$b" .plugin)
+  printf '%-34s ' "$n"; /tmp/apiscan "$b/Contents/MacOS/$n"
+done
+```
+
+`common=` が全件で揃っていること。**apiscan が無言で落ちる(rc=139)プラグインは
+`setAPIVersion()` の戻り値を見ていない**ので、`if (!info->setAPIVersion(...)) return;` を入れる
+(API 不一致のときに未設定の opType ポインタへ書いてクラッシュする)。
+
 ### 2.2 Xcode
 
 **ほぼ全てのプラグインは Command Line Tools だけで足りる**(`clang++` と `swiftc` が使えればよい。

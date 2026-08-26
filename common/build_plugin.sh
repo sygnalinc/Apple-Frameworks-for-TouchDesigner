@@ -17,7 +17,12 @@ set -e
 # （実際に CoreImageCode 等6件がこの状態でビルド不能になっていた）。
 source "$(dirname "${(%):-%N}")/version.sh"
 
-TD_SDK="${TD_SDK:-/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP}"
+# ビルドに使う TouchDesigner の SDK ヘッダ。TD を複数入れている場合は TD_APP で切り替える:
+#   TD_APP=/Applications/TouchDesigner_2.app ./build.sh
+# SDK のバージョンが動かす TD と食い違うと、TD は "provides an invalid opType name" という
+# 原因と無関係に見えるエラーでロードを拒否する(tools/apiscan.c で宣言バージョンを確認できる)。
+TD_APP="${TD_APP:-/Applications/TouchDesigner.app}"
+TD_SDK="${TD_SDK:-$TD_APP/Contents/Resources/tfs/Samples/CPlusPlus/CHOP}"
 
 build_td_plugin() {
     local name="$1"; shift
@@ -61,5 +66,11 @@ PLIST
 
     td_stamp_version "build/$name.plugin"   # バージョンを焼いてから署名
     codesign --force -s - "build/$name.plugin"
+    # どの TD の SDK でビルドしたかを必ず出す。ここが動かす TD と食い違うと
+    # TD は "provides an invalid opType name" という紛らわしいエラーで拒否する。
+    local td_ver
+    td_ver=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" \
+             "$TD_APP/Contents/Info.plist" 2>/dev/null || echo "?")
     echo "built: $(pwd)/build/$name.plugin"
+    echo "  SDK: $TD_APP ($td_ver)"
 }

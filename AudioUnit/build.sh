@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")"
 source ../common/version.sh
-SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
+SDK="${TD_APP:-/Applications/TouchDesigner.app}/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
 # Python.h: パネル生成・パラメータ書き戻し用(シンボルは実行時に TD 本体から解決)
 PYINC="/Applications/TouchDesigner.app/Contents/Frameworks/Python.framework/Versions/3.11/include/python3.11"
 rm -rf build

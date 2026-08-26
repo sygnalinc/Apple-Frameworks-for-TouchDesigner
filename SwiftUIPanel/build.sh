@@ -3,7 +3,7 @@
 set -e
 cd "$(dirname "$0")"
 source ../common/version.sh
-SDK_CHOP="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
+SDK_CHOP="${TD_APP:-/Applications/TouchDesigner.app}/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
 EPOCH=$(date +%s)
 rm -rf build
 NAME="SwiftUIPanelCHOP"

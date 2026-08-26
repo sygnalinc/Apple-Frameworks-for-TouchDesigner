@@ -36,7 +36,7 @@ if ! xcodebuild -version >/dev/null 2>&1; then
     exit 1
 fi
 
-SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
+SDK="${TD_APP:-/Applications/TouchDesigner.app}/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
 NAME=LLMMLXDAT
 OUT="build/$NAME.plugin/Contents"
 PRODUCTS="helper/.xcbuild/Build/Products/Release"

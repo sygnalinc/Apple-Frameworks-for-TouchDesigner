@@ -2,7 +2,7 @@
 set -e
 cd "$(dirname "$0")"
 source ../common/version.sh
-SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
+SDK="${TD_APP:-/Applications/TouchDesigner.app}/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
 NAME=SpeechActivityCHOP
 OUT="build/$NAME.plugin/Contents"
 rm -rf build

@@ -8183,3 +8183,33 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
   ピクセル形式、空 IndexSet の挙動は、どれもヘッダを読んだだけでは分からなかった
 - ビルド・署名・常設インストール済み。**TD は起動していなかったので次回起動時に反映される**
   (TD 内での視認確認は未実施)
+
+### 2026-08-26 ビルドに使う TD の SDK を `TD_APP` で切り替えられるようにした
+
+- ユーザー「/Applications/TouchDesigner_2.app の 32280 の SDK を使ってビルドして」
+- **背景(自分で事故を起こしていた)**: 既定の `/Applications/TouchDesigner.app` がいつの間にか
+  **2025.33070(`OP_CommonAPIVersion = 2`)** になっており、直前に私がビルドした VisionSubject だけが
+  **common=2**、他83個は全部 **common=1** という状態だった。CLAUDE.md 2026-08-07 に記録した
+  「invalid opType name」の事故そのものを再現していた
+
+  | | バージョン | OP_CommonAPIVersion |
+  |---|---|---|
+  | `/Applications/TouchDesigner.app` | 2025.33070 | **2** |
+  | `/Applications/TouchDesigner_2.app` | 2025.32280 | **1** |
+
+- **`TD_APP` を導入**。`common/build_plugin.sh` が `TD_APP`(既定 `/Applications/TouchDesigner.app`)
+  から `TD_SDK` を導き、**67個の build.sh の直書きパス**も `${TD_APP:-...}` 経由へ置換した。
+  `TD_APP=/Applications/TouchDesigner_2.app ./build.sh` で切り替わる
+- **ビルドの最後に使った SDK を必ず表示**するようにした(`SDK: /Applications/... (2025.32280)`)。
+  取り違えを黙って通さないための一行。実際これを入れた直後に、TD_APP 無しでビルドして
+  33070 に戻ってしまったのをその場で検出できた
+
+**副産物: apiscan が落ちる3プラグインを発見して修正**
+
+- 全84個を apiscan で走査したら、**AudioUnit Effect / AudioUnit Instrument / CoreAudio Out の3つが
+  無言で SIGSEGV(rc=139)**。いずれも今セッションで私が書いたもので、
+  **`info->setAPIVersion(...)` の戻り値を見ていなかった**(他81個は全部 `if (!...) return;`)
+- setAPIVersion が false のとき opType ポインタは未設定のままなので、そこへ書くと落ちる。
+  = **API バージョンが食い違う TD では、拒否されるのではなく TD ごとクラッシュする**。3件とも修正
+- **apiscan が無言で落ちること自体が「戻り値を見ていない」の検出器になる**(SETUP.md に明記)
+- 最終確認: **インストール済み84個すべて common=1・不一致なし・読めないものなし**

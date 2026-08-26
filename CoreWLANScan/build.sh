@@ -2,7 +2,7 @@
 # CoreWLAN Scan CHOP のビルド → build/CoreWLANScanCHOP.plugin
 # SSID取得用のヘルパー .app(独自Info.plist・Location用途文字列)を Contents/Resources/Helpers に同梱。
 cd "$(dirname "$0")"
-export TD_SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
+export TD_SDK="${TD_APP:-/Applications/TouchDesigner.app}/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
 # Python.h（callPythonCallback で Info DAT を自動生成する）。シンボルは実行時に TD 本体から解決。
 PYINC="/Applications/TouchDesigner.app/Contents/Frameworks/Python.framework/Versions/3.11/include/python3.11"
 export TD_EXTRA_CFLAGS="-I $PYINC -undefined dynamic_lookup"

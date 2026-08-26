@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")"
 
 source ../common/version.sh
-SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
+SDK="${TD_APP:-/Applications/TouchDesigner.app}/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
 rm -rf build
 
 build_one() {

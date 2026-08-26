@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")"
 
 source ../common/version.sh
-SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/SimpleShapesSOP"
+SDK="${TD_APP:-/Applications/TouchDesigner.app}/Contents/Resources/tfs/Samples/CPlusPlus/SimpleShapesSOP"
 NAME=RealityKitCaptureSOP
 OUT="build/$NAME.plugin/Contents"
 DYLIB="libPhotogrammetryHelper_$(date +%s).dylib"

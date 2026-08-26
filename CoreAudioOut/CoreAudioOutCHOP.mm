@@ -483,7 +483,10 @@ extern "C" {
 
 DLLEXPORT void FillCHOPPluginInfo(CHOP_PluginInfo* info)
 {
-    info->setAPIVersion(CHOPCPlusPlusAPIVersion);
+    // 戻り値を見ないと、SDK バージョンが食い違ったときに未設定の opType ポインタへ
+    // 書き込んでクラッシュする。TD 側に安全に拒否させる。
+    if (!info->setAPIVersion(CHOPCPlusPlusAPIVersion))
+        return;
     info->customOPInfo.opType->setString("Coreaudioout");
     info->customOPInfo.opLabel->setString("CoreAudio Out");
     info->customOPInfo.opIcon->setString("CAO");

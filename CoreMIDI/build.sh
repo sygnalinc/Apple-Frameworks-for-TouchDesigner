@@ -7,7 +7,7 @@
 set -e
 cd "$(dirname "$0")"
 source ../common/version.sh
-SDK_CHOP="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
+SDK_CHOP="${TD_APP:-/Applications/TouchDesigner.app}/Contents/Resources/tfs/Samples/CPlusPlus/CHOP"
 PYINC="/Applications/TouchDesigner.app/Contents/Frameworks/Python.framework/Versions/3.11/include/python3.11"
 rm -rf build
 

@@ -4,7 +4,7 @@
 set -e
 cd "$(dirname "$0")"
 source ../common/version.sh
-SDK_TOP="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP"
+SDK_TOP="${TD_APP:-/Applications/TouchDesigner.app}/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP"
 EPOCH=$(date +%s)
 rm -rf build
 

@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")"
 
 source ../common/version.sh
-SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP"
+SDK="${TD_APP:-/Applications/TouchDesigner.app}/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP"
 NAME=ImagePlaygroundTOP
 DYLIB="libPlaygroundHelper_$(date +%s).dylib"
 OUT="build/$NAME.plugin/Contents"

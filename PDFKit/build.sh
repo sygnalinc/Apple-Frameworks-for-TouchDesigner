@@ -3,7 +3,7 @@
 set -e
 cd "$(dirname "$0")"
 source ../common/version.sh
-SDK_TOP="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP"
+SDK_TOP="${TD_APP:-/Applications/TouchDesigner.app}/Contents/Resources/tfs/Samples/CPlusPlus/CPUMemoryTOP"
 rm -rf build
 build_one() {
   local NAME="$1" SRC="$2" SDK="$3" SUFFIX="$4"

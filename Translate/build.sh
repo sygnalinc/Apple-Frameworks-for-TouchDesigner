@@ -6,7 +6,7 @@ set -e
 cd "$(dirname "$0")"
 
 source ../common/version.sh
-SDK="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
+SDK="${TD_APP:-/Applications/TouchDesigner.app}/Contents/Resources/tfs/Samples/CPlusPlus/DAT"
 NAME=TranslateDAT
 OUT="build/$NAME.plugin/Contents"
 DYLIB="libTrHelper_$(date +%s).dylib"
