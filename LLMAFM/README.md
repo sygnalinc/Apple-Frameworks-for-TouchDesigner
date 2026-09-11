@@ -85,11 +85,30 @@ is enough to produce `status: error: Exceeded model context window size` (measur
 - For structured results, either use Output Schema above or instruct "reply in JSON only" and
   parse the DAT
 
-### macOS 27 (AFM3-generation) additions — experimental
+### macOS 27 (AFM3-generation) additions
 
-> **Unverified.** These are implemented and the parameters/diagnostics were checked in TD,
-> but generation itself is untested because Apple Intelligence is not enabled on the test
-> machine yet. macOS 26 behaviour is unchanged.
+> **Verified on macOS 27.0 (release build, M2, Apple Intelligence enabled) — with two hard
+> limits that are Apple's, not this OP's.** macOS 26 behaviour is unchanged.
+
+Measured (2026-09-11, `Assets/sample_objects.mp4` frame 60 for the image test):
+
+| Feature | On-Device | Private Cloud Compute |
+|---|---|---|
+| Text generation | **works** ("Red is a primary color because…", 76 in / 21 out tokens) | **fails** — see below |
+| Image input (Vision) | **works** ("a laptop, a banana, an apple, a cup of coffee, a succulent, and a notebook" — matches what YOLO finds in the same clip; 207 input tokens) | — |
+| Reasoning | **not supported.** `capabilities` = `vision toolCalling guidedGeneration` (no `reasoning`); any level other than Off returns `error: The selected model doesn't have the capabilities needed for this operation.` | listed in `capabilities`, but PCC itself fails |
+| `context_size` | 4096 | 32768 |
+| `availability` / `quotaUsage` | available | available / belowLimit |
+
+**Private Cloud Compute cannot be used from TouchDesigner.** `availability` says available and
+the quota is fine, but every inference fails with `ModelManagerServices.ModelManagerError 1046`.
+The FoundationModels binary carries the reason verbatim: *"To develop with PCC you must meet
+certain eligibility requirements … request access to the managed entitlement"*
+(https://developer.apple.com/contact/request/private-cloud-compute/). The entitlement has to be
+on the **host app** (TouchDesigner), which does not have it, and a plugin cannot add one. The same
+failure reproduces from a plain command-line tool, so it is not TD-specific. The OP appends this
+explanation to `status` when it happens. Since Reasoning only exists on PCC, **Reasoning is
+effectively unavailable in TD as well**.
 
 On macOS 27 FoundationModels moves to the new-generation model (AFM3) with an extended API.
 This OP adds:
@@ -122,10 +141,29 @@ Apple の **FoundationModels framework**（Apple Intelligence のオンデバイ
 
 実測（M2）: 日本語の実況テキスト生成が数秒・ストリーミングで出力。
 
-### macOS 27(AFM3世代)の新機能 — 実験中
+### macOS 27(AFM3世代)の新機能
 
-> **未検証。** 実装とパラメータ/診断の表示はTD実機で確認済みですが、検証機で
-> Apple Intelligence が未有効のため**生成そのものは未テスト**です。macOS 26 の挙動は不変。
+> **macOS 27.0(正式版・M2・Apple Intelligence 有効)で実機検証済み。ただし Apple 側の
+> 制約が2つある**(本OPの不具合ではない)。macOS 26 の挙動は不変。
+
+実測(2026-09-11・画像は `Assets/sample_objects.mp4` の60フレーム目):
+
+| 機能 | On-Device | Private Cloud Compute |
+|---|---|---|
+| テキスト生成 | **動く**("Red is a primary color because…"・入力76 / 出力21トークン) | **失敗** — 下記 |
+| 画像入力(Vision) | **動く**("a laptop, a banana, an apple, a cup of coffee, a succulent, and a notebook" — 同じ素材で YOLO が検出するものと一致・入力207トークン) | — |
+| Reasoning | **非対応。** `capabilities` は `vision toolCalling guidedGeneration` で `reasoning` が無く、Off 以外にすると `error: The selected model doesn't have the capabilities needed for this operation.` | `capabilities` にはあるが PCC 自体が失敗 |
+| `context_size` | 4096 | 32768 |
+| `availability` / `quotaUsage` | available | available / belowLimit |
+
+**Private Cloud Compute は TouchDesigner からは使えない。** `availability` は available・
+クォータも余裕があるのに、推論は必ず `ModelManagerServices.ModelManagerError 1046` で落ちる。
+FoundationModels のバイナリ自身がその理由を持っている: *「PCC で開発するには適格性要件を満たし、
+managed entitlement へのアクセスを申請する必要がある」*
+(https://developer.apple.com/contact/request/private-cloud-compute/)。このエンタイトルメントは
+**ホストアプリ**(TouchDesigner)に付いている必要があり、TD は持っておらず、プラグインから足すことも
+できない。素の CLI でも同じ失敗になるので TD 固有ではない。本OPはこの状況を検出して `status` に
+説明を付ける。**Reasoning は PCC にしか無いので、TD では実質使えない**ことになる。
 
 macOS 27 では FoundationModels が新世代モデル(AFM3)と拡張APIになり、本OPは以下に対応:
 

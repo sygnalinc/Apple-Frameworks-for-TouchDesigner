@@ -93,6 +93,33 @@ final class FMSession: @unchecked Sendable {
         if modelChanged { checkAvailability() }
     }
 
+    /// 生成エラーを人が読める形に。Private Cloud Compute は `availability` が available でも
+    /// **ホストアプリに Apple が申請ベースで付与する managed entitlement が無いと推論できず**、
+    /// `ModelManagerServices.ModelManagerError 1046` で落ちる(macOS 27.0 実測・素の CLI でも
+    /// TouchDesigner 内でも同じ)。FoundationModels 自身がバイナリ内に
+    /// 「request access to the managed entitlement」の案内文を持っている。素の -1 だけでは
+    /// 原因に辿り着けないので、この場合は理由を付ける
+    /// 注意: 必ず lock を握った状態で呼ばれる(catch ブロック内)。中で lock を取らないこと
+    private func describeError(_ error: Error) -> String {
+        var msg = error.localizedDescription
+        var chain: [NSError] = [error as NSError]
+        var seenMMS1046 = false
+        while let e = chain.popLast() {
+            if e.domain.contains("ModelManagerError") && e.code == 1046 { seenMMS1046 = true }
+            chain.append(contentsOf: e.underlyingErrors.map { $0 as NSError })
+        }
+        // 呼び出し元(各 catch ブロック)は既に lock を握っている。NSLock は再帰不可なので
+        // ここで lock を取ると自分でデッドロックし、メインスレッドの setConfig まで巻き込んで
+        // TD が固まる(実際に起こした)。ロック無しで読む(Int の読みで、呼び出し元がロック中)
+        let kind = modelKind
+        if seenMMS1046 || kind == 1 {
+            msg += " — Private Cloud Compute requires an Apple-granted managed entitlement on the host app"
+            msg += " (TouchDesigner does not have it; see https://developer.apple.com/contact/request/private-cloud-compute/)."
+            msg += " Use Model = ondevice."
+        }
+        return msg
+    }
+
     private func checkAvailability() {
         lock.lock(); let kind = modelKind; lock.unlock()
         if kind == 1 {
@@ -135,7 +162,16 @@ final class FMSession: @unchecked Sendable {
         switch model.availability {
         case .available:
 #if TD_AFM3
-            if #available(macOS 27.0, *) { updateCapabilities(model.capabilities) }
+            if #available(macOS 27.0, *) {
+                updateCapabilities(model.capabilities)
+                Task { [weak self] in   // SystemLanguageModel.contextSize も公開(async)
+                    if let cs = try? await model.contextSize {
+                        self?.lock.lock()
+                        self?.contextSize = cs
+                        self?.lock.unlock()
+                    }
+                }
+            }
 #endif
             setStatus("ready")
         case .unavailable(let reason):
@@ -286,7 +322,7 @@ final class FMSession: @unchecked Sendable {
         } catch {
             lock.lock()
             busy = false
-            status = "error: \(error.localizedDescription)"
+            status = "error: \(describeError(error))"
             if var last = history.last, last["role"] == "assistant", last["text"]!.isEmpty {
                 last["text"] = "(エラー)"
                 history[history.count - 1] = last
@@ -392,7 +428,7 @@ final class FMSession: @unchecked Sendable {
         } catch {
             lock.lock()
             busy = false
-            status = "error: \(error.localizedDescription)"
+            status = "error: \(describeError(error))"
             if var last = history.last, last["role"] == "assistant", last["text"]!.isEmpty {
                 last["text"] = "(エラー)"
                 history[history.count - 1] = last
@@ -508,7 +544,7 @@ final class FMSession: @unchecked Sendable {
         } catch {
             lock.lock()
             busy = false
-            status = "error: \(error.localizedDescription)"
+            status = "error: \(describeError(error))"
             lock.unlock()
         }
     }
@@ -616,7 +652,7 @@ final class FMSession: @unchecked Sendable {
         } catch {
             lock.lock()
             busy = false
-            status = "error: \(error.localizedDescription)"
+            status = "error: \(describeError(error))"
             let c = toolCont
             toolCont = nil
             pendingToolName = ""

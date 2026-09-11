@@ -12,6 +12,15 @@
 #   swiftc は `-target $TD_SWIFT_TARGET` の明示が必須。
 TD_MIN_MACOS="${TD_MIN_MACOS:-26.0}"
 export MACOSX_DEPLOYMENT_TARGET="$TD_MIN_MACOS"      # clang++ 用
+
+# どの TouchDesigner の SDK でビルドしているかを毎回表示する。
+# common/build_plugin.sh を通らない手組みの build.sh(1フォルダ複数バンドル・SPM 等)でも
+# ここは必ず source されるので、全ビルドに出る。TD_APP 無しで 33070 の SDK を掴んで
+# common=2 のバンドルを作り、TD 32280 に「plugin not found」と言われる事故を実際に起こした
+_td_app="${TD_APP:-/Applications/TouchDesigner.app}"
+_td_ver="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$_td_app/Contents/Info.plist" 2>/dev/null || echo "?")"
+echo "TD SDK: $_td_app ($_td_ver)  [TD_APP で切替]"
+unset _td_app _td_ver
 TD_SWIFT_TARGET="arm64-apple-macos$TD_MIN_MACOS"     # swiftc 用(-target で明示すること)
 
 TD_REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo ..)"

@@ -8250,3 +8250,51 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
   手組み build_one / SPM のもの(今回の4件)は出ないので、整合は apiscan で確認する
 - 未実施: 上記5件の常設インストール + TD 再起動 + AFM3 の実生成テスト(ユーザー確認待ち。
   3件は新規なので承認ダイアログが出る)
+
+### 2026-09-11 5件を常設インストール + TD 再起動 + AFM3 の実生成テスト(macOS 27.0 正式版)
+
+- ユーザー指示「ビルドした5件を常設 Plugins に入れて TD を再起動し、AFM3 の生成テスト」
+- **インストール**: VisionSubject / LLMAFM(更新)+ MusicUnderstanding / RealityKitSplat / VisionIterSeg
+  (新規)。実行ファイルの存在を確認してからコピー(空バンドル事故の予防)。常設 **87個・全 common=1**。
+  demo.toe は `project.save()` してから quit(ユーザーの編集を残す・保存ダイアログ回避)。
+  承認ダイアログは出なかった(3件新規でも)。5型とも新規 create で登録・パラメータ生成を確認
+
+**AFM3 実生成の結果(M2・Apple Intelligence 有効・初めての実機検証)**
+
+| | On-Device | PCC |
+|---|---|---|
+| テキスト | **成功**("Red is a primary color because…"・76 in / 21 out) | **失敗** |
+| 画像入力 | **成功**(sample_objects → laptop / banana / apple / coffee / succulent / notebook。YOLO の検出と一致・207 in) | — |
+| Reasoning | **非対応**(`capabilities` に reasoning 無し → "doesn't have the capabilities") | capabilities にはある |
+| context_size | 4096(helper 修正後・従来は 0) | 32768 |
+
+- **PCC は TD からは使えない(Apple の制約)**: `availability`=available・`quotaUsage`=belowLimit なのに
+  推論で `ModelManagerServices.ModelManagerError 1046`。**素の CLI でも同じ**。原因は FoundationModels の
+  バイナリ内の文言で確定 — *"To develop with PCC you must meet certain eligibility requirements …
+  request access to the managed entitlement"*(ModelManagerServices にも `missingEntitlement`)。
+  エンタイトルメントは**ホストアプリ**に要り、TD には無い(`codesign -d --entitlements` で確認)。
+  プラグインからは足せない。= **Reasoning も PCC 専用なので TD では実質使えない**
+  - XPC 越しなので Swift enum の description は落ち、NSError の code だけが届く。文字列は
+    `getsectiondata(__TEXT,__cstring)` を自プロセスで走査して見つけた(共有キャッシュ内なので
+    ディスクの strings は効かない)
+- **helper を2点改修**: ①`describeError()` — 1046 or PCC 選択時のエラーに理由を付ける
+  ②オンデバイスでも `SystemLanguageModel.contextSize` を出す(4096)
+
+**やらかし2件(いずれも自分の手で回復)**
+
+1. **`TD_APP` 無しでリビルドして common=2 を入れてしまった**。最初は付けていたが、エラー行を確認する
+   ために `zsh ./build.sh` を素で2回走らせ、最後が勝った。TD 32280 は新規ノードに
+   「The plugin required for this Custom OP was not found」を出す(**既存ノードは .toe の定義で
+   パラメータだけ残るので、そこを見ても気づけない**)。手組み build.sh は SDK 表示が無かった
+   → **`common/version.sh`(全 build.sh が経由)で `TD SDK: <app> (<ver>)` を毎回表示**するように。
+   **インストール前に apiscan で common を確認する**手順も定着させる
+2. **`describeError` の中で `lock.lock()` して TD を固めた**。呼び出し元の catch ブロックは既に
+   lock を握っており、**NSLock は再帰不可**。生成タスクが自分でデッドロック → ロック保持のまま →
+   メインスレッドの `fm_set_config` が `__psynch_mutexwait` で待つ → TD 全体がハング(MCP も 120秒
+   タイムアウト)。`sample <pid>` で一発で特定。`pkill -9` で回復し、ロック無しで読むよう修正。
+   **ロックの内側から呼ぶ関数にはロックを入れない**。コメントに前提を明記した
+- 検証の型: `Clear` と `Submit` を**同じ cook で処理させると Submit が消える**(下流が無い DAT は
+  pulse が溜まり、両方が同じ execute で処理される)。Clear → force cook → Submit と分ける。
+  moviefilein は file 設定直後の cook では 128x128 のまま(実時間で待つ)
+- 最終確認: PCC エラー後にオンデバイスへ戻して "56"(7×8)と即答・復帰も正常。
+  テストコンテナは削除して demo.toe 保存済み。README(LLMAFM 英日)を「検証済み+制約2点」に書き換え
