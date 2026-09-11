@@ -8228,3 +8228,25 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
   **5番目以降は警告もなく捨てている**(`if (idx >= 1 && idx <= 4)`)。
   1人だけ欲しいなら新しい `Instance` パラメータのほうが上位互換(入力解像度・ソフト・上限なし)で、
   このモードが今も唯一なのは「4人を別チャンネルとして同時に持てる」点だけ
+
+### 2026-09-11 この機(M2)を macOS 27.0 正式版へ更新 — 27 依存部分の動作を確認
+
+- ユーザー「os27 にアップデートした」。環境: **macOS 27.0 (26A428・正式版)**、`/Applications/Xcode.app`
+  (beta ではない)・SDK 27.0・Swift 6.4.0.34.1、**Metal Toolchain は有効なまま**(beta 更新時は
+  無効化されたが今回は無事)。TD は 33070 / 32280 の両方あり、インストール済み84個は全て minos 26.0
+- **27 に依存する5件を `TD_APP=/Applications/TouchDesigner_2.app` で並列ビルド → 全て成功**:
+  VisionSubject(対照)/ **MusicUnderstanding / RealityKitSplat / VisionIterSeg**(27 専用・
+  この機では初めてビルドできた)/ **LLMAFM**(SDK≥27 で `-D TD_AFM3` が自動有効)
+  - **`TD_MIN_MACOS` ガードは 27 機でも効く**: 5件とも **minos 26.0**、apiscan は全て common=1
+  - **AFM3 経路は実際にコンパイルされている**: helper dylib の `nm -u` に
+    `PrivateCloudComputeLanguageModel` 12 / `ReasoningLevel` 5 / `ContextOptions` 8 / `Attachment` 4
+- **測定の罠(自分で踏んだ)**: **Swift のシンボルは `strings` に出ない**(シンボルテーブルに
+  あって文字列セクションに無い)。`strings | grep` で 0 件だったので「AFM3 が入っていない」と
+  一度誤診した。**Swift 型の有無は `nm -u` で見る**。ObjC/C の文字列リテラルは `strings` でよい
+- **この機は Apple Intelligence が有効**(`CloudSubscriptionFeatures.optIn` に opted_in)。
+  = **AFM3 の生成(ondevice / PCC / Reasoning / 画像入力)を初めて実機で検証できる状態**。
+  27 beta 機は AI 未有効で status 確認止まりだった
+- `common/build_plugin.sh` の「使った SDK を表示」は **`build_td_plugin` を通るプラグインにしか出ない**。
+  手組み build_one / SPM のもの(今回の4件)は出ないので、整合は apiscan で確認する
+- 未実施: 上記5件の常設インストール + TD 再起動 + AFM3 の実生成テスト(ユーザー確認待ち。
+  3件は新規なので承認ダイアログが出る)
