@@ -96,7 +96,7 @@ Measured (2026-09-11, `Assets/sample_objects.mp4` frame 60 for the image test):
 |---|---|---|
 | Text generation | **works** ("Red is a primary color because…", 76 in / 21 out tokens) | **fails** — see below |
 | Image input (Vision) | **works** ("a laptop, a banana, an apple, a cup of coffee, a succulent, and a notebook" — matches what YOLO finds in the same clip; 207 input tokens) | — |
-| Reasoning | **not supported.** `capabilities` = `vision toolCalling guidedGeneration` (no `reasoning`); any level other than Off returns `error: The selected model doesn't have the capabilities needed for this operation.` | listed in `capabilities`, but PCC itself fails |
+| Reasoning | **not supported** (`capabilities` = `vision toolCalling guidedGeneration`, no `reasoning`; measured `error: The selected model doesn't have the capabilities needed for this operation.`) | listed in `capabilities`, but PCC itself fails |
 | `context_size` | 4096 | 32768 |
 | `availability` / `quotaUsage` | available | available / belowLimit |
 
@@ -108,16 +108,17 @@ certain eligibility requirements … request access to the managed entitlement"*
 on the **host app** (TouchDesigner), which does not have it, and a plugin cannot add one. The same
 failure reproduces from a plain command-line tool, so it is not TD-specific. The OP appends this
 explanation to `status` when it happens. Since Reasoning only exists on PCC, **Reasoning is
-effectively unavailable in TD as well**.
+effectively unavailable in TD as well**. For that reason **neither the Model nor the Reasoning
+menu is shown in the UI** — the OP always runs on-device with reasoning off.
 
 On macOS 27 FoundationModels moves to the new-generation model (AFM3) with an extended API.
 This OP adds:
 
 | Feature | Details |
 |---|---|
-| **Model menu** | `On-Device (AFM)` / `Private Cloud Compute` (Apple's server-side larger model) |
+| Model (on-device / PCC) | **Not exposed in the UI.** PCC can never run from TouchDesigner (entitlement, see above), so the OP is fixed to on-device. The helper code is kept behind `#if TD_AFM3` in case a host entitlement ever appears |
 | **Image input (Vision)** | `Image TOP` + `Use Image` on the Vision page — attach a TOP image to the prompt |
-| **Reasoning** | `Off / Light / Moderate / Deep` (`ContextOptions.ReasoningLevel`) |
+| Reasoning | **Not exposed in the UI.** Only the PCC model has it, and the on-device model rejects it, so the OP is fixed to Off |
 | **Diagnostics** | Info DAT: `model` / `capabilities`; Info CHOP: `context_size / input_tokens / output_tokens` |
 
 **macOS 26 compatibility is kept**: every 27-only API sits behind `#available(macOS 27.0, *)`.
@@ -152,7 +153,7 @@ Apple の **FoundationModels framework**（Apple Intelligence のオンデバイ
 |---|---|---|
 | テキスト生成 | **動く**("Red is a primary color because…"・入力76 / 出力21トークン) | **失敗** — 下記 |
 | 画像入力(Vision) | **動く**("a laptop, a banana, an apple, a cup of coffee, a succulent, and a notebook" — 同じ素材で YOLO が検出するものと一致・入力207トークン) | — |
-| Reasoning | **非対応。** `capabilities` は `vision toolCalling guidedGeneration` で `reasoning` が無く、Off 以外にすると `error: The selected model doesn't have the capabilities needed for this operation.` | `capabilities` にはあるが PCC 自体が失敗 |
+| Reasoning | **非対応**(`capabilities` は `vision toolCalling guidedGeneration` で `reasoning` 無し。実測 `error: The selected model doesn't have the capabilities needed for this operation.`) | `capabilities` にはあるが PCC 自体が失敗 |
 | `context_size` | 4096 | 32768 |
 | `availability` / `quotaUsage` | available | available / belowLimit |
 
@@ -164,14 +165,15 @@ managed entitlement へのアクセスを申請する必要がある」*
 **ホストアプリ**(TouchDesigner)に付いている必要があり、TD は持っておらず、プラグインから足すことも
 できない。素の CLI でも同じ失敗になるので TD 固有ではない。本OPはこの状況を検出して `status` に
 説明を付ける。**Reasoning は PCC にしか無いので、TD では実質使えない**ことになる。
+そのため **Model と Reasoning のメニューは UI に出していない**(常に on-device・Reasoning off で動く)。
 
 macOS 27 では FoundationModels が新世代モデル(AFM3)と拡張APIになり、本OPは以下に対応:
 
 | 機能 | 内容 |
 |---|---|
-| **Model メニュー** | `On-Device (AFM)` / `Private Cloud Compute`(Appleサーバ側の大型モデル・`PrivateCloudComputeLanguageModel`) |
+| Model(on-device / PCC) | **UI には出していない。** PCC は TouchDesigner からは動かない(上記 entitlement)ため on-device 固定。helper の実装は `#if TD_AFM3` の中に残してあり、ホスト側に entitlement が付く日が来れば戻せる |
 | **画像入力(Vision)** | Vision ページの `Image TOP` + `Use Image`。TOPの画像をプロンプトに添付(AFM3 は `capabilities.vision` 対応) |
-| **Reasoning** | `Off / Light / Moderate / Deep`(`ContextOptions.ReasoningLevel`)。推論を深くする |
+| Reasoning | **UI には出していない。** PCC のモデルにしか無く、on-device は拒否するので Off 固定 |
 | **診断** | Info DAT に `model` / `capabilities`(vision reasoning toolCalling guidedGeneration)、Info CHOP に `context_size / input_tokens / output_tokens` |
 
 **macOS 26 互換は維持**: 27専用APIは全て `#available(macOS 27.0, *)` ガード付きで、
@@ -199,8 +201,6 @@ index | role      | text
 | Temperature | 0.7 | ランダム性 |
 | Max Tokens | 512 | 最大生成トークン |
 | Keep Context (Multi-turn) | On | 会話の文脈を保持。オフなら毎回独立した1問1答 |
-| Model | ondevice | 生成モデル(macOS 27): On-Device (AFM) / Private Cloud Compute |
-| Reasoning | off | 推論レベル(macOS 27): Off / Light / Moderate / Deep |
 | Image TOP (Visionページ) | — | プロンプトに添付する画像TOP(macOS 27・vision対応モデル) |
 | Use Image (Visionページ) | Off | Onで Submit 時に Image TOP を添付(Tool Calling とは併用不可) |
 | Max Rows | 50 | 保持する履歴行数 |

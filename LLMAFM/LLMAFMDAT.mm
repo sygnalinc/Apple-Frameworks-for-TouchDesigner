@@ -83,10 +83,17 @@ public:
             myInstructions = instructions;
         }
 
-        // AFM3(macOS 27)設定: モデル(on-device/PCC)と reasoning レベルを毎cook反映
+        // AFM3(macOS 27)設定。Model(on-device / PCC)と Reasoning は **UI に出していない**:
+        //   - Private Cloud Compute は Apple が申請ベースで付与する managed entitlement が
+        //     ホストアプリ(TouchDesigner)に無いと推論できない(ModelManagerError 1046・実測)。
+        //     プラグインからは足せないので、選べても必ずエラーになる
+        //   - Reasoning は PCC にしか無い(オンデバイスの capabilities に reasoning が無い・実測)
+        //   helper 側の実装(#if TD_AFM3)は残してあるので、entitlement が付く日が来たら
+        //   下の kModel / kReasoning をパラメータ読み取りに戻すだけで復活する
         if (mySession) {
-            fm_set_config(mySession, (int32_t)inputs->getParInt("Model"),
-                          (int32_t)inputs->getParInt("Reasoning"));
+            const int32_t kModel = 0;       // 0 = on-device(固定)
+            const int32_t kReasoning = 0;   // 0 = off(固定)
+            fm_set_config(mySession, kModel, kReasoning);
         }
 
         // Submit パルス
@@ -215,26 +222,8 @@ public:
             p.clampMins[0] = true;
             manager->appendInt(p);
         }
-        {
-            // AFM3(macOS 27): 生成に使うモデル。PCCはAppleサーバ側の大型モデル
-            OP_StringParameter p("Model");
-            p.label = "Model";
-            p.page = "LLM AFM";
-            p.defaultValue = "ondevice";
-            const char* names[] = {"ondevice", "pcc"};
-            const char* labels[] = {"On-Device (AFM)", "Private Cloud Compute"};
-            manager->appendMenu(p, 2, names, labels);
-        }
-        {
-            // AFM3(macOS 27): reasoning レベル(ContextOptions.ReasoningLevel)
-            OP_StringParameter p("Reasoning");
-            p.label = "Reasoning";
-            p.page = "LLM AFM";
-            p.defaultValue = "off";
-            const char* names[] = {"off", "light", "moderate", "deep"};
-            const char* labels[] = {"Off", "Light", "Moderate", "Deep"};
-            manager->appendMenu(p, 4, names, labels);
-        }
+        // "Model"(on-device / PCC)と "Reasoning" のメニューは意図的に生やしていない。
+        // 理由は execute の fm_set_config 付近のコメントを参照(TD からは使えないため)
         {
             OP_NumericParameter p("Keepcontext");
             p.label = "Keep Context (Multi-turn)";

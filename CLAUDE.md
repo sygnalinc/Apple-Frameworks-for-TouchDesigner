@@ -8298,3 +8298,19 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
   moviefilein は file 設定直後の cook では 128x128 のまま(実時間で待つ)
 - 最終確認: PCC エラー後にオンデバイスへ戻して "56"(7×8)と即答・復帰も正常。
   テストコンテナは削除して demo.toe 保存済み。README(LLMAFM 英日)を「検証済み+制約2点」に書き換え
+
+### 2026-09-11 LLM AFM: Model(PCC)と Reasoning のメニューを UI から外した(コードは残す)
+
+- ユーザー「PCC も reasoning も使えないなら」→「UI に出さないで」
+- `setupParameters` から `Model` / `Reasoning` の2メニューを外し、`fm_set_config` には
+  **on-device / off を固定値**で渡す。helper 側の PCC / Reasoning 実装(`#if TD_AFM3`)はそのまま。
+  ホストに entitlement が付く日が来たら .mm の2箇所(パラメータ定義・読み取り)を戻すだけで復活する。
+  理由は .mm のコメントに書いた(「選べても必ずエラーになる選択肢を並べない」)
+- **既存 .toe への影響なし**: demo の Llmafm1〜3 は `Model` / `Reasoning` の保存値を持っていたが、
+  TD は無いパラメータを黙って捨てる。3ノードともエラー無し・`Useimage` は残る
+- 実測(再起動後): 新規ノードのパラメータから両方消え、Info DAT は `model=ondevice`、
+  **画像入力は健在**("A laptop, a banana, an apple, a succulent, a cup of coffee, and a notebook are
+  on the desk." 195 in / 31 out)。context_size 4096
+- README(英日)のパラメータ表から2行削除、AFM3 節は「UI に出していない」表記に
+- 検証の注意(再発): moviefilein は file 設定 + reloadpulse の後、**5秒程度は実時間で待たないと
+  128x128 のまま**。1〜2秒では足りず、一度「未ロード」で空振りした
