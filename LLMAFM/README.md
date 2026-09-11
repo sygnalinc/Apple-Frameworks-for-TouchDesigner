@@ -117,7 +117,7 @@ This OP adds:
 | Feature | Details |
 |---|---|
 | Model (on-device / PCC) | **Not exposed in the UI.** PCC can never run from TouchDesigner (entitlement, see above), so the OP is fixed to on-device. The helper code is kept behind `#if TD_AFM3` in case a host entitlement ever appears |
-| **Image input (Vision)** | `Image TOP` + `Use Image` on the Vision page — attach a TOP image to the prompt |
+| **Image input (Vision)** | `Image TOP` + `Use Image` on the Vision page — attach a TOP image to the prompt. **Both parameters are greyed out when the model reports no `vision` capability** (macOS 26, or a model without vision). If `Use Image` is still on in that state (e.g. a .toe saved on macOS 27 opened on 26) the OP warns and generates from text only instead of erroring |
 | Reasoning | **Not exposed in the UI.** Only the PCC model has it, and the on-device model rejects it, so the OP is fixed to Off |
 | **Diagnostics** | Info DAT: `model` / `capabilities`; Info CHOP: `context_size / input_tokens / output_tokens` |
 
@@ -172,7 +172,7 @@ macOS 27 では FoundationModels が新世代モデル(AFM3)と拡張APIにな�
 | 機能 | 内容 |
 |---|---|
 | Model(on-device / PCC) | **UI には出していない。** PCC は TouchDesigner からは動かない(上記 entitlement)ため on-device 固定。helper の実装は `#if TD_AFM3` の中に残してあり、ホスト側に entitlement が付く日が来れば戻せる |
-| **画像入力(Vision)** | Vision ページの `Image TOP` + `Use Image`。TOPの画像をプロンプトに添付(AFM3 は `capabilities.vision` 対応) |
+| **画像入力(Vision)** | Vision ページの `Image TOP` + `Use Image`。TOPの画像をプロンプトに添付。**モデルが `vision` を報告しない環境(macOS 26・vision 非対応モデル)では両パラメータがグレーアウト**する。その状態で `Use Image` が On のまま(27 で保存した .toe を 26 で開いた等)なら、エラーにせず警告を出してテキストだけで生成する |
 | Reasoning | **UI には出していない。** PCC のモデルにしか無く、on-device は拒否するので Off 固定 |
 | **診断** | Info DAT に `model` / `capabilities`(vision reasoning toolCalling guidedGeneration)、Info CHOP に `context_size / input_tokens / output_tokens` |
 

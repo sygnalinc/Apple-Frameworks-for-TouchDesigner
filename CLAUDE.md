@@ -8314,3 +8314,20 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
 - README(英日)のパラメータ表から2行削除、AFM3 節は「UI に出していない」表記に
 - 検証の注意(再発): moviefilein は file 設定 + reloadpulse の後、**5秒程度は実時間で待たないと
   128x128 のまま**。1〜2秒では足りず、一度「未ロード」で空振りした
+
+### 2026-09-11 LLM AFM: vision が無い環境では Image TOP / Use Image をグレーアウト
+
+- ユーザー「macOS 26 で開いた時は Vision は使えない様になって表示されますか?」→ **なっていなかった**。
+  両パラメータは無条件に生え、26 では Submit 後に status へ「image input requires macOS 27+」が
+  出るだけで、事前には分からなかった
+- 修正: helper の poll JSON `capabilities` に `vision` が無ければ `enablePar("Imagetop"/"Useimage", false)`
+  (状態が変わったときだけ呼ぶ)。それでも `Use Image` が On なら(27 で保存した .toe を 26 で開いた等)
+  `getWarningString` で警告し、**エラーで止めずテキスト生成へフォールバック**
+  - **DAT の `getWarningString` は `(OP_String*, void*)` で `inputs` を取らない**(CHOP/TOP と違う)。
+    値は execute で `myUseImageRequested` に控えて使う
+- **実測(この 27 機で両分岐を踏めた)**: 初回 cook = helper がまだ capabilities を返していない状態
+  (= macOS 26 が常にいる状態)で **`Useimage.enable=False` / `Imagetop.enable=False`**、
+  capabilities が来ると **True**。画像生成も引き続き成功("Banana."・197 in / 5 out)
+- **警告文は未観測**: この機では初回 cook の中で vision が報告されるため、「Use Image On かつ vision
+  無し」が cook をまたいで存在しない。26 では続くので出るはずだが、**論理であって実測ではない**。
+  26 機で開いたときに確認する(申し送り)

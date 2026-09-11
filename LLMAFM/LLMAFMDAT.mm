@@ -72,6 +72,15 @@ public:
     void execute(DAT_Output* output, const OP_Inputs* inputs, void*) override
     {
         myExecCount++;
+        // 画像入力(Vision ページ)は vision capability が無い環境ではグレーアウトする。
+        // macOS 26 では helper が capabilities を報告しない(空)のでここが false になる。
+        // enablePar はパラメータ UI を更新させるので、状態が変わったときだけ呼ぶ
+        myUseImageRequested = inputs->getParInt("Useimage") != 0;
+        if (myVisionOK != myVisionEnabledShown) {
+            inputs->enablePar("Imagetop", myVisionOK);
+            inputs->enablePar("Useimage", myVisionOK);
+            myVisionEnabledShown = myVisionOK;
+        }
         const char* instPar = inputs->getParString("Instructions");
         const std::string instructions = instPar ? instPar : "";
 
@@ -102,7 +111,10 @@ public:
             const char* prompt = inputs->getParString("Prompt");
             const char* schema = inputs->getParString("Schema");
             const bool useTools = inputs->getParInt("Enabletools") != 0;
-            const bool useImage = inputs->getParInt("Useimage") != 0;
+            // 画像入力は helper が vision capability を報告しているときだけ使う。
+            // 無い環境(macOS 26・または vision 非対応モデル)で Use Image が On のまま
+            // (27 で保存した .toe を 26 で開いた等)なら、エラーで止めずにテキスト生成へ落とす
+            const bool useImage = myUseImageRequested && myVisionOK;
             if (useImage && !useTools && submitWithImage(inputs, prompt)) {
                 // 画像つき生成(Vision)。成功したら通常経路はスキップ
             } else if (useTools) {
@@ -330,6 +342,14 @@ public:
             myWantToolResult = true;
     }
 
+    void getWarningString(OP_String* warning, void*) override
+    {
+        if (myUseImageRequested && !myVisionOK)
+            warning->setString("Use Image is on but this environment has no vision capability "
+                               "(needs macOS 27 and an on-device model that reports 'vision'); "
+                               "generating from text only");
+    }
+
     int32_t getNumInfoCHOPChans(void*) override { return 7; }
     void getInfoCHOPChan(int32_t index, OP_InfoCHOPChan* chan, void*) override
     {
@@ -423,6 +443,7 @@ private:
                     joined += c.UTF8String ?: "";
                 }
                 myCapabilities = joined;
+                myVisionOK = (joined.find("vision") != std::string::npos);
             }
             myContextSize = [dict[@"context_size"] intValue];
             myInputTokens = [dict[@"input_tokens"] intValue];
@@ -476,6 +497,9 @@ private:
     std::string myPendingTool, myPendingToolArgs;
     std::string myModelName = "ondevice";
     std::string myCapabilities;
+    bool myVisionOK = false;            // helper の capabilities に vision があるか
+    bool myUseImageRequested = false;   // Use Image の現在値(getWarningString は inputs を持たないため控える)
+    bool myVisionEnabledShown = true;   // enablePar で最後に UI へ伝えた状態(初回に必ず同期させる)
     int myContextSize = 0;
     int myInputTokens = 0;
     int myOutputTokens = 0;
