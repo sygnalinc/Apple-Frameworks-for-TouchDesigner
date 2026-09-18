@@ -197,6 +197,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [ColorSync](ColorSync/) | TOP | 実験中 |
 | [CI Bokeh](CoreImageBokeh/) | TOP | 実験中 |
 | [CoreAI](CoreAI/) | TOP | 実験中 — macOS 27+ |
+| [CoreAI LLM](CoreAI/#coreai-llm-dat) | DAT | 実験中 — macOS 27+(coreai-models バンドルの LLM / VLM チャット) |
 | [CI Enhance](CoreImageEnhance/) | TOP | 実験中 |
 | [CoreLocation Beacon](CoreLocationBeacon/) | CHOP | 実験中 |
 | [CoreML Motion](CoreMLMotion/) | CHOP | 実験中 |

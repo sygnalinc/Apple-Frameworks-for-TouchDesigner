@@ -52,6 +52,21 @@ cp -R ../../exports/da3-small_float32.aimodel <this repo>/models/
 Every folder under `coreai-models/models/` (edsr, yolo, sam3, clip, …) has the same `uv run export.py`;
 any exported model with an image input can be dropped into the CoreAI TOP.
 
+### LLM / VLM bundles (CoreAI LLM DAT)
+
+Language models export as a **bundle folder** (`metadata.json` + `<name>.aimodel` + `tokenizer/`;
+VLMs add `vision.aimodel` and `embed.aimodel`). Copy the whole folder and point the DAT's
+*Model Bundle* at it:
+
+```bash
+cd coreai-models/models/qwen3 && uv run export.py        # -> exports/mac/qwen3_1_7b_4bit_dynamic (about 1.2 GB)
+cd coreai-models/models/qwen3_vl && uv run export.py     # -> exports/vlm-fp16/qwen3_vl_2b (VLM, about 4 GB)
+cp -R ../../exports/mac/qwen3_1_7b_4bit_dynamic <this repo>/models/
+```
+
+Verified on an M2: qwen3 (1.7B / 4B), gemma_3 (4B), qwen3_vl (2B). Other recipes in the repo
+(mistral, phi_4, gemma_3n, gpt_oss …) use the same layout.
+
 ## Licenses
 
 Each model has its own license, separate from this repository's MIT license. Check the model

@@ -1,4 +1,4 @@
-# CoreAI TOP
+# CoreAI TOP / CoreAI LLM DAT
 
 **English** | [日本語](#日本語)
 
@@ -90,6 +90,77 @@ per input and output with `kind / dtype / shape`.
 - The op keeps the Core AI compilation cache the OS provides (`AIModelCache`); the second load of
   the same model is much faster than the first.
 
+## CoreAI LLM DAT
+
+The same folder also builds **CoreAI LLM DAT** (opType `Coreaillm`): a chat DAT that runs the
+LLM / VLM bundles exported by Apple's [coreai-models](https://github.com/apple/coreai-models)
+(Qwen3, Gemma 3, Mistral, Phi-4, Qwen3-VL …) fully on-device through Core AI. It is the Core AI
+counterpart of LLM MLX: the model runs in a **spawned helper process** (`coreai-llm-helper`,
+built from the coreai-models Swift package), tokens stream into the conversation table, and the
+multi-GB model plus its Metal state never live inside the TouchDesigner process.
+
+- Output table: `index / role / text` (+ `think` column when *Show Thinking Column* is on)
+- **Model Bundle** is the `exports/<name>` **folder** (contains `metadata.json`, the `.aimodel`
+  and `tokenizer/`), not the `.aimodel` itself
+- **Image input** (Vision page): with *Use Image Input* on, the *Image TOP* is captured at Submit
+  and sent to the model. Needs a VLM bundle (`kind = vlm` in the Info DAT); text-only models
+  report an error. Only the **latest** image is kept in the conversation; each VLM turn re-encodes
+  the image and replays the whole conversation (the engine's KV cache cannot be reused across
+  image turns), so multi-turn VLM chat gets slower as the history grows
+- **Enable Thinking**: reasoning models (Qwen3) emit `<think>…</think>`; off (default) appends
+  `/no_think` and the visible answer starts immediately. Thinking text goes to the `think` column
+- Info CHOP: `executes busy ready progress turns tokens_per_sec ttft_sec last_tokens context_length`.
+  Info DAT: `status / model / kind / context_length`
+
+### Getting an LLM / VLM bundle
+
+Same tool as the TOP models — clone coreai-models and run its exporter; the bundle lands in
+`exports/<name>/`:
+
+```bash
+cd coreai-models/models/qwen3 && uv run export.py            # → exports/mac/qwen3_1_7b_4bit_dynamic
+cd coreai-models/models/qwen3_vl && uv run export.py         # → exports/vlm-fp16/qwen3_vl_2b
+```
+
+Point *Model Bundle* at that folder (an expression like
+`project.folder + '/models/qwen3_1_7b_4bit_dynamic'` keeps it relative to the .toe).
+
+### Measured (M2 24 GB, macOS 27.0, helper standalone unless noted)
+
+Every LLM / VLM export in a local coreai-models checkout was run through the helper
+(`Name one primary color in one short sentence.`, greedy, thinking off):
+
+| Bundle | Load (first / cached) | Generation | Result |
+|---|---|---|---|
+| qwen3_1_7b_4bit | 36 s / 3 s | 34 tok/s standalone, **4–10 tok/s inside TD** | OK, multi-turn |
+| qwen3_4b_4bit | — / 7 s | 7.8 tok/s | OK (`/no_think` honored) |
+| qwen3_8b_4bit | — | 4.2 tok/s | OK |
+| gemma_3_4b_it_4bit | 67 s / 7–11 s | 7.4 tok/s | OK after the stop-token fix below |
+| gemma_3n_e2b_it_4bit | — | 3.0 tok/s | OK |
+| mistral_7b_instruct_v0_3_4bit | — | 0.7 tok/s | OK but swapping (4 GB model + TD resident) |
+| gpt_oss_20b | — | 1.8 tok/s | OK, 10 GB swap; Harmony `<|channel|>analysis` is not parsed as thinking |
+| phi_4_mini_instruct_4bit | 15 s | 1.0 tok/s | **broken export** — degenerate repetition; llm-runner gives the same and logs `RoPE freqs shape [48] must match half_embed [64]` |
+| qwen3_vl_2b (fp16, VLM) | 140 s / 19 s | 5–8 tok/s, image encode ≈ 4 s | OK inside TD: correct object list from a 1280×720 frame |
+| community gemma-4-E2B | — | — | **unsupported**: model takes 4 inputs (`ple_table`, `ple_scale`) the standard engine does not feed |
+| community gemma-4-12B (mm) | — | — | **unsupported**: Core AI's compiler aborts (`LLVM ERROR: cannot unwrap empty odiec_module_t`) — bundle built with a different toolchain; the helper dies and the DAT reports `helper exited` |
+
+Generation inside TD is slower than the standalone helper by a large factor (4–10 vs 34 tok/s
+for the same 1.7B model). Not explained yet — probably GPU contention with TD's own rendering.
+Rates above 4B parameters are dominated by memory pressure on a 24 GB machine with TD resident.
+
+### Notes
+
+- **Context is small and there is no truncation**: when the prompt exceeds `context_length` the
+  op reports an error; use *Reset Conversation*
+- Loading a new bundle resets `ready` / `progress` / `kind`; the helper reports progress while
+  Core AI compiles the model (first load of a 7B model can take minutes)
+- **Stop tokens**: coreai-models' exporter strips `added_tokens_decoder` from `tokenizer_config.json`,
+  so the library's `additionalStopTokenIds` finds nothing and Gemma keeps emitting `<end_of_turn>`
+  forever (llm-runner has the same problem with these exports). The helper therefore looks up the
+  well-known turn-end tokens (`<end_of_turn>`, `<|im_end|>`, `<|eot_id|>`, `<|end|>`, …) in the vocab
+  directly; the IDs it found are in the `ready` event (`stops`)
+- Diffusion bundles (FLUX) are out of scope for this DAT
+
 ## 日本語
 
 任意の **Core AI** モデル(`.aimodel`・macOS 27+)を TOP で回す。CoreML TOP の Core AI 版で、
@@ -170,12 +241,85 @@ Info DAT: `status`・`stage`・モデルパス・関数一覧・計算ユニッ�
 - グレー入力(`C = 1`)は BT.601 の重みで変換
 - コンパイル結果は OS の `AIModelCache` に残るので、同じモデルの2回目以降のロードは速い
 
+## CoreAI LLM DAT
+
+同じフォルダから **CoreAI LLM DAT**(opType `Coreaillm`)もビルドされる。Apple の
+[coreai-models](https://github.com/apple/coreai-models) が書き出す LLM / VLM バンドル
+(Qwen3・Gemma 3・Mistral・Phi-4・Qwen3-VL …)を Core AI で完全オンデバイス実行するチャット DAT。
+LLM MLX の Core AI 版で、モデルは**別プロセスのヘルパ**(`coreai-llm-helper`・coreai-models の
+Swift パッケージから生成)で動き、トークンは会話テーブルへストリーミングされる。数 GB のモデルと
+Metal の状態を TouchDesigner のプロセスに抱え込まない
+
+- 出力テーブル: `index / role / text`(*Show Thinking Column* オンで `think` 列が付く)
+- **Model Bundle** は `exports/<name>` の**フォルダ**(`metadata.json`・`.aimodel`・`tokenizer/`
+  が入っている)。`.aimodel` そのものではない
+- **画像入力**(Vision ページ): *Use Image Input* オンで、Submit 時に *Image TOP* を取り込んで
+  モデルへ渡す。VLM バンドル(Info DAT の `kind = vlm`)が必要で、テキスト専用モデルではエラーになる。
+  会話に残る画像は**最新の1枚**だけ。VLM のターンは毎回画像を再エンコードして会話全体を頭から
+  流し直す(画像ターンをまたいで KV キャッシュを使い回せない)ので、履歴が伸びるほど遅くなる
+- **Enable Thinking**: 推論モデル(Qwen3)は `<think>…</think>` を出す。オフ(既定)なら `/no_think`
+  を付けて回答から始まる。思考テキストは `think` 列へ
+- Info CHOP: `executes busy ready progress turns tokens_per_sec ttft_sec last_tokens context_length`。
+  Info DAT: `status / model / kind / context_length`
+
+### LLM / VLM バンドルの入手
+
+TOP のモデルと同じ手順。coreai-models を clone してエクスポータを走らせると `exports/<name>/` に
+バンドルができる:
+
+```bash
+cd coreai-models/models/qwen3 && uv run export.py            # → exports/mac/qwen3_1_7b_4bit_dynamic
+cd coreai-models/models/qwen3_vl && uv run export.py         # → exports/vlm-fp16/qwen3_vl_2b
+```
+
+*Model Bundle* にそのフォルダを指定する(`project.folder + '/models/qwen3_1_7b_4bit_dynamic'`
+のような式にすると .toe の位置に追従する)
+
+### 実測(M2 24GB・macOS 27.0・断りが無ければヘルパ単体)
+
+ローカルの coreai-models checkout にある LLM / VLM の書き出しを全部ヘルパに通した
+(`Name one primary color in one short sentence.`・greedy・思考オフ):
+
+| バンドル | ロード(初回 / キャッシュ後) | 生成 | 結果 |
+|---|---|---|---|
+| qwen3_1_7b_4bit | 36 s / 3 s | 単体 34 tok/s・**TD 内 4〜10 tok/s** | OK・マルチターン |
+| qwen3_4b_4bit | — / 7 s | 7.8 tok/s | OK(`/no_think` が効く) |
+| qwen3_8b_4bit | — | 4.2 tok/s | OK |
+| gemma_3_4b_it_4bit | 67 s / 7〜11 s | 7.4 tok/s | 下記の停止トークン修正後 OK |
+| gemma_3n_e2b_it_4bit | — | 3.0 tok/s | OK |
+| mistral_7b_instruct_v0_3_4bit | — | 0.7 tok/s | OK だがスワップ(4GB のモデル + TD 常駐) |
+| gpt_oss_20b | — | 1.8 tok/s | OK・スワップ 10GB。Harmony 形式の `<|channel|>analysis` は思考として分離されない |
+| phi_4_mini_instruct_4bit | 15 s | 1.0 tok/s | **書き出しが壊れている** — 同じ語の繰り返し。llm-runner でも同じで、コンパイル時に `RoPE freqs shape [48] must match half_embed [64]` |
+| qwen3_vl_2b(fp16・VLM) | 140 s / 19 s | 5〜8 tok/s・画像エンコード約 4 s | TD 内で 1280×720 のフレームから物体一覧を正答 |
+| community gemma-4-E2B | — | — | **非対応**: 入力が4つ(`ple_table`・`ple_scale`)で標準エンジンが渡せない |
+| community gemma-4-12B(mm) | — | — | **非対応**: Core AI のコンパイラが落ちる(`LLVM ERROR: cannot unwrap empty odiec_module_t`)。別ツールチェーン製のバンドル。ヘルパごと落ち、DAT は `helper exited` を出す |
+
+TD 内の生成はヘルパ単体より大きく遅い(同じ 1.7B で 4〜10 対 34 tok/s)。原因は未特定
+(TD 自身の描画との GPU 競合が有力)。4B 超のレートは 24GB 機で TD が常駐した状態のメモリ圧で決まっている
+
+### 注意
+
+- **コンテキストは小さく、切り詰めはしない**。プロンプトが `context_length` を超えるとエラーになる。
+  *Reset Conversation* で消す
+- 別バンドルをロードすると `ready` / `progress` / `kind` はリセットされる。Core AI がモデルを
+  コンパイルする間ヘルパが progress を報告する(7B の初回は数分)
+- **停止トークン**: coreai-models のエクスポータは `tokenizer_config.json` から `added_tokens_decoder` を
+  落とすので、ライブラリの `additionalStopTokenIds` は何も拾えず、Gemma が `<end_of_turn>` を延々と
+  吐き続ける(llm-runner でもこの書き出しでは同じ)。ヘルパは既知のターン終端トークン
+  (`<end_of_turn>`・`<|im_end|>`・`<|eot_id|>`・`<|end|>` …)を語彙から直接引く。見つけた ID は
+  `ready` イベントの `stops` に入る
+- 拡散モデル(FLUX)のバンドルはこの DAT の対象外
+
 ### ビルド
 
 ```bash
-cd CoreAI && TD_APP=/Applications/TouchDesigner.app zsh ./build.sh   # → build/CoreAITOP.plugin
+cd CoreAI && TD_APP=/Applications/TouchDesigner.app zsh ./build.sh   # → build/CoreAITOP.plugin + build/CoreAILLMDAT.plugin
 ```
 
 Swift ヘルパ(`CoreAIHelper.swift`・C ABI `ai_`)は `-weak_framework CoreAI` でリンクし、
 `-target arm64-apple-macos26.0`。SDK 27 が無い環境では `canImport(CoreAI)` が偽になり
 「unavailable」経路だけがビルドされる。
+
+LLM DAT のヘルパ(`helper/`・SwiftPM・coreai-models と swift-transformers に依存)は SDK 27 以上の
+ときだけビルドされ、`Contents/Helpers/coreai-llm-helper` と依存バンドル(`*.bundle`)が同梱される。
+SDK 26 では `CoreAILLMDAT.plugin` はスキップされる。

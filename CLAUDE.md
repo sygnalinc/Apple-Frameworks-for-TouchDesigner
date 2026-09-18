@@ -8396,3 +8396,50 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
 - 未対応(README に明記): 動的 shape 入力、CVPixelBuffer(image 型)入力、テンソル出力の CHOP 化
   (YOLOS の logits/boxes 等 → 将来 **CoreAI CHOP**)、LLM / 拡散パイプライン(coreai-models の Swift
   パッケージが要る → 別 op)
+
+### 2026-09-19 CoreAI LLM DAT 実装 + ローカルの coreai-models 書き出しを全部検証(LLM / VLM)
+
+- ユーザー「coreai op からローカルの coreai models をどれでも使えるか検証したい。LLM VLM も」→
+  **CoreAI LLM DAT**(opType `Coreaillm` / label "CoreAI LLM" / icon CAL・`CoreAI/` の2バンドル目・
+  experimental・minos 27.0)を実装。LLM MLX と同じ**別プロセスのヘルパ**方式(posix_spawn + pipe +
+  JSON-lines)。ヘルパは Apple の coreai-models Swift パッケージ(`CoreAILM`・BSD-3)+ swift-transformers を
+  SwiftPM で組み、`Contents/Helpers/coreai-llm-helper` と依存 `*.bundle` を同梱。SDK 27 未満はスキップ
+- **ヘルパの要点(coreai-models の API・SDK 実確認)**: `LanguageBundle(from:)` → `EngineFactory.createEngine`
+  (LLM)/ `CoreAISequentialVLMEngine(config:visionModel:embedModel:llmModel:)`(VLM)。テキストは
+  `VanillaDecodingStrategy().decode(...)`、VLM は `encodeImage(at:)` → 画像トークンを `tokenCount` 個に展開 →
+  `generate(with:tokens:)`。思考は `ThinkTagParser` で `think` 列へ分離、`think=false` は `/no_think` を付ける
+- **踏んだ罠(いずれも実測で切り分け)**:
+  1. **画像ターンの後に純テキスト経路を混ぜると VLM エンジンが SIGTRAP**(`GenerationSequence.Iterator.next()`
+     の範囲エラー)→ 画像を含む会話は最新の画像を持ったまま常に VLM 経路で生成
+  2. **VLM の2ターン目が `invalidState("No new tokens to process")`** → KV キャッシュが generate 間で残る。
+     VLM 経路は毎回 `reset(to: 0)` してから頭から流す(履歴が伸びるほど遅くなる)
+  3. **Gemma が `<end_of_turn>` を延々と吐く**(`stops=[]`)。coreai-models のエクスポータが
+     `tokenizer_config.json` から `added_tokens_decoder` を落とすため、ライブラリの `additionalStopTokenIds`
+     が何も拾えない(**llm-runner でも同じ**)。既知のターン終端トークンを `encode`→`decode` の往復で
+     語彙から直接引くようにして解決(`vocabContains` は internal で使えない)
+  4. **ヘルパのバイナリを、それを実行中のテストと同時に `swift build` で書き換えた**→ テストが無出力で終了。
+     ビルドと実行を重ねない
+  5. **Phi-4-mini は書き出し自体が壊れている**(同じ語の繰り返し・`<|end|>` 後も続く)。llm-runner でも同じで
+     コンパイル時に `RoPE freqs shape [48] must match half_embed [64]` = 部分 RoPE 未対応。ヘルパの問題ではない
+  6. **community の gemma-4 12B は Core AI のコンパイラが `LLVM ERROR` で落ちる**(別ツールチェーン製)→
+     ヘルパごと死ぬ。DAT が "loading model" のまま固まって見えないよう、パイプ EOF で busy/ready を下ろし
+     `helper exited (model incompatible…)` を出すようにした。gemma-4 E2B は入力が4つ(`ple_table` 等)で
+     標準エンジン非対応
+  7. `oneShot` モードは思考オフを付けないので qwen3_4b の80トークンが全部 `<think>` に消えた(visible 空)。
+     検証は serve プロトコル(`--serve`)で think=false を明示する
+- **実測(M2 24GB・macOS 27.0・ヘルパ単体)**: qwen3 1.7B 34 tok/s(TD 内 4〜10)/ 4B 7.8 / 8B 4.2、
+  gemma_3 4B 7.4、gemma_3n 3.0、mistral 7B 0.7(スワップ)、gpt_oss_20b 1.8(スワップ 10GB・Harmony 形式は
+  思考分離されない)、qwen3_vl_2b 5〜8 + 画像エンコード 4 s。**TD 内**: 1.7B のマルチターン、VLM は
+  1280×720 のフレームから物体一覧を正答。**TD 内が単体の 1/4〜1/8 な理由は未特定**(GPU 競合が有力)
+- DAT 側の修正: Load 送信時に `beginLoad()` で ready/progress/kind を巻き戻す(前は前モデルの ready=1 が残った)
+- **TD 再起動でハマった**: バンドル差し替え後の起動が「Checking CodeMeter Licenses」で止まる。
+  `sample` すると TD スレッドが `CFUserNotificationDisplayAlert` で待機 = **New Plugin ダイアログは
+  CFUserNotification で、描画は別プロセス `UserNotificationCenter`**。`CGWindowListCopyWindowInfo` で
+  その2窓を確認できたが、同時に `loginwindow` の全画面レイヤ(=画面ロック)が出ており押せない。
+  `Plugins.json` の `Hashes` は署名付きダイジェストで事前承認は不可 → **ユーザーの承認待ち**
+- 未確認(TD 再起動後に要確認): 新ビルドの DAT で gemma_3_4b が `<end_of_turn>` で止まること、
+  Load 切替で ready が 0 に戻ること、demo.toe に `_lltest` が無いこと(削除して保存済み)
+- README(CoreAI 英日に LLM DAT 節 + 全モデルの実測表)、ルート README(英日)の実験中表、`models/README.md`
+  (LLM / VLM バンドルの書き出し手順)を更新。**PLUGINS.tsv はフォルダ単位なので `CoreAI` の1行のまま**
+- 次にやること: TD 内の tok/s 低下の原因(GPU 競合か優先度か)、gpt_oss の Harmony 形式の思考分離、
+  demo.toe への CoreAI LLM 利用例(experimental なので入れるかはユーザー判断)、Load 中の progress 表示

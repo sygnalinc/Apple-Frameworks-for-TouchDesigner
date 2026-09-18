@@ -198,6 +198,7 @@ and are unsupported. The source is here so you can build and try them yourself
 | [ColorSync](ColorSync/) | TOP | experimental |
 | [CI Bokeh](CoreImageBokeh/) | TOP | experimental |
 | [CoreAI](CoreAI/) | TOP | experimental — macOS 27+ |
+| [CoreAI LLM](CoreAI/#coreai-llm-dat) | DAT | experimental — macOS 27+ (LLM / VLM chat via coreai-models bundles) |
 | [CI Enhance](CoreImageEnhance/) | TOP | experimental |
 | [CoreLocation Beacon](CoreLocationBeacon/) | CHOP | experimental |
 | [CoreML Motion](CoreMLMotion/) | CHOP | experimental |

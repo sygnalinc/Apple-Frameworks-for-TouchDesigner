@@ -1,0 +1,737 @@
+// CoreAI LLM DAT — ローカル LLM / VLM 推論(Apple Core AI・macOS 27+)
+//
+// Apple の coreai-models(https://github.com/apple/coreai-models)で書き出した .aimodel の
+// LLM / VLM バンドル(exports/<name>/ = metadata.json + *.aimodel + tokenizer/)を
+// 完全オンデバイスで走らせる TD カスタム DAT。Gemma 3 / Qwen3 / Mistral / Phi / gpt-oss と
+// Qwen3-VL(画像入力)を実測済み。
+//
+// LLM MLX(mlx-community の重み)と同じ設計で、バックエンドが MLX ではなく Core AI:
+// 重い推論は同梱ヘルパ実行ファイル coreai-llm-helper を別プロセスとして起動し、
+// JSON-lines プロトコルで通信する(多GBモデルと GPU/ANE をTDから隔離し、cook は絶対にブロックしない)。
+//
+// 出力テーブル(会話履歴): index | role | text | think
+//   user / assistant が交互。生成中は最後の assistant 行がトークンで伸びる。
+//   think 列は推論モデル(Qwen3 等)の思考部分(Show Thinking Column が On のとき)。
+
+#import <Foundation/Foundation.h>
+#import <CoreGraphics/CoreGraphics.h>
+#import <ImageIO/ImageIO.h>
+
+#include <atomic>
+#include <cstring>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <vector>
+
+#include <dlfcn.h>
+#include <fcntl.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#include "DAT_CPlusPlusBase.h"
+#include "CPlusPlus_Common.h"
+
+using namespace TD;
+
+extern char** environ;
+
+namespace {
+
+struct Turn
+{
+    std::string role;
+    std::string text;
+    std::string think;   // 推論モデルの思考部分(assistant 行のみ)
+};
+
+// ヘルパ実行ファイルの起動・JSON-lines通信・状態管理を担う。
+class HelperProcess
+{
+public:
+    ~HelperProcess() { stop(); }
+
+    bool running() const { return myPid > 0; }
+
+    // .plugin/Contents/Helpers/coreai-llm-helper を起動
+    bool start(const std::string& exePath)
+    {
+        if (myPid > 0)
+            return true;
+
+        int inPipe[2];   // 親→子 stdin
+        int outPipe[2];  // 子→親 stdout
+        if (pipe(inPipe) != 0)
+            return false;
+        if (pipe(outPipe) != 0) {
+            close(inPipe[0]);
+            close(inPipe[1]);
+            return false;
+        }
+
+        posix_spawn_file_actions_t fa;
+        posix_spawn_file_actions_init(&fa);
+        posix_spawn_file_actions_adddup2(&fa, inPipe[0], STDIN_FILENO);
+        posix_spawn_file_actions_adddup2(&fa, outPipe[1], STDOUT_FILENO);
+        posix_spawn_file_actions_addclose(&fa, inPipe[1]);
+        posix_spawn_file_actions_addclose(&fa, outPipe[0]);
+        posix_spawn_file_actions_addclose(&fa, inPipe[0]);
+        posix_spawn_file_actions_addclose(&fa, outPipe[1]);
+
+        // 子プロセスに DYLD_FRAMEWORK_PATH / DYLD_LIBRARY_PATH を注入する。
+        // xcodebuild は MLX を動的フレームワークとして Helpers/PackageFrameworks に置くため、
+        // ヘルパ実行時にそこを検索させる必要がある（metallib バンドルは実行ファイルの隣）。
+        std::string dir = exePath;
+        size_t slash = dir.rfind('/');
+        if (slash != std::string::npos)
+            dir = dir.substr(0, slash);
+        std::string fwPath = dir + "/PackageFrameworks:" + dir;
+        std::string dyfw = "DYLD_FRAMEWORK_PATH=" + fwPath;
+        std::string dylib = "DYLD_LIBRARY_PATH=" + fwPath;
+        std::vector<std::string> envStore;
+        for (char** e = environ; e && *e; e++) {
+            if (strncmp(*e, "DYLD_FRAMEWORK_PATH=", 20) == 0 ||
+                strncmp(*e, "DYLD_LIBRARY_PATH=", 18) == 0)
+                continue;   // 上書き
+            envStore.push_back(*e);
+        }
+        envStore.push_back(dyfw);
+        envStore.push_back(dylib);
+        std::vector<char*> envp;
+        for (auto& s : envStore)
+            envp.push_back(const_cast<char*>(s.c_str()));
+        envp.push_back(nullptr);
+
+        const char* argv[] = {exePath.c_str(), "--serve", nullptr};
+        pid_t pid = 0;
+        int rc = posix_spawn(&pid, exePath.c_str(), &fa, nullptr,
+                             const_cast<char* const*>(argv), envp.data());
+        posix_spawn_file_actions_destroy(&fa);
+        close(inPipe[0]);
+        close(outPipe[1]);
+        if (rc != 0) {
+            close(inPipe[1]);
+            close(outPipe[0]);
+            return false;
+        }
+
+        myPid = pid;
+        myWriteFd = inPipe[1];
+        myReadFd = outPipe[0];
+        {
+            std::lock_guard<std::mutex> l(myMutex);
+            myStatus = "starting helper";
+        }
+        myAlive = true;
+        myReader = std::thread([this] { readLoop(); });
+        return true;
+    }
+
+    void stop()
+    {
+        if (myPid <= 0)
+            return;
+        sendLine("{\"cmd\":\"quit\"}");
+        myAlive = false;
+        if (myWriteFd >= 0) {
+            close(myWriteFd);
+            myWriteFd = -1;
+        }
+        // 子の終了を少し待ってから強制終了
+        for (int i = 0; i < 20 && myPid > 0; i++) {
+            int st = 0;
+            pid_t r = waitpid(myPid, &st, WNOHANG);
+            if (r == myPid) {
+                myPid = 0;
+                break;
+            }
+            usleep(10000);
+        }
+        if (myPid > 0) {
+            kill(myPid, SIGTERM);
+            int st = 0;
+            waitpid(myPid, &st, 0);
+            myPid = 0;
+        }
+        if (myReadFd >= 0) {
+            close(myReadFd);
+            myReadFd = -1;
+        }
+        if (myReader.joinable())
+            myReader.join();
+    }
+
+    void sendLine(const std::string& line)
+    {
+        if (myWriteFd < 0)
+            return;
+        std::string out = line + "\n";
+        ssize_t n = write(myWriteFd, out.data(), out.size());
+        (void)n;
+    }
+
+    // ---- スナップショット取得 ----
+    void snapshot(std::string& status, int& progress, bool& busy, bool& ready,
+                  std::vector<Turn>& history, std::string& kind, std::string& name,
+                  int& context, double& tps, double& ttft, int& lastTokens)
+    {
+        std::lock_guard<std::mutex> l(myMutex);
+        status = myStatus;
+        progress = myProgress;
+        busy = myBusy;
+        ready = myReady;
+        history = myHistory;
+        kind = myKind; name = myName; context = myContext;
+        tps = myTps; ttft = myTtft; lastTokens = myLastTokens;
+    }
+
+    // gen コマンド送信時に user + 空 assistant 行をローカルに積む
+    void beginTurn(const std::string& prompt)
+    {
+        std::lock_guard<std::mutex> l(myMutex);
+        myHistory.push_back({"user", prompt, ""});
+        myHistory.push_back({"assistant", "", ""});
+        myBusy = true;
+    }
+
+    // load コマンド送信時: 前モデルの ready/progress/kind が残ると
+    // 「ロード済み」に見えたまま新モデルのロードが走るので、ここで巻き戻す
+    void beginLoad()
+    {
+        std::lock_guard<std::mutex> l(myMutex);
+        myReady = false;
+        myProgress = 0;
+        myBusy = false;
+        myKind.clear(); myName.clear(); myContext = 0;
+        myStatus = "loading model";
+    }
+
+    void resetHistory()
+    {
+        std::lock_guard<std::mutex> l(myMutex);
+        myHistory.clear();
+        myBusy = false;
+    }
+
+private:
+    void readLoop()
+    {
+        std::string acc;
+        char buf[4096];
+        while (myAlive) {
+            ssize_t n = read(myReadFd, buf, sizeof(buf));
+            if (n <= 0)
+                break;
+            acc.append(buf, buf + n);
+            size_t pos;
+            while ((pos = acc.find('\n')) != std::string::npos) {
+                std::string line = acc.substr(0, pos);
+                acc.erase(0, pos + 1);
+                if (!line.empty())
+                    handleEvent(line);
+            }
+        }
+        std::lock_guard<std::mutex> l(myMutex);
+        if (myAlive) {
+            // Core AI のコンパイラは非対応バンドルで LLVM ERROR を出してヘルパごと落ちる(実測:
+            // 別ツールチェーンで作られた community の gemma-4 12B)。"loading model" のまま
+            // 固まって見えないよう、状態を全部下ろして理由を出す
+            myStatus = "helper exited (model incompatible with this Core AI? see Console.app)";
+            myBusy = false;
+            myReady = false;
+            myProgress = 0;
+        }
+    }
+
+    void handleEvent(const std::string& line)
+    {
+        @autoreleasepool {
+            NSData* data = [NSData dataWithBytes:line.data() length:line.size()];
+            NSDictionary* d = [NSJSONSerialization JSONObjectWithData:data
+                                                             options:0
+                                                               error:nil];
+            if (![d isKindOfClass:[NSDictionary class]])
+                return;
+            NSString* type = d[@"type"];
+            if (![type isKindOfClass:[NSString class]])
+                return;
+            std::lock_guard<std::mutex> l(myMutex);
+            if ([type isEqualToString:@"progress"]) {
+                myProgress = [d[@"pct"] intValue];
+            } else if ([type isEqualToString:@"ready"]) {
+                myReady = true;
+                myProgress = 100;
+                myStatus = "ready";
+                NSString* k = d[@"kind"]; NSString* nm = d[@"name"];
+                if ([k isKindOfClass:[NSString class]]) myKind = k.UTF8String ?: "";
+                if ([nm isKindOfClass:[NSString class]]) myName = nm.UTF8String ?: "";
+                myContext = [d[@"context"] intValue];
+            } else if ([type isEqualToString:@"status"]) {
+                NSString* t = d[@"text"];
+                if ([t isKindOfClass:[NSString class]])
+                    myStatus = t.UTF8String ?: "";
+            } else if ([type isEqualToString:@"token"]) {
+                NSString* t = d[@"text"];
+                if ([t isKindOfClass:[NSString class]] && !myHistory.empty() &&
+                    myHistory.back().role == "assistant")
+                    myHistory.back().text += (t.UTF8String ?: "");
+                myStatus = "generating";
+            } else if ([type isEqualToString:@"think"]) {
+                NSString* t = d[@"text"];
+                if ([t isKindOfClass:[NSString class]] && !myHistory.empty() &&
+                    myHistory.back().role == "assistant")
+                    myHistory.back().think += (t.UTF8String ?: "");
+                myStatus = "thinking";
+            } else if ([type isEqualToString:@"done"]) {
+                myBusy = false;
+                myStatus = "ready";
+                myTps = [d[@"tps"] doubleValue];
+                myTtft = [d[@"ttft"] doubleValue];
+                myLastTokens = [d[@"tokens"] intValue];
+            } else if ([type isEqualToString:@"error"]) {
+                NSString* t = d[@"text"];
+                myBusy = false;
+                myStatus = std::string("error: ") +
+                           ([t isKindOfClass:[NSString class]] ? (t.UTF8String ?: "") : "");
+            }
+        }
+    }
+
+    pid_t myPid = 0;
+    int myWriteFd = -1;
+    int myReadFd = -1;
+    std::atomic<bool> myAlive{false};
+    std::thread myReader;
+
+    std::mutex myMutex;
+    std::string myStatus = "idle";
+    int myProgress = 0;
+    bool myBusy = false;
+    bool myReady = false;
+    std::vector<Turn> myHistory;
+    std::string myKind, myName;
+    int myContext = 0;
+    double myTps = 0, myTtft = 0;
+    int myLastTokens = 0;
+};
+
+// この .plugin バンドル内の Helpers/coreai-llm-helper の絶対パスを得る
+std::string helperExecutablePath()
+{
+    Dl_info info;
+    if (dladdr(reinterpret_cast<const void*>(&helperExecutablePath), &info) && info.dli_fname) {
+        // .../Contents/MacOS/<bin> → .../Contents/Helpers/coreai-llm-helper
+        std::string p = info.dli_fname;
+        size_t macos = p.rfind("/MacOS/");
+        if (macos != std::string::npos) {
+            std::string contents = p.substr(0, macos);
+            return contents + "/Helpers/coreai-llm-helper";
+        }
+    }
+    return "";
+}
+
+class CoreAILLMDAT : public DAT_CPlusPlusBase
+{
+public:
+    explicit CoreAILLMDAT(const OP_NodeInfo*) {}
+
+    ~CoreAILLMDAT() override { myHelper.stop(); }
+
+    void getGeneralInfo(DAT_GeneralInfo* ginfo, const OP_Inputs*, void*) override
+    {
+        ginfo->cookEveryFrameIfAsked = true;
+    }
+
+    void execute(DAT_Output* output, const OP_Inputs* inputs, void*) override
+    {
+        myExecCount++;
+
+        const char* modelPar = inputs->getParString("Model");
+        const std::string model = modelPar ? modelPar : "";
+
+        // Load パルス、または初回 Submit で必要ならヘルパ起動 + モデルロード
+        if (myWantLoad.exchange(false))
+            ensureLoaded(model);
+
+        if (myWantSubmit.exchange(false)) {
+            if (!myHelper.running())
+                ensureLoaded(model);
+            if (myHelper.running()) {
+                const char* prompt = inputs->getParString("Prompt");
+                const char* sys = inputs->getParString("System");
+                const std::string p = prompt ? prompt : "";
+                const std::string image = captureImage(inputs);   // 画像入力ONなら一時PNGパス
+                myHelper.beginTurn(p);
+                myHelper.sendLine(buildGenCommand(
+                    p, sys ? sys : "", inputs->getParDouble("Temperature"),
+                    (int)inputs->getParInt("Maxtokens"),
+                    inputs->getParInt("Keepcontext") != 0, image,
+                    inputs->getParInt("Think") != 0));
+            }
+        }
+
+        if (myWantReset.exchange(false)) {
+            if (myHelper.running())
+                myHelper.sendLine("{\"cmd\":\"reset\"}");
+            myHelper.resetHistory();
+        }
+
+        // 状態スナップショット → テーブル出力
+        std::string status;
+        int progress = 0;
+        bool busy = false, ready = false;
+        std::vector<Turn> history;
+        myHelper.snapshot(status, progress, busy, ready, history, myKind, myName, myContext,
+                          myTps, myTtft, myLastTokens);
+        myStatus = status;
+        myProgress = progress;
+        myBusy = busy ? 1 : 0;
+        myReady = ready ? 1 : 0;
+        myTurnCount = (int)history.size();
+
+        const int maxRows = std::max(1, (int)inputs->getParInt("Maxrows"));
+        const int begin = std::max(0, (int)history.size() - maxRows);
+        output->setOutputDataType(DAT_OutDataType::Table);
+        const bool showThink = inputs->getParInt("Showthink") != 0;
+        output->setTableSize(1 + (int32_t)(history.size() - begin), showThink ? 4 : 3);
+        output->setCellString(0, 0, "index");
+        output->setCellString(0, 1, "role");
+        output->setCellString(0, 2, "text");
+        if (showThink) output->setCellString(0, 3, "think");
+        int32_t row = 1;
+        for (size_t r = begin; r < history.size(); r++) {
+            char idx[16];
+            snprintf(idx, sizeof(idx), "%d", (int)r);
+            output->setCellString(row, 0, idx);
+            output->setCellString(row, 1, history[r].role.c_str());
+            output->setCellString(row, 2, history[r].text.c_str());
+            if (showThink) output->setCellString(row, 3, history[r].think.c_str());
+            row++;
+        }
+    }
+
+    void setupParameters(OP_ParameterManager* manager, void*) override
+    {
+        {
+            OP_StringParameter p("Model");
+            p.label = "Model Bundle (exports/<name> folder)";
+            p.page = "CoreAI LLM";
+            p.defaultValue = "";
+            manager->appendFolder(p);   // バンドルはフォルダ(metadata.json + .aimodel + tokenizer/)
+        }
+        {
+            OP_StringParameter p("System");
+            p.label = "System Instructions";
+            p.page = "CoreAI LLM";
+            manager->appendString(p);
+        }
+        {
+            OP_StringParameter p("Prompt");
+            p.label = "Prompt";
+            p.page = "CoreAI LLM";
+            manager->appendString(p);
+        }
+        {
+            OP_NumericParameter p("Temperature");
+            p.label = "Temperature";
+            p.page = "CoreAI LLM";
+            p.defaultValues[0] = 0.7;
+            p.minSliders[0] = 0.0;
+            p.maxSliders[0] = 2.0;
+            manager->appendFloat(p);
+        }
+        {
+            OP_NumericParameter p("Maxtokens");
+            p.label = "Max Tokens";
+            p.page = "CoreAI LLM";
+            p.defaultValues[0] = 512;
+            p.minSliders[0] = 16;
+            p.maxSliders[0] = 4096;
+            p.minValues[0] = 1;
+            p.clampMins[0] = true;
+            manager->appendInt(p);
+        }
+        {
+            OP_NumericParameter p("Keepcontext");
+            p.label = "Keep Context (Multi-turn)";
+            p.page = "CoreAI LLM";
+            p.defaultValues[0] = 1;
+            manager->appendToggle(p);
+        }
+        {
+            // 推論モデル(Qwen3 等)の思考。Off で system に /no_think を足して思考を省く(速い)
+            OP_NumericParameter p("Think");
+            p.label = "Enable Thinking (reasoning models)";
+            p.page = "CoreAI LLM";
+            p.defaultValues[0] = 0;
+            manager->appendToggle(p);
+        }
+        {
+            OP_NumericParameter p("Showthink");
+            p.label = "Show Thinking Column";
+            p.page = "CoreAI LLM";
+            p.defaultValues[0] = 0;
+            manager->appendToggle(p);
+        }
+        {
+            OP_NumericParameter p("Maxrows");
+            p.label = "Max Rows";
+            p.page = "CoreAI LLM";
+            p.defaultValues[0] = 50;
+            p.minSliders[0] = 1;
+            p.maxSliders[0] = 200;
+            manager->appendInt(p);
+        }
+        // ---- Vision（画像入力・VLMモデル使用時）----
+        {
+            OP_NumericParameter p("Useimage");
+            p.label = "Use Image Input";
+            p.page = "Vision";
+            p.defaultValues[0] = 0;
+            manager->appendToggle(p);
+        }
+        {
+            // 画像を渡す TOP。VLM バンドル(Qwen3-VL 等・metadata の kind=vlm)使用時に有効
+            OP_StringParameter p("Image");
+            p.label = "Image TOP";
+            p.page = "Vision";
+            manager->appendTOP(p);
+        }
+        {
+            OP_NumericParameter p("Load");
+            p.label = "Load Model";
+            p.page = "CoreAI LLM";
+            manager->appendPulse(p);
+        }
+        {
+            OP_NumericParameter p("Submit");
+            p.label = "Submit";
+            p.page = "CoreAI LLM";
+            manager->appendPulse(p);
+        }
+        {
+            OP_NumericParameter p("Reset");
+            p.label = "Reset Conversation";
+            p.page = "CoreAI LLM";
+            manager->appendPulse(p);
+        }
+    }
+
+    void pulsePressed(const char* name, void*) override
+    {
+        if (strcmp(name, "Submit") == 0)
+            myWantSubmit = true;
+        else if (strcmp(name, "Load") == 0)
+            myWantLoad = true;
+        else if (strcmp(name, "Reset") == 0)
+            myWantReset = true;
+    }
+
+    int32_t getNumInfoCHOPChans(void*) override { return 9; }
+    void getInfoCHOPChan(int32_t index, OP_InfoCHOPChan* chan, void*) override
+    {
+        const char* names[9] = {"executes", "busy", "ready", "progress", "turns",
+                                "tokens_per_sec", "ttft_sec", "last_tokens", "context_length"};
+        float values[9] = {(float)myExecCount, (float)myBusy, (float)myReady,
+                           (float)myProgress, (float)myTurnCount,
+                           (float)myTps, (float)myTtft, (float)myLastTokens, (float)myContext};
+        chan->name->setString(names[index]);
+        chan->value = values[index];
+    }
+
+    bool getInfoDATSize(OP_InfoDATSize* infoSize, void*) override
+    {
+        infoSize->rows = 4;
+        infoSize->cols = 2;
+        infoSize->byColumn = false;
+        return true;
+    }
+
+    void getInfoDATEntries(int32_t index, int32_t, OP_InfoDATEntries* entries, void*) override
+    {
+        const char* keys[4] = {"status", "model", "kind", "context_length"};
+        std::string vals[4] = {myStatus, myName, myKind, std::to_string(myContext)};
+        entries->values[0]->setString(keys[index]);
+        entries->values[1]->setString(vals[index].c_str());
+    }
+
+private:
+    void ensureLoaded(const std::string& model)
+    {
+        if (!myHelper.running()) {
+            std::string exe = helperExecutablePath();
+            if (exe.empty() || access(exe.c_str(), X_OK) != 0) {
+                myStatus = "helper not found";
+                return;
+            }
+            if (!myHelper.start(exe)) {
+                myStatus = "helper start failed";
+                return;
+            }
+        }
+        if (model != myLoadedModel) {
+            myLoadedModel = model;
+            myHelper.beginLoad();
+            myHelper.sendLine(buildLoadCommand(model));
+        }
+    }
+
+    static std::string jsonEscape(const std::string& s)
+    {
+        std::string o;
+        o.reserve(s.size() + 8);
+        for (char c : s) {
+            switch (c) {
+                case '"': o += "\\\""; break;
+                case '\\': o += "\\\\"; break;
+                case '\n': o += "\\n"; break;
+                case '\r': o += "\\r"; break;
+                case '\t': o += "\\t"; break;
+                default:
+                    if ((unsigned char)c < 0x20) {
+                        char b[8];
+                        snprintf(b, sizeof(b), "\\u%04x", c);
+                        o += b;
+                    } else {
+                        o += c;
+                    }
+            }
+        }
+        return o;
+    }
+
+    static std::string buildLoadCommand(const std::string& model)
+    {
+        return "{\"cmd\":\"load\",\"model\":\"" + jsonEscape(model) + "\"}";
+    }
+
+    static std::string buildGenCommand(const std::string& prompt, const std::string& sys,
+                                       double temp, int maxTok, bool keep,
+                                       const std::string& image, bool think)
+    {
+        char nums[160];
+        snprintf(nums, sizeof(nums), ",\"temp\":%.4f,\"max\":%d,\"keep\":%s,\"think\":%s", temp,
+                 maxTok, keep ? "true" : "false", think ? "true" : "false");
+        std::string cmd = "{\"cmd\":\"gen\",\"prompt\":\"" + jsonEscape(prompt) +
+                          "\",\"system\":\"" + jsonEscape(sys) + "\"" + nums;
+        if (!image.empty())
+            cmd += ",\"image\":\"" + jsonEscape(image) + "\"";
+        cmd += "}";
+        return cmd;
+    }
+
+    // 画像入力ON時、Image TOP パラメータのテクスチャを一時PNGに書き出しパスを返す。
+    // ヘルパは .url(そのパス) で VLM に渡す。cook上の一時的な stall は Submit 時のみで許容。
+    std::string captureImage(const OP_Inputs* inputs)
+    {
+        if (inputs->getParInt("Useimage") == 0)
+            return "";
+        const OP_TOPInput* top = inputs->getParTOP("Image");
+        if (!top)
+            return "";
+        OP_TOPInputDownloadOptions opts;
+        opts.pixelFormat = OP_PixelFormat::BGRA8Fixed;
+        opts.verticalFlip = true;   // TDは bottom-up。正立画像にして意味処理系(VLM)へ
+        OP_SmartRef<OP_TOPDownloadResult> res = top->downloadTexture(opts, nullptr);
+        if (!res)
+            return "";
+        const uint8_t* data = (const uint8_t*)res->getData();   // 準備できるまで stall
+        int w = (int)res->textureDesc.width;
+        int h = (int)res->textureDesc.height;
+        if (!data || w <= 0 || h <= 0)
+            return "";
+        return writePNG(data, w, h);
+    }
+
+    std::string writePNG(const uint8_t* bgra, int w, int h)
+    {
+        @autoreleasepool {
+            CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+            // BGRA8 を little-endian の XRGB(=メモリ上 B,G,R,X)として解釈。アルファは無視
+            CGContextRef ctx = CGBitmapContextCreate(
+                (void*)bgra, w, h, 8, (size_t)w * 4, cs,
+                kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little);
+            CGColorSpaceRelease(cs);
+            if (!ctx)
+                return "";
+            CGImageRef img = CGBitmapContextCreateImage(ctx);
+            CGContextRelease(ctx);
+            if (!img)
+                return "";
+            if (myTempImagePath.empty()) {
+                NSString* tmp = [NSTemporaryDirectory()
+                    stringByAppendingPathComponent:
+                        [NSString stringWithFormat:@"coreaillm_%p.png", (void*)this]];
+                myTempImagePath = tmp.UTF8String ?: "";
+            }
+            NSURL* url = [NSURL fileURLWithPath:
+                [NSString stringWithUTF8String:myTempImagePath.c_str()]];
+            CGImageDestinationRef dst = CGImageDestinationCreateWithURL(
+                (__bridge CFURLRef)url, (CFStringRef)@"public.png", 1, nullptr);
+            std::string result;
+            if (dst) {
+                CGImageDestinationAddImage(dst, img, nullptr);
+                if (CGImageDestinationFinalize(dst))
+                    result = myTempImagePath;
+                CFRelease(dst);
+            }
+            CGImageRelease(img);
+            return result;
+        }
+    }
+
+    HelperProcess myHelper;
+    std::string myLoadedModel;
+    std::string myTempImagePath;   // 画像入力用の一時PNG
+    std::string myStatus = "idle";
+    std::atomic<bool> myWantSubmit{false};
+    std::atomic<bool> myWantLoad{false};
+    std::atomic<bool> myWantReset{false};
+    int myProgress = 0;
+    int myBusy = 0;
+    int myReady = 0;
+    int myTurnCount = 0;
+    std::string myKind, myName;
+    int myContext = 0;
+    double myTps = 0, myTtft = 0;
+    int myLastTokens = 0;
+    std::atomic<int> myExecCount{0};
+};
+
+}   // namespace
+
+// ------------------------------------------------------------------ entry points
+
+extern "C" {
+
+DLLEXPORT void
+FillDATPluginInfo(DAT_PluginInfo* info)
+{
+    if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
+        return;
+    info->customOPInfo.opType->setString("Coreaillm");
+    info->customOPInfo.opLabel->setString("CoreAI LLM");
+    info->customOPInfo.authorName->setString("SYGNAL Inc.");
+    info->customOPInfo.majorVersion = 0;
+    info->customOPInfo.minorVersion = 9;
+    info->customOPInfo.opIcon->setString("CAL");
+    if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/CoreAI/README.md");
+    info->customOPInfo.minInputs = 0;
+    info->customOPInfo.maxInputs = 0;
+}
+
+DLLEXPORT DAT_CPlusPlusBase*
+CreateDATInstance(const OP_NodeInfo* info)
+{
+    return new CoreAILLMDAT(info);
+}
+
+DLLEXPORT void
+DestroyDATInstance(DAT_CPlusPlusBase* instance)
+{
+    delete (CoreAILLMDAT*)instance;
+}
+
+}   // extern "C"
