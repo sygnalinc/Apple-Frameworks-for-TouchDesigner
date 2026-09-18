@@ -16,6 +16,7 @@ example in `demo.toe` will run as-is.
 | `coreml-stable-diffusion-2-1-base-split-einsum/` | CoreML ImageGen (TOP) — text2img | https://huggingface.co/apple/coreml-stable-diffusion-2-1-base |
 | `gemma-3-4b-it-qat-4bit/` | LLM MLX (DAT) — local LLM | https://huggingface.co/mlx-community/gemma-3-4b-it-qat-4bit |
 | `Qwen2-VL-2B-Instruct-4bit/` | LLM MLX (DAT) — local **vision** LLM | https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit |
+| `da3-small_float32.aimodel` | CoreAI (TOP) — Depth Anything v3 depth (macOS 27+) | exported with Apple's coreai-models recipe, see below |
 
 Any other model works too: CoreML TOP / CHOP / DAT take any Core ML model, and LLM MLX takes
 any [mlx-community](https://huggingface.co/mlx-community) repository.
@@ -33,6 +34,23 @@ Single files can just be downloaded from the "Files" tab of the model page.
 
 LLM MLX can also take a repository ID directly (`mlx-community/…`) instead of a local path — it
 then downloads the model on first use. Pointing it at a local folder here keeps it fully offline.
+
+## Core AI models (`.aimodel`, macOS 27+)
+
+There are no pre-built `.aimodel` downloads; Apple's [coreai-models](https://github.com/apple/coreai-models)
+repository ships **export recipes** that download the original weights from Hugging Face and convert
+them on your Mac. The whole thing is three commands (needs `uv`; the first export also creates a
+Python environment with PyTorch, a few minutes):
+
+```bash
+brew install uv
+git clone https://github.com/apple/coreai-models.git
+cd coreai-models/models/depth-anything && uv run export.py     # -> coreai-models/exports/da3-small_float32.aimodel (about 100 MB)
+cp -R ../../exports/da3-small_float32.aimodel <this repo>/models/
+```
+
+Every folder under `coreai-models/models/` (edsr, yolo, sam3, clip, …) has the same `uv run export.py`;
+any exported model with an image input can be dropped into the CoreAI TOP.
 
 ## Licenses
 

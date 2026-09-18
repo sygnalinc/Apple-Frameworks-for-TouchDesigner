@@ -8355,3 +8355,44 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
   `CTFontCreateWithFontDescriptor` → PostScript 名を見る。**同じ家族名の別フェイスを他アプリが
   入れるとフォールバックが横取りされる**。TD で日本語が豆腐になったら、まず
   「Noto Sans CJK JP が何に解決されるか」を確認する(Adobe Fonts / Google Fonts の Noto が定番の犯人)
+
+### 2026-09-19 CoreAI TOP 実装(macOS 27 の Core AI フレームワーク・.aimodel 汎用推論)
+
+- ユーザー「CoreAI op を作りたい」+「coreai-models をローカルに clone してあり exports にモデルもある」
+  → **CoreAI TOP**(opType `Coreai` / label "CoreAI" / icon CAI / フォルダ `CoreAI/`・**experimental・
+  minos 27.0**)を新規実装。CoreML TOP の Core AI 版。Swift ヘルパ(`CoreAIHelper.swift`・C ABI `ai_`)+
+  CPUMem TOP の家族の型。**`-weak_framework CoreAI` + `@available(macOS 27.0,*)`** で 26 でもロードは落ちず
+  status に理由を返す(MusicUnderstanding と同じ)
+- **API の要点(SDK 27.0 実測)**: `AIModel(contentsOf:options:)` → `loadFunction(named:)` →
+  `InferenceFunction.run(inputs:[String:NDArray])`。入出力は `descriptor` が自己記述(name / shape /
+  scalarType / hasDynamicShape)なので、TOP 側は「最初の画像形の入力に流し込み、選んだ出力名を画像として
+  解釈」するだけでモデル非依存。`Outputs` は `names` + `remove(_:) → InferenceValue → .ndArray`。
+  メタデータ(author/license/description)は `AIModelAsset(contentsOf:).metadata` を Mirror で読む
+- **実測(M2・macOS 27.0・TD 実機)**: da3-small(Depth Anything v3・`[1,2,3,224,224]`→depth
+  `[1,2,224,224]`)= 前処理 2〜10ms + 推論 **60〜100ms**(auto/ANE)・CPU 220ms、ロード 0.3〜2.5s。
+  EDSR x2(16→32px)6ms、YOLOS(800×800 fp16)約3秒/回。深度は近い=暗いで出るので demo は Invert On
+- **踏んだ罠(いずれも実測で切り分け)**:
+  1. **`NDArray(scalars:shape:)` は 30万要素で 63ms**(要素ごとの処理)。`NDArray(shape:scalarType:)` +
+     `mutableView(as:).withUnsafeMutablePointer` へ memcpy で **0.1ms**。前処理が 117ms → 2〜10ms になった
+     (Swift 配列の添字ループを疑って vImage + LUT + 生ポインタに書き直しても 117ms のままで、真犯人は
+     NDArray 生成だった。**段階ごとの時間(pre/run/post)を Info CHOP に出してから**特定できた)
+  2. Swift の `private` 型を `internal` プロパティ/メソッドで使うと「must be declared fileprivate」。
+     ヘルパ内は fileprivate で揃える
+  3. 最初の TD 検証で **ANE 指定の初回推論が busy のまま 20秒以上戻らなかった**(スレッドはどこにも
+     居らず Task が await で停止)。再起動後・同じ手順では再現せず(初回のオンデバイスコンパイル待ちの
+     可能性)。対策として `requestLoad` で busy をリセット(モデルを変えれば必ず復帰できる)+
+     診断用に `stage`(preprocess/run/collect)を status/Info DAT に出す。**再発したら stage を見る**
+  4. `.aimodel` は**ディレクトリ**なので Model パラメータは `appendFolder`(ファイル選択だと中に入る)
+  5. 動的メニュー(Output)は**ロード完了(loaded 0→1)の遷移でメニューを組み直す**。60cook 周期だと
+     cook されないノードで古い出力名が残った
+- **demo.toe に `/project1/CoreAI`**(04 CoreML の行・x=600・藍): sample_objects → Coreai1
+  (Output=depth・Channel=1・Invert・auto)→ fit1(224→1280×720)→ out1 + info + info_chop + note。
+  allowCooking=False で保存。**モデルは `models/da3-small_float32.aimodel`**(101MB・gitignore)
+- **ユーザー指示「誰でも入手しやすいモデルでサンプルを作り、README に入手方法を書く」**:
+  Core AI に**プリビルドのダウンロードは存在しない**。Apple の coreai-models の
+  **`uv run export.py`(3コマンド)** が唯一の経路なので、それを `models/README.md`・`CoreAI/README.md`・
+  demo の note に同じ手順で記載(`brew install uv` → clone → `models/depth-anything && uv run export.py`
+  → exports/ を models/ へ)。初回は PyTorch 環境構築で数分
+- 未対応(README に明記): 動的 shape 入力、CVPixelBuffer(image 型)入力、テンソル出力の CHOP 化
+  (YOLOS の logits/boxes 等 → 将来 **CoreAI CHOP**)、LLM / 拡散パイプライン(coreai-models の Swift
+  パッケージが要る → 別 op)
