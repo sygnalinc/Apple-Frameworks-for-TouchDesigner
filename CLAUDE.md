@@ -8331,3 +8331,27 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
 - **警告文は未観測**: この機では初回 cook の中で vision が報告されるため、「Use Image On かつ vision
   無し」が cook をまたいで存在しない。26 では続くので出るはずだが、**論理であって実測ではない**。
   26 機で開いたときに確認する(申し送り)
+
+### 2026-09-19 TD の note の日本語が □□□ になる → 原因は Adobe Fonts の「Noto Sans CJK JP Medium」
+
+- ユーザー「demo.toe の note の日本語が表示されなくなった。macOS 27 にしたから?」
+- **データは無事**(54個の note DAT に日本語がそのまま入っている)。TD 画面で **□□□(豆腐)**
+  = グリフが見つからない表示問題。CoreText 単体では日本語を描けた(ヒラギノは全ウェイト実在。
+  `ls | grep ヒラギノ` が空振りしたのは**ファイル名が NFD** で grep の NFC と一致しないため)
+- **TD の日本語描画の仕組み(libGX を実測)**: UI は同梱 Roboto/OpenSans(CJK 無し)。CJK は
+  **内部の固定フォールバック家族名リスト**(Lucida Grande / Geeza Pro / **Noto Sans CJK JP** /
+  Thonburi / Kohinoor…)で CoreText の cascade を組み、同梱 `NotoSansCJKjp-Regular.otf.slug`
+  (Slug の事前ラスタライズ)で描く
+- **真因**: `Noto Sans CJK JP` の家族名が **Adobe Fonts(Creative Cloud)が OS に有効化していた
+  `NotoSansCJKjp-Medium`**(`~/Library/Application Support/Adobe/CoreSync/plugins/livetype/.r/`)
+  に解決されていた。TD は Regular/Bold の slug しか持たないので Medium は描けず豆腐。
+  ファイルは 9/15 作成 = **OS 更新(9/11)の後に Creative Cloud が再同期**したのが引き金
+  (macOS 27 の CoreText の変化ではない)
+- **直し方**: Creative Cloud → 右上の斜体「f」(Fonts)→ Added fonts → `Noto Sans CJK JP` の
+  Medium 行の「⋮」→ **Remove font**。ユーザーが場所を見つけられなかったので、私が
+  computer-use(app_* ・背景操作)で実施。CoreText で `Noto Sans CJK JP` が解決不能になったのを
+  確認 → TD 再起動 → **同じ note が「オプティカルフロー」と正しく描画**されることを視認
+- **切り分けの型**: `CTFontDescriptorCreateWithAttributes([family: "Noto Sans CJK JP"])` →
+  `CTFontCreateWithFontDescriptor` → PostScript 名を見る。**同じ家族名の別フェイスを他アプリが
+  入れるとフォールバックが横取りされる**。TD で日本語が豆腐になったら、まず
+  「Noto Sans CJK JP が何に解決されるか」を確認する(Adobe Fonts / Google Fonts の Noto が定番の犯人)
