@@ -132,7 +132,6 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | [CI Glass](CoreImageGlass/) | TOP | **macOS frosted glass and macOS 26 Liquid Glass**. Presets measured from the real views; edge refraction driven by the shape mask |
 | [CI Code](CoreImageCode/) | TOP | **Generate** QR / Aztec / PDF417 / Code128 (no external library) |
 | [CoreAI](CoreAI/) | TOP | **Run any Core AI model** (`.aimodel`, **macOS 27+**) on a TOP — the Core AI counterpart of CoreML TOP. Inputs / outputs are read from the model's own descriptor (depth, super-resolution, segmentation…). Models come from Apple's coreai-models exporter |
-| [CoreAI LLM](CoreAI/#coreai-llm-dat) | DAT | **On-device LLM / VLM chat through Core AI** (**macOS 27+**): Qwen3, Gemma 3, Mistral, gpt-oss and Qwen3-VL bundles exported by coreai-models; streams tokens into a conversation table, takes an Image TOP for vision models, thinking toggle for reasoning models |
 | [CoreAI ImageGen](CoreAI/#coreai-imagegen-top) | TOP | **text2img / img2img with SD 3.5 and FLUX.2 through Core AI** (**macOS 27+**). Bundles exported by coreai-models; the pipeline stays resident. Slow on an M2 (FLUX.2 4 steps 24–68 s) — the point is model coverage that Core ML lacks |
 
 ### Audio & sound
@@ -153,6 +152,7 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 |---|---|---|
 | [LLM AFM](LLMAFM/) | DAT | **Apple Intelligence LLM** (macOS 26+). **Structured output (JSON schema)** + **Tool Calling** (the LLM calls a tool, TouchDesigner executes it and returns the result) straight into show control. *(Experimental, unverified: macOS 27 model select / image input / reasoning levels)* |
 | [LLM MLX](LLMMLX/) | DAT | **Local LLM via Apple MLX** (mlx-swift-lm). Runs any mlx-community model (Gemma 4 / Qwen / Llama) fully on-device with token streaming. No API key; model auto-downloads from Hugging Face on first use |
+| [LLM CoreAI](CoreAI/#llm-coreai-dat) | DAT | **On-device LLM / VLM chat through Core AI** (**macOS 27+**): Qwen3, Gemma 3, Mistral, gpt-oss and Qwen3-VL bundles exported by coreai-models; streams tokens into a conversation table, takes an Image TOP for vision models, thinking toggle for reasoning models |
 | [Translate](Translate/) | DAT | **On-device translation.** Wire to Speech Transcribe for real-time subtitle translation |
 | [Text Analyze](TextAnalyze/) | DAT | Sentiment / language ID / named entities / semantic similarity (JA supported) + **tokens (token / POS / lemma)** and **embedding vectors** (numeric). "Drive visuals from speech mood/topic" |
 

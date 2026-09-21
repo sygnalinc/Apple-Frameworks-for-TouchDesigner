@@ -129,7 +129,7 @@ public:
         myPid = pid;
         myWriteFd = inPipe[1];
         myReadFd = outPipe[0];
-        // ヘルパが落ちた後に書くと SIGPIPE で TouchDesigner ごと死ぬ(CoreAI LLM で実測)。
+        // ヘルパが落ちた後に書くと SIGPIPE で TouchDesigner ごと死ぬ(LLM CoreAI で実測)。
         // このパイプでは SIGPIPE を発生させず EPIPE を返させる
         fcntl(myWriteFd, F_SETNOSIGPIPE, 1);
         {

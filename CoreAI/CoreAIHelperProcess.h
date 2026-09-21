@@ -1,5 +1,5 @@
 // CoreAI 系プラグイン共通: ヘルパ実行ファイルを別プロセスで spawn して JSON-lines で通信する。
-// CoreAILLMDAT.mm の HelperProcess から、LLM 固有の状態を外して汎用化したもの。
+// LLMCoreAIDAT.mm の HelperProcess から、LLM 固有の状態を外して汎用化したもの。
 // - 子が死んだ後の write で SIGPIPE が TouchDesigner ごと落とす → F_SETNOSIGPIPE
 // - パイプ EOF で子を回収して running() を false に → 次の start() で作り直せる
 // - joinable な読み取りスレッドを残したまま破棄すると std::terminate → stop() が必ず join

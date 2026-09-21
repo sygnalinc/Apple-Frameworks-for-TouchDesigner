@@ -131,7 +131,6 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [CI Glass](CoreImageGlass/) | TOP | **macOSのすりガラスとmacOS 26のLiquid Glass**。プリセットは実物から実測。縁の屈折は形のマスクから生成 |
 | [CI Code](CoreImageCode/) | TOP | QR / Aztec / PDF417 / Code128 の**生成**(外部ライブラリ不要) |
 | [CoreAI](CoreAI/) | TOP | **任意の Core AI モデル**(`.aimodel`・**macOS 27+**)を TOP で回す。CoreML TOP の Core AI 版で、入出力はモデル自身のディスクリプタから読む(深度・超解像・セグメンテーション…)。モデルは Apple の coreai-models で書き出す |
-| [CoreAI LLM](CoreAI/#coreai-llm-dat) | DAT | **Core AI によるオンデバイス LLM / VLM チャット**(**macOS 27+**)。coreai-models が書き出す Qwen3 / Gemma 3 / Mistral / gpt-oss / Qwen3-VL のバンドルをトークンストリーミングで会話テーブルへ。Image TOP を渡せば画像入力、推論モデルは思考トグル |
 | [CoreAI ImageGen](CoreAI/#coreai-imagegen-top) | TOP | **SD 3.5 / FLUX.2 の text2img / img2img を Core AI で**(**macOS 27+**)。coreai-models の書き出しをそのまま使い、パイプラインは常駐。M2 では遅い(FLUX.2 4 steps で 24〜68 秒)— 価値は Core ML に無いモデルが使えること |
 
 ### 音声・音響
@@ -152,6 +151,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 |---|---|---|
 | [LLM AFM](LLMAFM/) | DAT | **Apple Intelligence LLM**(macOS26+)。**構造化出力(JSONスキーマ)**+**ツール呼び出し**(LLMがツールを要求→TouchDesignerが実行して結果を返す)でショー制御へ直結。*(実験中・未検証: macOS 27 のモデル選択/画像入力/Reasoning)* |
 | [LLM MLX](LLMMLX/) | DAT | **Apple MLX によるローカルLLM**(mlx-swift-lm)。任意の mlx-community モデル(Gemma 4 / Qwen / Llama)を完全オンデバイスで実行しトークンをストリーミング。APIキー不要・モデルは初回にHFから自動DL |
+| [LLM CoreAI](CoreAI/#llm-coreai-dat) | DAT | **Core AI によるオンデバイス LLM / VLM チャット**(**macOS 27+**)。coreai-models が書き出す Qwen3 / Gemma 3 / Mistral / gpt-oss / Qwen3-VL のバンドルをトークンストリーミングで会話テーブルへ。Image TOP を渡せば画像入力、推論モデルは思考トグル |
 | [Translate](Translate/) | DAT | **オンデバイス翻訳**。Speech Transcribe 直結でリアルタイム字幕翻訳 |
 | [Text Analyze](TextAnalyze/) | DAT | 感情スコア・言語判定・固有表現・意味的類似度(日本語対応)+**トークン(token / 品詞 / 見出し語)**と**埋め込みベクトル**(数値)。「発話の感情/話題でビジュアル制御」 |
 

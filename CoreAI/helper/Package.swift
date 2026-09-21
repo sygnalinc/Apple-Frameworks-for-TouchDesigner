@@ -1,7 +1,7 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// CoreAI helpers for TouchDesigner (CoreAI LLM DAT / CoreAI ImageGen TOP).
+// CoreAI helpers for TouchDesigner (LLM CoreAI DAT / CoreAI ImageGen TOP).
 // Apple の coreai-models(Swift パッケージ・BSD-3)の CoreAILM を使い、.aimodel の
 // LLM / VLM バンドル(exports/<name>/ = metadata.json + *.aimodel + tokenizer/)を
 // JSON-lines プロトコルで回す常駐プロセス。DAT はこれを別プロセスとして spawn する

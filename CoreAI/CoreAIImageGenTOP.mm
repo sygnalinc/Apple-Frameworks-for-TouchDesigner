@@ -4,7 +4,7 @@
 // 別プロセスのヘルパ(coreai-diffusion-helper・CoreAIDiffusion)で回し、生成画像を
 // TOP に出す。CoreML ImageGen(ml-stable-diffusion)の Core AI 版。
 //
-// 構造は CoreAI LLM DAT と同じ: posix_spawn + pipe + JSON-lines。画像は一時ファイルの
+// 構造は LLM CoreAI DAT と同じ: posix_spawn + pipe + JSON-lines。画像は一時ファイルの
 // 生 RGBA8(top-down)でやり取りする(PNG エンコードを挟まない)。
 // - 生成は非同期(cook はブロックしない)。done を受けたらファイルを読んでキャッシュし、
 //   毎 execute アップロードする(bypass 復帰で黒にならないため・CoreML ImageGen と同じ)

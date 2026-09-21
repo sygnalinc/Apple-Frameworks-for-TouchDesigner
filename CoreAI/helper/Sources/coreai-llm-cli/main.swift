@@ -1,4 +1,4 @@
-// coreai-llm-cli — CoreAI LLM DAT のヘルパ(常駐プロセス)
+// coreai-llm-cli — LLM CoreAI DAT のヘルパ(常駐プロセス)
 //
 // 使い方:
 //   coreai-llm-cli --serve                     JSON-lines プロトコル(DAT が使う)

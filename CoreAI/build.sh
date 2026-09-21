@@ -1,5 +1,5 @@
 #!/bin/zsh
-# CoreAI(1フォルダ3バンドル): CoreAITOP.plugin(画像モデル)/ CoreAILLMDAT.plugin(LLM / VLM)/ CoreAIImageGenTOP.plugin(拡散)
+# CoreAI(1フォルダ3バンドル): CoreAITOP.plugin(画像モデル)/ LLMCoreAIDAT.plugin(LLM / VLM)/ CoreAIImageGenTOP.plugin(拡散)
 # dylib はビルド毎に名前を変える(TD/dyld が install name でキャッシュするため)
 set -e
 cd "$(dirname "$0")"
@@ -53,12 +53,14 @@ plist "$NAME" coreai-top
 codesign --force --deep -s - "build/$NAME.plugin"
 echo "built: $(pwd)/build/$NAME.plugin ($DYLIB)"
 
-# ---------- ② CoreAI LLM DAT(ヘルパ実行ファイル + DAT)----------
+# ---------- ② LLM CoreAI DAT(ヘルパ実行ファイル + DAT)----------
+# opLabel は LLM AFM / LLM MLX と揃えて "LLM CoreAI"。フォルダは coreai-models の Swift パッケージを
+# ImageGen と共有するため CoreAI/ のまま(1フォルダ複数バンドルの型)。ヘルパ名 coreai-llm-helper は内部名
 # ヘルパは Apple coreai-models(SPM・BSD-3)を使う Swift パッケージ。macOS 27 SDK が要る
 # (Package.swift の platforms が 27.0)。26 機ではここをスキップして TOP だけ作る。
 SDKVER=$(xcrun --show-sdk-version 2>/dev/null | cut -d. -f1)
 if [ "${SDKVER:-0}" -ge 27 ]; then
-  NAME=CoreAILLMDAT
+  NAME=LLMCoreAIDAT
   OUT="build/$NAME.plugin/Contents"
   ( cd helper && swift build -c release --product coreai-llm-cli --product coreai-diffusion-cli 2>&1 | grep -E "error:|Compiling|Build complete" || true )
   HELPER="helper/.build/release/coreai-llm-cli"
@@ -69,7 +71,7 @@ if [ "${SDKVER:-0}" -ge 27 ]; then
   # 残ると、それをインストールした TD が起動時にクラッシュする・MapKit で実際に踏んだ)
   clang++ -std=c++17 -fobjc-arc -O2 -bundle \
     -I "$SDK_DAT" \
-    CoreAILLMDAT.mm \
+    LLMCoreAIDAT.mm \
     -framework Foundation -framework CoreGraphics -framework ImageIO \
     -o "build/$NAME.tmp"
   mkdir -p "$OUT/MacOS" "$OUT/Helpers"
@@ -79,7 +81,7 @@ if [ "${SDKVER:-0}" -ge 27 ]; then
   for b in helper/.build/release/*.bundle; do
     [ -e "$b" ] && cp -R "$b" "$OUT/Helpers/"
   done
-  plist "$NAME" coreai-llm-dat
+  plist "$NAME" llm-coreai-dat
   codesign --force --deep -s - "build/$NAME.plugin"
   echo "built: $(pwd)/build/$NAME.plugin"
 
@@ -103,7 +105,7 @@ if [ "${SDKVER:-0}" -ge 27 ]; then
   codesign --force --deep -s - "build/$NAME.plugin"
   echo "built: $(pwd)/build/$NAME.plugin"
 else
-  echo "skip CoreAILLMDAT / CoreAIImageGenTOP (needs macOS 27 SDK; found ${SDKVER:-none})"
+  echo "skip LLMCoreAIDAT / CoreAIImageGenTOP (needs macOS 27 SDK; found ${SDKVER:-none})"
 fi
 
 td_stamp_all

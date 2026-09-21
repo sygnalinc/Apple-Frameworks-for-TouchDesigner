@@ -1,4 +1,4 @@
-# CoreAI TOP / CoreAI LLM DAT / CoreAI ImageGen TOP
+# CoreAI TOP / LLM CoreAI DAT / CoreAI ImageGen TOP
 
 **English** | [日本語](#日本語)
 
@@ -91,9 +91,9 @@ per input and output with `kind / dtype / shape`.
 - The op keeps the Core AI compilation cache the OS provides (`AIModelCache`); the second load of
   the same model is much faster than the first.
 
-## CoreAI LLM DAT
+## LLM CoreAI DAT
 
-The same folder also builds **CoreAI LLM DAT** (opType `Coreaillm`): a chat DAT that runs the
+The same folder also builds **LLM CoreAI DAT** (opType `Llmcoreai`; named like LLM AFM / LLM MLX): a chat DAT that runs the
 LLM / VLM bundles exported by Apple's [coreai-models](https://github.com/apple/coreai-models)
 (Qwen3, Gemma 3, Mistral, Phi-4, Qwen3-VL …) fully on-device through Core AI. It is the Core AI
 counterpart of LLM MLX: the model runs in a **spawned helper process** (`coreai-llm-helper`,
@@ -126,7 +126,7 @@ cd coreai-models/models/qwen3_vl && uv run export.py         # → exports/vlm-f
 Point *Model Bundle* at that folder (an expression like
 `project.folder + '/models/qwen3_1_7b_4bit_dynamic'` keeps it relative to the .toe).
 
-`demo.toe` has `/project1/CoreAILLM` with both: a text turn on `qwen3_1_7b_4bit_dynamic` and a
+`demo.toe` has `/project1/LLMCoreAI` with both: a text turn on `qwen3_1_7b_4bit_dynamic` and a
 vision turn on `qwen3_vl_2b` fed from `Assets/sample_objects.mp4`.
 
 ### Measured (M2 24 GB, macOS 27.0, helper standalone unless noted)
@@ -297,9 +297,9 @@ Info DAT: `status`・`stage`・モデルパス・関数一覧・計算ユニッ�
 - グレー入力(`C = 1`)は BT.601 の重みで変換
 - コンパイル結果は OS の `AIModelCache` に残るので、同じモデルの2回目以降のロードは速い
 
-## CoreAI LLM DAT
+## LLM CoreAI DAT
 
-同じフォルダから **CoreAI LLM DAT**(opType `Coreaillm`)もビルドされる。Apple の
+同じフォルダから **LLM CoreAI DAT**(opType `Llmcoreai`・LLM AFM / LLM MLX と揃えた名前)もビルドされる。Apple の
 [coreai-models](https://github.com/apple/coreai-models) が書き出す LLM / VLM バンドル
 (Qwen3・Gemma 3・Mistral・Phi-4・Qwen3-VL …)を Core AI で完全オンデバイス実行するチャット DAT。
 LLM MLX の Core AI 版で、モデルは**別プロセスのヘルパ**(`coreai-llm-helper`・coreai-models の
@@ -331,7 +331,7 @@ cd coreai-models/models/qwen3_vl && uv run export.py         # → exports/vlm-f
 *Model Bundle* にそのフォルダを指定する(`project.folder + '/models/qwen3_1_7b_4bit_dynamic'`
 のような式にすると .toe の位置に追従する)
 
-`demo.toe` の `/project1/CoreAILLM` に両方の利用例がある(`qwen3_1_7b_4bit_dynamic` のテキストと、
+`demo.toe` の `/project1/LLMCoreAI` に両方の利用例がある(`qwen3_1_7b_4bit_dynamic` のテキストと、
 `Assets/sample_objects.mp4` を渡す `qwen3_vl_2b` の画像入力)
 
 ### 実測(M2 24GB・macOS 27.0・断りが無ければヘルパ単体)
@@ -421,7 +421,7 @@ cd coreai-models/models/stable-diffusion && uv run export.py # → exports/stabl
 ### ビルド
 
 ```bash
-cd CoreAI && TD_APP=/Applications/TouchDesigner.app zsh ./build.sh   # → build/CoreAITOP.plugin + CoreAILLMDAT.plugin + CoreAIImageGenTOP.plugin
+cd CoreAI && TD_APP=/Applications/TouchDesigner.app zsh ./build.sh   # → build/CoreAITOP.plugin + LLMCoreAIDAT.plugin + CoreAIImageGenTOP.plugin
 ```
 
 Swift ヘルパ(`CoreAIHelper.swift`・C ABI `ai_`)は `-weak_framework CoreAI` でリンクし、
@@ -430,4 +430,4 @@ Swift ヘルパ(`CoreAIHelper.swift`・C ABI `ai_`)は `-weak_framework CoreAI` 
 
 LLM DAT のヘルパ(`helper/`・SwiftPM・coreai-models と swift-transformers に依存)は SDK 27 以上の
 ときだけビルドされ、`Contents/Helpers/coreai-llm-helper` と依存バンドル(`*.bundle`)が同梱される。
-SDK 26 では `CoreAILLMDAT.plugin` はスキップされる。
+SDK 26 では `LLMCoreAIDAT.plugin` はスキップされる。

@@ -8552,3 +8552,28 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
   外すなら別フォルダに切り出すか、フォルダごと experimental に戻す
 - 次にやること: バンドルの既定 Steps / Guidance を Info DAT に出す(今は手で合わせる)、
   SDXL 書き出しでの動作確認(未検証)、リリース 0.9.8 はユーザー指示があってから
+
+### 2026-09-22 CoreAI LLM → LLM CoreAI に改名(LLM AFM / LLM MLX と命名を統一)
+
+- ユーザー「LLM AFM と LLM MLX があるので CoreAI LLM も揃えた方が」→ 2026-07-21 の
+  「LLM 関連は `LLM <バックエンド>`」規則に合わせて改名。**opType `Coreaillm` → `Llmcoreai`**、
+  opLabel "LLM CoreAI"、icon CAL → LCA、ソース `CoreAILLMDAT.mm` → `LLMCoreAIDAT.mm`(git mv)、
+  バンドル `LLMCoreAIDAT.plugin`。**まだどの DMG にも入っていない**ので互換性の負債ゼロで改名できた
+  (0.9.8 で初出荷。majorVersion 据え置き)
+- **フォルダは `CoreAI/` のまま**(規則からの意図的な例外): ImageGen と coreai-models の
+  Swift パッケージを共有しており、別フォルダに出すと helper のビルドが二重になる。
+  Cinematic / MapKit / AudioUnit と同じ「共通基盤を共有する複数バンドル」扱い。build.sh に理由を明記。
+  ヘルパ名 `coreai-llm-helper` / SPM パッケージ名 `CoreAILLMHelper` は内部名として据え置き(規約どおり)
+- ルート README(英日)の行を General ML から **Language & text の LLM AFM / LLM MLX の隣**へ移動。
+  CoreAI/README・models/README・LLMMLX のコメントも追随。`Coreaillm` / `CoreAI LLM` の残存は
+  CLAUDE.md の履歴と SPM パッケージ名のみ
+- demo.toe: `/project1/CoreAILLM` → **`/project1/LLMCoreAI`**、`Coreaillm1/2` を `LlmcoreaiDAT` で
+  作り直し(copyParameters + 配線復元)→ **`Llmcoreai1/2`** に。info / select の参照、note、
+  `_README`(「experimental」の古い表記も released に合わせて削除)を更新
+- **検証(TD 実機・32280 SDK・common=1)**: 常設から旧 `CoreAILLMDAT.plugin` を撤去して新バンドルを
+  設置 → TD 起動 → 新型で Load → ready → "Name one primary color in three words." →
+  **"Red, Blue, Yellow."**。エラーなし。会話を Reset・allowCooking=False に戻して保存
+- 罠(小): 会話クリアのパルス名は `Clear` ではなく **`Reset`**(`n.pars('*')` で確認)
+- 「CoreML で LLM を回す op は無い」もこの日に回答: CoreML TOP/CHOP/DAT は単発推論器で
+  トークナイザ・自己回帰ループ・MLState を持たない。macOS 26 は LLM MLX、27 は LLM CoreAI が
+  役割を埋めているので、LLM CoreML は優先度低(MLX の依存無しで純正のみで回したい場合のみ価値)

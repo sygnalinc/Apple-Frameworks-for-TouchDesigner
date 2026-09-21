@@ -1,4 +1,4 @@
-// CoreAI LLM DAT — ローカル LLM / VLM 推論(Apple Core AI・macOS 27+)
+// LLM CoreAI DAT — ローカル LLM / VLM 推論(Apple Core AI・macOS 27+)
 //
 // Apple の coreai-models(https://github.com/apple/coreai-models)で書き出した .aimodel の
 // LLM / VLM バンドル(exports/<name>/ = metadata.json + *.aimodel + tokenizer/)を
@@ -362,12 +362,12 @@ std::string helperExecutablePath()
     return "";
 }
 
-class CoreAILLMDAT : public DAT_CPlusPlusBase
+class LLMCoreAIDAT : public DAT_CPlusPlusBase
 {
 public:
-    explicit CoreAILLMDAT(const OP_NodeInfo*) {}
+    explicit LLMCoreAIDAT(const OP_NodeInfo*) {}
 
-    ~CoreAILLMDAT() override { myHelper.stop(); }
+    ~LLMCoreAIDAT() override { myHelper.stop(); }
 
     void getGeneralInfo(DAT_GeneralInfo* ginfo, const OP_Inputs*, void*) override
     {
@@ -447,26 +447,26 @@ public:
         {
             OP_StringParameter p("Model");
             p.label = "Model Bundle (exports/<name> folder)";
-            p.page = "CoreAI LLM";
+            p.page = "LLM CoreAI";
             p.defaultValue = "";
             manager->appendFolder(p);   // バンドルはフォルダ(metadata.json + .aimodel + tokenizer/)
         }
         {
             OP_StringParameter p("System");
             p.label = "System Instructions";
-            p.page = "CoreAI LLM";
+            p.page = "LLM CoreAI";
             manager->appendString(p);
         }
         {
             OP_StringParameter p("Prompt");
             p.label = "Prompt";
-            p.page = "CoreAI LLM";
+            p.page = "LLM CoreAI";
             manager->appendString(p);
         }
         {
             OP_NumericParameter p("Temperature");
             p.label = "Temperature";
-            p.page = "CoreAI LLM";
+            p.page = "LLM CoreAI";
             p.defaultValues[0] = 0.7;
             p.minSliders[0] = 0.0;
             p.maxSliders[0] = 2.0;
@@ -475,7 +475,7 @@ public:
         {
             OP_NumericParameter p("Maxtokens");
             p.label = "Max Tokens";
-            p.page = "CoreAI LLM";
+            p.page = "LLM CoreAI";
             p.defaultValues[0] = 512;
             p.minSliders[0] = 16;
             p.maxSliders[0] = 4096;
@@ -486,7 +486,7 @@ public:
         {
             OP_NumericParameter p("Keepcontext");
             p.label = "Keep Context (Multi-turn)";
-            p.page = "CoreAI LLM";
+            p.page = "LLM CoreAI";
             p.defaultValues[0] = 1;
             manager->appendToggle(p);
         }
@@ -494,21 +494,21 @@ public:
             // 推論モデル(Qwen3 等)の思考。Off で system に /no_think を足して思考を省く(速い)
             OP_NumericParameter p("Think");
             p.label = "Enable Thinking (reasoning models)";
-            p.page = "CoreAI LLM";
+            p.page = "LLM CoreAI";
             p.defaultValues[0] = 0;
             manager->appendToggle(p);
         }
         {
             OP_NumericParameter p("Showthink");
             p.label = "Show Thinking Column";
-            p.page = "CoreAI LLM";
+            p.page = "LLM CoreAI";
             p.defaultValues[0] = 0;
             manager->appendToggle(p);
         }
         {
             OP_NumericParameter p("Maxrows");
             p.label = "Max Rows";
-            p.page = "CoreAI LLM";
+            p.page = "LLM CoreAI";
             p.defaultValues[0] = 50;
             p.minSliders[0] = 1;
             p.maxSliders[0] = 200;
@@ -532,19 +532,19 @@ public:
         {
             OP_NumericParameter p("Load");
             p.label = "Load Model";
-            p.page = "CoreAI LLM";
+            p.page = "LLM CoreAI";
             manager->appendPulse(p);
         }
         {
             OP_NumericParameter p("Submit");
             p.label = "Submit";
-            p.page = "CoreAI LLM";
+            p.page = "LLM CoreAI";
             manager->appendPulse(p);
         }
         {
             OP_NumericParameter p("Reset");
             p.label = "Reset Conversation";
-            p.page = "CoreAI LLM";
+            p.page = "LLM CoreAI";
             manager->appendPulse(p);
         }
     }
@@ -748,12 +748,12 @@ FillDATPluginInfo(DAT_PluginInfo* info)
 {
     if (!info->setAPIVersion(DATCPlusPlusAPIVersion))
         return;
-    info->customOPInfo.opType->setString("Coreaillm");
-    info->customOPInfo.opLabel->setString("CoreAI LLM");
+    info->customOPInfo.opType->setString("Llmcoreai");
+    info->customOPInfo.opLabel->setString("LLM CoreAI");
     info->customOPInfo.authorName->setString("SYGNAL Inc.");
     info->customOPInfo.majorVersion = 0;
     info->customOPInfo.minorVersion = 9;
-    info->customOPInfo.opIcon->setString("CAL");
+    info->customOPInfo.opIcon->setString("LCA");
     if (info->customOPInfo.opHelpURL) info->customOPInfo.opHelpURL->setString("https://github.com/sygnalinc/Apple-Frameworks-for-TouchDesigner/blob/main/CoreAI/README.md");
     info->customOPInfo.minInputs = 0;
     info->customOPInfo.maxInputs = 0;
@@ -762,13 +762,13 @@ FillDATPluginInfo(DAT_PluginInfo* info)
 DLLEXPORT DAT_CPlusPlusBase*
 CreateDATInstance(const OP_NodeInfo* info)
 {
-    return new CoreAILLMDAT(info);
+    return new LLMCoreAIDAT(info);
 }
 
 DLLEXPORT void
 DestroyDATInstance(DAT_CPlusPlusBase* instance)
 {
-    delete (CoreAILLMDAT*)instance;
+    delete (LLMCoreAIDAT*)instance;
 }
 
 }   // extern "C"
