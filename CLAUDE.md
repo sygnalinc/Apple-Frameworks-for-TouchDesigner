@@ -8507,3 +8507,48 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
 - CoreAI LLM DAT に macOS 26 ガードを追加: ヘルパは minos 27 なので 26 では spawn が dyld に
   拒否されて "helper exited" になる → 先に `unavailable: Core AI requires macOS 27+` を出す
 - 未実施: リリース本番(VERSION 更新 → 全再ビルド → sign/verify/dmg/notarize)はユーザー指示待ち
+
+### 2026-09-21 CoreAI ImageGen TOP 実装(coreai-models の拡散バンドル: SD 3.5 / FLUX.2 を Core AI で)
+
+- ユーザー「CoreAI で画像生成もできる?」→ 実測して「できるが遅い」と答えた後、
+  「CoreAI ImageGen TOP 作りましょう」で実装。**CoreAI/ の3つ目のバンドル**
+  (opType `Coreaiimagegen` / label "CoreAI ImageGen" / icon CAG)。CoreML ImageGen と同じ
+  パラメータ構成(Prompt / Negative / Steps / Guidance / Seed / 入力0の img2img / Continuous)
+- **アーキテクチャ**: LLM DAT と同じ**別プロセスのヘルパ**(`coreai-diffusion-helper`・
+  JSON-lines・画像は RGBA8 の生ファイル往復)。ヘルパ側は coreai-models の
+  `CoreAIDiffusion`(module `CoreAIDiffusionPipeline`)。`PipelineDescriptor.resolve(at:)` で
+  SD / SDXL / SD3 / FLUX2 を判別して各 Pipeline を作り、`generateImages(configuration:progressHandler:)`。
+  スケジューラは flow 系(SD3 / FLUX2)なら `.discreteFlow`、それ以外は `.dpmSolverMultistep`
+- **ヘルパプロセスの共通部分を `CoreAI/CoreAIHelperProcess.h`(namespace tdcoreai)に切り出した**
+  (posix_spawn + pipe + reader thread + SIGPIPE 無効化 + EOF で回収)。LLM DAT からの抽出。
+  `extern char** environ;` を namespace の外に置く必要がある
+- **実測(M2 24GB・macOS 27.0・TD 内・モデル常駐)**: FLUX.2-klein 4B(512 書き出し・`half`)
+  4 steps **24〜68 秒**(メモリ圧で大きくぶれる。他アプリでスワップ 4〜7GB の状態)、
+  SD 3.5 medium 4bit 512/20 steps **81.5 秒**、FLUX.2 img2img(写真→水彩・strength 0.6)68 秒。
+  比較: CoreML ImageGen は SD 2.1 7.6 秒 / Turbo 0.8 秒。**Core AI は速い経路ではなく、
+  SD 3.5 / FLUX.2 という Core ML 版の無いモデルを使える点が価値**
+- **踏んだ罠(いずれも実測で切り分け)**:
+  1. **FLUX.2 の 512 書き出しは `Transformer_512` + `VAEDecoder_half` しか無い** → Decode は
+     `half` 必須、img2img は参照グリッド `half` のみ。`full` を渡すと
+     `unsupportedConfiguration("...no img2img transformer for the full reference grid")`。
+     `Flux2Pipeline.img2imgRoutes` を見て **full → half → quarter の順で在るものを選ぶ**(`bestReferenceGrid`)
+  2. **`lazyModelLoading`(ステージごとにロード/アンロード)は2枚目以降が遅い**。既定は常駐
+     (`loadResources()` を一度)にし、`Low Memory` トグルで lazy に切り替える
+  3. **`PipelineProgress.step` は SD が 0 始まり、SD3 / FLUX が 1 始まり**。進捗 % は total で割るだけにした
+  4. **stable-diffusion-v1-5 の古い書き出しは latent が NaN**(fp16 オーバーフロー・現行 5e00960 で修正済み)。
+     op の問題ではない
+  5. モデル切替後、ヘルパの `serial` はプロセス内で連番を続けるので、**前モデルの serial と一致した
+     `image_serial` を「新しい絵」と誤読しない**。次の serial を待つ
+  6. `build.sh` は「一時パスへコンパイル → 成功したらバンドルを組む」順に(空バンドル事故の予防・
+     MapKit で踏んだのと同じ)。ヘルパは `swift build --product coreai-llm-cli --product coreai-diffusion-cli`
+     で2つ同時に作る
+- **demo.toe に `/project1/CoreAIImageGen`**(05 画像生成の行): sample_objects → Coreaiimagegen1
+  (Model=`project.folder + '/models/FLUX.2-klein-4B'`・Decode half・Steps 4・Guidance 1.0・Seed 42)
+  → out1 + info + info_chop + note。allowCooking=False。モデルは `models/FLUX.2-klein-4B/`(5.9GB・gitignore)
+- README(CoreAI 英日に ImageGen 節・タイトルと build 行を3バンドルに)+ ルート README(英日)の
+  本表に行追加 + `models/README.md` に FLUX.2 行(`coreai-models/models/flux2 && uv run export.py`)
+- **申し送り(要ユーザー判断)**: `PLUGINS.tsv` は**フォルダ単位**で `CoreAI` が released なので、
+  この新 TOP は**次の DMG にそのまま入る**(新規 op は experimental のまま、の規約と衝突)。
+  外すなら別フォルダに切り出すか、フォルダごと experimental に戻す
+- 次にやること: バンドルの既定 Steps / Guidance を Info DAT に出す(今は手で合わせる)、
+  SDXL 書き出しでの動作確認(未検証)、リリース 0.9.8 はユーザー指示があってから

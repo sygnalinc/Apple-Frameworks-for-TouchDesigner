@@ -132,6 +132,7 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [CI Code](CoreImageCode/) | TOP | QR / Aztec / PDF417 / Code128 の**生成**(外部ライブラリ不要) |
 | [CoreAI](CoreAI/) | TOP | **任意の Core AI モデル**(`.aimodel`・**macOS 27+**)を TOP で回す。CoreML TOP の Core AI 版で、入出力はモデル自身のディスクリプタから読む(深度・超解像・セグメンテーション…)。モデルは Apple の coreai-models で書き出す |
 | [CoreAI LLM](CoreAI/#coreai-llm-dat) | DAT | **Core AI によるオンデバイス LLM / VLM チャット**(**macOS 27+**)。coreai-models が書き出す Qwen3 / Gemma 3 / Mistral / gpt-oss / Qwen3-VL のバンドルをトークンストリーミングで会話テーブルへ。Image TOP を渡せば画像入力、推論モデルは思考トグル |
+| [CoreAI ImageGen](CoreAI/#coreai-imagegen-top) | TOP | **SD 3.5 / FLUX.2 の text2img / img2img を Core AI で**(**macOS 27+**)。coreai-models の書き出しをそのまま使い、パイプラインは常駐。M2 では遅い(FLUX.2 4 steps で 24〜68 秒)— 価値は Core ML に無いモデルが使えること |
 
 ### 音声・音響
 

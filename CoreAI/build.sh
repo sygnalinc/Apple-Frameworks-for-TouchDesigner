@@ -1,5 +1,5 @@
 #!/bin/zsh
-# CoreAI(1フォルダ2バンドル): CoreAITOP.plugin(画像モデル)/ CoreAILLMDAT.plugin(LLM / VLM)
+# CoreAI(1フォルダ3バンドル): CoreAITOP.plugin(画像モデル)/ CoreAILLMDAT.plugin(LLM / VLM)/ CoreAIImageGenTOP.plugin(拡散)
 # dylib はビルド毎に名前を変える(TD/dyld が install name でキャッシュするため)
 set -e
 cd "$(dirname "$0")"
@@ -60,27 +60,50 @@ SDKVER=$(xcrun --show-sdk-version 2>/dev/null | cut -d. -f1)
 if [ "${SDKVER:-0}" -ge 27 ]; then
   NAME=CoreAILLMDAT
   OUT="build/$NAME.plugin/Contents"
-  ( cd helper && swift build -c release --product coreai-llm-cli 2>&1 | grep -E "error:|Compiling|Build complete" || true )
+  ( cd helper && swift build -c release --product coreai-llm-cli --product coreai-diffusion-cli 2>&1 | grep -E "error:|Compiling|Build complete" || true )
   HELPER="helper/.build/release/coreai-llm-cli"
   if [ ! -x "$HELPER" ]; then
     echo "ERROR: helper executable not built ($HELPER)"; exit 1
   fi
+  # 先にコンパイルし、成功したときだけバンドルを組む(失敗時に実行ファイルの無い骨格が
+  # 残ると、それをインストールした TD が起動時にクラッシュする・MapKit で実際に踏んだ)
+  clang++ -std=c++17 -fobjc-arc -O2 -bundle \
+    -I "$SDK_DAT" \
+    CoreAILLMDAT.mm \
+    -framework Foundation -framework CoreGraphics -framework ImageIO \
+    -o "build/$NAME.tmp"
   mkdir -p "$OUT/MacOS" "$OUT/Helpers"
+  mv "build/$NAME.tmp" "$OUT/MacOS/$NAME"
   cp "$HELPER" "$OUT/Helpers/coreai-llm-helper"
   # SwiftPM の resource bundle(tokenizer 等)があれば実行ファイルの隣へ
   for b in helper/.build/release/*.bundle; do
     [ -e "$b" ] && cp -R "$b" "$OUT/Helpers/"
   done
-  clang++ -std=c++17 -fobjc-arc -O2 -bundle \
-    -I "$SDK_DAT" \
-    CoreAILLMDAT.mm \
-    -framework Foundation -framework CoreGraphics -framework ImageIO \
-    -o "$OUT/MacOS/$NAME"
   plist "$NAME" coreai-llm-dat
   codesign --force --deep -s - "build/$NAME.plugin"
   echo "built: $(pwd)/build/$NAME.plugin"
+
+  # ---------- ③ CoreAI ImageGen TOP(拡散モデル。同じ Swift パッケージの2つ目の実行ファイル)----------
+  NAME=CoreAIImageGenTOP
+  OUT="build/$NAME.plugin/Contents"
+  DHELPER="helper/.build/release/coreai-diffusion-cli"
+  if [ ! -x "$DHELPER" ]; then
+    echo "ERROR: diffusion helper executable not built ($DHELPER)"; exit 1
+  fi
+  clang++ -std=c++17 -fobjc-arc -O2 -bundle \
+    -I "$SDK_TOP" \
+    CoreAIImageGenTOP.mm \
+    -framework Foundation -framework CoreGraphics -framework ImageIO \
+    -o "build/$NAME.tmp"
+  mkdir -p "$OUT/MacOS" "$OUT/Helpers"
+  mv "build/$NAME.tmp" "$OUT/MacOS/$NAME"
+  cp "$DHELPER" "$OUT/Helpers/coreai-diffusion-helper"
+  # 拡散ヘルパは Transformers に依存しないので同梱バンドルは不要
+  plist "$NAME" coreai-imagegen-top
+  codesign --force --deep -s - "build/$NAME.plugin"
+  echo "built: $(pwd)/build/$NAME.plugin"
 else
-  echo "skip CoreAILLMDAT (needs macOS 27 SDK; found ${SDKVER:-none})"
+  echo "skip CoreAILLMDAT / CoreAIImageGenTOP (needs macOS 27 SDK; found ${SDKVER:-none})"
 fi
 
 td_stamp_all

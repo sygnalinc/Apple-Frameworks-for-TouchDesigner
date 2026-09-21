@@ -1,7 +1,7 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// CoreAI LLM helper for TouchDesigner (CoreAI LLM DAT).
+// CoreAI helpers for TouchDesigner (CoreAI LLM DAT / CoreAI ImageGen TOP).
 // Apple の coreai-models(Swift パッケージ・BSD-3)の CoreAILM を使い、.aimodel の
 // LLM / VLM バンドル(exports/<name>/ = metadata.json + *.aimodel + tokenizer/)を
 // JSON-lines プロトコルで回す常駐プロセス。DAT はこれを別プロセスとして spawn する
@@ -13,6 +13,7 @@ let package = Package(
     platforms: [.macOS("27.0")],
     products: [
         .executable(name: "coreai-llm-cli", targets: ["coreai-llm-cli"]),
+        .executable(name: "coreai-diffusion-cli", targets: ["coreai-diffusion-cli"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/coreai-models.git",
@@ -27,6 +28,14 @@ let package = Package(
                 .product(name: "Transformers", package: "swift-transformers"),
             ],
             path: "Sources/coreai-llm-cli"
+        ),
+        // 拡散モデル(SD 1.x/2.x・SD3・FLUX.2)。CoreAIDiffusion は Transformers に依存しない
+        .executableTarget(
+            name: "coreai-diffusion-cli",
+            dependencies: [
+                .product(name: "CoreAIDiffusion", package: "coreai-models"),
+            ],
+            path: "Sources/coreai-diffusion-cli"
         ),
     ]
 )

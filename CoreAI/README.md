@@ -1,4 +1,4 @@
-# CoreAI TOP / CoreAI LLM DAT
+# CoreAI TOP / CoreAI LLM DAT / CoreAI ImageGen TOP
 
 **English** | [日本語](#日本語)
 
@@ -167,6 +167,55 @@ Rates above 4B parameters are dominated by memory pressure on a 24 GB machine wi
   and the next *Load Model* spawns a fresh helper. Deleting the node in that state is safe too
 - Diffusion bundles (FLUX) are out of scope for this DAT
 
+## CoreAI ImageGen TOP
+
+The third bundle in this folder: **CoreAI ImageGen TOP** (opType `Coreaiimagegen`) runs the
+**diffusion** bundles exported by coreai-models — Stable Diffusion 1.x / 2.x, **SD 3.x** and
+**FLUX.2-klein** — through Core AI's `CoreAIDiffusion` pipeline. It is the Core AI counterpart of
+CoreML ImageGen: same parameters (Prompt / Negative / Steps / Guidance / Seed / img2img on input 0 /
+Continuous), same asynchronous behaviour, and the same spawned-helper design as the LLM DAT
+(`coreai-diffusion-helper`; the multi-GB model lives outside the TouchDesigner process).
+
+- **Model Bundle** = the `exports/<name>` folder (`metadata.json` + `*.aimodel` + `tokenizer/`)
+- The pipeline stays **resident** (all stages loaded once) so the second image does not pay the
+  load again. *Low Memory* switches to stage-by-stage loading (slower, smaller footprint)
+- **Decode Resolution** applies to FLUX.2 only: `half` = 512×512 (the `Transformer_512` export),
+  `full` / `tiled` = 1024. `auto` picks the best the bundle has
+- **img2img** (input 0): the input is resized to the model's square size. FLUX.2 uses the
+  reference grid the bundle ships (the 512 export has only `half`; the helper picks it)
+- Info CHOP: `busy ready progress step steps gen_seconds image_serial seed executes`.
+  Info DAT: `status / model / kind / size / img2img`
+
+### Measured (M2 24 GB, macOS 27.0, inside TouchDesigner, models resident)
+
+| Bundle | Size | Steps | Time per image |
+|---|---|---|---|
+| FLUX.2-klein 4B (fp16, 512 export, `half`) | 512×512 | 4 | **24–68 s** (varies with memory pressure) |
+| SD 3.5 medium 4-bit (512 export) | 512×512 | 20 | **≈ 80 s** (≈ 4 s / step) |
+| FLUX.2 img2img (photo → "watercolor painting", strength 0.6) | 512×512 | 4 | 68 s, layout preserved |
+
+For comparison, **CoreML ImageGen** on the same Mac: SD 2.1 15 steps **7.6 s**, SD Turbo **0.8 s**.
+Core AI is not the fast path today — its point is **SD 3.5 and FLUX.2**, which have no Core ML
+route. Not usable in real time on an M2.
+
+### Getting a diffusion bundle
+
+```bash
+cd coreai-models/models/flux2 && uv run export.py            # → exports/FLUX.2-klein-4B (5.9 GB)
+cd coreai-models/models/stable-diffusion && uv run export.py # → exports/stable-diffusion-3.5-medium-4bit-512x512 etc.
+```
+
+`demo.toe` has `/project1/CoreAIImageGen` on `models/FLUX.2-klein-4B`.
+
+### Notes
+
+- The `stable-diffusion-v1-5` export in an older coreai-models checkout produced NaN latents
+  (float16 overflow); re-export with the current recipe (`5e00960` fixes it)
+- Steps / Guidance defaults differ per model family (FLUX.2: 4 steps, guidance 1.0; SD 3.5: 28 /
+  5.0; SD 1.x/2.x: 20 / 7.5). The Info DAT does not yet expose the bundle defaults — set them
+  by hand
+- Same helper-death handling as the LLM DAT: `helper exited …` → next Load respawns
+
 ## 日本語
 
 任意の **Core AI** モデル(`.aimodel`・macOS 27+)を TOP で回す。CoreML TOP の Core AI 版で、
@@ -322,10 +371,57 @@ TD 内の生成はヘルパ単体より大きく遅い(同じ 1.7B で 4〜10 �
   次の *Load Model* で新しいヘルパを起動する。その状態でノードを削除しても安全
 - 拡散モデル(FLUX)のバンドルはこの DAT の対象外
 
+## CoreAI ImageGen TOP
+
+このフォルダの3つ目のバンドル: **CoreAI ImageGen TOP**(opType `Coreaiimagegen`)。coreai-models が
+書き出す**拡散モデル**のバンドル — Stable Diffusion 1.x / 2.x・**SD 3.x**・**FLUX.2-klein** — を
+Core AI の `CoreAIDiffusion` パイプラインで回す。CoreML ImageGen の Core AI 版で、パラメータ
+(Prompt / Negative / Steps / Guidance / Seed / 入力0の img2img / Continuous)も非同期の挙動も同じ。
+LLM DAT と同じ別プロセスのヘルパ(`coreai-diffusion-helper`)で、数 GB のモデルは TD の外に置く
+
+- **Model Bundle** = `exports/<name>` のフォルダ(`metadata.json` + `*.aimodel` + `tokenizer/`)
+- パイプラインは**常駐**(全ステージを一度ロード)なので2枚目からロード時間が乗らない。
+  *Low Memory* でステージごとのロード/アンロードに切り替わる(遅いがメモリを食わない)
+- **Decode Resolution** は FLUX.2 のみ: `half` = 512×512(`Transformer_512` 書き出し)、
+  `full` / `tiled` = 1024。`auto` はバンドルにある最良を選ぶ
+- **img2img**(入力0): 入力はモデルの正方形サイズへリサイズされる。FLUX.2 はバンドルに入っている
+  参照グリッドを使う(512 書き出しは `half` のみ。ヘルパが自動で選ぶ)
+- Info CHOP: `busy ready progress step steps gen_seconds image_serial seed executes`。
+  Info DAT: `status / model / kind / size / img2img`
+
+### 実測(M2 24GB・macOS 27.0・TD 内・モデル常駐)
+
+| バンドル | サイズ | Steps | 1枚の時間 |
+|---|---|---|---|
+| FLUX.2-klein 4B(fp16・512 書き出し・`half`) | 512×512 | 4 | **24〜68 秒**(メモリ圧でぶれる) |
+| SD 3.5 medium 4bit(512 書き出し) | 512×512 | 20 | **約 80 秒**(約 4 秒/step) |
+| FLUX.2 img2img(写真 → "watercolor painting"・strength 0.6) | 512×512 | 4 | 68 秒・構図は保持 |
+
+比較: 同じ Mac の **CoreML ImageGen** は SD 2.1 15 steps **7.6 秒**、SD Turbo **0.8 秒**。
+現時点の Core AI は速い経路ではない。意味は **Core ML 版の無い SD 3.5 / FLUX.2 が使える**こと。
+M2 ではリアルタイム用途には向かない
+
+### 拡散バンドルの入手
+
+```bash
+cd coreai-models/models/flux2 && uv run export.py            # → exports/FLUX.2-klein-4B(5.9GB)
+cd coreai-models/models/stable-diffusion && uv run export.py # → exports/stable-diffusion-3.5-medium-4bit-512x512 等
+```
+
+`demo.toe` の `/project1/CoreAIImageGen` が `models/FLUX.2-klein-4B` を使う
+
+### 注意
+
+- 古い coreai-models で書き出した `stable-diffusion-v1-5` は latent が NaN になる(fp16
+  オーバーフロー)。現行レシピ(`5e00960` で修正済み)で書き出し直す
+- Steps / Guidance の既定はモデル系で違う(FLUX.2: 4 steps・guidance 1.0 / SD 3.5: 28・5.0 /
+  SD 1.x/2.x: 20・7.5)。バンドルの既定値はまだ Info DAT に出していないので手で合わせる
+- ヘルパが死んだときの扱いは LLM DAT と同じ(`helper exited …` → 次の Load で再起動)
+
 ### ビルド
 
 ```bash
-cd CoreAI && TD_APP=/Applications/TouchDesigner.app zsh ./build.sh   # → build/CoreAITOP.plugin + build/CoreAILLMDAT.plugin
+cd CoreAI && TD_APP=/Applications/TouchDesigner.app zsh ./build.sh   # → build/CoreAITOP.plugin + CoreAILLMDAT.plugin + CoreAIImageGenTOP.plugin
 ```
 
 Swift ヘルパ(`CoreAIHelper.swift`・C ABI `ai_`)は `-weak_framework CoreAI` でリンクし、
