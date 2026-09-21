@@ -8443,3 +8443,29 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
   (LLM / VLM バンドルの書き出し手順)を更新。**PLUGINS.tsv はフォルダ単位なので `CoreAI` の1行のまま**
 - 次にやること: TD 内の tok/s 低下の原因(GPU 競合か優先度か)、gpt_oss の Harmony 形式の思考分離、
   demo.toe への CoreAI LLM 利用例(experimental なので入れるかはユーザー判断)、Load 中の progress 表示
+
+### 2026-09-21 CoreAI LLM DAT: ヘルパが死んだ後に TD ごと落ちる2経路を修正(LLM MLX にも同じ穴)
+
+- TD 再起動後の実機確認: gemma_3_4b が `<end_of_turn>` で止まる(6トークン "Red is a primary color.")、
+  Load 切替直後に `ready=0 / progress=0 / status=loading model` へ戻る、非対応バンドルで
+  `helper exited (model incompatible…)` が出る — いずれも OK
+- **ところが「ヘルパ死亡後に別モデルを Load」で TD が無言で消えた**(クラッシュレポートも
+  CrashAutoSave も無し)。原因は **SIGPIPE**: ヘルパが死んでも `myPid` が残るので `running()` が
+  true のままになり、読み手のいないパイプへ load コマンドを `write()` → 既定の SIGPIPE で
+  プロセス終了。**シグナル死は .ips を残さない**ので「TD gone・レポート無し」がこの症状の指紋
+  → ①`fcntl(fd, F_SETNOSIGPIPE, 1)` で SIGPIPE を EPIPE に ②パイプ EOF で `waitpid` して
+  `myPid=0`(`running()` が false に)③`start()` は前のヘルパの fd/スレッドを片付けてから spawn
+  ④`ensureLoaded` はヘルパ不在なら `myLoadedModel` を消して load を送り直す
+- **2つ目: ヘルパ死亡後にノードを削除すると `std::terminate`**(`~HelperProcess` で joinable な
+  読み取りスレッドが残るため。`stop()` が `myPid<=0` で早期 return していた)。
+  こちらは SIGABRT で .ips が出る。`stop()` を「myPid が 0 でも fd を閉じて join」に修正
+- **LLM MLX DAT も同じ構造**(同じ雛形から生成した)なので同じ4点を移植。DAT の .mm だけを
+  単独コンパイルして常設バンドルの実行ファイルを差し替えた(ヘルパは不変。LLMMLX のフル
+  ビルドは macOS 26 機で行う方針のまま)
+- **検証(TD 実機)**: 非対応バンドル → `helper exited` → 良いモデルを Load → **5秒で ready・生成成功**、
+  ヘルパ死亡状態でノード削除 → **TD 生存**、通常の gemma 生成も従来どおり
+- **やらかし**: `stop()` の修正を「python が ok と出した」だけで信じて進めたら、**ファイルに入って
+  いなかった**(LLMMLX 側には入っていた。CoreAI 側は消えていた。原因不明)。そのまま TD で再現
+  試験をして1回余計にクラッシュさせた。**編集後は grep で実在を確認してからビルドする**
+  (CLAUDE.md 既出の「str.replace が黙って何もしない」と同じ型の油断)
+- CoreAI README(英日)の注意に「ヘルパが死んでも次の Load で復帰・削除も安全」を追記

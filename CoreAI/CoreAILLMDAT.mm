@@ -53,12 +53,22 @@ public:
     ~HelperProcess() { stop(); }
 
     bool running() const { return myPid > 0; }
+    // 直前のヘルパが自分で死んだか(次の start() で古い fd/スレッドを片付けるため)
+    std::atomic<bool> myDied{false};
 
     // .plugin/Contents/Helpers/coreai-llm-helper を起動
     bool start(const std::string& exePath)
     {
         if (myPid > 0)
             return true;
+        if (myDied) {
+            // 前のヘルパの残骸(書き込み fd・読み取り fd・読み取りスレッド)を片付ける
+            myAlive = false;
+            if (myWriteFd >= 0) { close(myWriteFd); myWriteFd = -1; }
+            if (myReadFd >= 0) { close(myReadFd); myReadFd = -1; }
+            if (myReader.joinable()) myReader.join();
+            myDied = false;
+        }
 
         int inPipe[2];   // 親→子 stdin
         int outPipe[2];  // 子→親 stdout
@@ -119,6 +129,10 @@ public:
         myPid = pid;
         myWriteFd = inPipe[1];
         myReadFd = outPipe[0];
+        // ヘルパが落ちた後に書くと SIGPIPE で TouchDesigner ごと死ぬ(実測: 非対応バンドルで
+        // ヘルパが LLVM ERROR 終了 → 次の Load で TD が無言で消えた。クラッシュレポートも出ない)。
+        // このパイプでは SIGPIPE を発生させず EPIPE を返させる
+        fcntl(myWriteFd, F_SETNOSIGPIPE, 1);
         {
             std::lock_guard<std::mutex> l(myMutex);
             myStatus = "starting helper";
@@ -130,8 +144,16 @@ public:
 
     void stop()
     {
-        if (myPid <= 0)
+        if (myPid <= 0) {
+            // ヘルパが自分で死んだ後でも、読み取りスレッドと fd は残っている。
+            // joinable なスレッドを持ったまま破棄すると std::terminate で TD ごと落ちる
+            // (実測: ヘルパ死亡後にノードを削除して TD がクラッシュした)
+            myAlive = false;
+            if (myWriteFd >= 0) { close(myWriteFd); myWriteFd = -1; }
+            if (myReadFd >= 0) { close(myReadFd); myReadFd = -1; }
+            if (myReader.joinable()) myReader.join();
             return;
+        }
         sendLine("{\"cmd\":\"quit\"}");
         myAlive = false;
         if (myWriteFd >= 0) {
@@ -231,6 +253,14 @@ private:
                 if (!line.empty())
                     handleEvent(line);
             }
+        }
+        // 子が死んだ(パイプ EOF)。ここで回収して myPid を 0 に戻さないと running() が
+        // true のままになり、次の Load が死んだパイプへ書いてしまう(=再起動できない)
+        if (myAlive && myPid > 0) {
+            int st = 0;
+            waitpid(myPid, &st, 0);
+            myPid = 0;
+            myDied = true;
         }
         std::lock_guard<std::mutex> l(myMutex);
         if (myAlive) {
@@ -561,6 +591,7 @@ private:
     void ensureLoaded(const std::string& model)
     {
         if (!myHelper.running()) {
+            myLoadedModel.clear();   // 前のヘルパが死んでいる。新しいヘルパへ必ず load を送り直す
             std::string exe = helperExecutablePath();
             if (exe.empty() || access(exe.c_str(), X_OK) != 0) {
                 myStatus = "helper not found";

@@ -54,12 +54,21 @@ public:
     ~HelperProcess() { stop(); }
 
     bool running() const { return myPid > 0; }
+    // 直前のヘルパが自分で死んだか(次の start() で古い fd/スレッドを片付けるため)
+    std::atomic<bool> myDied{false};
 
     // .plugin/Contents/Helpers/mlxllm-helper を起動
     bool start(const std::string& exePath)
     {
         if (myPid > 0)
             return true;
+        if (myDied) {
+            myAlive = false;
+            if (myWriteFd >= 0) { close(myWriteFd); myWriteFd = -1; }
+            if (myReadFd >= 0) { close(myReadFd); myReadFd = -1; }
+            if (myReader.joinable()) myReader.join();
+            myDied = false;
+        }
 
         int inPipe[2];   // 親→子 stdin
         int outPipe[2];  // 子→親 stdout
@@ -120,6 +129,9 @@ public:
         myPid = pid;
         myWriteFd = inPipe[1];
         myReadFd = outPipe[0];
+        // ヘルパが落ちた後に書くと SIGPIPE で TouchDesigner ごと死ぬ(CoreAI LLM で実測)。
+        // このパイプでは SIGPIPE を発生させず EPIPE を返させる
+        fcntl(myWriteFd, F_SETNOSIGPIPE, 1);
         {
             std::lock_guard<std::mutex> l(myMutex);
             myStatus = "starting helper";
@@ -131,8 +143,14 @@ public:
 
     void stop()
     {
-        if (myPid <= 0)
+        if (myPid <= 0) {
+            // ヘルパが自分で死んだ後: joinable なスレッドを残したまま破棄すると std::terminate
+            myAlive = false;
+            if (myWriteFd >= 0) { close(myWriteFd); myWriteFd = -1; }
+            if (myReadFd >= 0) { close(myReadFd); myReadFd = -1; }
+            if (myReader.joinable()) myReader.join();
             return;
+        }
         sendLine("{\"cmd\":\"quit\"}");
         myAlive = false;
         if (myWriteFd >= 0) {
@@ -217,6 +235,12 @@ private:
                 if (!line.empty())
                     handleEvent(line);
             }
+        }
+        if (myAlive && myPid > 0) {   // 子を回収して running() を false に(次の Load で再起動できる)
+            int st = 0;
+            waitpid(myPid, &st, 0);
+            myPid = 0;
+            myDied = true;
         }
         std::lock_guard<std::mutex> l(myMutex);
         if (myAlive)
@@ -500,6 +524,7 @@ private:
     void ensureLoaded(const std::string& model)
     {
         if (!myHelper.running()) {
+            myLoadedModel.clear();   // 前のヘルパが死んでいる。新しいヘルパへ必ず load を送り直す
             std::string exe = helperExecutablePath();
             if (exe.empty() || access(exe.c_str(), X_OK) != 0) {
                 myStatus = "helper not found";

@@ -159,6 +159,8 @@ Rates above 4B parameters are dominated by memory pressure on a 24 GB machine wi
   forever (llm-runner has the same problem with these exports). The helper therefore looks up the
   well-known turn-end tokens (`<end_of_turn>`, `<|im_end|>`, `<|eot_id|>`, `<|end|>`, …) in the vocab
   directly; the IDs it found are in the `ready` event (`stops`)
+- If the helper process dies (incompatible bundle, out of memory), the DAT reports `helper exited …`
+  and the next *Load Model* spawns a fresh helper. Deleting the node in that state is safe too
 - Diffusion bundles (FLUX) are out of scope for this DAT
 
 ## 日本語
@@ -308,6 +310,8 @@ TD 内の生成はヘルパ単体より大きく遅い(同じ 1.7B で 4〜10 �
   吐き続ける(llm-runner でもこの書き出しでは同じ)。ヘルパは既知のターン終端トークン
   (`<end_of_turn>`・`<|im_end|>`・`<|eot_id|>`・`<|end|>` …)を語彙から直接引く。見つけた ID は
   `ready` イベントの `stops` に入る
+- ヘルパプロセスが死んだとき(非対応バンドル・メモリ不足)は DAT が `helper exited …` を出し、
+  次の *Load Model* で新しいヘルパを起動する。その状態でノードを削除しても安全
 - 拡散モデル(FLUX)のバンドルはこの DAT の対象外
 
 ### ビルド
