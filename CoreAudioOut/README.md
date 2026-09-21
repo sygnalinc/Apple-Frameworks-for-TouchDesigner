@@ -39,11 +39,11 @@ The file player is the part a custom op can actually fix.
 | | Input Gain | gain for input 0 |
 | | Exclusive (Hog Mode) | take the device exclusively (no other apps, no rate changes) |
 | File Player | Audio File | any format Core Audio reads (wav/aiff/mp3/m4a/…) |
-| | Play / Loop / File Gain | transport; decoding converts to the device rate |
+| | Play / Loop / File Gain | transport; decoding converts to the device rate. **Play Off pauses on the next device buffer** (~10 ms) and holds the position; Play On resumes from where you heard it. With Loop Off the file plays to the end, then Play Off→On restarts from 0 |
 | | Cue Point (s) / Cue Pulse | seek |
 
 The CHOP output is a **monitor copy** of what actually played. Info CHOP: `device_rate`, `running`,
-`file_position`, `file_duration`, `file_buffered` (samples of decode-ahead), `buffer_frames`
+`file_position` (the position you are **hearing**, i.e. decode position minus the read-ahead), `file_duration`, `file_buffered` (samples of decode-ahead), `buffer_frames`
 (the device's actual I/O buffer). When the device rate changes, the file player reopens and
 converts to the new rate automatically.
 
@@ -93,11 +93,11 @@ TD の音声は cook 駆動で、Audio File In は cook されたときしかサ
 | | Input Gain | 入力0のゲイン |
 | | Exclusive (Hog Mode) | デバイスを排他で取る(他アプリの音・レート変更が入らない) |
 | File Player | Audio File | Core Audio が読める形式(wav/aiff/mp3/m4a/…) |
-| | Play / Loop / File Gain | トランスポート。デコード時にデバイスのレートへ変換 |
+| | Play / Loop / File Gain | トランスポート。デコード時にデバイスのレートへ変換。**Play Off は次のデバイスバッファ(約10ms)で止まり**位置を保持、On で聞こえていた位置から再開。Loop Off は末尾まで鳴らして止まり、Play Off→On で先頭から |
 | | Cue Point (s) / Cue Pulse | 頭出し |
 
 CHOP 出力は**実際に鳴った音のモニタコピー**。Info CHOP: `device_rate` / `running` /
-`file_position` / `file_duration` / `file_buffered`(先読みサンプル数)/ `buffer_frames`
+`file_position`(**今聞こえている位置** = デコード位置 − 先読み分)/ `file_duration` / `file_buffered`(先読みサンプル数)/ `buffer_frames`
 (デバイスの実際の I/O バッファ)。デバイスのレートが変わるとファイルプレイヤーは
 自動で開き直し、新しいレートへ変換する。
 

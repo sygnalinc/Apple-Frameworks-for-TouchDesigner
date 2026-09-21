@@ -33,7 +33,10 @@ constexpr uint32_t kMask = kRing - 1;
 struct FilePlayer {
     std::vector<float> ringL, ringR;
     std::atomic<uint64_t> w{0}, r{0};
-    std::atomic<bool> playing{false}, loop{true}, quit{false}, seekReq{false};
+    // playing = ユーザーの Play トグル。IOProc もこれを見て読み出しを止める(=一時停止)。
+    // Play を Off にした瞬間に音が止まり、リングの先読み分は保持されて On で続きから鳴る。
+    // eof = ループ無しでファイル末尾に達した(デコードだけ止め、リングの残りは鳴らし切る)
+    std::atomic<bool> playing{false}, loop{true}, quit{false}, seekReq{false}, eof{false};
     std::atomic<double> seekTo{0}, position{0}, duration{0}, gain{1.0};
     std::string path, err;
     double fileRate = 0, outRate = 48000;
@@ -46,7 +49,7 @@ struct FilePlayer {
     {
         stop();
         path = p; outRate = devRate; err.clear();
-        w = 0; r = 0; position = 0; quit = false;
+        w = 0; r = 0; position = 0; quit = false; eof = false;
         th = std::thread([this] { run(); });
     }
     void stop()
@@ -83,14 +86,21 @@ struct FilePlayer {
             duration = fileRate > 0 ? (double)frames / fileRate : 0;
 
             std::vector<float> buf(4096 * 2);
+            bool prevPlaying = playing.load();
             while (!quit.load()) {
                 if (seekReq.exchange(false)) {
                     const double t = seekTo.load();
                     ExtAudioFileSeek(f, (SInt64)(t * fileRate));
-                    position = t;
+                    position = t; eof = false;
                     w.store(r.load());          // リングを空にして即座に新しい位置から
                 }
-                if (!playing.load()) { std::this_thread::sleep_for(std::chrono::milliseconds(10)); continue; }
+                const bool pl = playing.load();
+                // 末尾で止まった後に Play を Off→On したら先頭から(ループ無しの再生し直し)
+                if (eof.load() && pl && !prevPlaying) {
+                    ExtAudioFileSeek(f, 0); position = 0; eof = false;
+                }
+                prevPlaying = pl;
+                if (!pl || eof.load()) { std::this_thread::sleep_for(std::chrono::milliseconds(10)); continue; }
                 // リングの空きが半分を切るまで詰める
                 const uint64_t used = w.load() - r.load();
                 if (used > kRing / 2) { std::this_thread::sleep_for(std::chrono::milliseconds(5)); continue; }
@@ -103,7 +113,7 @@ struct FilePlayer {
                 if (ExtAudioFileRead(f, &n, &abl) != noErr) { err = "read error"; break; }
                 if (n == 0) {                    // ファイル末尾
                     if (loop.load()) { ExtAudioFileSeek(f, 0); position = 0; continue; }
-                    playing = false; continue;
+                    eof = true; continue;        // playing は倒さない(リングの残りを IOProc が鳴らし切る)
                 }
                 const float g = (float)gain.load();
                 uint64_t wp = w.load();
@@ -348,7 +358,8 @@ public:
             const UInt32 ch = outB->mBuffers[b].mNumberChannels;
             const UInt32 nf = outB->mBuffers[b].mDataByteSize / (sizeof(float) * (ch ? ch : 1));
             uint64_t fr = myPlayer.r.load();
-            const uint64_t fw = myPlayer.w.load();
+            // Play=Off なら先読み済みでも読み出さない(fw=fr で「空」扱い)。位置は保持される
+            const uint64_t fw = myPlayer.playing.load() ? myPlayer.w.load() : fr;
             uint64_t ir = myInR.load();
             const uint64_t iw = myInW.load();
             uint64_t mw = myMonW.load();
@@ -449,9 +460,14 @@ public:
                                              kAudioObjectPropertyScopeOutput, kAudioObjectPropertyElementMain };
             AudioObjectGetPropertyData(myDev, &a, 0, nullptr, &bsz, &bf);
         }
+        // file_position は「今聞こえている位置」= デコード位置 − リングの先読み分。
+        // ループ折り返し直後は先読み分が前周のものなので負になり得る → 0 でクランプ
+        const double buffered = (double)(myPlayer.w.load() - myPlayer.r.load());
+        double heard = myPlayer.position.load() - (myPlayer.outRate > 0 ? buffered / myPlayer.outRate : 0);
+        if (heard < 0) heard = 0;
         const float v[] = { (float)myExec.load(), (float)myDevRate, myRunning ? 1.f : 0.f,
-                            (float)myPlayer.position.load(), (float)myPlayer.duration.load(),
-                            (float)(myPlayer.w.load() - myPlayer.r.load()), (float)bf };
+                            (float)heard, (float)myPlayer.duration.load(),
+                            (float)buffered, (float)bf };
         c->name->setString(n[i]); c->value = v[i];
     }
     void getErrorString(OP_String* s, void*) override

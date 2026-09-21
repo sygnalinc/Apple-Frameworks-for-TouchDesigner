@@ -8577,3 +8577,22 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
 - 「CoreML で LLM を回す op は無い」もこの日に回答: CoreML TOP/CHOP/DAT は単発推論器で
   トークナイザ・自己回帰ループ・MLState を持たない。macOS 26 は LLM MLX、27 は LLM CoreAI が
   役割を埋めているので、LLM CoreML は優先度低(MLX の依存無しで純正のみで回したい場合のみ価値)
+
+### 2026-09-22 CoreAudio Out: Play を Off にしても約2.7秒鳴り続ける問題を修正
+
+- ユーザー報告「File Player の Play を On→Off にしてもすぐ止まらない」
+- **原因**: `Play=Off` は**デコードスレッドを止めるだけ**で、IOProc はリングに先読み済みの音
+  (`kRing/2` = 131072 サンプル ≈ 48kHz で **2.7秒**)を最後まで鳴らし切っていた。
+  cook から切り離した設計(音が途切れない)の裏返しで、止める側の経路が無かった
+- **修正**: ①IOProc が `playing` を見て **Off なら読み出さない**(`fw = playing ? w : r` で空扱い)。
+  リングは保持されるので On で**聞こえていた位置から**再開(一時停止の意味になる)
+  ②ファイル末尾は `playing=false` にしていたのを **`eof` フラグに分離**。playing を倒すと
+  ①でリングの残り 2.7 秒が切られてしまうため。eof 中はデコードだけ止めて残りを鳴らし切り、
+  Play Off→On の立ち上がりで先頭へ巻き戻す ③Info CHOP の `file_position` を
+  **「聞こえている位置」= デコード位置 − 先読み分**に(従来は 2.7 秒先のデコード位置を出していた)
+- **実測(M2・TD 実機・Filegain 0.03)**: Off → **0.3 秒以内に monitor peak 0**、position 5.568 で固定、
+  buffered 134144 のまま保持 → On → 5.568 から続き(1.2 秒後 6.784)。Loop Off で末尾: 70.053 →
+  70.296(=duration)で buffered 0・無音 → Play Off→On で **1.7 秒後 position 1.707**(先頭から再生)
+- 罠(小): Cue のパルス名は `Cuepulse`(`Cue` ではない)。検証で一度空振りした
+- README(英日)の Play / file_position の説明を更新。常設インストール・TD 再起動済み。
+  demo.toe の状態は元に戻した(未保存・変更なし)
