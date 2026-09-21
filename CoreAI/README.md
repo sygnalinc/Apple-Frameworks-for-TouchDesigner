@@ -125,6 +125,9 @@ cd coreai-models/models/qwen3_vl && uv run export.py         # → exports/vlm-f
 Point *Model Bundle* at that folder (an expression like
 `project.folder + '/models/qwen3_1_7b_4bit_dynamic'` keeps it relative to the .toe).
 
+`demo.toe` has `/project1/CoreAILLM` with both: a text turn on `qwen3_1_7b_4bit_dynamic` and a
+vision turn on `qwen3_vl_2b` fed from `Assets/sample_objects.mp4`.
+
 ### Measured (M2 24 GB, macOS 27.0, helper standalone unless noted)
 
 Every LLM / VLM export in a local coreai-models checkout was run through the helper
@@ -276,6 +279,9 @@ cd coreai-models/models/qwen3_vl && uv run export.py         # → exports/vlm-f
 
 *Model Bundle* にそのフォルダを指定する(`project.folder + '/models/qwen3_1_7b_4bit_dynamic'`
 のような式にすると .toe の位置に追従する)
+
+`demo.toe` の `/project1/CoreAILLM` に両方の利用例がある(`qwen3_1_7b_4bit_dynamic` のテキストと、
+`Assets/sample_objects.mp4` を渡す `qwen3_vl_2b` の画像入力)
 
 ### 実測(M2 24GB・macOS 27.0・断りが無ければヘルパ単体)
 

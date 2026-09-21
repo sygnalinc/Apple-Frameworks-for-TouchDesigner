@@ -8469,3 +8469,18 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
   試験をして1回余計にクラッシュさせた。**編集後は grep で実在を確認してからビルドする**
   (CLAUDE.md 既出の「str.replace が黙って何もしない」と同じ型の油断)
 - CoreAI README(英日)の注意に「ヘルパが死んでも次の Load で復帰・削除も安全」を追記
+
+### 2026-09-21 demo.toe に CoreAI LLM の利用例(テキスト + VLM)を追加
+
+- ユーザー「demo に Core AI で動作可能なモデルのサンプルを入れて」→ `/project1/CoreAILLM`
+  (03 LLM の行・x=600・紫)。experimental だがユーザー指示で demo に入れる(CoreAI TOP と同じ扱い)
+- 構成は LLMMLX の例と同型: 上段 `Coreaillm1`(qwen3_1_7b_4bit_dynamic)→ select1 → convert1 /
+  下段 `sample_objects → null1 → Coreaillm2`(qwen3_vl_2b・Use Image)→ select2 → convert2、
+  info / info2(Info DAT)、note、out1(null1)。select は `max(1, numRows-1)` で**最新の応答行だけ**表示
+- モデルは `models/qwen3_1_7b_4bit_dynamic`(935MB)と `models/qwen3_vl_2b`(5.0GB)を
+  coreai-models の exports からコピー(gitignore)。`models/README.md` に2行追加し、note にも
+  `uv run export.py` の手順を記載
+- **実測(TD 実機・allowCooking を一時 True)**: 両モデル ready → テキスト "Red, blue, or yellow." /
+  VLM "A laptop, an apple, a banana, a book, a cup of coffee, and a small potted succulent."
+  (sample_objects の 1280x720 フレーム)。エラーなし。確認後 allowCooking=False で保存
+- `_README` の 03 行と「外部モデルが要る op」の行に CoreAI LLM を追記

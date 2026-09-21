@@ -17,6 +17,8 @@ example in `demo.toe` will run as-is.
 | `gemma-3-4b-it-qat-4bit/` | LLM MLX (DAT) — local LLM | https://huggingface.co/mlx-community/gemma-3-4b-it-qat-4bit |
 | `Qwen2-VL-2B-Instruct-4bit/` | LLM MLX (DAT) — local **vision** LLM | https://huggingface.co/mlx-community/Qwen2-VL-2B-Instruct-4bit |
 | `da3-small_float32.aimodel` | CoreAI (TOP) — Depth Anything v3 depth (macOS 27+) | exported with Apple's coreai-models recipe, see below |
+| `qwen3_1_7b_4bit_dynamic/` | CoreAI LLM (DAT) — Qwen3 1.7B text LLM (macOS 27+) | exported with coreai-models `models/qwen3`, see below |
+| `qwen3_vl_2b/` | CoreAI LLM (DAT) — Qwen3-VL 2B **vision** LLM (macOS 27+, ~5 GB) | exported with coreai-models `models/qwen3_vl`, see below |
 
 Any other model works too: CoreML TOP / CHOP / DAT take any Core ML model, and LLM MLX takes
 any [mlx-community](https://huggingface.co/mlx-community) repository.
