@@ -114,10 +114,10 @@ and `notes_held` returns to 0 when the values go back to 0. Cook time 0.138 ms.
 process, so that plugin appears not to load its default sound bank in this context. If you hear
 nothing, try **AUMIDISynth, AUSampler, or a third-party instrument** before suspecting the wiring.
 
-> **Status: experimental.** Verified end to end on macOS 26 with Apple's bundled effects (audio
-> processing, parameter automation, presets, state save/restore, GUI window). Not tested with
-> third-party plugins yet, and **not shipped in the release DMG**. `PLUGINS.tsv` is the source of
-> truth — build it yourself from this folder.
+> **Status: released.** Verified end to end on macOS 26 with Apple's bundled effects and
+> instruments (audio processing, parameter automation, presets, state save/restore, GUI window,
+> Learn panel, MIDI file playback). **Not yet tested with third-party plugins** — the mechanism is
+> the same, but report anything that misbehaves.
 
 ### Why this exists
 
@@ -427,10 +427,9 @@ Info CHOP に `file_position` / `file_duration` が出る。
 このプラグインが既定のサウンドバンクをこの文脈で読めていないと思われる)。
 音が出ないときは **AUMIDISynth や AUSampler、サードパーティの楽器で確かめる**
 
-> **状態: experimental。** macOS 26 上で Apple 純正エフェクトを使い、音の処理・パラメータ自動化・
-> プリセット・状態の保存復元・GUI 表示まで一通り実測済み。ただし**サードパーティ製プラグインでは
-> 未検証**で、**リリース DMG には入らない**。正は `PLUGINS.tsv`。使うにはこのフォルダで
-> 自分でビルドする。
+> **状態: released。** macOS 26 上で Apple 純正のエフェクト・楽器を使い、音の処理・パラメータ自動化・
+> プリセット・状態の保存復元・GUI 表示・Learn パネル・MIDI ファイル再生まで一通り実測済み。
+> **サードパーティ製プラグインは未検証**(仕組みは同じ。不具合があれば報告を)。
 
 ### なぜ必要か
 

@@ -8484,3 +8484,26 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
   VLM "A laptop, an apple, a banana, a book, a cup of coffee, and a small potted succulent."
   (sample_objects の 1280x720 フレーム)。エラーなし。確認後 allowCooking=False で保存
 - `_README` の 03 行と「外部モデルが要る op」の行に CoreAI LLM を追記
+
+### 2026-09-21 次のリリースへ CoreAudio Out / CoreAI(TOP + LLM DAT)/ AU Effect・AU Instrument を昇格
+
+- ユーザー「次のリリースに CoreMIDI CoreAudio CoreAI を追加したい」→「AudioUnit も」。
+  CoreMIDI は v0.9.7 で released 済み。`PLUGINS.tsv` で **CoreAudioOut / CoreAI / AudioUnit** を
+  released に(released 60フォルダ・バンドル 67)。ルート README(英日)の本表へ移動
+  (CoreAudio Out と AU 2op は Audio & sound、CoreAI 2op は General ML)、実験中表から削除、
+  各 README の状態ブロックを released 向けに書き換え
+- **demo.toe に不足していた利用例を追加**(released の条件): `/project1/CoreAudioOut`
+  (File Player で同梱サンプル曲を再生・`stall_test` DAT を Run Script すると main thread が
+  2秒止まるが曲は途切れない)、`/project1/AUEffect`(AUDelay・Dry/Wet 0.5・params Info DAT)。
+  実測: CoreAudio Out は file_position 進行・peak 0.335、AU Effect は renders 進行・peak 0.211。
+  どちらも allowCooking=False で保存(開いただけで鳴らさない)
+- **release.sh を2点修正**: ①`SDK_ROOT` が `/Applications/TouchDesigner.app` 固定だった
+  (この機では 33070=common 2 なので verify が全滅する)→ `TD_APP` に追従
+  ②**released なのに手元の SDK より minos が新しいプラグインがあれば止める**。
+  TSV のコメントは「ビルドから除外される」と書いていたが、**実際には minos 列を誰も読んでおらず**、
+  26 機で CoreAI を作ると LLM DAT が黙って抜け、TOP も `canImport(CoreAI)` 偽の
+  「unavailable」しか出せない中身で配布される。= **CoreAI を含むリリースは macOS 27 SDK の
+  マシンで切る**(この機は 27.0 正式版 + Metal Toolchain 有効なので LLMMLX も含めて切れる)
+- CoreAI LLM DAT に macOS 26 ガードを追加: ヘルパは minos 27 なので 26 では spawn が dyld に
+  拒否されて "helper exited" になる → 先に `unavailable: Core AI requires macOS 27+` を出す
+- 未実施: リリース本番(VERSION 更新 → 全再ビルド → sign/verify/dmg/notarize)はユーザー指示待ち

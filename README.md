@@ -131,6 +131,8 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | [ImagePlayground](ImagePlayground/) | TOP | **text→image via Apple Image Playground** (`ImageCreator`, macOS 15.4+). No external model; Animation / Illustration / Sketch. Wire a face image into input 0 to generate people |
 | [CI Glass](CoreImageGlass/) | TOP | **macOS frosted glass and macOS 26 Liquid Glass**. Presets measured from the real views; edge refraction driven by the shape mask |
 | [CI Code](CoreImageCode/) | TOP | **Generate** QR / Aztec / PDF417 / Code128 (no external library) |
+| [CoreAI](CoreAI/) | TOP | **Run any Core AI model** (`.aimodel`, **macOS 27+**) on a TOP — the Core AI counterpart of CoreML TOP. Inputs / outputs are read from the model's own descriptor (depth, super-resolution, segmentation…). Models come from Apple's coreai-models exporter |
+| [CoreAI LLM](CoreAI/#coreai-llm-dat) | DAT | **On-device LLM / VLM chat through Core AI** (**macOS 27+**): Qwen3, Gemma 3, Mistral, gpt-oss and Qwen3-VL bundles exported by coreai-models; streams tokens into a conversation table, takes an Image TOP for vision models, thinking toggle for reasoning models |
 
 ### Audio & sound
 
@@ -140,6 +142,9 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | [Sound Features](SoundFeatures/) | CHOP | Audio features (RMS / peak / centroid / onset / beat / BPM / 16 bands) |
 | [Speech Transcribe](SpeechTranscribe/) | DAT | **Live transcription.** Apple SpeechAnalyzer (macOS 26+) / WhisperKit (macOS 14+, multilingual, translate) |
 | [Speech Synth](SpeechSynth/) | CHOP | On-device **speech synthesis** → PCM stereo |
+| [CoreAudio Out](CoreAudioOut/) | CHOP | **Audio out that survives cook stalls.** A file player decoded on its own thread feeds the CoreAudio device directly (keeps playing through a 2 s main-thread stall), optionally mixed with a CHOP input; device / sample-rate / buffer-size selection and hog mode |
+| [AU Effect](AudioUnit/) | CHOP | **Host any Audio Unit effect** (TD's Audio VST CHOP is VST3-only; a stock Mac has 0 VST3 and 30 AUs). Presets, the plugin's own GUI window, state saved in the .toe, and **Learn**: knobs you touch in the GUI become a Script CHOP panel (0–1, display curves respected) wired to input 1 — drive them from MIDI |
+| [AU Instrument](AudioUnit/) | CHOP | **Host any Audio Unit instrument** and play it from CHOP channels (`ch1n60` straight from CoreMIDI In) or a built-in **MIDI file player** with Movie File In-style transport (Play / Loop / Cue / Locked to Timeline / Sync to TD Tempo), program changes and a GM sound bank |
 
 ### Language & text
 
@@ -175,7 +180,6 @@ The media lives in `docs/demo/`; regenerate it from the screen recordings with
 | [MapKit MapView](MapKit/) | TOP | **Apple Maps rendered live** — fly through the 3D map (satellite / hybrid, realistic 3D) at 57fps. Camera is two-way with the on-screen window; **Markers DAT** projects lat/lon to screen u/v so you can overlay your own geometry exactly on the map |
 | [MapKit LookAround](MapKit/) | TOP | **Look Around street-level imagery**, live. Heading / Look Pitch drive the view direction (two-way with drag) |
 | [MapKit Search](MapKit/) | DAT | **Search / geocode / reverse geocode / routes** (walking, driving, transit — with the full polyline) and **Look Around coverage** scanning |
-| [CoreAudio Out](CoreAudioOut/) | CHOP | experimental |
 | [CoreMIDI Out](CoreMIDI/) | CHOP | **MIDI out with hot-plug and device identity** (UniqueID survives re-plugging; manufacturer / model / online on its Info DAT). Send notes / CC from the parameters or from CHOP channels, plus **DAW transport (MMC) and sync — MIDI Clock or MTC** with per-packet timestamps |
 | [CoreMIDI In](CoreMIDI/) | CHOP | **MIDI in that builds its own channels**: keys / pads / knobs appear as `ch1n60` / `ch1c74` as they arrive (no need to list them first). Also turns **MIDI Clock into BPM / beat** and receives **MTC** |
 
@@ -192,13 +196,9 @@ and are unsupported. The source is here so you can build and try them yourself
 | [AVAudio Spatial](AVAudioSpatial/) | CHOP | experimental |
 | [AVF Camera](AVFoundationCamera/) | TOP | experimental |
 | [AudioToolbox Mix](AudioToolboxMix/) | CHOP | experimental |
-| [AU Effect](AudioUnit/) | CHOP | experimental |
-| [AU Instrument](AudioUnit/) | CHOP | experimental |
 | [Caption Author](CaptionAuthor/) | DAT | experimental |
 | [ColorSync](ColorSync/) | TOP | experimental |
 | [CI Bokeh](CoreImageBokeh/) | TOP | experimental |
-| [CoreAI](CoreAI/) | TOP | experimental — macOS 27+ |
-| [CoreAI LLM](CoreAI/#coreai-llm-dat) | DAT | experimental — macOS 27+ (LLM / VLM chat via coreai-models bundles) |
 | [CI Enhance](CoreImageEnhance/) | TOP | experimental |
 | [CoreLocation Beacon](CoreLocationBeacon/) | CHOP | experimental |
 | [CoreML Motion](CoreMLMotion/) | CHOP | experimental |

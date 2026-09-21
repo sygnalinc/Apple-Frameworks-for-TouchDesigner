@@ -12,9 +12,10 @@ path. Two sources, mixed together:
   IOProc. **Playback survives cook stalls completely** — the file keeps playing even while
   TouchDesigner's main thread is blocked.
 
-> **Status: experimental.** File playback through a 2-second deliberate main-thread stall verified
-> on macOS 26 (position kept advancing, ~2.7 s of decode-ahead maintained). Not shipped in the
-> release DMG. `PLUGINS.tsv` is the source of truth.
+> **Status: released.** File playback through a 2-second deliberate main-thread stall verified
+> on macOS 26 (position kept advancing, ~2.7 s of decode-ahead maintained); device / sample-rate /
+> buffer-size switching verified on a virtual device. Note that changing *Device Sample Rate*
+> changes the device for the whole system.
 
 ### Why this exists (measured)
 
@@ -66,9 +67,9 @@ CoreAudio の出力デバイスへ**直接**音を出す。TouchDesigner の coo
 - **File Player ページ**: 音声ファイルを自前スレッドでデコードし、デバイスの IOProc へ直接流す。
   **cook が止まっても再生は完全に継続する**
 
-> **状態: 実験中。** メインスレッドを意図的に2秒止めても再生が続くこと(位置が進み続け、
-> 約2.7秒の先読みを維持)を macOS 26 で実測済み。リリース DMG には同梱しない。
-> 正は `PLUGINS.tsv`。
+> **状態: released。** メインスレッドを意図的に2秒止めても再生が続くこと(位置が進み続け、
+> 約2.7秒の先読みを維持)、デバイス / サンプルレート / バッファサイズの切替を仮想デバイスで
+> 実測済み。*Device Sample Rate* の変更は**システム全体のデバイス設定**を変えることに注意。
 
 ### 何のためにあるか(実測)
 

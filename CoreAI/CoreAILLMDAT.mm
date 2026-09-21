@@ -591,6 +591,12 @@ private:
     void ensureLoaded(const std::string& model)
     {
         if (!myHelper.running()) {
+            // ヘルパは macOS 27 SDK(platforms 27.0)でしか作れず minos 27。26 で spawn すると
+            // dyld に拒否されて即 "helper exited" になるので、先に理由を出して止める
+            if ([NSProcessInfo processInfo].operatingSystemVersion.majorVersion < 27) {
+                myStatus = "unavailable: Core AI requires macOS 27+";
+                return;
+            }
             myLoadedModel.clear();   // 前のヘルパが死んでいる。新しいヘルパへ必ず load を送り直す
             std::string exe = helperExecutablePath();
             if (exe.empty() || access(exe.c_str(), X_OK) != 0) {

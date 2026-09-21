@@ -10,9 +10,10 @@ Mono32Float / RGBA32Float texture. The model's inputs and outputs are self-descr
 (shape / dtype), so nothing is hard-coded per model — depth estimation, super-resolution,
 segmentation and similar single-function image models work as-is.
 
-> **Status: experimental (macOS 27+).** Not included in the DMG (`PLUGINS.tsv` is the single source
-> of truth). Verified with Depth Anything v3, EDSR x2 and YOLOS on an M2 / macOS 27.0, but Core AI
-> itself is new in macOS 27 and the op has not had wider testing.
+> **Status: released — requires macOS 27.** On macOS 26 the bundles load but do nothing (status
+> `unavailable`). Verified with Depth Anything v3, EDSR x2 and YOLOS (TOP) and with Qwen3 / Gemma 3 /
+> Mistral / gpt-oss / Qwen3-VL bundles (LLM DAT) on an M2 / macOS 27.0. Core AI itself is new in
+> macOS 27, so expect rough edges on models the exporter does not fully support yet.
 
 - Input 0 = image. It is resized to the model's input size, normalized and packed as NCHW / NHWC,
   float32 or float16 — whatever the descriptor says. Batch / view dims (`[1,V,3,H,W]`) get the
@@ -173,9 +174,10 @@ Rates above 4B parameters are dominated by memory pressure on a 24 GB machine wi
 テクスチャで受け取る。入出力はモデルの関数ディスクリプタが自己記述(shape / dtype)しているので、
 モデルごとの特別扱いは無い。深度推定・超解像・セグメンテーション等の単機能画像モデルがそのまま通る。
 
-> **状態: 実験中(macOS 27+)。** DMG には含まれません(`PLUGINS.tsv` が唯一の正)。
-> Depth Anything v3 / EDSR x2 / YOLOS を M2・macOS 27.0 で確認済みですが、Core AI 自体が
-> macOS 27 の新フレームワークで、広い検証はまだです。
+> **状態: released — macOS 27 必須。** macOS 26 ではロードはできるが何もしない(status
+> `unavailable`)。Depth Anything v3 / EDSR x2 / YOLOS(TOP)と Qwen3 / Gemma 3 / Mistral /
+> gpt-oss / Qwen3-VL のバンドル(LLM DAT)を M2・macOS 27.0 で確認済み。Core AI 自体が
+> macOS 27 の新フレームワークなので、エクスポータが未対応のモデルでは粗が出る
 
 - 入力0 = 画像。モデルの入力サイズへリサイズし、正規化して NCHW / NHWC・float32 / float16 の
   うちディスクリプタどおりに詰める。バッチ / ビュー次元(`[1,V,3,H,W]`)には同じ画像を複製

@@ -30,6 +30,18 @@ td_released_plugins() {
         comm -3 <(echo "$tracked") <(echo "$listed") | sed 's/^/  /' >&2
         exit 1
     fi
+    # released なのに手元の SDK より新しい minos を要求するものがあれば止める。
+    # 黙って除外すると「全部入っている」と誤解される(CoreAI は 26 SDK だと LLM DAT が
+    # 作られず、TOP も「unavailable」しか出せない中身で配布されてしまう)
+    local host_sdk; host_sdk="$(xcrun --show-sdk-version 2>/dev/null | cut -d. -f1)"
+    local too_new
+    too_new="$(grep -v '^#' "$tsv" | awk -F'\t' -v h="${host_sdk:-0}" '$2=="released" && int($3) > h {print $1" (needs macOS "$3" SDK)"}')"
+    if [ -n "$too_new" ]; then
+        echo "ERROR: released なのにこのマシンの SDK(${host_sdk:-?})では作れないプラグインがあります:" >&2
+        echo "$too_new" | sed 's/^/  - /' >&2
+        echo "  → macOS $(echo "$too_new" | sed 's/.*macOS \([0-9.]*\).*/\1/' | sort -n | tail -1) 以上の SDK を持つマシンでリリースを切ってください" >&2
+        exit 1
+    fi
     grep -v '^#' "$tsv" | awk -F'\t' '$2=="released"{print $1}' | sort
 }
 # 配布物の最低対応 macOS。common/version.sh と同じ既定値にする
@@ -45,7 +57,7 @@ DMG="$REPO/dist/Apple-Frameworks-for-TouchDesigner-v$VERSION.dmg"
 CS=(codesign -f --timestamp --options runtime -s "$SIGN_ID")
 
 # 現在の TD SDK が期待する OP_CommonAPIVersion(バンドルの宣言値と一致必須)
-SDK_ROOT="/Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus"
+SDK_ROOT="${TD_APP:-/Applications/TouchDesigner.app}/Contents/Resources/tfs/Samples/CPlusPlus"   # ビルドと同じ TD_APP で判定する
 EXPECT_COMMON="$(grep -h -m1 'OP_CommonAPIVersion = ' "$SDK_ROOT/CHOP/CPlusPlus_Common.h" | sed 's/[^0-9]*\([0-9]*\).*/\1/')"
 
 # 1バンドルを内側から深署名(dylib → ネスト.app/framework → ヘルパ実行ファイル → 本体)

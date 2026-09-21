@@ -130,6 +130,8 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [ImagePlayground](ImagePlayground/) | TOP | **Apple Image Playground でテキスト→画像**(`ImageCreator`・macOS 15.4+)。外部モデル不要。Animation / Illustration / Sketch。人物は入力0に顔画像を接続 |
 | [CI Glass](CoreImageGlass/) | TOP | **macOSのすりガラスとmacOS 26のLiquid Glass**。プリセットは実物から実測。縁の屈折は形のマスクから生成 |
 | [CI Code](CoreImageCode/) | TOP | QR / Aztec / PDF417 / Code128 の**生成**(外部ライブラリ不要) |
+| [CoreAI](CoreAI/) | TOP | **任意の Core AI モデル**(`.aimodel`・**macOS 27+**)を TOP で回す。CoreML TOP の Core AI 版で、入出力はモデル自身のディスクリプタから読む(深度・超解像・セグメンテーション…)。モデルは Apple の coreai-models で書き出す |
+| [CoreAI LLM](CoreAI/#coreai-llm-dat) | DAT | **Core AI によるオンデバイス LLM / VLM チャット**(**macOS 27+**)。coreai-models が書き出す Qwen3 / Gemma 3 / Mistral / gpt-oss / Qwen3-VL のバンドルをトークンストリーミングで会話テーブルへ。Image TOP を渡せば画像入力、推論モデルは思考トグル |
 
 ### 音声・音響
 
@@ -139,6 +141,9 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [Sound Features](SoundFeatures/) | CHOP | 音響特徴(RMS/peak/centroid/onset/beat/BPM/16帯域) |
 | [Speech Transcribe](SpeechTranscribe/) | DAT | **ライブ文字起こし**。Apple SpeechAnalyzer(macOS26+)/ WhisperKit(macOS14+・多言語・英訳) |
 | [Speech Synth](SpeechSynth/) | CHOP | オンデバイス**音声合成**→ PCM stereo |
+| [CoreAudio Out](CoreAudioOut/) | CHOP | **cook が止まっても途切れない音声出力。** 自前スレッドでデコードしたファイルを CoreAudio デバイスへ直接流す(メインスレッドを2秒止めても再生継続)。CHOP 入力とのミックス、デバイス / サンプルレート / バッファサイズの選択、hog mode |
+| [AU Effect](AudioUnit/) | CHOP | **任意の Audio Unit エフェクトをホスト**(TD の Audio VST CHOP は VST3 専用で、素の Mac では VST3 0個 / AU 30個)。プリセット・プラグイン自身の GUI・状態の .toe 保存に加え、**Learn**: GUI で触ったつまみが Script CHOP のパネル(0〜1・表示曲線込み)として生え入力1へ配線される。MIDI からそのまま回せる |
+| [AU Instrument](AudioUnit/) | CHOP | **任意の Audio Unit 楽器をホスト**し、CHOP チャンネル(CoreMIDI In の `ch1n60` をそのまま)か内蔵の **MIDI ファイルプレイヤー**(Play / Loop / Cue / Locked to Timeline / Sync to TD Tempo の Movie File In 風トランスポート)で鳴らす。プログラムチェンジと GM サウンドバンク対応 |
 
 ### 言語・テキスト
 
@@ -174,7 +179,6 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [MapKit MapView](MapKit/) | TOP | **Apple マップをライブでレンダ** — 3D地図(衛星/ハイブリッド・Realistic 3D)の中を 57fps で飛べる。画面に出したウインドウとカメラは双方向。**Markers DAT** で緯度経度を画面 u/v へ射影できるので、自前のジオメトリを地図にぴったり重ねられる |
 | [MapKit LookAround](MapKit/) | TOP | **Look Around(街並みの実写)をライブ表示**。視線の向きは Heading / Look Pitch で操作(ドラッグと双方向) |
 | [MapKit Search](MapKit/) | DAT | **検索 / ジオコーディング / 逆ジオ / 経路**(徒歩・車・公共交通。ポリライン全点も)と **Look Around カバレッジ**の走査 |
-| [CoreAudio Out](CoreAudioOut/) | CHOP | 実験中 |
 | [CoreMIDI Out](CoreMIDI/) | CHOP | **ホットプラグと機材識別に対応した MIDI 出力**(UniqueID で挿し直しても同じ機材。製造元/モデル/オンライン状態は Info DAT)。パラメータからも CHOP チャンネルからも送れ、**DAW のトランスポート(MMC)と同期(MIDI Clock / MTC)** をパケット単位のタイムスタンプ付きで送出 |
 | [CoreMIDI In](CoreMIDI/) | CHOP | **届いた分だけチャンネルを自動生成する MIDI 入力**: 鍵盤・パッド・ノブが `ch1n60` / `ch1c74` として現れる(事前の列挙が要らない)。**MIDI Clock を BPM / 拍**に変換し、**MTC** も受信 |
 
@@ -191,13 +195,9 @@ Apple Intelligence 内蔵のオンデバイスモデル(~3B)です。**出力は
 | [AVAudio Spatial](AVAudioSpatial/) | CHOP | 実験中 |
 | [AVF Camera](AVFoundationCamera/) | TOP | 実験中 |
 | [AudioToolbox Mix](AudioToolboxMix/) | CHOP | 実験中 |
-| [AU Effect](AudioUnit/) | CHOP | 実験中 |
-| [AU Instrument](AudioUnit/) | CHOP | 実験中 |
 | [Caption Author](CaptionAuthor/) | DAT | 実験中 |
 | [ColorSync](ColorSync/) | TOP | 実験中 |
 | [CI Bokeh](CoreImageBokeh/) | TOP | 実験中 |
-| [CoreAI](CoreAI/) | TOP | 実験中 — macOS 27+ |
-| [CoreAI LLM](CoreAI/#coreai-llm-dat) | DAT | 実験中 — macOS 27+(coreai-models バンドルの LLM / VLM チャット) |
 | [CI Enhance](CoreImageEnhance/) | TOP | 実験中 |
 | [CoreLocation Beacon](CoreLocationBeacon/) | CHOP | 実験中 |
 | [CoreML Motion](CoreMLMotion/) | CHOP | 実験中 |
