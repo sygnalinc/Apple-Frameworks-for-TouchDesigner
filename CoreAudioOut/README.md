@@ -28,6 +28,26 @@ operator's file player does not depend on cooking at all: a decoder thread keeps
 The CHOP input, by contrast, **is still cook-driven** — if TD stalls, that component stops with it.
 The file player is the part a custom op can actually fix.
 
+### CoreAudio Out vs. Audio Device Out
+
+Both send audio to a CoreAudio output device. They are not interchangeable:
+
+| | Audio Device Out (TD built-in) | CoreAudio Out |
+|---|---|---|
+| Audio source | CHOP input only (cook-driven) | CHOP input **and** a built-in file player on its own thread |
+| Behaviour when TouchDesigner stalls | queue drains; crackle/dropout once the stall exceeds *Buffer Length* (0.15 s default) | file player keeps playing regardless; the CHOP input still stops (it is cook-driven) |
+| Latency | *Buffer Length* (0.15 s default, ~0.02 s at best) + device | device I/O buffer only (~14 ms measured) for the file player |
+| Channels | multi-channel with speaker layouts (surround) | **stereo only** (2 in / 2 out) |
+| Device sample rate | not exposed — TD resamples to whatever the device runs at | selectable (**changes the device system-wide**) |
+| Device buffer size / exclusive (hog) mode | no | yes |
+| Selected device unplugged | (not compared) | raises an error instead of silently falling back |
+| Output | none | monitor copy of what actually played; Info CHOP with position / read-ahead / device rate |
+
+Use **Audio Device Out** for ordinary TouchDesigner audio, anything multi-channel, or speaker
+layouts. Use **CoreAudio Out** when a file must keep playing through heavy frames, when you need
+the lowest possible latency to the device, or when you need to control the device itself
+(rate / buffer / exclusive).
+
 ### Parameters
 
 | Page | Parameter | Meaning |
@@ -81,6 +101,25 @@ TD の音声は cook 駆動で、Audio File In は cook されたときしかサ
 
 一方 **CHOP 入力は今までどおり cook 駆動**なので、TD が止まればその成分は止まる。
 自作 op で本当に直せるのはファイル再生の部分。
+
+### Audio Device Out との違い
+
+どちらも CoreAudio の出力デバイスへ音を出すが、置き換え可能ではない:
+
+| | Audio Device Out(TD 標準) | CoreAudio Out |
+|---|---|---|
+| 音源 | CHOP 入力のみ(cook 駆動) | CHOP 入力 **と** 自前スレッドの内蔵ファイルプレイヤー |
+| TouchDesigner が止まったとき | 待ち行列が減り、*Buffer Length*(既定 0.15 秒)を超えるとプツッと切れる | ファイル再生は止まらない。CHOP 入力は cook 駆動なので止まる |
+| レイテンシ | *Buffer Length*(既定 0.15 秒・詰めて約 0.02 秒)+ デバイス | ファイルプレイヤーはデバイスの I/O バッファのみ(実測 約 14 ms) |
+| チャンネル | 多チャンネル・スピーカー配置(サラウンド)対応 | **ステレオのみ**(2 in / 2 out) |
+| デバイスのサンプルレート | 指定不可(デバイスのレートへ TD が変換) | 選択可(**システム全体のデバイス設定が変わる**) |
+| バッファサイズ / 排他(hog)モード | なし | あり |
+| 選択したデバイスが抜かれたとき | (未比較) | 黙って別デバイスへ切り替えずエラーで止まる |
+| 出力 | なし | 実際に鳴った音のモニタコピー。Info CHOP に位置 / 先読み量 / デバイスレート |
+
+普段の TouchDesigner の音・多チャンネル・スピーカー配置が要るなら **Audio Device Out**。
+重いフレームでもファイルを途切れさせたくない・デバイスまでの遅延を最小にしたい・
+デバイス自体(レート / バッファ / 排他)を制御したいなら **CoreAudio Out**。
 
 ### パラメータ
 
