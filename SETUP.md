@@ -49,7 +49,16 @@ grep -m1 'OP_CommonAPIVersion = ' \
   /Applications/TouchDesigner.app/Contents/Resources/tfs/Samples/CPlusPlus/CHOP/CPlusPlus_Common.h
 ```
 
-この2つが一致しない環境では、**そのマシンでビルドし直す**のが唯一の解。
+**互換は一方向**(2026-10-20 実測):
+
+| ビルドした SDK | 2025.32280 の TD(common=1) | 2025.33070 の TD(common=2) |
+|---|---|---|
+| common=1(32280 の SDK) | 読める | **読める**(67種を新規作成・パラメータ生成・描画まで確認) |
+| common=2(33070 の SDK) | **拒否**(invalid opType name) | 読める |
+
+TD は自分が受け付ける common の範囲(Min〜Max)をプラグインへ渡しており、新しい TD は古い common も
+受け付ける。したがって**対応したい最も古い TD の SDK でビルドすれば、それより新しい TD でも動く**。
+逆に新しい SDK でビルドすると古い TD が全滅する。拒否されたら、その TD の SDK でビルドし直す。
 
 #### TD を複数入れている場合は `TD_APP` で SDK を選ぶ
 

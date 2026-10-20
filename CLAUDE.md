@@ -8605,3 +8605,26 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
   **ステレオのみ**)、デバイスレート・バッファ・排他の制御可否、抜線時の挙動、出力の有無。
   最後に「どちらを使うか」の指針を1段落
 - Audio Device Out の抜線時の挙動は**実測していない**ので「未比較」と書いた(推測を表に入れない)
+
+### 2026-10-20 環境の変化を確認 + TD 33070 が common=1 のプラグインを読めると実測
+
+- 前回(9/22)から: macOS 27.0 → **27.2(26B118)**。SDK 27.0 / Xcode 27.0(27A266a)/ Swift 6.4 /
+  **Metal Toolchain は installed のまま**でビルド環境は無事。`xcode-select` は Xcode.app を指している
+- **`/Applications/TouchDesigner_2.app`(2025.32280・common=1)が無くなっていた。**
+  残るのは `TouchDesigner.app` 2025.33070(common=2)だけ。常設 Plugins の90個は全て common=1
+- **33070 は common=1 のプラグインを読める(実測)**: demo.toe の**コピー**(scratchpad)を 33070 で開き、
+  demo に出てくるカスタムOP 67種を新規 create → force cook。**67種すべてパラメータが生成され、
+  プラグイン読み込みエラー0件**。CoreText TOP は実際に文字を描画した。承認ダイアログも出なかった
+  - SDK の `checkAPIVersionSupported(version, Min, Max)` は TD が渡す範囲で判定する。
+    33070 は Min に common=1 を含めている = **互換は一方向**(新しい TD は古い common を読む・
+    古い TD は新しい common を拒否する。2026-08-07 の事故は後者)
+  - demo のコンテナは allowCooking=False なので、**既存ノードのエラー有無を見ても判定できない**
+    (cook されず何も出ない)。新規 create して cook させるのが確実
+  - リポジトリの demo.toe には触れていない(未コミットの 9/22 04:54 の変更はそのまま)。
+    Plugins.json も変化なし
+- **影響**: リリースを common=1 でビルドすれば 32280 と 33070 の両方で動く。common=2 で切ると
+  32280 以前は全滅する。**ところが 32280 の SDK がこの機から消えたので、今ビルドすると自動的に
+  common=2 になる**(`release.sh verify` も TD_APP の SDK に合わせて common=2 を期待する)
+  → 次のリリース前に、対象とする最古の TD を決め、その SDK を用意する(32280 を
+  `/Applications/TouchDesigner_2.app` として入れ直すのが最短)
+- SETUP.md の「一致しなければビルドし直すのが唯一の解」を、一方向互換の表に書き換えた
