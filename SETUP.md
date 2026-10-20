@@ -36,7 +36,7 @@
 
 ### 2.1 TouchDesigner は**同じビルドを入れる**
 
-現在の基準は **2025.32280**（`defaults read /Applications/TouchDesigner.app/Contents/Info.plist CFBundleVersion` で確認）。
+現在の基準は **2025.33070**(2026-10-20 に 33070 以降だけを対象にすると決定。それ以前の TD は対象外)（`defaults read /Applications/TouchDesigner.app/Contents/Info.plist CFBundleVersion` で確認）。
 
 **バージョンが違うと `OP_CommonAPIVersion` が変わり、片方のマシンでビルドしたプラグインが
 もう片方で「invalid opType name」という原因と無関係に見えるエラーで拒否される。**

@@ -273,8 +273,9 @@ the release build.
 cd VisionPose && ./build.sh      # → VisionPose/build/VisionPoseCHOP.plugin
 ```
 
-Requires Xcode (`clang++`) and TouchDesigner.app (its C++ SDK headers are reused). Runs on
-TouchDesigner 2023 or later. To try a freshly built bundle without restarting, drop a
+Requires Xcode (`clang++`) and TouchDesigner.app (its C++ SDK headers are reused). Build with
+TouchDesigner 2025.33070 or later: a bundle built against an older SDK still loads in newer
+TouchDesigner, but not the other way round. To try a freshly built bundle without restarting, drop a
 `C++ CHOP/TOP/DAT/SOP` and point its Plugin Path at the `.plugin`.
 
 ### 4. If you build with an AI coding agent
@@ -335,7 +336,9 @@ referenced them. The API is not frozen yet.
 
 ## Requirements
 
-- macOS 12+ (Apple Silicon recommended). Some features need a newer macOS — noted in each README.
+- **TouchDesigner 2025.33070 or later.** Older builds reject the plugins with an
+  "invalid opType name" error (the C++ SDK version they accept is older).
+- macOS 26+ (Apple Silicon recommended). Some operators need macOS 27 — noted in each README.
 - Xcode and TouchDesigner.app to build.
 
 ### Non-Commercial TouchDesigner is not well tested

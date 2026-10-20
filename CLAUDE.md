@@ -8628,3 +8628,23 @@ Deadzone 0.15 内で正しく無視。**tox から復元したインスタンス
   → 次のリリース前に、対象とする最古の TD を決め、その SDK を用意する(32280 を
   `/Applications/TouchDesigner_2.app` として入れ直すのが最短)
 - SETUP.md の「一致しなければビルドし直すのが唯一の解」を、一方向互換の表に書き換えた
+
+### 2026-10-20 対象を TouchDesigner 2025.33070 以降に限定(ユーザー判断)+ 全91プラグインを 33070 SDK でビルド
+
+- ユーザー判断: **今後は 33070 以降だけを対象にする**(32280 の SDK を入れ直して common=1 を維持する案は採らない)。
+  次のリリースからバンドルは common=2 になり、**32280 以前の TD では全プラグインが読めない**。
+  リリースノートには「TouchDesigner 2025.33070 以降が必要」と利用者向けに書くこと
+- **全91フォルダを 33070 SDK(既定の TD_APP)でビルド → 91件すべて成功**(並列6・約16分)。
+  成果物99バンドルを apiscan で走査し **全件 common=2・minos 26.0・古い成果物の混入なし**。
+  コンパイラ警告は Swift 側の既存のもの(非同期コンテキストでの NSLock・非 frozen enum の switch・
+  MLDataTable の非推奨)だけで、**TD SDK の更新で壊れた箇所は無かった**
+  - RealityKitCapture の `switch output` に `.requestProgressInfo` / `.stitchingIncomplete` が足りない
+    警告がある(macOS 27 SDK で増えた case)。動作には影響しないが `@unknown default` を入れる余地あり
+- ドキュメント: README(英日)の必要環境に「TouchDesigner 2025.33070 以降」を追加。
+  **ついでに「macOS 12+」を「macOS 26 以降(一部 27)」に訂正**(TD_MIN_MACOS=26.0 なので 12 は誤り)。
+  ソースからビルドの節の「TD 2023 以降」も訂正。SETUP.md の基準を 33070 に
+- **常設 Plugins への入れ替えは未実施**。Plugins.json はプラグインごとにハッシュで承認を記録しており、
+  中身が変わると TD 起動時に New Plugin ダイアログが出る(84件入れ替えると最大84回)。
+  このセッションには画面クリックの手段が無いので、ユーザーが居るときに行う
+  - 常設には第三者製6件(AzureKinect×4 / KinectPlayback / MultiTouchHID)も入っている。入れ替え対象は
+    このリポジトリの84件だけ。experimental で未インストールの15件(AVAudio* / SwiftUI* / Phase 等)は入れない

@@ -272,7 +272,7 @@ TouchDesigner で動かしたいときだけ必要です。
 cd VisionPose && ./build.sh      # → VisionPose/build/VisionPoseCHOP.plugin
 ```
 
-前提: Xcode(`clang++`)と TouchDesigner.app(C++ SDK ヘッダを流用)。実行は TD 2023 系以降。
+前提: Xcode(`clang++`)と TouchDesigner.app(C++ SDK ヘッダを流用)。ビルドには TouchDesigner 2025.33070 以降を使う(古い SDK でビルドしたものは新しい TD でも読めるが、逆は読めない)。
 ビルドしたものを再起動せずに試すには、`C++ CHOP/TOP/DAT/SOP` を置いて
 Plugin Path に `.plugin` を指定します。
 
@@ -332,7 +332,8 @@ ln -s "$PWD/.claude/skills/td-apple-ops" ~/.claude/skills/td-apple-ops
 
 ## 必要環境
 
-- macOS 12+(Apple Silicon 推奨)。一部の機能はより新しい macOS を要求(各 README に明記)
+- **TouchDesigner 2025.33070 以降。** それより古い TD はプラグインを「invalid opType name」というエラーで拒否する(受け付ける C++ SDK のバージョンが古いため)
+- macOS 26 以降(Apple Silicon 推奨)。macOS 27 が必要な op もある(各 README に明記)
 - ビルドに Xcode と TouchDesigner.app
 
 ### TouchDesigner Non-Commercial では検証が不十分です
